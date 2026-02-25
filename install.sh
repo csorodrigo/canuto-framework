@@ -98,7 +98,6 @@ fetch_content() {
 
 # ── File lists ─────────────────────────────────────────────────────────
 
-# Core files: always updated on install and --update
 FRAMEWORK_FILES=(
   ".agents/personas/maestro.md"
   ".agents/personas/architect.md"
@@ -122,7 +121,6 @@ FRAMEWORK_FILES=(
   ".agents/SPEC.md"
 )
 
-# Files only copied on fresh install (never overwrite user data)
 INSTALL_ONLY_FILES=(
   ".agents/memory/last-session.md"
   ".agents/memory/decisions.md"
@@ -131,7 +129,6 @@ INSTALL_ONLY_FILES=(
 )
 
 # ── merge_claude_md ─────────────────────────────────────────────────────────
-# Creates CLAUDE.md if missing; merges only missing sections if it exists.
 merge_claude_md() {
   if [ ! -f "$CLAUDE_MD" ]; then
     download "CLAUDE.md" "$CLAUDE_MD"
@@ -170,6 +167,7 @@ SECTION
     cat >> "$CLAUDE_MD" << 'SECTION'
 
 ## Project Rules
+- Before finalizing any plan, always interview the user in detail using AskUserQuestion about implementation choices, UI/UX decisions, trade-offs, and concerns. Never assume — always ask first.
 - Read any .context.md and docs/FEATURE-MAP.md files if they exist.
 - If they do not exist, have the Contextualizer create them (with approval).
 - Never run Git or shell commands without explicit confirmation.
@@ -305,15 +303,12 @@ if [ "$MODE" = "install" ]; then
     ok "$file"
   done
 
-  # plugins/ directory
   mkdir -p ".agents/plugins"
   touch ".agents/plugins/.gitkeep"
   ok ".agents/plugins/ (empty, ready for plugins)"
 
-  # CLAUDE.md: create or merge missing sections
   merge_claude_md
 
-  # Git commit
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
     log "Staging files for git..."
@@ -322,7 +317,7 @@ if [ "$MODE" = "install" ]; then
     read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Commit now? [Y/n] ")" COMMIT_ANSWER
     COMMIT_ANSWER="${COMMIT_ANSWER:-Y}"
     if [[ "$COMMIT_ANSWER" =~ ^[Yy]$ ]]; then
-      git commit -m "chore: add Canuto Framework v1.2"
+      git commit -m "chore: add Canuto Framework v1.3"
       ok "Committed!"
     else
       warn "Files staged but not committed. Run 'git commit' when ready."
@@ -360,10 +355,8 @@ if [ "$MODE" = "update" ]; then
     ok "updated: $file"
   done
 
-  # CLAUDE.md: merge any missing sections (never overwrite)
   merge_claude_md
 
-  # Git commit
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
     log "Staging updated files..."
@@ -372,7 +365,7 @@ if [ "$MODE" = "update" ]; then
     read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Commit now? [Y/n] ")" COMMIT_ANSWER
     COMMIT_ANSWER="${COMMIT_ANSWER:-Y}"
     if [[ "$COMMIT_ANSWER" =~ ^[Yy]$ ]]; then
-      git commit -m "chore: update Canuto Framework to v1.2"
+      git commit -m "chore: update Canuto Framework to v1.3"
       ok "Committed!"
     else
       warn "Files staged but not committed. Run 'git commit' when ready."
@@ -381,7 +374,7 @@ if [ "$MODE" = "update" ]; then
 
   echo ""
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
-  echo -e "${GREEN}  Framework updated to v1.2 successfully.${RESET}"
+  echo -e "${GREEN}  Framework updated to v1.3 successfully.${RESET}"
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
   echo ""
 fi
