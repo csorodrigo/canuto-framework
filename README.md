@@ -42,20 +42,47 @@ Maestro → Architect → Coder → Tester → Reviewer
                              Debugger → Coder (fix) → Tester (re-run)
 ```
 
-## How to Use
+## Installation
 
-1. Copy `.agents/` folder to your project root.
-2. Add the `CLAUDE.md` template (see below) to your project root.
-3. Open the project in Claude Code (or any compatible AI tool).
-4. The Maestro will:
-   - Load memory and present a session briefing.
-   - Detect project style (Canuto / foreign-schema / new).
-   - Bootstrap context files if needed (via Contextualizer).
-   - Orchestrate the appropriate personas for your task.
+### Projeto existente — fresh install
+
+Na raiz do seu projeto:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash
+```
+
+O script:
+- Baixa todas as personas e skills
+- Cria os arquivos de memória (last-session, decisions, pending, metrics)
+- Cria o `CLAUDE.md` se não existir (preserva se já existir)
+- Oferece commit ao final
+
+### Atualizar o framework num projeto existente
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --update
+```
+
+O `--update` **nunca sobrescreve** `memory/`, `plugins/`, ou `CLAUDE.md` — só atualiza personas e skills.
+
+### Projeto novo (via GitHub Template)
+
+Clica em **"Use this template"** no topo do repositório.
+
+---
+
+## Como Funciona
+
+Após a instalação, abre o projeto em Claude Code. O Maestro vai:
+- Carregar a memória e apresentar o briefing da sessão.
+- Detectar o estilo do projeto (Canuto / foreign-schema / novo).
+- Fazer o bootstrap dos context files se necessário (via Contextualizer).
+- Orquestrar as personas para a sua tarefa.
 
 ## CLAUDE.md Template
 
-Place this at the root of each project:
+Coloca isso na raiz de cada projeto (o install.sh cria automaticamente se não existir):
 
 ```markdown
 # Project AI Setup
@@ -93,9 +120,9 @@ You are my coding orchestrator for this repository.
 
 **Session memory**: The `memory/` folder persists context between sessions, reducing token usage and preventing rework.
 
-**Plugins**: Optional extensions in `.agents/plugins/` that add new personas, skills, or templates without modifying core files.
+**Plugins**: Optional extensions in `.agents/plugins/` that add personas, skills, or templates without touching core files.
 
-**Multi-provider**: Maestro can delegate tier-2 personas (Coder, Tester, etc.) to Codex or GLM while keeping strategic decisions on Claude.
+**Multi-provider**: Maestro pode delegar personas tier-2 (Coder, Tester, etc.) para Codex ou GLM enquanto mantém decisões estratégicas no Claude.
 
 ## Design Principles
 
