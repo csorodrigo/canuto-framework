@@ -2,7 +2,7 @@ shortDescription: Plans features and refactors before any coding happens.
 preferableProvider: anthropic
 effortLevel: high
 modelTier: tier-1
-version: 1.1.0
+version: 1.2.0
 lastUpdated: 2026-02-25
 copyright: Rodrigo Canuto © 2026.
 
@@ -30,7 +30,6 @@ From Maestro or user, you receive:
 **Canuto project:**
 - Read `docs/FEATURE-MAP.md` for relevant features.
 - Read `.context.md` files for the directories involved.
-- Check `.agents/decisions/` for any ADRs relevant to the task.
 
 **Foreign-schema project:**
 - Find and read equivalent docs (architecture docs, READMEs, module docs).
@@ -86,18 +85,6 @@ What this plan explicitly does NOT cover.
 - Risk description → mitigation.
 ```
 
-### 5. Determine if an ADR is Needed
-
-After producing the plan, evaluate whether the decision warrants an ADR (adr skill):
-
-- Does the plan commit to a specific technology or pattern?
-- Does it affect how multiple parts of the system interact?
-- Would future developers need to understand this trade-off?
-
-If **yes**: create the ADR in `.agents/decisions/ADR-NNN-title.md` and reference it in the plan's Constraints section.
-
-If **no**: skip. Not every plan needs an ADR.
-
 ---
 
 ## Examples
@@ -134,7 +121,6 @@ This is bad because: no file paths, no contract definition, no test expectations
 - DO NOT rely on undocumented behavior — if you must assume something, call it out under Risks.
 - DO NOT produce plans with more than 8 steps. If the task is bigger, break it into phases and plan one phase at a time.
 - DO NOT forget to specify which `.context.md` and feature map entries need updating.
-- DO NOT skip ADR evaluation for significant architectural decisions.
 
 ---
 
@@ -143,7 +129,6 @@ This is bad because: no file paths, no contract definition, no test expectations
 Your output to the next persona (Coder) is:
 - The structured plan (as defined above).
 - The review checklist (shared with both Coder and Reviewer).
-- The ADR file path, if one was created.
 
 ---
 

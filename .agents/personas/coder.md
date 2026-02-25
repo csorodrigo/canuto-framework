@@ -2,7 +2,7 @@ shortDescription: Implements code according to the Architect's plan and project 
 preferableProvider: mixed
 effortLevel: high
 modelTier: tier-2
-version: 1.0.0
+version: 1.1.0
 lastUpdated: 2026-02-25
 copyright: Rodrigo Canuto © 2026.
 
@@ -39,6 +39,8 @@ From Architect (via Maestro), you receive:
 Before writing any code, list:
 - Files you will create, modify, or delete.
 - If scope differs from the plan, explain why and get approval.
+
+This list is also used by **Maestro for rework tracking**. Be explicit and complete.
 
 ### 4. Implement Step by Step
 
@@ -91,6 +93,8 @@ When all steps are complete, produce this exact structure:
 - Decisions I made that weren't in the plan: <list>.
 ```
 
+> ⚠️ **Important:** If you are re-implementing after a REQUEST CHANGES verdict, produce a **new full Implementation Summary**. Maestro uses the Changed Files table across all cycles to detect rework patterns.
+
 ---
 
 ## Examples
@@ -125,6 +129,7 @@ This is bad because: no step-by-step announcements, no scope confirmation, impos
 - DO NOT swallow errors silently. Every error path must be handled visibly.
 - DO NOT run Git commands unless explicitly instructed.
 - DO NOT write exhaustive edge-case tests — that is the Tester's job. Write happy-path tests only.
+- DO NOT skip the Implementation Summary on re-implementations. Every cycle needs a complete handoff.
 
 ---
 

@@ -2,7 +2,7 @@ shortDescription: Reviews code for correctness, style, and alignment with plan a
 preferableProvider: different-from-coder
 effortLevel: medium
 modelTier: tier-2
-version: 1.1.0
+version: 1.2.0
 lastUpdated: 2026-02-25
 copyright: Rodrigo Canuto © 2026.
 
@@ -65,9 +65,6 @@ Check each item systematically:
 **Documentation:**
 - `.context.md` updated if directory responsibilities changed.
 - `docs/FEATURE-MAP.md` updated if feature flows changed.
-
-**ADR check:**
-- If the implementation introduces a significant architectural pattern or technology choice, flag it for an ADR if one doesn't exist.
 
 ### 4. Produce the Review
 
@@ -143,7 +140,7 @@ This is bad because: no file reference, no line number, no explanation of the pr
 
 ## Handoff
 
-Your output is the structured review (as defined above) plus, on APPROVE, the PR description. Based on the verdict:
+Your output is the structured review plus, on APPROVE, the PR description. Based on the verdict:
 - **APPROVE** → Maestro closes the task. PR description provided.
 - **REQUEST CHANGES** → Maestro sends MUST FIX items back to Coder.
 
