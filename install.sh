@@ -6,7 +6,7 @@
 #   Local run:        bash install.sh
 #   Update only:      bash install.sh --update
 #   Check versions:   bash install.sh --check
-#   Install a skill:  bash install.sh --skill adr --skill pr-description
+#   Install a skill:  bash install.sh --skill pr-description --skill health-check
 # =============================================================================
 
 set -euo pipefail
@@ -98,7 +98,7 @@ fetch_content() {
 
 # ── File lists ─────────────────────────────────────────────────────────
 
-# Files to always copy on install/update (personas + skills)
+# Core files: always updated on install and --update
 FRAMEWORK_FILES=(
   ".agents/personas/maestro.md"
   ".agents/personas/architect.md"
@@ -117,9 +117,7 @@ FRAMEWORK_FILES=(
   ".agents/skills/multi-provider.md"
   ".agents/skills/metrics.md"
   ".agents/skills/squads.md"
-  ".agents/skills/session-goals.md"
   ".agents/skills/pr-description.md"
-  ".agents/skills/adr.md"
   ".agents/skills/health-check.md"
   ".agents/SPEC.md"
 )
@@ -264,7 +262,7 @@ if [ "$MODE" = "skill" ]; then
       ok "Installed: $skill_file"
       INSTALLED+=("$skill_name")
     else
-      warn "Skill '$skill_name' not found in registry. Check registry.md for available skills."
+      warn "Skill '$skill_name' not found. Check registry.md for available skills."
     fi
   done
 
@@ -307,11 +305,6 @@ if [ "$MODE" = "install" ]; then
     ok "$file"
   done
 
-  # decisions/ directory for ADRs
-  mkdir -p ".agents/decisions"
-  touch ".agents/decisions/.gitkeep"
-  ok ".agents/decisions/ (ready for ADRs)"
-
   # plugins/ directory
   mkdir -p ".agents/plugins"
   touch ".agents/plugins/.gitkeep"
@@ -329,7 +322,7 @@ if [ "$MODE" = "install" ]; then
     read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Commit now? [Y/n] ")" COMMIT_ANSWER
     COMMIT_ANSWER="${COMMIT_ANSWER:-Y}"
     if [[ "$COMMIT_ANSWER" =~ ^[Yy]$ ]]; then
-      git commit -m "chore: add Canuto Framework v1.1"
+      git commit -m "chore: add Canuto Framework v1.2"
       ok "Committed!"
     else
       warn "Files staged but not committed. Run 'git commit' when ready."
@@ -367,10 +360,6 @@ if [ "$MODE" = "update" ]; then
     ok "updated: $file"
   done
 
-  # Ensure decisions/ directory exists (new in v1.1)
-  mkdir -p ".agents/decisions"
-  [ ! -f ".agents/decisions/.gitkeep" ] && touch ".agents/decisions/.gitkeep" && ok ".agents/decisions/ created"
-
   # CLAUDE.md: merge any missing sections (never overwrite)
   merge_claude_md
 
@@ -378,12 +367,12 @@ if [ "$MODE" = "update" ]; then
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
     log "Staging updated files..."
-    git add "$AGENTS_DIR/personas/" "$AGENTS_DIR/skills/" "$AGENTS_DIR/SPEC.md" "$AGENTS_DIR/decisions/" "$CLAUDE_MD" 2>/dev/null || true
+    git add "$AGENTS_DIR/personas/" "$AGENTS_DIR/skills/" "$AGENTS_DIR/SPEC.md" "$CLAUDE_MD" 2>/dev/null || true
     echo ""
     read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Commit now? [Y/n] ")" COMMIT_ANSWER
     COMMIT_ANSWER="${COMMIT_ANSWER:-Y}"
     if [[ "$COMMIT_ANSWER" =~ ^[Yy]$ ]]; then
-      git commit -m "chore: update Canuto Framework to v1.1"
+      git commit -m "chore: update Canuto Framework to v1.2"
       ok "Committed!"
     else
       warn "Files staged but not committed. Run 'git commit' when ready."
@@ -392,7 +381,7 @@ if [ "$MODE" = "update" ]; then
 
   echo ""
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
-  echo -e "${GREEN}  Framework updated to v1.1 successfully.${RESET}"
+  echo -e "${GREEN}  Framework updated to v1.2 successfully.${RESET}"
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
   echo ""
 fi

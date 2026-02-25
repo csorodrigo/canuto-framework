@@ -6,42 +6,47 @@
 
 ---
 
-## Official Skills
+## Core Skills (installed by default)
 
-These skills ship with the framework and are installed by default.
+These skills ship with every install and update automatically.
 
-| Name | Description | File | Tags |
-|------|-------------|------|------|
-| `context-maintenance` | How to maintain `.context.md` and `FEATURE-MAP.md` | `.agents/skills/context-maintenance.md` | core, documentation |
-| `api-design` | How to design and evolve HTTP/JSON APIs | `.agents/skills/api-design.md` | core, backend |
-| `frontend-implementation` | How to implement frontend features | `.agents/skills/frontend-implementation.md` | core, frontend |
-| `cli-usage` | How to safely use CLI commands and scripts | `.agents/skills/cli-usage.md` | core, devops |
-| `security-practices` | Rules for secrets, env vars, and security hygiene | `.agents/skills/security-practices.md` | core, security |
-| `git-workflow` | Branching, commits, and PR conventions | `.agents/skills/git-workflow.md` | core, workflow |
-| `plugin-system` | How to create and manage opt-in plugins | `.agents/skills/plugin-system.md` | core, extensibility |
-| `multi-provider` | How Maestro delegates to Claude, Codex, GLM | `.agents/skills/multi-provider.md` | core, orchestration |
-| `metrics` | Quality, velocity, and compliance tracking | `.agents/skills/metrics.md` | core, analytics |
-| `squads` | Parallel domain-based workstreams | `.agents/skills/squads.md` | core, orchestration |
-| `session-goals` | Track session goals with completion status | `.agents/skills/session-goals.md` | workflow, productivity |
-| `pr-description` | Auto-generate PR descriptions after review | `.agents/skills/pr-description.md` | workflow, git |
-| `adr` | Architecture Decision Records with structured templates | `.agents/skills/adr.md` | architecture, documentation |
-| `health-check` | Diagnose framework setup integrity | `.agents/skills/health-check.md` | devops, diagnostics |
+| Name | Description | Tags |
+|------|-------------|------|
+| `context-maintenance` | How to maintain `.context.md` and `FEATURE-MAP.md` | documentation |
+| `api-design` | How to design and evolve HTTP/JSON APIs | backend |
+| `frontend-implementation` | How to implement frontend features | frontend |
+| `cli-usage` | How to safely use CLI commands and scripts | devops |
+| `security-practices` | Rules for secrets, env vars, and security hygiene | security |
+| `git-workflow` | Branching, commits, and PR conventions | workflow |
+| `plugin-system` | How to create and manage opt-in plugins | extensibility |
+| `multi-provider` | How Maestro delegates to Claude, Codex, GLM | orchestration |
+| `metrics` | Quality, velocity, compliance, and rework tracking | analytics |
+| `squads` | Parallel domain-based workstreams | orchestration |
+| `pr-description` | Auto-generate PR descriptions after review | workflow |
+| `health-check` | Diagnose framework setup integrity | diagnostics |
 
 ---
 
-## Installing a Specific Skill
+## Optional Skills (install on demand)
 
-If you removed a skill or want to add one from the registry:
+Useful in specific project types. Install with `bash install.sh --skill <name>`.
+
+| Name | Description | Best for | Tags |
+|------|-------------|----------|------|
+| `session-goals` | Track session goals explicitly in a separate skill file | Teams or highly structured workflows | productivity |
+| `adr` | Architecture Decision Records | Long-lived projects with multiple contributors | architecture |
+
+---
+
+## Installing an Optional Skill
 
 ```bash
-# Install a single skill
+# Single skill
 bash install.sh --skill adr
 
-# Install multiple skills
-bash install.sh --skill adr --skill pr-description --skill session-goals
+# Multiple skills
+bash install.sh --skill adr --skill session-goals
 ```
-
-The installer downloads the skill file to `.agents/skills/` and offers a git commit.
 
 ---
 
@@ -49,11 +54,10 @@ The installer downloads the skill file to `.agents/skills/` and offers a git com
 
 > None yet. Be the first to contribute!
 
-To contribute a skill:
+To contribute:
 1. Fork [csorodrigo/canuto-framework](https://github.com/csorodrigo/canuto-framework)
 2. Add your skill file to `.agents/skills/`
-3. Add an entry below (name, description, file, author, tags)
-4. Open a PR
+3. Add an entry below and open a PR
 
 | Name | Description | File | Author | Tags |
 |------|-------------|------|--------|------|
