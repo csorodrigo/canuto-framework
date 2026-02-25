@@ -18,7 +18,7 @@ TMP_DIR=$(mktemp -d)
 MODE="auto" # auto | install | update | check | skill
 SKILLS_TO_INSTALL=()
 
-# ── Colors ─────────────────────────────────────────────────────────
+# ── Colors ─────────────────────────────────────────────────────────────────
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
@@ -30,7 +30,7 @@ ok()     { echo -e "${GREEN}[canuto]${RESET} \u2713 $1"; }
 warn()   { echo -e "${YELLOW}[canuto]${RESET} \u26a0 $1"; }
 error()  { echo -e "${RED}[canuto]${RESET} \u2717 $1"; exit 1; }
 
-# ── Parse args ─────────────────────────────────────────────────────────
+# ── Parse args ──────────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
   case $1 in
     --update) MODE="update" ;;
@@ -43,7 +43,7 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-# ── Detect mode ─────────────────────────────────────────────────────────
+# ── Detect mode ──────────────────────────────────────────────────────────────
 if [ "$MODE" = "auto" ]; then
   if [ "${#SKILLS_TO_INSTALL[@]}" -gt 0 ]; then
     MODE="skill"
@@ -54,7 +54,7 @@ if [ "$MODE" = "auto" ]; then
   fi
 fi
 
-# ── Confirm not running in the framework repo itself ───────────────────────
+# ── Confirm not running in the framework repo itself ────────────────────────
 if [ -f ".agents/SPEC.md" ] && grep -q "Canuto Framework" ".agents/SPEC.md" 2>/dev/null; then
   if [ ! -f "src/index.js" ] && [ ! -f "src/main.py" ] && [ ! -f "package.json" ]; then
     warn "This looks like the canuto-framework repo itself. Aborting."
@@ -62,7 +62,7 @@ if [ -f ".agents/SPEC.md" ] && grep -q "Canuto Framework" ".agents/SPEC.md" 2>/d
   fi
 fi
 
-# ── Check git availability ──────────────────────────────────────────────────────
+# ── Check git availability ──────────────────────────────────────────────────
 if ! git rev-parse --git-dir > /dev/null 2>&1; then
   warn "Not a git repository. Files will be copied but not committed."
   GIT_AVAILABLE=false
@@ -96,7 +96,7 @@ fetch_content() {
   fi
 }
 
-# ── File lists ─────────────────────────────────────────────────────────
+# ── File lists ──────────────────────────────────────────────────────────────
 
 FRAMEWORK_FILES=(
   ".agents/personas/maestro.md"
@@ -129,6 +129,9 @@ INSTALL_ONLY_FILES=(
 )
 
 # ── merge_claude_md ─────────────────────────────────────────────────────────
+# Creates CLAUDE.md if missing.
+# If it exists: adds missing top-level sections AND patches missing rules
+# inside existing sections. Safe to run multiple times (idempotent).
 merge_claude_md() {
   if [ ! -f "$CLAUDE_MD" ]; then
     download "CLAUDE.md" "$CLAUDE_MD"
@@ -136,9 +139,10 @@ merge_claude_md() {
     return
   fi
 
-  log "$CLAUDE_MD already exists — checking for missing framework sections..."
+  log "$CLAUDE_MD already exists — checking for missing sections and rules..."
   local appended=0
 
+  # ── Section: ## Framework ──────────────────────────────────────────────
   if ! grep -q "^## Framework" "$CLAUDE_MD" 2>/dev/null; then
     cat >> "$CLAUDE_MD" << 'SECTION'
 
@@ -151,6 +155,7 @@ SECTION
     appended=1
   fi
 
+  # ── Section: ## Preferences ────────────────────────────────────────────
   if ! grep -q "^## Preferences" "$CLAUDE_MD" 2>/dev/null; then
     cat >> "$CLAUDE_MD" << 'SECTION'
 
@@ -163,7 +168,9 @@ SECTION
     appended=1
   fi
 
+  # ── Section: ## Project Rules ──────────────────────────────────────────
   if ! grep -q "^## Project Rules" "$CLAUDE_MD" 2>/dev/null; then
+    # Section missing entirely — add the full block
     cat >> "$CLAUDE_MD" << 'SECTION'
 
 ## Project Rules
@@ -173,10 +180,23 @@ SECTION
 - Never run Git or shell commands without explicit confirmation.
 - When in doubt, ask questions instead of guessing.
 SECTION
-    ok "  added: ## Project Rules"
+    ok "  added: ## Project Rules (full block)"
     appended=1
+  else
+    # Section exists — patch individual missing rules
+    if ! grep -q "AskUserQuestion" "$CLAUDE_MD" 2>/dev/null; then
+      # Insert planning-interview rule as first item under ## Project Rules
+      awk '/^## Project Rules/{
+        print
+        print "- Before finalizing any plan, always interview the user in detail using AskUserQuestion about implementation choices, UI/UX decisions, trade-offs, and concerns. Never assume \342\200\224 always ask first."
+        next
+      }1' "$CLAUDE_MD" > "${CLAUDE_MD}.tmp" && mv "${CLAUDE_MD}.tmp" "$CLAUDE_MD"
+      ok "  patched: planning-interview rule added to ## Project Rules"
+      appended=1
+    fi
   fi
 
+  # ── Section: ## On Session Start ───────────────────────────────────────
   if ! grep -q "^## On Session Start" "$CLAUDE_MD" 2>/dev/null; then
     cat >> "$CLAUDE_MD" << 'SECTION'
 
@@ -191,13 +211,13 @@ SECTION
   fi
 
   if [ "$appended" -eq 1 ]; then
-    ok "$CLAUDE_MD — missing sections added automatically"
+    ok "$CLAUDE_MD — updated (missing sections/rules added)"
   else
-    ok "$CLAUDE_MD — all framework sections already present, nothing to do"
+    ok "$CLAUDE_MD — already up to date, nothing to do"
   fi
 }
 
-# ── CHECK ──────────────────────────────────────────────────────────────
+# ── CHECK ───────────────────────────────────────────────────────────────────
 if [ "$MODE" = "check" ]; then
   echo ""
   echo -e "${CYAN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
@@ -243,7 +263,7 @@ if [ "$MODE" = "check" ]; then
   exit 0
 fi
 
-# ── SKILL INSTALL ─────────────────────────────────────────────────────────
+# ── SKILL INSTALL ───────────────────────────────────────────────────────────
 if [ "$MODE" = "skill" ]; then
   echo ""
   echo -e "${CYAN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
@@ -283,7 +303,7 @@ if [ "$MODE" = "skill" ]; then
   exit 0
 fi
 
-# ── INSTALL ──────────────────────────────────────────────────────────────
+# ── INSTALL ─────────────────────────────────────────────────────────────────
 if [ "$MODE" = "install" ]; then
   echo ""
   echo -e "${CYAN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
@@ -332,7 +352,7 @@ if [ "$MODE" = "install" ]; then
   echo ""
 fi
 
-# ── UPDATE ──────────────────────────────────────────────────────────────
+# ── UPDATE ───────────────────────────────────────────────────────────────────
 if [ "$MODE" = "update" ]; then
   echo ""
   echo -e "${CYAN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
@@ -379,5 +399,5 @@ if [ "$MODE" = "update" ]; then
   echo ""
 fi
 
-# ── Cleanup ──────────────────────────────────────────────────────────────
+# ── Cleanup ──────────────────────────────────────────────────────────────────
 rm -rf "$TMP_DIR"
