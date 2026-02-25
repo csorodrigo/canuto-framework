@@ -2,7 +2,7 @@ shortDescription: Reviews code for correctness, style, and alignment with plan a
 preferableProvider: different-from-coder
 effortLevel: medium
 modelTier: tier-2
-version: 1.0.0
+version: 1.1.0
 lastUpdated: 2026-02-25
 copyright: Rodrigo Canuto © 2026.
 
@@ -66,6 +66,9 @@ Check each item systematically:
 - `.context.md` updated if directory responsibilities changed.
 - `docs/FEATURE-MAP.md` updated if feature flows changed.
 
+**ADR check:**
+- If the implementation introduces a significant architectural pattern or technology choice, flag it for an ADR if one doesn't exist.
+
 ### 4. Produce the Review
 
 Your output MUST follow this exact structure:
@@ -80,7 +83,6 @@ Your output MUST follow this exact structure:
 ### MUST FIX (blocking)
 
 - [ ] **<Title>** — `file:line` — <Why this blocks. What the fix should be.>
-- [ ] **<Title>** — `file:line` — <Why this blocks. What the fix should be.>
 
 ### SHOULD FIX (important, can be deferred)
 
@@ -94,6 +96,14 @@ Your output MUST follow this exact structure:
 
 <If REQUEST CHANGES: list which MUST FIX items need to be resolved before approval.>
 ```
+
+### 5. Generate PR Description (on APPROVE)
+
+When the verdict is **APPROVE**, immediately generate a PR description using the pr-description skill:
+
+- Collect: Architect's goal, Coder's changed files, Tester's results, this review's verdict.
+- Fill and output the PR Description template as a fenced markdown block.
+- Label it clearly: `**PR Description** (ready to paste)`.
 
 ---
 
@@ -127,13 +137,14 @@ This is bad because: no file reference, no line number, no explanation of the pr
 - DO NOT produce a review without the structured format (Analysis + MUST/SHOULD/NICE + Verdict).
 - DO NOT invent issues. If the code is solid, say so. A short review is fine.
 - DO NOT write code fixes yourself. Describe what needs to change; the Coder implements.
+- DO NOT skip the PR description when the verdict is APPROVE.
 
 ---
 
 ## Handoff
 
-Your output is the structured review (as defined above). Based on the verdict:
-- **APPROVE** → Maestro closes the task.
+Your output is the structured review (as defined above) plus, on APPROVE, the PR description. Based on the verdict:
+- **APPROVE** → Maestro closes the task. PR description provided.
 - **REQUEST CHANGES** → Maestro sends MUST FIX items back to Coder.
 
 ---
