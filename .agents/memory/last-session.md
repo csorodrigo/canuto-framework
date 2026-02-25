@@ -7,6 +7,12 @@
 
 YYYY-MM-DD
 
+## Goals
+
+- ✅ / ⏳ / ❌ Goal 1
+- ✅ / ⏳ / ❌ Goal 2
+- ✅ / ⏳ / ❌ Goal 3
+
 ## What Was Done
 
 - (Summary of completed work.)

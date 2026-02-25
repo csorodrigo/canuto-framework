@@ -1,4 +1,4 @@
-# Canuto Framework v1.0
+# Canuto Framework v1.1
 
 Personal multi-agent framework for AI-assisted development. Claude-first, provider-agnostic.
 
@@ -12,7 +12,7 @@ Personal multi-agent framework for AI-assisted development. Claude-first, provid
     coder.md            — Implementer. Writes code following the Architect's plan.
     tester.md           — QA. Focuses on edge cases, error scenarios, coverage gaps.
     debugger.md         — Diagnostician. Investigates test failures and root causes.
-    reviewer.md         — Quality gate. Reviews code for correctness and plan alignment.
+    reviewer.md         — Quality gate. Reviews code + generates PR descriptions.
     contextualizer.md   — Knowledge engine. Scans code and maintains context files.
   skills/
     context-maintenance.md    — How to maintain .context.md and FEATURE-MAP.md.
@@ -23,15 +23,21 @@ Personal multi-agent framework for AI-assisted development. Claude-first, provid
     git-workflow.md           — Branching, commits, and PR conventions (opt-in).
     plugin-system.md          — How to create and manage opt-in plugins.
     multi-provider.md         — How Maestro delegates to Claude, Codex, GLM.
-    metrics.md                — Quality, velocity, and compliance tracking.
+    metrics.md                — Quality, velocity, compliance, and rework tracking.
     squads.md                 — Parallel workstreams for larger projects.
+    session-goals.md          — Track session goals with completion status.
+    pr-description.md         — Auto-generate PR descriptions after review.
+    adr.md                    — Architecture Decision Records with structured templates.
+    health-check.md           — Diagnose framework setup integrity on demand.
   memory/
-    last-session.md     — Summary of the last session (overwritten each time).
+    last-session.md     — Summary + goals of the last session (overwritten each time).
     decisions.md        — Append-only log of architectural/business decisions.
     pending.md          — Unfinished tasks from previous sessions.
     metrics.md          — Append-only session metrics log.
+  decisions/            — ADR files: ADR-001-title.md, ADR-002-title.md, ...
   plugins/              — Opt-in plugin extensions (see plugin-system skill).
   SPEC.md               — Full specification and design decisions.
+registry.md             — Skill registry for community and official skills.
 ```
 
 ## Standard Flow
@@ -55,16 +61,40 @@ curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/in
 O script:
 - Baixa todas as personas e skills
 - Cria os arquivos de memória (last-session, decisions, pending, metrics)
-- Cria o `CLAUDE.md` se não existir (preserva se já existir)
+- Cria `.agents/decisions/` para ADRs
+- Cria o `CLAUDE.md` se não existir, ou adiciona as seções faltando se já existir
 - Oferece commit ao final
 
 ### Atualizar o framework num projeto existente
+
+```bash
+bash install.sh --update
+```
+
+Ou via curl:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --update
 ```
 
 O `--update` **nunca sobrescreve** `memory/`, `plugins/`, ou `CLAUDE.md` — só atualiza personas e skills.
+
+### Verificar se está atualizado
+
+```bash
+bash install.sh --check
+```
+
+Lista cada arquivo com seu status: `✓ OK`, `⚠ OUTDATED`, ou `✗ MISSING`.
+
+### Instalar uma skill extra
+
+```bash
+bash install.sh --skill adr
+bash install.sh --skill adr --skill pr-description
+```
+
+Veja `registry.md` para a lista completa de skills disponíveis.
 
 ### Projeto novo (via GitHub Template)
 
@@ -74,15 +104,14 @@ Clica em **"Use this template"** no topo do repositório.
 
 ## Como Funciona
 
-Após a instalação, abre o projeto em Claude Code. O Maestro vai:
-- Carregar a memória e apresentar o briefing da sessão.
-- Detectar o estilo do projeto (Canuto / foreign-schema / novo).
-- Fazer o bootstrap dos context files se necessário (via Contextualizer).
-- Orquestrar as personas para a sua tarefa.
+Após a instalação, abre o projeto em Claude. O Maestro vai:
+1. Carregar a memória e apresentar o briefing da sessão.
+2. Pedir os objetivos da sessão (até 3 goals).
+3. Detectar o estilo do projeto (Canuto / foreign-schema / novo).
+4. Orquestrar as personas para a sua tarefa.
+5. Ao encerrar: marcar goals, gravar memória, gerar métricas.
 
 ## CLAUDE.md Template
-
-Coloca isso na raiz de cada projeto (o install.sh cria automaticamente se não existir):
 
 ```markdown
 # Project AI Setup
@@ -120,6 +149,12 @@ You are my coding orchestrator for this repository.
 
 **Session memory**: The `memory/` folder persists context between sessions, reducing token usage and preventing rework.
 
+**Session goals**: Maestro asks for up to 3 goals at session start and tracks completion. Deferred goals carry to the next session.
+
+**Rework detection**: Maestro warns when the same file is modified 3+ times in a session — a signal to re-plan.
+
+**ADRs**: Architecture Decision Records stored in `.agents/decisions/`. Architect creates them for significant decisions.
+
 **Plugins**: Optional extensions in `.agents/plugins/` that add personas, skills, or templates without touching core files.
 
 **Multi-provider**: Maestro pode delegar personas tier-2 (Coder, Tester, etc.) para Codex ou GLM enquanto mantém decisões estratégicas no Claude.
@@ -134,4 +169,4 @@ You are my coding orchestrator for this repository.
 
 ---
 
-*Canuto Framework v1.0 — Rodrigo Canuto © 2026*
+*Canuto Framework v1.1 — Rodrigo Canuto © 2026*
