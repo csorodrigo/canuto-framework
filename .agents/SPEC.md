@@ -66,13 +66,13 @@ A personal multi-agent framework for AI-assisted development that:
 
 | Persona | Role | Provider | Tier | Status |
 |---------|------|----------|------|--------|
-| **Maestro** | Orchestrator. Coordinates all personas, manages session lifecycle, detects project style. | Claude (always) | tier-1 | Exists (needs improvement) |
-| **Architect** | Plans features and refactors. Produces step-by-step plans. | Claude | tier-1 | Exists (needs improvement) |
-| **Coder** | Implements code per the Architect's plan. Writes basic tests. | Mixed (Claude/Codex/GLM) | tier-2 | Exists (needs improvement) |
-| **Tester** | QA specialist. Focuses on edge cases, error scenarios, coverage gaps. Validates that Coder's tests are sufficient. | Mixed | tier-2 | **New** |
-| **Debugger** | Investigates test failures. Diagnoses root cause and proposes fixes. | Mixed | tier-2 | **New** |
-| **Reviewer** | Reviews code for correctness, style, plan alignment. Produces analysis + checklist. | Different-from-coder | tier-2 | Exists (needs improvement) |
-| **Contextualizer** | Scans codebase, generates and maintains `.context.md` and `FEATURE-MAP.md`. | Claude | tier-1 | **New** |
+| **Maestro** | Orchestrator. Coordinates all personas, manages session lifecycle, detects project style. | Claude (always) | tier-1 | Complete |
+| **Architect** | Plans features and refactors. Produces step-by-step plans. | Claude | tier-1 | Complete |
+| **Coder** | Implements code per the Architect's plan. Writes basic tests. | Mixed (Claude/Codex/GLM) | tier-2 | Complete |
+| **Tester** | QA specialist. Focuses on edge cases, error scenarios, coverage gaps. Validates that Coder's tests are sufficient. | Mixed | tier-2 | Complete |
+| **Debugger** | Investigates test failures. Diagnoses root cause and proposes fixes. | Mixed | tier-2 | Complete |
+| **Reviewer** | Reviews code for correctness, style, plan alignment. Produces analysis + checklist. | Different-from-coder | tier-2 | Complete |
+| **Contextualizer** | Scans codebase, generates and maintains `.context.md` and `FEATURE-MAP.md`. | Claude | tier-1 | Complete |
 
 ### 3.2 Standard Flow
 
@@ -106,7 +106,7 @@ Current problems (all three apply):
 2. Instructions are too vague → LLM interprets freely.
 3. LLM ignores boundaries → does everything at once instead of respecting persona divisions.
 
-Improvements needed:
+Improvements applied:
 - Shorter, more focused persona definitions.
 - Concrete examples in each playbook (input → expected output).
 - Explicit "DO NOT" lists with specific anti-patterns.
@@ -117,29 +117,34 @@ Improvements needed:
 
 ## 4. Skills
 
-### 4.1 Existing Skills
-
-| Skill | Status |
-|-------|--------|
-| `context-maintenance` | Exists (good) |
-| `cli-usage` | Exists (needs EN translation) |
-| `api-design` | Exists (needs EN translation) |
-| `frontend-implementation` | Exists (needs EN translation) |
-
-### 4.2 New Skills
+### 4.1 Core Skills
 
 | Skill | Purpose |
 |-------|--------|
-| `security-practices` | Rules for handling .env, API keys, secrets. Never commit secrets. Use .env.example. Reviewer blocks if secrets found. |
-| `git-workflow` | Branching, conventional commits, PR templates. Opt-in per project. |
+| `context-maintenance` | How to maintain `.context.md` and `FEATURE-MAP.md` |
+| `api-design` | How to design and evolve HTTP/JSON APIs |
+| `frontend-implementation` | How to implement frontend features |
+| `cli-usage` | How to safely use CLI commands and scripts |
+| `security-practices` | Rules for handling .env, API keys, secrets |
+| `git-workflow` | Branching, conventional commits, PR templates (opt-in) |
+
+### 4.2 Advanced Skills
+
+| Skill | Purpose |
+|-------|--------|
+| `plugin-system` | How to create, install, and manage opt-in plugins |
+| `multi-provider` | How Maestro delegates to Claude, Codex, GLM |
+| `metrics` | Quality, velocity, and compliance tracking |
+| `squads` | Parallel workstreams for larger projects |
 
 ### 4.3 Plugin Architecture
 
 - Structure: **monorepo with opt-in**.
 - Core skills live in `.agents/skills/`.
-- Plugin skills live in `.agents/plugins/` (optional, per-project).
-- No manifest file for MVP — presence in folder = active.
-- Future: manifest (`plugins.json`) for selective sync.
+- Plugin skills live in `.agents/plugins/<name>/` (optional, per-project).
+- Each plugin has a `plugin.md` manifest.
+- Core always wins on name conflicts; plugins use namespaced names.
+- Maestro discovers plugins on session start and announces them.
 
 ---
 
@@ -153,6 +158,7 @@ Improvements needed:
     last-session.md    — Summary of last session (overwritten each time)
     decisions.md       — Append-only log of architectural/business decisions
     pending.md         — Tasks pending from previous sessions
+    metrics.md         — Append-only session metrics log
 ```
 
 ### 5.2 Session Start Briefing
@@ -161,7 +167,8 @@ When Maestro starts a new session:
 
 1. Read `.agents/memory/last-session.md` → show **short summary** of what changed.
 2. Check for **stale contexts** (git-based diff: compare `.context.md` timestamps vs file changes).
-3. Report both to user before starting work.
+3. Scan `.agents/plugins/` for active plugins.
+4. Report all to user before starting work.
 
 Format:
 ```
@@ -169,6 +176,7 @@ Session Briefing:
 - Last session (2025-02-24): Implemented user auth flow, added JWT middleware.
 - Stale contexts: src/api/ (3 files changed since last .context.md update)
 - Pending: Integration tests for auth flow.
+- Active plugins: ci-pipeline, database-migrations.
 ```
 
 ### 5.3 Session End
@@ -178,6 +186,7 @@ Before closing, Maestro:
 1. Writes `last-session.md` with: date, what was done, decisions made, what's pending.
 2. Updates `pending.md` if there are unfinished tasks.
 3. Appends to `decisions.md` if any architectural decisions were made.
+4. Appends session metrics to `metrics.md`.
 
 ### 5.4 Token Economy Strategy
 
@@ -272,50 +281,83 @@ The template generates a default `CLAUDE.md` with these configurable sections:
 - handoff-verbosity: explicit | silent | milestones-only
 - session-briefing: true | false
 
+## Providers
+- primary: claude
+- coder: codex | claude | glm
+- tester: claude | codex
+- debugger: claude
+- reviewer: claude
+
+## Squads
+- mode: auto | manual | disabled
+- max-parallel: 2
+
 ## Project Rules
 - [Project-specific rules go here]
 
 ## On Session Start
 1. Read .agents/memory/last-session.md
 2. Check for stale contexts
-3. Brief the user
-4. Ask what to work on
+3. Scan plugins
+4. Brief the user
+5. Ask what to work on
 ```
 
 ---
 
 ## 9. Priorities & Roadmap
 
-### Phase 1 — Foundation (NOW)
+### Phase 1 — Foundation ✅
 1. **Improve persona compliance** — rewrite all personas with better prompts, examples, anti-patterns.
 2. **Create Contextualizer persona** — the bootstrap engine.
 3. **Create memory structure** — `last-session.md`, `decisions.md`, `pending.md`.
 4. **Translate skills to English** — standardize language.
 
-### Phase 2 — New Personas & Skills
+### Phase 2 — New Personas & Skills ✅
 5. **Create Tester persona**.
 6. **Create Debugger persona**.
 7. **Create `security-practices` skill**.
 8. **Create `git-workflow` skill**.
 
-### Phase 3 — Template & Distribution
+### Phase 3 — Template & Distribution ✅
 9. **Create GitHub template repo** with `.agents/` + default `CLAUDE.md`.
 10. **Document the template** with usage instructions.
 
-### Phase 4 — Advanced (Future)
-11. **Plugin architecture** — opt-in plugins folder.
-12. **Multi-provider orchestration** — Maestro delegates to Codex/GLM via API.
-13. **Metrics system** — quality, velocity, compliance tracking.
-14. **Squads** — revisit groupings concept.
+### Phase 4 — Advanced ✅
+11. **Plugin architecture** — `plugin-system` skill with `plugins/` folder convention, `plugin.md` manifest, and resolution rules.
+12. **Multi-provider orchestration** — `multi-provider` skill with tier system, delegation protocol, fallback strategy, and provider config in CLAUDE.md.
+13. **Metrics system** — `metrics` skill with quality/velocity/compliance tracking, `metrics.md` memory file, and trend analysis.
+14. **Squads** — `squads` skill with domain-based grouping, parallel execution, cross-squad coordination, and configurable mode.
 
 ---
 
-## 10. Open Questions (Deferred)
+## 10. Skills Inventory (Complete)
 
-- Squads: what are they, how do they work? Postponed to avoid complexity.
-- Metrics implementation: how to actually measure quality/velocity/compliance? Needs research.
-- Multi-provider API delegation: technical feasibility depends on tool capabilities.
-- Plugin manifest system: `plugins.json` for selective activation.
+### Core Skills
+| Skill | Purpose |
+|-------|--------|
+| `context-maintenance` | How to maintain `.context.md` and `FEATURE-MAP.md` |
+| `api-design` | How to design and evolve HTTP/JSON APIs |
+| `frontend-implementation` | How to implement frontend features |
+| `cli-usage` | How to safely use CLI commands and scripts |
+| `security-practices` | Rules for secrets, env vars, and security hygiene |
+| `git-workflow` | Branching, commits, and PR conventions (opt-in) |
+
+### Advanced Skills
+| Skill | Purpose |
+|-------|--------|
+| `plugin-system` | How to create, install, and manage opt-in plugins |
+| `multi-provider` | How Maestro delegates work to Claude, Codex, GLM |
+| `metrics` | How to track quality, velocity, and compliance |
+| `squads` | How to group personas into parallel workstreams |
+
+---
+
+## 11. Open Questions (Remaining)
+
+- Multi-provider API delegation: actual integration depends on API access and tool capabilities per environment.
+- Squads in practice: needs real-world testing to validate the 30% overlap threshold and max-parallel defaults.
+- Metrics automation: some metrics may be hard to collect automatically — needs iteration.
 
 ---
 

@@ -21,10 +21,16 @@ Personal multi-agent framework for AI-assisted development. Claude-first, provid
     cli-usage.md              — How to safely use CLI commands and scripts.
     security-practices.md     — Rules for secrets, env vars, and security hygiene.
     git-workflow.md           — Branching, commits, and PR conventions (opt-in).
+    plugin-system.md          — How to create and manage opt-in plugins.
+    multi-provider.md         — How Maestro delegates to Claude, Codex, GLM.
+    metrics.md                — Quality, velocity, and compliance tracking.
+    squads.md                 — Parallel workstreams for larger projects.
   memory/
     last-session.md     — Summary of the last session (overwritten each time).
     decisions.md        — Append-only log of architectural/business decisions.
     pending.md          — Unfinished tasks from previous sessions.
+    metrics.md          — Append-only session metrics log.
+  plugins/              — Opt-in plugin extensions (see plugin-system skill).
   SPEC.md               — Full specification and design decisions.
 ```
 
@@ -86,6 +92,10 @@ You are my coding orchestrator for this repository.
 **Foreign-schema project**: Has its own documentation style. The framework adapts to the existing format without overwriting it.
 
 **Session memory**: The `memory/` folder persists context between sessions, reducing token usage and preventing rework.
+
+**Plugins**: Optional extensions in `.agents/plugins/` that add new personas, skills, or templates without modifying core files.
+
+**Multi-provider**: Maestro can delegate tier-2 personas (Coder, Tester, etc.) to Codex or GLM while keeping strategic decisions on Claude.
 
 ## Design Principles
 
