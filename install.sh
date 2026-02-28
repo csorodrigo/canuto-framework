@@ -118,6 +118,7 @@ FRAMEWORK_FILES=(
   ".agents/skills/squads.md"
   ".agents/skills/pr-description.md"
   ".agents/skills/health-check.md"
+  ".agents/skills/stack-lock.md"
   ".agents/SPEC.md"
 )
 
@@ -126,6 +127,7 @@ INSTALL_ONLY_FILES=(
   ".agents/memory/decisions.md"
   ".agents/memory/pending.md"
   ".agents/memory/metrics.md"
+  ".agents/stack.md"
 )
 
 # ── merge_claude_md ─────────────────────────────────────────────────────────
