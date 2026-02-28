@@ -7,48 +7,48 @@
 
 ## Auth
 <!-- Clerk | Supabase Auth | NextAuth | outro -->
-- [ ] Escolher: ___
+- [x] Supabase Auth
 
 ## UI
 <!-- Tailwind + shadcn/ui | Chakra UI | outro -->
-- [ ] Escolher: ___
+- [x] Tailwind CSS + shadcn/ui
 
 ## Estado (client)
 <!-- Zustand | Jotai | outro -->
-- [ ] Escolher: ___
+- [x] Zustand
 
 ## Estado (server)
 <!-- React Query | SWR | Server Components | outro -->
-- [ ] Escolher: ___
+- [x] TanStack Query (React Query)
 
 ## API
 <!-- tRPC | Server Actions | REST | outro -->
-- [ ] Escolher: ___
+- [x] Server Actions (Next.js App Router)
 
 ## Banco de dados
 <!-- Prisma + Neon | Prisma + Supabase | outro -->
-- [ ] Escolher: ___
+- [x] Prisma + Supabase
 
 ## Pagamentos
 <!-- Stripe | outro -->
-- [ ] Escolher: ___
+- [x] Stripe
 
 ## Error tracking
 <!-- Sentry | Highlight | outro -->
-- [ ] Escolher: ___
+- [x] Sentry
 
 ## Analytics
 <!-- PostHog | Plausible | outro -->
-- [ ] Escolher: ___
+- [x] PostHog
 
 ## Upload de arquivos
 <!-- UploadThing | Cloudinary | outro -->
-- [ ] Escolher: ___
+- [x] UploadThing
 
 ## Busca
 <!-- Algolia | Typesense | Meilisearch | não se aplica -->
-- [ ] Escolher: ___
+- [ ] não se aplica
 
 ## Realtime
 <!-- Supabase Realtime | Pusher | Partykit | não se aplica -->
-- [ ] Escolher: ___
+- [x] Supabase Realtime (quando necessário)
