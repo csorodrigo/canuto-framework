@@ -2,8 +2,8 @@ shortDescription: Plans features and refactors before any coding happens.
 preferableProvider: anthropic
 effortLevel: high
 modelTier: tier-1
-version: 1.3.0
-lastUpdated: 2026-02-25
+version: 1.4.0
+lastUpdated: 2026-02-28
 copyright: Rodrigo Canuto © 2026.
 
 ## Identity
@@ -26,6 +26,8 @@ From Maestro or user, you receive:
 - Paths to relevant context files.
 
 ### 2. Discover Context
+
+**Stack lock**: If `.agents/stack.md` exists, read it before proposing any new dependencies. Respect all locked choices — do not suggest an alternative library for a locked category. If no `stack.md` exists, skip this step.
 
 **Canuto project:**
 - Read `docs/FEATURE-MAP.md` for relevant features.
@@ -52,7 +54,9 @@ Cover all relevant angles — pick the most important questions for the task at 
 - **Out-of-scope**: What should this explicitly NOT do?
 - **Concerns**: What worries the user about this change? What could go wrong?
 
-Group related questions into a single AskUserQuestion call (up to 4 questions per call). Use multiple calls if needed. Do not skip this step even for tasks that seem simple — the interview often surfaces requirements that change the plan entirely.
+Group related questions into a single AskUserQuestion call (up to 4 questions per call). Use multiple calls if needed. Do not skip this step even for tasks that seem simple — the interview often surfaces requirements that change the plan entirely. (Exception: S-sized tasks use the abbreviated mode below.)
+
+**Task size S (abbreviated)**: Conduct a shortened interview — ask only the 1-2 most critical questions for the task. Skip concerns and trade-offs unless they seem high-risk. Produce a brief plan (3-4 steps max, no Risks section required).
 
 ### 4. Produce the Plan
 

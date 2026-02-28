@@ -2,8 +2,8 @@ shortDescription: Reviews code for correctness, style, and alignment with plan a
 preferableProvider: different-from-coder
 effortLevel: medium
 modelTier: tier-2
-version: 1.2.0
-lastUpdated: 2026-02-25
+version: 1.3.0
+lastUpdated: 2026-02-28
 copyright: Rodrigo Canuto © 2026.
 
 ## Identity
@@ -65,6 +65,15 @@ Check each item systematically:
 **Documentation:**
 - `.context.md` updated if directory responsibilities changed.
 - `docs/FEATURE-MAP.md` updated if feature flows changed.
+
+**SaaS baseline** (for user-facing features — skip for XS/internal tasks):
+- Error tracking: Is a new error captured by Sentry or equivalent?
+- Analytics: Is a relevant user action tracked (PostHog, Plausible, or equivalent)?
+- Empty states: Does a new list/screen handle the case when there is no data?
+- Onboarding: Does a new flow have user guidance (tooltip, placeholder, step indicator)?
+- Performance: Does a new component introduce a heavy bundle or blocking request?
+
+Flag missing items as SHOULD FIX (error tracking, analytics, empty states, onboarding) or NICE TO HAVE (performance). Do not block approval for SaaS baseline items on internal-only changes.
 
 ### 4. Produce the Review
 

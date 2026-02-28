@@ -66,8 +66,8 @@ A personal multi-agent framework for AI-assisted development that:
 
 | Persona | Role | Provider | Tier | Status |
 |---------|------|----------|------|--------|
-| **Maestro** | Orchestrator. Coordinates all personas, manages session lifecycle, detects project style. | Claude (always) | tier-1 | Complete |
-| **Architect** | Plans features and refactors. Produces step-by-step plans. | Claude | tier-1 | Complete |
+| **Maestro** | Orchestrator. Task sizing, persona routing, session lifecycle, rework detection, refactor cadence. | Claude (always) | tier-1 | Complete |
+| **Architect** | Plans features and refactors. Abbreviated mode for S tasks. | Claude | tier-1 | Complete |
 | **Coder** | Implements code per the Architect's plan. Writes basic tests. | Mixed (Claude/Codex/GLM) | tier-2 | Complete |
 | **Tester** | QA specialist. Focuses on edge cases, error scenarios, coverage gaps. Validates that Coder's tests are sufficient. | Mixed | tier-2 | Complete |
 | **Debugger** | Investigates test failures. Diagnoses root cause and proposes fixes. | Mixed | tier-2 | Complete |
@@ -329,6 +329,12 @@ The template generates a default `CLAUDE.md` with these configurable sections:
 13. **Metrics system** — `metrics` skill with quality/velocity/compliance tracking, `metrics.md` memory file, and trend analysis.
 14. **Squads** — `squads` skill with domain-based grouping, parallel execution, cross-squad coordination, and configurable mode.
 
+### Phase 5 — SaaS Efficiency ✅
+15. **Task Sizing** — Maestro classifies tasks as XS/S/M/L before routing. XS tasks skip Architect entirely. S tasks use abbreviated Architect interview. Reduces token consumption 40-60% on small tasks.
+16. **Stack Lock** — `stack-lock.md` skill + `.agents/stack.md` per-project config. Architect checks approved libraries before proposing dependencies. Prevents library drift across sessions.
+17. **SaaS baseline checks** — Reviewer checklist extended with: error tracking, analytics events, empty states, onboarding, and performance. Applied to user-facing features only.
+18. **Refactoring cadence** — Maestro tracks tasks completed per session. Suggests a cleanup session when ≥3 tasks are completed.
+
 ---
 
 ## 10. Skills Inventory (Complete)
@@ -350,6 +356,7 @@ The template generates a default `CLAUDE.md` with these configurable sections:
 | `multi-provider` | How Maestro delegates work to Claude, Codex, GLM |
 | `metrics` | How to track quality, velocity, and compliance |
 | `squads` | How to group personas into parallel workstreams |
+| `stack-lock` | How to enforce approved library choices via `.agents/stack.md` |
 
 ---
 
