@@ -124,6 +124,7 @@ Improvements applied:
 | `context-maintenance` | How to maintain `.context.md` and `FEATURE-MAP.md` |
 | `api-design` | How to design and evolve HTTP/JSON APIs |
 | `frontend-implementation` | How to implement frontend features |
+| `frontend-design` | How to make frontend features visually distinctive and design-coherent |
 | `cli-usage` | How to safely use CLI commands and scripts |
 | `security-practices` | Rules for handling .env, API keys, secrets |
 | `git-workflow` | Branching, conventional commits, PR templates (opt-in) |
@@ -155,10 +156,12 @@ Improvements applied:
 ```
 .agents/
   memory/
-    last-session.md    — Summary of last session (overwritten each time)
-    decisions.md       — Append-only log of architectural/business decisions
-    pending.md         — Tasks pending from previous sessions
-    metrics.md         — Append-only session metrics log
+    last-session.md        — Summary of last session (overwritten each time)
+    decisions.md           — Append-only log of architectural/business decisions
+    pending.md             — Tasks pending from previous sessions
+    metrics.md             — Append-only session metrics log
+    design-profile.md      — Visual identity for the project (optional, for frontend projects)
+    component-inventory.md — Registry of approved UI components (optional, for frontend projects)
 ```
 
 ### 5.2 Session Start Briefing
@@ -335,6 +338,12 @@ The template generates a default `CLAUDE.md` with these configurable sections:
 17. **SaaS baseline checks** — Reviewer checklist extended with: error tracking, analytics events, empty states, onboarding, and performance. Applied to user-facing features only.
 18. **Refactoring cadence** — Maestro tracks tasks completed per session. Suggests a cleanup session when ≥3 tasks are completed.
 
+### Phase 6 — Design Excellence ✅
+19. **Frontend design skill** — `frontend-design.md` with opinionated design principles for typography, color, motion, backgrounds, and composition. Works within the Tailwind + shadcn/ui stack. Includes reference aesthetic patterns (glassmorphism, glow accents, depth layering, color-per-card, tactile surfaces, spatial decorators).
+20. **Design profile** — `design-profile.md` in memory. Persists the project's visual identity (mood, fonts, colors, surface treatment, visual signature). Populated by Architect during design interview.
+21. **Component inventory** — `component-inventory.md` in memory. Registry of existing UI components. Prevents duplication and promotes reuse.
+22. **Design integration** — Architect interviews about visual design and presents 3 variations (Design Preview Protocol). Coder reads design profile and applies design principles. Reviewer checks design adherence (Design Lens — Pass 3). Inspiration Ingestion Protocol processes user-provided visual references.
+
 ---
 
 ## 10. Skills Inventory (Complete)
@@ -345,6 +354,7 @@ The template generates a default `CLAUDE.md` with these configurable sections:
 | `context-maintenance` | How to maintain `.context.md` and `FEATURE-MAP.md` |
 | `api-design` | How to design and evolve HTTP/JSON APIs |
 | `frontend-implementation` | How to implement frontend features |
+| `frontend-design` | How to make frontend features visually distinctive and design-coherent |
 | `cli-usage` | How to safely use CLI commands and scripts |
 | `security-practices` | Rules for secrets, env vars, and security hygiene |
 | `git-workflow` | Branching, commits, and PR conventions (opt-in) |
