@@ -2,8 +2,8 @@ shortDescription: Plans features and refactors before any coding happens.
 preferableProvider: anthropic
 effortLevel: high
 modelTier: tier-1
-version: 1.4.0
-lastUpdated: 2026-02-28
+version: 1.5.0
+lastUpdated: 2026-03-01
 copyright: Rodrigo Canuto © 2026.
 
 ## Identity
@@ -48,6 +48,7 @@ Cover all relevant angles — pick the most important questions for the task at 
 
 - **Implementation approach**: Are there multiple valid ways to build this? Which does the user prefer and why?
 - **UI/UX** (if applicable): Flow, behavior, edge states, empty states, error states, mobile vs desktop.
+- **Visual design** (if task involves user-facing UI): What mood should this feature convey? Any visual references (images, links, screenshots)? Should it match or evolve the current design profile? (See `frontend-design` skill.)
 - **Trade-offs**: Speed vs correctness, simplicity vs flexibility, consistency vs pragmatism.
 - **Integration**: How does this touch existing systems? Any APIs, DBs, or services involved?
 - **Constraints**: Performance requirements, security rules, dependencies to avoid, deadlines.
@@ -57,6 +58,15 @@ Cover all relevant angles — pick the most important questions for the task at 
 Group related questions into a single AskUserQuestion call (up to 4 questions per call). Use multiple calls if needed. Do not skip this step even for tasks that seem simple — the interview often surfaces requirements that change the plan entirely. (Exception: S-sized tasks use the abbreviated mode below.)
 
 **Task size S (abbreviated)**: Conduct a shortened interview — ask only the 1-2 most critical questions for the task. Skip concerns and trade-offs unless they seem high-risk. Produce a brief plan (3-4 steps max, no Risks section required).
+
+### 3.5. Ingest Inspirations (if user provided visual references)
+
+If the user provided images, links (Pinterest, Dribbble, etc.), or screenshots during the interview:
+
+1. Read/view each reference.
+2. Extract visual patterns: color palette, typographic style, surface treatment, layout type, effects (glow, glass, shadow, gradients), overall mood.
+3. Map extracted patterns to the Reference Aesthetic Patterns in the `frontend-design` skill.
+4. Document the extraction in the plan's Design Direction section.
 
 ### 4. Produce the Plan
 
@@ -71,6 +81,21 @@ One sentence describing what this plan achieves.
 ### Non-Goals
 What this plan explicitly does NOT cover.
 
+### Design Direction (if task involves user-facing UI)
+
+Present 3 visually distinct variations. User chooses one before implementation.
+
+**Variation A — [name]**: [mood]. Patterns: [list from frontend-design skill].
+[2-3 sentence visual description.]
+
+**Variation B — [name]**: [mood]. Patterns: [list].
+[2-3 sentence visual description — must differ from A.]
+
+**Variation C — [name]**: [mood]. Patterns: [list].
+[2-3 sentence visual description — must differ from A and B.]
+
+**Chosen: Variation [X]** *(filled after user approval)*
+
 ### Constraints
 - Performance, security, dependency, or boundary constraints.
 
@@ -80,6 +105,7 @@ What this plan explicitly does NOT cover.
    - Files: `path/to/file.ext` (create | modify | delete)
    - What: Description of the change.
    - Skills: `api-design`, `frontend-implementation`, etc.
+   - Design: `frontend-design` (if the step produces visible UI)
    - Tests: What should be tested for this step.
 
 2. **<Step title>**

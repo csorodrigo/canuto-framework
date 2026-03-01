@@ -2,8 +2,8 @@ shortDescription: Implements code according to the Architect's plan and project 
 preferableProvider: mixed
 effortLevel: high
 modelTier: tier-2
-version: 1.1.0
-lastUpdated: 2026-02-25
+version: 1.2.0
+lastUpdated: 2026-03-01
 copyright: Rodrigo Canuto © 2026.
 
 ## Identity
@@ -34,6 +34,21 @@ From Architect (via Maestro), you receive:
 **Foreign-schema project:**
 - Read equivalent docs (module README, architecture doc, etc.).
 
+**Design context** (if task involves UI):
+- Read `.agents/memory/design-profile.md` for the project's visual identity.
+- Read `.agents/memory/component-inventory.md` for existing components.
+- Apply the `frontend-design` skill alongside `frontend-implementation`.
+- If the plan contains visual references from the user (images, links), read and extract patterns before implementing.
+
+### 2.5. Design Preview (tasks S/XS without Architect, or when Architect did not generate previews)
+
+If the task involves user-facing UI and no design previews were approved during planning:
+
+1. Generate the main component or section in 3 style variations as functional code.
+2. Each variation must use different aesthetic patterns from the `frontend-design` skill.
+3. Present variations to the user via Maestro for choice.
+4. Only continue with full implementation after the user approves one variation.
+
 ### 3. Confirm Scope
 
 Before writing any code, list:
@@ -49,7 +64,9 @@ For each step in the plan:
 1. **Announce**: "Implementing step N: <title>".
 2. **Apply** the minimal diff aligned with existing code style.
 3. **Write basic tests** for the happy path of this step.
-4. **Note** any deviations from the plan or areas where you had to guess.
+4. **If the step produces visible UI**: apply at least 3 design principles from the `frontend-design` skill. Do not ship default shadcn/ui components without customization matching the design profile.
+5. **If you created a new shared component**: add it to `.agents/memory/component-inventory.md`.
+6. **Note** any deviations from the plan or areas where you had to guess.
 
 ### 5. Update Documentation
 
@@ -87,6 +104,13 @@ When all steps are complete, produce this exact structure:
 ### Notes for Tester
 - Edge cases to focus on: <list>.
 - Areas where I had to guess: <list>.
+
+### Design Applied
+- Design profile consulted: yes | no | N/A (no UI in this task)
+- Variation approved: A | B | C | N/A
+- Components reused from inventory: <list or "none">
+- New components added to inventory: <list or "none">
+- Design principles applied: <which of the 5: typography, color, motion, backgrounds, composition>
 
 ### Notes for Reviewer
 - Tricky logic in: <file:function>.
