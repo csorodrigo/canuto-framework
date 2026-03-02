@@ -4,6 +4,21 @@ version: 1.0.0
 lastUpdated: 2026-02-25
 copyright: Rodrigo Canuto © 2026.
 
+## When to Use
+
+**Triggers:**
+- A directory's purpose, structure, or responsibility has changed
+- Files, components, or dependencies were added or removed
+- A new user-facing feature was created or significantly altered
+- Coder or Architect needs to decide whether `.context.md` needs updating after a change
+
+**Not for:**
+- Bug fixes that don't change architecture or directory structure
+- Style, formatting, or test-only changes
+- Internal refactors that preserve the same external structure
+
+---
+
 ## Purpose
 
 Every meaningful directory in a project should have a `.context.md` that orients whoever arrives next — human or agent.
@@ -132,6 +147,48 @@ Brief description of what this feature does from the user's perspective.
 - Keep descriptions to one line.
 - If a feature branches (e.g., sync vs async), show the primary path and note the branch.
 - The feature map update MUST be in the same commit as the feature code changes.
+
+---
+
+## Examples
+
+### ✅ Good — complete, useful .context.md
+
+```markdown
+<context path="src/auth" updated="2026-03-01">
+
+Handles all authentication logic: JWT generation, validation, and session refresh.
+This directory owns the auth contract — no other directory should duplicate token logic.
+
+## Summary
+
+- token-service.ts – generates and verifies JWTs using the configured secret.
+- auth-middleware.ts – Express middleware that attaches decoded user to req.user.
+- session-store.ts – manages refresh token persistence via Redis.
+
+## Constraints
+
+- MUST NOT store tokens in localStorage — use httpOnly cookies only.
+- MUST throw InvalidTokenError (never return null) on verification failure.
+
+## Guidance
+
+- SHOULD use short-lived access tokens (15min) with long-lived refresh tokens (7d).
+
+</context>
+```
+
+Orients the next agent instantly: what lives here, what the rules are, what each file does.
+
+### ❌ Bad — vague, useless .context.md
+
+```markdown
+# Auth
+
+This folder contains authentication files.
+```
+
+This is bad because: tells the agent nothing specific, doesn't list files, has no constraints or guidance — the next agent will read the raw source code anyway, defeating the purpose.
 
 ---
 

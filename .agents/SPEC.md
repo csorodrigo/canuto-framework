@@ -113,6 +113,40 @@ Improvements applied:
 - Structured output formats (not just prose instructions).
 - Clear scope boundaries with checksums (e.g., "Your output MUST contain exactly: [plan, checklist]. Nothing else.").
 
+### 3.6 Anti-Hallucination Protocol
+
+All personas MUST follow these rules at all times:
+
+1. **Verify before stating.** Do not describe a file, function, path, or behavior as fact unless you have read it in this session. If you have not verified it, mark it `[ASSUMED]`.
+2. **Check before acting.** Before modifying a file, confirm it exists. Before calling a function, confirm its signature. Before following a pattern, confirm it is used in the project.
+3. **Cite your sources.** When making a factual claim about the codebase, reference the `file:line` where you observed it.
+4. **Stop, don't invent.** If you cannot find a file or confirm a fact, stop and ask. Do not substitute a plausible-sounding alternative.
+5. **Flag uncertainty.** Use the Confidence Tagging system (§3.7) to make uncertainty visible rather than hiding it in confident-sounding prose.
+
+### 3.7 Confidence Tagging
+
+When citing facts in plans, diagnoses, or handoffs, tag each non-trivial claim:
+
+| Tag | Meaning | When to use |
+|-----|---------|-------------|
+| `[CONFIRMED]` | Directly observed in this session | File read, test output seen, user stated it |
+| `[ASSUMED]` | Inferred, not verified | Logical deduction from context |
+| `[UNCERTAIN]` | Unknown; cannot determine from available info | Requires investigation before proceeding |
+
+**Rules:**
+- Plans may contain `[ASSUMED]` items — but each must be resolved before implementation begins.
+- Implementation steps must **not** contain `[ASSUMED]` items. Verify first, then implement.
+- `[UNCERTAIN]` items MUST trigger an `AskUserQuestion` or an exploration step before proceeding.
+- Diagnoses: a stated root cause must be `[CONFIRMED]` — traced to a specific `file:line`. A `[ASSUMED]` root cause is a hypothesis, not a diagnosis.
+
+**Example (Architect plan step):**
+```
+Step 2 — Add rate limiting middleware
+- File: src/middleware/rate-limit.ts [ASSUMED — path follows project pattern, verify before editing]
+- Library: express-rate-limit [CONFIRMED — listed in stack.md]
+- Limit: 100 req/min per IP [CONFIRMED — per user interview]
+```
+
 ---
 
 ## 4. Skills
@@ -343,6 +377,12 @@ The template generates a default `CLAUDE.md` with these configurable sections:
 20. **Design profile** — `design-profile.md` in memory. Persists the project's visual identity (mood, fonts, colors, surface treatment, visual signature). Populated by Architect during design interview.
 21. **Component inventory** — `component-inventory.md` in memory. Registry of existing UI components. Prevents duplication and promotes reuse.
 22. **Design integration** — Architect interviews about visual design and presents 3 variations (Design Preview Protocol). Coder reads design profile and applies design principles. Reviewer checks design adherence (Design Lens — Pass 3). Inspiration Ingestion Protocol processes user-provided visual references.
+
+### Phase 7 — Prompting Quality ✅
+23. **Anti-Hallucination Protocol** — Universal rule set (§3.6) requiring all personas to verify before stating, cite sources, and stop rather than invent.
+24. **Confidence Tagging** — `[CONFIRMED]` / `[ASSUMED]` / `[UNCERTAIN]` tags (§3.7) in plans, diagnoses, and handoffs. Makes uncertainty explicit. Architect resolves `[ASSUMED]` before implementation; Debugger must `[CONFIRM]` root cause before fixing.
+25. **Few-shot examples in all skills** — Every skill file gains a `## Examples` section with a ✅ Good and ❌ Bad pair to anchor agent behavior.
+26. **"When to Use" in all skills** — Every skill file gains a `## When to Use` section with explicit triggers and exclusions, enabling correct Maestro routing.
 
 ---
 

@@ -4,6 +4,18 @@ version: 1.0.0
 lastUpdated: 2026-02-25
 copyright: Rodrigo Canuto © 2026.
 
+## When to Use
+
+**Triggers:**
+- Session start — Maestro always prompts for goals after the session briefing
+- Session end — Maestro marks each goal ✅ / ⏳ / ❌ before writing `last-session.md`
+- User skips goals prompt — Maestro infers and records goals from conversation
+
+**Not for:**
+- Mid-task goal changes (capture those as deviations in the session, not as new goals)
+
+---
+
 ## Purpose
 
 Give every session a clear direction and a measurable outcome. At session start, the user defines up to 3 goals. At session end, each goal is marked ✅ achieved or ⏳ carried forward.
@@ -69,6 +81,34 @@ Session Briefing:
 - Stale contexts: none
 - Pending tasks: none
 ```
+
+---
+
+## Examples
+
+### ✅ Good — outcome-oriented goals with honest end-of-session marking
+
+```markdown
+## Goals
+
+- ✅ JWT authentication works end-to-end (login, refresh, logout)
+- ⏳ Integration tests for auth flow (login done, refresh token tests pending)
+- ❌ Update API documentation (ran out of context window)
+```
+
+Outcome-oriented ("works end-to-end"), not task-oriented ("write auth code"). Marking is honest — partial work is ⏳, not ✅.
+
+### ❌ Bad — task-oriented goals, over-optimistic marking
+
+```markdown
+## Goals
+
+- ✅ Write auth code
+- ✅ Write tests
+- ✅ Update docs
+```
+
+This is bad because: "write auth code" is a task, not an outcome — you can write code that doesn't work. Marking everything ✅ without evidence (Reviewer APPROVE, tests passing) obscures real progress.
 
 ---
 

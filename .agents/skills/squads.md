@@ -4,6 +4,20 @@ version: 1.0.0
 lastUpdated: 2026-02-25
 copyright: Rodrigo Canuto © 2026.
 
+## When to Use
+
+**Triggers:**
+- Session involves 2+ independent features with no shared code paths
+- Project has clear domain boundaries (separate services, modules, packages)
+- User explicitly requests parallel work: `"work on auth and dashboard in parallel"`
+
+**Not for:**
+- Single-feature sessions — standard sequential flow is sufficient
+- Features with >30% file overlap (risk of merge conflicts)
+- Small projects (<20 files, single module)
+
+---
+
 ## Purpose
 
 As projects grow, a single sequential flow (Architect → Coder → Tester → Reviewer) can become a bottleneck. Squads allow the Maestro to organize personas into parallel workstreams, each tackling a different part of the system.
@@ -122,6 +136,34 @@ Session Briefing:
 - Cross-squad dependencies: none currently.
 - Pending: auth squad waiting for API contract from dashboard squad.
 ```
+
+---
+
+## Examples
+
+### ✅ Good — squads with clear domain separation and dependencies declared
+
+```
+Squad "auth": src/auth/, src/api/middleware/
+  Goal: Implement JWT refresh token rotation
+  Status: Step 2/4
+
+Squad "dashboard": src/pages/dashboard/, src/components/charts/
+  Goal: Add revenue chart component
+  Status: Step 1/3
+
+Cross-squad dependencies: auth squad must complete token-service before
+dashboard squad reads user subscription data. Dashboard paused at Step 2.
+```
+
+### ❌ Bad — squads with overlapping files
+
+```
+Squad "auth": src/auth/, src/models/user.ts
+Squad "profile": src/models/user.ts, src/pages/profile/
+```
+
+This is bad because: both squads modify `src/models/user.ts` — parallel execution will cause merge conflicts. Use sequential flow instead.
 
 ---
 

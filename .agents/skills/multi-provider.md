@@ -4,6 +4,19 @@ version: 1.0.0
 lastUpdated: 2026-02-25
 copyright: Rodrigo Canuto © 2026.
 
+## When to Use
+
+**Triggers:**
+- CLAUDE.md has a `## Providers` section with non-Claude entries configured
+- User explicitly requests a specific provider for a task
+- A tier-2 persona (Coder, Tester, Debugger, Reviewer) is being handed off
+
+**Not for:**
+- Tier-1 personas (Maestro, Architect, Contextualizer) — always Claude
+- Projects without API keys configured for secondary providers (fall back to Claude silently)
+
+---
+
 ## Purpose
 
 Enable the Maestro to orchestrate multiple AI providers for different personas, optimizing cost, speed, and quality. Claude remains the primary provider (always runs Maestro), but execution personas (Coder, Tester, Debugger) can be delegated to other providers.
@@ -96,6 +109,30 @@ GLM_API_KEY=...           # GLM (optional)
 ```
 
 These MUST be in `.env` (never committed). See `security-practices` skill.
+
+---
+
+## Examples
+
+### ✅ Good — transparent delegation with fallback logging
+
+```
+Delegating Step 3 (implement auth middleware) to Codex.
+Handoff package: plan step 3 + src/auth/.context.md + coder.md playbook.
+[Codex responds with implementation summary]
+Validating output format... ✅ accepted.
+```
+
+User is informed, delegation is logged, output is validated before accepting.
+
+### ❌ Bad — silent failure and fabricated output
+
+```
+[Codex API call fails, no response]
+[Maestro continues as if Coder completed the task]
+```
+
+This is bad because: Maestro must fall back to Claude and log the failure — never silently pretend a delegation succeeded when it didn't.
 
 ---
 

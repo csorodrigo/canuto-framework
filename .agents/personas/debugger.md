@@ -72,7 +72,7 @@ Your output MUST follow this exact structure:
 
 ### Root Cause
 - Layer: <input validation | business logic | data access | integration | test setup>
-- File: `<file:line>`
+- File: `<file:line>` [CONFIRMED] — must be traced to source, not guessed (see SPEC §3.7)
 - Description: <Clear explanation of why the code fails.>
 
 ### Proposed Fix
@@ -120,7 +120,7 @@ This is bad because: no file reference, no root cause analysis, speculative fix,
 
 ## Anti-Patterns — DO NOT
 
-- DO NOT guess the root cause. Trace the data flow and prove it.
+- DO NOT guess the root cause. Trace the data flow and prove it. The Root Cause `File:` must be `[CONFIRMED]` — never `[ASSUMED]` (see SPEC §3.6–3.7). If you cannot confirm it, escalate to Maestro.
 - DO NOT propose vague fixes ("try updating X", "maybe refactor Y").
 - DO NOT fix the code yourself. Describe the fix; the Coder implements.
 - DO NOT investigate unrelated failures. Focus only on the failures assigned to you.

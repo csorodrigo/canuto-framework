@@ -4,6 +4,20 @@ version: 1.0.0
 lastUpdated: 2026-03-01
 copyright: Rodrigo Canuto © 2026.
 
+## When to Use
+
+**Triggers:**
+- Architect is planning a task that produces user-facing UI (include Design Direction section in plan)
+- Coder is implementing any screen, page, or component visible to the user
+- Reviewer is reviewing code with user-facing changes (activates Design Lens — Pass 3)
+
+**Not for:**
+- Backend-only tasks with no visible UI
+- Internal admin utilities where design quality is not a priority
+- XS tasks where visual impact is negligible (e.g., fix a typo on a label)
+
+---
+
 ## Purpose
 
 Prevent generic-looking UI by encoding opinionated design principles within the locked stack (Tailwind CSS + shadcn/ui). This skill ensures every user-facing feature has visual personality, consistency, and intentional design choices — not default component styling.
@@ -216,6 +230,40 @@ When reviewing code that includes user-facing UI changes:
   - Does this new UI feel consistent with existing pages in the app?
   - Was a design preview approved before full implementation?
 - Design issues are **SHOULD FIX**, never MUST FIX. Design is important but does not block shipping.
+
+---
+
+## Examples
+
+### ✅ Good — customized component with 3+ design principles applied
+
+```tsx
+// Glassmorphism surface + color identity + motion entrance + typography contrast
+<motion.div
+  initial={{ opacity: 0, y: 16 }}
+  animate={{ opacity: 1, y: 0 }}
+  className="backdrop-blur-md bg-white/10 border border-white/20
+             shadow-lg rounded-2xl p-6 bg-emerald-950/50"
+>
+  <h2 className="font-serif text-3xl font-bold tracking-tight">Revenue</h2>
+  <p className="text-sm font-light text-white/70 mt-1">Last 30 days</p>
+</motion.div>
+```
+
+Applies: glassmorphism surface, color-per-card identity (emerald), motion entrance, typography contrast (serif bold heading + light body).
+
+### ❌ Bad — vanilla shadcn/ui, zero customization
+
+```tsx
+<Card>
+  <CardHeader>
+    <CardTitle>Revenue</CardTitle>
+    <CardDescription>Last 30 days</CardDescription>
+  </CardHeader>
+</Card>
+```
+
+This is bad because: default shadcn/ui `Card` with zero design application — no color, no typography contrast, no surface treatment, no motion. Ships the design system's placeholder look instead of the project's visual identity.
 
 ---
 

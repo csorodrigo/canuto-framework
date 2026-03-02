@@ -4,6 +4,18 @@ version: 1.1.0
 lastUpdated: 2026-02-25
 copyright: Rodrigo Canuto © 2026.
 
+## When to Use
+
+**Triggers:**
+- At session end — Maestro appends the session's metrics to `metrics.md`
+- User asks about trends, quality, or performance: `"how are we doing?"`, `"show metrics"`, `"any rework patterns?"`
+- Rework is detected in-session (file modified ≥3 times) — emit warning immediately
+
+**Not for:**
+- Real-time monitoring during a task (metrics are collected passively, not interactively)
+
+---
+
 ## Purpose
 
 Provide visibility into how the framework is performing over time. Metrics help identify recurring problems, measure improvement, and guide decisions about process changes.
@@ -143,6 +155,40 @@ When the user asks about metrics or trends:
    - Recurring rework files (files that appear in rework across multiple sessions → likely a design issue).
    - Goal achievement rate trends.
    - Provider performance comparison (if multi-provider is active).
+
+---
+
+## Examples
+
+### ✅ Good — complete session metrics entry
+
+```markdown
+## Session: 2026-03-01
+
+### Quality
+- Review verdict: APPROVE
+- MUST FIX count: 1
+- Test failures: 0/12
+- Debugger invocations: 0
+- Rework cycles: 1
+- Rework files: src/auth/token-service.ts (3 modifications)
+
+### Velocity
+- Tasks completed: 2
+- Steps executed: 6
+- Persona transitions: 8
+- Escalations: 0
+- Goals: 2/2 achieved (✅ Add JWT auth, ✅ Write integration tests)
+```
+
+### ❌ Bad — fabricated or missing metrics
+
+```markdown
+## Session: 2026-03-01
+Everything went well. Tests passed.
+```
+
+This is bad because: no structured fields, unmeasurable, cannot be compared across sessions — trend analysis becomes impossible.
 
 ---
 

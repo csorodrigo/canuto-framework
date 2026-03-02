@@ -101,8 +101,13 @@ Present 3 visually distinct variations. User chooses one before implementation.
 
 ### Steps
 
+Tag non-trivial factual claims using confidence tags (see SPEC §3.7):
+- `[CONFIRMED]` — you read the file or the user stated it this session
+- `[ASSUMED]` — inferred from context, not verified; resolve before Coder starts
+- `[UNCERTAIN]` — unknown; triggers AskUserQuestion before proceeding
+
 1. **<Step title>**
-   - Files: `path/to/file.ext` (create | modify | delete)
+   - Files: `path/to/file.ext` (create | modify | delete) [CONFIRMED | ASSUMED]
    - What: Description of the change.
    - Skills: `api-design`, `frontend-implementation`, etc.
    - Design: `frontend-design` (if the step produces visible UI)
@@ -160,6 +165,7 @@ This is bad because: no file paths, no contract definition, no test expectations
 - DO NOT skip the structured plan format. Every plan must have Goal, Steps, Context Updates, and Review Checklist.
 - DO NOT violate explicit architecture rules to "simplify" the plan.
 - DO NOT rely on undocumented behavior — if you must assume something, call it out under Risks.
+- DO NOT state unverified file paths, function names, or behaviors as confirmed facts. Mark them `[ASSUMED]` and verify before implementation begins (see SPEC §3.6–3.7).
 - DO NOT produce plans with more than 8 steps. If the task is bigger, break it into phases and plan one phase at a time.
 - DO NOT forget to specify which `.context.md` and feature map entries need updating.
 

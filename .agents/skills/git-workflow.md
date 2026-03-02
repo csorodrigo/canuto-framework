@@ -4,6 +4,19 @@ version: 1.0.0
 lastUpdated: 2026-02-25
 copyright: Rodrigo Canuto © 2026.
 
+## When to Use
+
+**Triggers:**
+- Coder is preparing a commit after implementation
+- Maestro is creating or naming a new branch for a task
+- Reviewer or Maestro is preparing a PR after an approved review cycle
+
+**Not for:**
+- Projects that explicitly disable this skill in CLAUDE.md (it's opt-in)
+- Reading git history for debugging purposes (use standard git commands directly)
+
+---
+
 ## Purpose
 
 Standardize how Git is used across projects so that:
@@ -105,6 +118,31 @@ Brief description of what this PR does and why.
 - One logical change per PR.
 - Keep PRs reviewable (< 400 lines when possible).
 - Request review from a persona different from the one that coded.
+
+---
+
+## Examples
+
+### ✅ Good — conventional commit with context
+
+```
+feat(auth): add JWT refresh token rotation
+
+Refresh tokens are now rotated on each use to prevent replay attacks.
+Old tokens are invalidated immediately after rotation.
+
+Closes #42
+```
+
+Type is clear, scope is explicit, body explains WHY (not what), issue is linked.
+
+### ❌ Bad — vague commit
+
+```
+updated auth stuff
+```
+
+This is bad because: no type, no scope, no rationale, untraceable — git blame provides zero context to the next developer (or agent) reading the history.
 
 ---
 

@@ -4,6 +4,20 @@ version: 1.0.0
 lastUpdated: 2026-02-25
 copyright: Rodrigo Canuto © 2026.
 
+## When to Use
+
+**Triggers:**
+- A decision affects how multiple parts of the system interact
+- The project is committing to a specific technology, pattern, or library
+- A decision has trade-offs future developers must understand
+- An earlier decision is being reversed or superseded
+
+**Not for:**
+- Low-risk, reversible decisions (rename a variable, add a utility function)
+- Decisions already captured in `stack.md` (use that for library choices)
+
+---
+
 ## Purpose
 
 Capture significant architectural and technical decisions with their rationale, alternatives, and consequences. ADRs prevent the same debates from happening repeatedly and create a traceable history of why the codebase is the way it is.
@@ -103,6 +117,46 @@ Number: sequential, zero-padded to 3 digits.
 - When a decision is reversed: mark old ADR as `Superseded by ADR-NNN`, create new ADR.
 - When a decision is deprecated: mark as `Deprecated`, note reason.
 - **Never edit** an accepted ADR's Decision or Context retroactively. Append a new ADR instead.
+
+---
+
+## Examples
+
+### ✅ Good — complete ADR with context, decision, and alternatives
+
+```markdown
+# ADR-002: PostgreSQL over MongoDB for user and subscription data
+
+**Date:** 2026-02-15
+**Status:** Accepted
+
+## Context
+We need a database for user accounts and subscription records. The data is relational
+(users → subscriptions → plans) and consistency is critical for billing.
+
+## Decision
+We will use PostgreSQL via Prisma. All relational data lives in a single Postgres instance.
+
+## Alternatives Considered
+| Option | Pros | Cons |
+|--------|------|------|
+| PostgreSQL (chosen) | ACID, Prisma support, relational | Harder to scale horizontally |
+| MongoDB | Flexible schema | No joins, inconsistency risk for billing |
+
+## Consequences
+Positive: Strong consistency for billing, type-safe queries with Prisma.
+Negative: Schema migrations required for structural changes.
+```
+
+### ❌ Bad — incomplete ADR, decision without rationale
+
+```markdown
+# ADR-002: Use PostgreSQL
+
+We decided to use PostgreSQL.
+```
+
+This is bad because: no context, no alternatives, no trade-offs — in 6 months, no one (including AI agents) knows why this decision was made or what was rejected.
 
 ---
 
