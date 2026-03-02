@@ -4,21 +4,22 @@ version: 1.0.0
 lastUpdated: 2026-02-25
 copyright: Rodrigo Canuto © 2026.
 
-## Purpose
+## When to Use
 
-Detect broken or missing framework components before they silently degrade session quality. The health check can be triggered on demand or automatically when something seems off.
+**Triggers:**
+- User says: `"health check"`, `"is the framework ok?"`, `"diagnose"`, `"check framework"`
+- Maestro detects unexpected behavior (missing persona response, incomplete handoff, corrupted memory file)
+- At session start in a freshly cloned or bootstrapped project
+
+**Not for:**
+- Mid-task interruptions — run at session start or on demand only
+- Projects not using the Canuto Framework
 
 ---
 
-## Trigger
+## Purpose
 
-Run a health check when the user says:
-- `"health check"`
-- `"is the framework ok?"`
-- `"diagnose"`
-- `"check framework"`
-
-Or when Maestro detects unexpected behavior (missing persona, corrupted memory file, incomplete handoff).
+Detect broken or missing framework components before they silently degrade session quality. The health check can be triggered on demand or automatically when something seems off.
 
 ---
 
@@ -93,6 +94,35 @@ Or when Maestro detects unexpected behavior (missing persona, corrupted memory f
 | Skill files missing | `bash install.sh --update` |
 | Memory files missing | `bash install.sh` (install mode) |
 | SPEC.md missing | `bash install.sh --update` |
+
+---
+
+## Examples
+
+### ✅ Good — structured report with verdict and remediation
+
+```markdown
+## Framework Health Check — 2026-03-02
+
+### ✅ Passing (4 items)
+- CLAUDE.md: all required sections present
+- Personas: all 7 present
+- Memory: last-session.md, decisions.md, pending.md present
+- SPEC.md: present
+
+### ⚠️ Warnings (1 item)
+- .agents/memory/metrics.md missing (will be created on first session end)
+
+### Verdict: HEALTHY
+```
+
+### ❌ Bad — vague, unstructured check
+
+```
+The framework seems fine. I checked a few files and they look ok.
+```
+
+This is bad because: no itemized checklist, no verdict, no remediation steps — the user cannot tell what was verified, what passed, or what to fix.
 
 ---
 

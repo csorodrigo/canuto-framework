@@ -4,6 +4,19 @@ version: 1.0.0
 lastUpdated: 2026-02-25
 copyright: Rodrigo Canuto © 2026.
 
+## When to Use
+
+**Triggers:**
+- Coder or Maestro is about to run a build, test, lint, migration, or seed command
+- A dev server or watcher needs to be started or stopped
+- A dangerous operation (data deletion, infrastructure change) is being requested
+
+**Not for:**
+- Planning steps that describe what commands will run later (no actual execution yet)
+- Reading or editing files (use file tools, not CLI)
+
+---
+
 ## Purpose
 
 Ensure that terminal commands and scripts (build, test, lint, migrations, seeds, tools) are used in a way that is:
@@ -62,6 +75,29 @@ For dangerous commands:
    - Update `.context.md` in script directories when new scripts are created or responsibilities change.
 3. Foreign-schema project:
    - Update script docs/README if they exist.
+
+---
+
+## Examples
+
+### ✅ Good — use declared script, explain before running
+
+```
+I'm going to run the test suite using the project's standard command:
+  pnpm test
+This runs all unit and integration tests. No side effects on the database (tests use mocks).
+Proceed?
+```
+
+Uses the declared script, explains what it does, asks before running.
+
+### ❌ Bad — undiscovered raw command, no explanation
+
+```
+Running: npx jest --testPathPattern=src/auth --forceExit --runInBand --coverage
+```
+
+This is bad because: bypasses the declared `pnpm test` script, uses raw Jest flags that may conflict with project config, gives the user no context before running.
 
 ---
 

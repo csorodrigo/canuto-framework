@@ -52,3 +52,8 @@
 ## Realtime
 <!-- Supabase Realtime | Pusher | Partykit | não se aplica -->
 - [x] Supabase Realtime (quando necessário)
+
+## Ícones
+<!-- lucide-animated + lucide-react | heroicons | outro -->
+- [x] lucide-animated (padrão — `pnpm dlx shadcn add @lucide-animated/{icon-name}`)
+- [x] lucide-react (fallback para ícones estáticos sem necessidade de animação)

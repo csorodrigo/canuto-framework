@@ -10,11 +10,15 @@ Eliminate the manual step of writing PR descriptions. After a review cycle, the 
 
 ---
 
-## Trigger
+## When to Use
 
-Reviewer generates the PR description automatically when:
-- The review verdict is **APPROVE**, OR
-- Maestro explicitly requests it (`"Generate PR description"`).
+**Triggers:**
+- Review verdict is **APPROVE** — Reviewer generates the PR description automatically
+- Maestro explicitly requests it: `"Generate PR description"`
+
+**Not for:**
+- Mid-review (wait for APPROVE verdict or explicit request)
+- Tasks that are not going through a PR workflow
 
 ---
 
@@ -70,6 +74,39 @@ Reviewer generates the PR description automatically when:
    - Notes: include relevant deviations or escalation context.
 
 3. **Output** the filled template as a fenced markdown block labeled **`PR Description`**.
+
+---
+
+## Examples
+
+### ✅ Good — specific, traceable PR description
+
+```markdown
+## Summary
+Adds JWT refresh token rotation to prevent replay attacks. Tokens are now
+invalidated immediately after use and replaced with a new token on each refresh.
+
+## Changes
+- `src/auth/token-service.ts` — added rotateRefreshToken() method with invalidation
+- `src/api/routes/auth.ts` — updated /refresh endpoint to return new token pair
+
+## Testing
+Unit tests added in `src/auth/__tests__/token-service.test.ts`.
+Integration test covers full rotation cycle (happy path + replay attempt).
+```
+
+### ❌ Bad — vague, framework-leaking PR description
+
+```markdown
+## Summary
+Maestro delegated to Architect who planned 4 steps. Coder implemented them.
+Reviewer approved after 1 rework cycle.
+
+## Changes
+- Made some auth changes
+```
+
+This is bad because: exposes internal framework details (Maestro, Architect), no file references, no test information — useless for a human reviewer or future git blame.
 
 ---
 

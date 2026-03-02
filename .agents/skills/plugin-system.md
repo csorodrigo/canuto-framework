@@ -4,6 +4,19 @@ version: 1.0.0
 lastUpdated: 2026-02-25
 copyright: Rodrigo Canuto © 2026.
 
+## When to Use
+
+**Triggers:**
+- Installing a community or custom plugin into `.agents/plugins/`
+- Creating a new plugin to extend the framework for a specific project need
+- Debugging why a plugin isn't being recognized on session start
+
+**Not for:**
+- Changes to core framework files (personas, skills, memory) — plugins must not touch those
+- Project-specific business logic (that belongs in the project code, not in framework plugins)
+
+---
+
 ## Purpose
 
 Allow the Canuto Framework to be extended with optional plugins without modifying core files. Plugins add new skills, personas, or workflows that are activated by their presence in the `.agents/plugins/` folder.
@@ -116,6 +129,33 @@ On session start, Maestro:
   personas/
     dba.md                   — Database specialist persona.
 ```
+
+---
+
+## Examples
+
+### ✅ Good — well-structured plugin with manifest and namespaced skill
+
+```
+.agents/plugins/ci-pipeline/
+  plugin.md         ← manifest: name, version, what it adds, activation, usage
+  skills/
+    ci-pipeline.md  ← namespaced skill, follows core skill format
+  templates/
+    github-actions.yml
+```
+
+Plugin is self-contained, has a manifest, doesn't conflict with core skills.
+
+### ❌ Bad — plugin without manifest, overrides core skill
+
+```
+.agents/plugins/my-stuff/
+  skills/
+    api-design.md   ← same name as core skill
+```
+
+This is bad because: no `plugin.md` manifest (will be silently ignored by Maestro), and overriding `api-design.md` by name violates the "core always wins" rule — the plugin must namespace it (e.g., `my-stuff:api-design.md`).
 
 ---
 

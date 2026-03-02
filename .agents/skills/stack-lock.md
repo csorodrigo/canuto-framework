@@ -3,6 +3,18 @@ version: 1.0.0
 lastUpdated: 2026-02-28
 copyright: Rodrigo Canuto © 2026.
 
+## When to Use
+
+**Triggers:**
+- Architect is about to propose a new external dependency
+- Coder is about to install a package
+- Reviewer is checking a PR that adds or changes dependencies
+
+**Not for:**
+- Removing or upgrading existing approved packages — record those changes directly in `stack.md` without the proposal process
+
+---
+
 ## Purpose
 
 Every project has a `.agents/stack.md` file that lists the approved library for each category. This skill defines the rules for using it.
@@ -42,6 +54,28 @@ Stack entries are changed only by explicit user decision. When a user approves a
 2. Log the decision in `.agents/memory/decisions.md`.
 
 Never change a stack entry based on personal preference or convenience.
+
+---
+
+## Examples
+
+### ✅ Good — consult stack, use approved library
+
+```
+Need: client-side state management for a shopping cart.
+Action: read .agents/stack.md → "State (client): Zustand" → implement with Zustand.
+```
+
+No deviation, no debate, no wasted tokens — the decision was already made.
+
+### ❌ Bad — introduce unapproved library without decision
+
+```
+I'll use Redux Toolkit here because it handles complex state better.
+[installs redux, @reduxjs/toolkit without updating stack.md]
+```
+
+This is bad because: bypasses stack-lock, creates library drift, undoes a previous decision without registering a new one. `stack.md` still says Zustand — now the project has both.
 
 ---
 

@@ -4,6 +4,19 @@ version: 1.0.0
 lastUpdated: 2026-02-25
 copyright: Rodrigo Canuto © 2026.
 
+## When to Use
+
+**Triggers:**
+- Coder is implementing a frontend feature, screen, or component
+- Reviewer is checking frontend code for structural or pattern compliance
+- Architect is deciding where a new UI component or page should live
+
+**Not for:**
+- Backend-only tasks with no UI component
+- Design decisions (see `frontend-design` skill for visual direction)
+
+---
+
 ## Purpose
 
 Guide UI implementation (web/mobile) so that it:
@@ -65,6 +78,47 @@ Works in both Canuto and foreign-schema projects.
      - Ensure `docs/FEATURE-MAP.md` has the complete updated flow (from UI entry point to backend).
 2. Foreign-schema project:
    - Update whatever UI docs the project uses (README, storybook notes, etc.).
+
+---
+
+## Examples
+
+### ✅ Good — structured component with clear separation and icon usage
+
+```tsx
+// Presentational: just layout + display
+export function SubscriptionCard({ plan, price }: SubscriptionCardProps) {
+  return (
+    <Card>
+      <StarIcon className="text-accent" /> {/* lucide-animated — hover animates */}
+      <h3>{plan}</h3>
+      <p>{price}/mo</p>
+    </Card>
+  )
+}
+
+// Container: handles data fetch and state
+export function SubscriptionCardContainer({ userId }: { userId: string }) {
+  const { data } = useSubscription(userId) // TanStack Query
+  if (!data) return <Skeleton />
+  return <SubscriptionCard plan={data.plan} price={data.price} />
+}
+```
+
+Presentational/container separation, TanStack Query for remote data, lucide-animated for interactive icons.
+
+### ❌ Bad — mixed concerns, raw fetch, no loading state
+
+```tsx
+export function SubscriptionCard({ userId }: { userId: string }) {
+  const [sub, setSub] = useState(null)
+  useEffect(() => { fetch(`/api/sub/${userId}`).then(r => r.json()).then(setSub) }, [userId])
+  return <div>{sub?.plan} — {sub?.price}</div>
+  // No loading state, no error handling, business logic in presentational component
+}
+```
+
+This is bad because: mixes data fetching into a presentational component, raw fetch bypasses TanStack Query, no loading/error states — inconsistent with the rest of the app.
 
 ---
 
