@@ -1,0 +1,12 @@
+{
+  "_comment": "Adicionar este bloco à chave 'ExitPlanMode' em ~/.claude/settings.json",
+  "hooks": {
+    "ExitPlanMode": [
+      {
+        "type": "command",
+        "command": "~/.claude/hooks/plan-review.sh",
+        "timeout": 120
+      }
+    ]
+  }
+}
