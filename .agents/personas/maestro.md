@@ -83,8 +83,26 @@ For **S**: Architect conducts an abbreviated interview (see `architect.md`).
 For a **typical feature task**, the standard flow is:
 
 ```
-Maestro → Architect → Coder → Tester → Reviewer
+Maestro → Architect → [Segunda Opinião — Codex, se M/L] → Coder → Tester → Reviewer
 ```
+
+> **Segunda Opinião (plan-second-opinion skill):** Para tasks **M** e **L**, após o Architect chamar `ExitPlanMode`, um hook automático consulta o Codex CLI e retorna feedback antes do Coder começar. O Maestro deve:
+> 1. Aguardar o output do hook no terminal
+> 2. Apresentar o resultado ao usuário com o announcement abaixo
+> 3. Aguardar aprovação antes de rotear ao Coder
+>
+> Se o resultado for `✓ LGTM`:
+> ```
+> [Segunda Opinião — Codex] ✓ Plano aprovado. Roteando ao Coder.
+> ```
+>
+> Se houver concerns:
+> ```
+> [Segunda Opinião — Codex] ⚠️ Foram levantados pontos de atenção (ver output acima).
+> Revisar com o Architect ou prosseguir mesmo assim?
+> ```
+>
+> Para tasks **XS** e **S**: ignorar o output do hook (se houver) e rotear ao Coder diretamente.
 
 For **context bootstrap or update**:
 

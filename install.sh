@@ -118,6 +118,8 @@ FRAMEWORK_FILES=(
   ".agents/skills/pr-description.md"
   ".agents/skills/health-check.md"
   ".agents/skills/stack-lock.md"
+  ".agents/skills/plan-second-opinion.md"
+  ".agents/hooks/plan-review.sh"
   ".agents/SPEC.md"
 )
 
@@ -215,6 +217,59 @@ SECTION
     ok "$CLAUDE_MD — updated (missing sections/rules added)"
   else
     ok "$CLAUDE_MD — already up to date, nothing to do"
+  fi
+}
+
+# ── setup_hooks ─────────────────────────────────────────────────────────────
+# Installs plan-review.sh to ~/.claude/hooks/ and registers it in settings.json
+setup_hooks() {
+  local hook_src=".agents/hooks/plan-review.sh"
+  local hook_dst="$HOME/.claude/hooks/plan-review.sh"
+  local settings="$HOME/.claude/settings.json"
+
+  # Require jq
+  if ! command -v jq &> /dev/null; then
+    warn "jq not found — skipping hook setup. Install with: brew install jq"
+    return
+  fi
+
+  # Skip if plan-review.sh wasn't downloaded (no codex, no-op)
+  if [ ! -f "$hook_src" ]; then
+    warn "plan-review.sh not found — skipping hook setup."
+    return
+  fi
+
+  log "Setting up plan-review hook..."
+
+  mkdir -p "$HOME/.claude/hooks"
+  cp "$hook_src" "$hook_dst"
+  chmod +x "$hook_dst"
+  ok "Installed: $hook_dst"
+
+  # Merge hook entry into ~/.claude/settings.json
+  if [ ! -f "$settings" ]; then
+    echo '{"hooks":{"ExitPlanMode":[]}}' > "$settings"
+  fi
+
+  if grep -q "plan-review.sh" "$settings" 2>/dev/null; then
+    ok "Hook ExitPlanMode already in settings.json — skipping."
+  else
+    local new_hook='{"type":"command","command":"~/.claude/hooks/plan-review.sh","timeout":120}'
+    local updated
+    updated=$(jq --argjson hook "$new_hook" '
+      if .hooks.ExitPlanMode then
+        .hooks.ExitPlanMode += [$hook]
+      else
+        .hooks.ExitPlanMode = [$hook]
+      end
+    ' "$settings")
+    if [[ -n "$updated" ]]; then
+      echo "$updated" > "$settings"
+      ok "Hook registered in $settings"
+    else
+      warn "jq failed — settings.json not modified."
+      return 1
+    fi
   fi
 }
 
@@ -329,6 +384,7 @@ if [ "$MODE" = "install" ]; then
   ok ".agents/plugins/ (empty, ready for plugins)"
 
   merge_claude_md
+  setup_hooks
 
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
@@ -377,11 +433,12 @@ if [ "$MODE" = "update" ]; then
   done
 
   merge_claude_md
+  setup_hooks
 
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
     log "Staging updated files..."
-    git add "$AGENTS_DIR/personas/" "$AGENTS_DIR/skills/" "$AGENTS_DIR/SPEC.md" "$CLAUDE_MD" 2>/dev/null || true
+    git add "$AGENTS_DIR/personas/" "$AGENTS_DIR/skills/" "$AGENTS_DIR/hooks/" "$AGENTS_DIR/SPEC.md" "$CLAUDE_MD" 2>/dev/null || true
     echo ""
     read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Commit now? [Y/n] ")" COMMIT_ANSWER
     COMMIT_ANSWER="${COMMIT_ANSWER:-Y}"
