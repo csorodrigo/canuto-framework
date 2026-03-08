@@ -19,6 +19,10 @@ vendor/
 venv/
 __pycache__/
 
+# Canuto Framework — session snapshots (local only)
+.agents/memory/.snapshots/
+.agents/memory/.last-save-timestamp
+
 # Build artifacts
 dist/
 build/
