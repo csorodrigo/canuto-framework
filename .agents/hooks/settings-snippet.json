@@ -1,11 +1,25 @@
 {
-  "_comment": "Adicionar este bloco à chave 'ExitPlanMode' em ~/.claude/settings.json",
+  "_comment": "Merge this into ~/.claude/settings.json. Each array entry is a hook.",
   "hooks": {
     "ExitPlanMode": [
       {
         "type": "command",
         "command": "~/.claude/hooks/plan-review.sh",
         "timeout": 120
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "~/.claude/hooks/session-save.sh",
+        "timeout": 30
+      }
+    ],
+    "Notification": [
+      {
+        "type": "command",
+        "command": "~/.claude/hooks/pre-compact-save.sh",
+        "timeout": 15
       }
     ]
   }

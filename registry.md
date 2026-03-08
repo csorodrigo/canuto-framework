@@ -24,6 +24,7 @@ These skills ship with every install and update automatically.
 | `squads` | Parallel domain-based workstreams | orchestration |
 | `pr-description` | Auto-generate PR descriptions after review | workflow |
 | `health-check` | Diagnose framework setup integrity | diagnostics |
+| `continuous-learning` | Extract, store, and evolve reusable patterns (instincts) from session experience | learning, memory |
 
 ---
 
