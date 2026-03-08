@@ -285,7 +285,13 @@ setup_hooks() {
   }
 
   # ── Install all hooks ──────────────────────────────────────────────────
-  install_hook ".agents/hooks/plan-review.sh"      "ExitPlanMode"  120
+  # Note: ExitPlanMode is not a valid Claude Code hook event.
+  # plan-review.sh is installed to ~/.claude/hooks/ for manual use only.
+  if [ -f ".agents/hooks/plan-review.sh" ]; then
+    cp ".agents/hooks/plan-review.sh" "$HOME/.claude/hooks/plan-review.sh"
+    chmod +x "$HOME/.claude/hooks/plan-review.sh"
+    ok "Installed: $HOME/.claude/hooks/plan-review.sh (run manually: bash ~/.claude/hooks/plan-review.sh)"
+  fi
   install_hook ".agents/hooks/session-save.sh"      "Stop"          30
   install_hook ".agents/hooks/pre-compact-save.sh"  "Notification"  15
   # session-load.sh is a utility script, not a hook — it's called manually or via CLAUDE.md

@@ -1,17 +1,6 @@
 {
-  "_comment": "Merge this into ~/.claude/settings.json. Each array entry is a hook group (Claude Code v1.x format).",
+  "_comment": "Merge this into ~/.claude/settings.json. Valid Claude Code hook events: PreToolUse, PostToolUse, Stop, Notification.",
   "hooks": {
-    "ExitPlanMode": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/plan-review.sh",
-            "timeout": 120
-          }
-        ]
-      }
-    ],
     "Stop": [
       {
         "hooks": [
