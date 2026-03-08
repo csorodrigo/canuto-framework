@@ -64,8 +64,19 @@ fi
 # ── setup_deps ──────────────────────────────────────────────────────────────
 # Ensures required CLI tools are available, installing via brew when possible.
 setup_deps() {
+  # brew — package manager for macOS (install all other deps via brew)
   local has_brew=false
-  command -v brew &> /dev/null && has_brew=true
+  if command -v brew &> /dev/null; then
+    has_brew=true
+    ok "brew $(brew --version | head -1) already installed"
+  elif [[ "$OSTYPE" == "darwin"* ]]; then
+    log "Installing Homebrew..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
+      && has_brew=true && ok "Homebrew installed" \
+      || warn "Failed to install Homebrew — install manually: https://brew.sh"
+  else
+    warn "brew not available (non-macOS). Install jq and ast-grep manually."
+  fi
 
   # jq — required for hooks and MCP setup
   if ! command -v jq &> /dev/null; then
