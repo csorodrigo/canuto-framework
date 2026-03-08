@@ -34,11 +34,11 @@ echo ""
 # ── Last Session ────────────────────────────────────────────────────────────
 LAST_SESSION="$MEMORY_DIR/last-session.md"
 if [ -f "$LAST_SESSION" ] && grep -q "^## Date" "$LAST_SESSION" 2>/dev/null; then
-  SESSION_DATE=$(grep -A1 "^## Date" "$LAST_SESSION" | tail -1 | tr -d '[:space:]')
+  SESSION_DATE=$(grep -A2 "^## Date" "$LAST_SESSION" | grep -v "^## Date" | grep -v "^$" | head -1 | tr -d '[:space:]')
   if [ "$SESSION_DATE" != "YYYY-MM-DD" ] && [ -n "$SESSION_DATE" ]; then
     echo "── Last Session ($SESSION_DATE) ──"
-    # Extract summary
-    sed -n '/^## What Was Done/,/^## /p' "$LAST_SESSION" | head -10
+    # Extract summary (exclude the next section's header)
+    sed -n '/^## What Was Done/,/^## /{/^## What Was Done/d;/^## /d;p}' "$LAST_SESSION" | head -10
     echo ""
   else
     echo "── Last Session: (no previous session recorded) ──"
@@ -52,10 +52,11 @@ fi
 # ── Pending Tasks ───────────────────────────────────────────────────────────
 PENDING="$MEMORY_DIR/pending.md"
 if [ -f "$PENDING" ]; then
-  TASK_COUNT=$(grep -c '^\- \[' "$PENDING" 2>/dev/null || echo "0")
+  # Strip HTML comments before counting (template has examples inside <!-- -->)
+  TASK_COUNT=$(sed '/<!--/,/-->/d' "$PENDING" | grep -c '^\- \[' 2>/dev/null) || TASK_COUNT=0
   if [ "$TASK_COUNT" -gt 0 ]; then
     echo "── Pending Tasks ($TASK_COUNT) ──"
-    grep '^\- \[' "$PENDING"
+    sed '/<!--/,/-->/d' "$PENDING" | grep '^\- \['
     echo ""
   else
     echo "── Pending Tasks: none ──"
@@ -66,7 +67,7 @@ fi
 # ── Instincts (if learning system is active) ────────────────────────────────
 INSTINCTS="$MEMORY_DIR/instincts.md"
 if [ -f "$INSTINCTS" ]; then
-  INSTINCT_COUNT=$(grep -c '^### ' "$INSTINCTS" 2>/dev/null || echo "0")
+  INSTINCT_COUNT=$(grep -c '^### ' "$INSTINCTS" 2>/dev/null) || INSTINCT_COUNT=0
   if [ "$INSTINCT_COUNT" -gt 0 ]; then
     echo "── Active Instincts ($INSTINCT_COUNT) ──"
     grep '^### ' "$INSTINCTS" | head -5

@@ -17,7 +17,7 @@ set -euo pipefail
 NOTIFICATION=$(cat 2>/dev/null || echo "")
 
 # Only act on compaction-related notifications
-if ! echo "$NOTIFICATION" | grep -qi "compact\|context.*window\|truncat" 2>/dev/null; then
+if ! echo "$NOTIFICATION" | grep -Eqi "compact|context.*window|truncat" 2>/dev/null; then
   exit 0
 fi
 
@@ -55,9 +55,9 @@ echo ""
 echo "── ESSENTIAL CONTEXT (preserve after compaction) ──"
 echo ""
 
-# Current pending tasks
+# Current pending tasks (strip HTML comments)
 if [ -f "$MEMORY_DIR/pending.md" ]; then
-  TASKS=$(grep '^\- \[' "$MEMORY_DIR/pending.md" 2>/dev/null || true)
+  TASKS=$(sed '/<!--/,/-->/d' "$MEMORY_DIR/pending.md" | grep '^\- \[' 2>/dev/null) || TASKS=""
   if [ -n "$TASKS" ]; then
     echo "Pending tasks:"
     echo "$TASKS"
@@ -67,7 +67,7 @@ fi
 
 # Active instincts (top 3 by confidence)
 if [ -f "$MEMORY_DIR/instincts.md" ]; then
-  INSTINCTS=$(grep -A1 '^### ' "$MEMORY_DIR/instincts.md" 2>/dev/null | head -9 || true)
+  INSTINCTS=$(grep -A1 '^### ' "$MEMORY_DIR/instincts.md" 2>/dev/null | head -9) || INSTINCTS=""
   if [ -n "$INSTINCTS" ]; then
     echo "Top instincts:"
     echo "$INSTINCTS"
