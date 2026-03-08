@@ -61,6 +61,38 @@ if git remote -v 2>/dev/null | grep -q "canuto-framework"; then
   exit 0
 fi
 
+# ── setup_deps ──────────────────────────────────────────────────────────────
+# Ensures required CLI tools are available, installing via brew when possible.
+setup_deps() {
+  local has_brew=false
+  command -v brew &> /dev/null && has_brew=true
+
+  # jq — required for hooks and MCP setup
+  if ! command -v jq &> /dev/null; then
+    if $has_brew; then
+      log "Installing jq via Homebrew..."
+      brew install jq 2>/dev/null && ok "jq installed" || warn "Failed to install jq — install manually: brew install jq"
+    else
+      warn "jq not found and brew unavailable. Install manually: brew install jq"
+      warn "Hooks and MCP setup will be skipped."
+    fi
+  else
+    ok "jq $(jq --version) already installed"
+  fi
+
+  # node / npx — required for ast-grep MCP server
+  if ! command -v node &> /dev/null; then
+    warn "node not found — ast-grep MCP server requires Node.js."
+    if $has_brew; then
+      warn "Install with: brew install node"
+    else
+      warn "Install from: https://nodejs.org"
+    fi
+  else
+    ok "node $(node --version) already installed"
+  fi
+}
+
 # ── Check git availability ──────────────────────────────────────────────────
 if ! git rev-parse --git-dir > /dev/null 2>&1; then
   warn "Not a git repository. Files will be copied but not committed."
@@ -453,6 +485,7 @@ if [ "$MODE" = "install" ]; then
   touch ".agents/plugins/.gitkeep"
   ok ".agents/plugins/ (empty, ready for plugins)"
 
+  setup_deps
   merge_claude_md
   setup_hooks
   setup_search_tools
@@ -503,6 +536,7 @@ if [ "$MODE" = "update" ]; then
     ok "updated: $file"
   done
 
+  setup_deps
   merge_claude_md
   setup_hooks
   setup_search_tools
