@@ -128,6 +128,7 @@ INSTALL_ONLY_FILES=(
   ".agents/memory/decisions.md"
   ".agents/memory/pending.md"
   ".agents/memory/metrics.md"
+  ".agents/memory/repo-index.json"
   ".agents/stack.md"
 )
 
