@@ -120,6 +120,10 @@ FRAMEWORK_FILES=(
   ".agents/skills/stack-lock.md"
   ".agents/skills/plan-second-opinion.md"
   ".agents/hooks/plan-review.sh"
+  ".agents/hooks/session-save.sh"
+  ".agents/hooks/session-load.sh"
+  ".agents/hooks/pre-compact-save.sh"
+  ".agents/skills/continuous-learning.md"
   ".agents/SPEC.md"
 )
 
@@ -128,6 +132,8 @@ INSTALL_ONLY_FILES=(
   ".agents/memory/decisions.md"
   ".agents/memory/pending.md"
   ".agents/memory/metrics.md"
+  ".agents/memory/repo-index.json"
+  ".agents/memory/instincts.md"
   ".agents/stack.md"
 )
 
@@ -221,10 +227,8 @@ SECTION
 }
 
 # ── setup_hooks ─────────────────────────────────────────────────────────────
-# Installs plan-review.sh to ~/.claude/hooks/ and registers it in settings.json
+# Installs all hooks to ~/.claude/hooks/ and registers them in settings.json
 setup_hooks() {
-  local hook_src=".agents/hooks/plan-review.sh"
-  local hook_dst="$HOME/.claude/hooks/plan-review.sh"
   local settings="$HOME/.claude/settings.json"
 
   # Require jq
@@ -233,43 +237,62 @@ setup_hooks() {
     return
   fi
 
-  # Skip if plan-review.sh wasn't downloaded (no codex, no-op)
-  if [ ! -f "$hook_src" ]; then
-    warn "plan-review.sh not found — skipping hook setup."
-    return
-  fi
-
-  log "Setting up plan-review hook..."
-
+  log "Setting up hooks..."
   mkdir -p "$HOME/.claude/hooks"
-  cp "$hook_src" "$hook_dst"
-  chmod +x "$hook_dst"
-  ok "Installed: $hook_dst"
 
-  # Merge hook entry into ~/.claude/settings.json
+  # Initialize settings.json if missing
   if [ ! -f "$settings" ]; then
-    echo '{"hooks":{"ExitPlanMode":[]}}' > "$settings"
+    echo '{"hooks":{}}' > "$settings"
   fi
 
-  if grep -q "plan-review.sh" "$settings" 2>/dev/null; then
-    ok "Hook ExitPlanMode already in settings.json — skipping."
-  else
-    local new_hook='{"type":"command","command":"~/.claude/hooks/plan-review.sh","timeout":120}'
-    local updated
-    updated=$(jq --argjson hook "$new_hook" '
-      if .hooks.ExitPlanMode then
-        .hooks.ExitPlanMode += [$hook]
-      else
-        .hooks.ExitPlanMode = [$hook]
-      end
-    ' "$settings")
-    if [[ -n "$updated" ]]; then
-      echo "$updated" > "$settings"
-      ok "Hook registered in $settings"
-    else
-      warn "jq failed — settings.json not modified."
-      return 1
+  # ── Helper: install a single hook ──────────────────────────────────────
+  install_hook() {
+    local src="$1"       # e.g. ".agents/hooks/plan-review.sh"
+    local event="$2"     # e.g. "ExitPlanMode"
+    local timeout="$3"   # e.g. 120
+    local filename
+    filename=$(basename "$src")
+    local dst="$HOME/.claude/hooks/$filename"
+
+    if [ ! -f "$src" ]; then
+      warn "$filename not found — skipping."
+      return
     fi
+
+    cp "$src" "$dst"
+    chmod +x "$dst"
+    ok "Installed: $dst"
+
+    if grep -q "$filename" "$settings" 2>/dev/null; then
+      ok "Hook $event ($filename) already in settings.json — skipping."
+    else
+      local new_hook="{\"type\":\"command\",\"command\":\"~/.claude/hooks/$filename\",\"timeout\":$timeout}"
+      local updated
+      updated=$(jq --argjson hook "$new_hook" --arg event "$event" '
+        if .hooks[$event] then
+          .hooks[$event] += [$hook]
+        else
+          .hooks[$event] = [$hook]
+        end
+      ' "$settings")
+      if [[ -n "$updated" ]]; then
+        echo "$updated" > "$settings"
+        ok "Hook $event ($filename) registered in $settings"
+      else
+        warn "jq failed for $filename — settings.json not modified."
+      fi
+    fi
+  }
+
+  # ── Install all hooks ──────────────────────────────────────────────────
+  install_hook ".agents/hooks/plan-review.sh"      "ExitPlanMode"  120
+  install_hook ".agents/hooks/session-save.sh"      "Stop"          30
+  install_hook ".agents/hooks/pre-compact-save.sh"  "Notification"  15
+  # session-load.sh is a utility script, not a hook — it's called manually or via CLAUDE.md
+  if [ -f ".agents/hooks/session-load.sh" ]; then
+    cp ".agents/hooks/session-load.sh" "$HOME/.claude/hooks/session-load.sh"
+    chmod +x "$HOME/.claude/hooks/session-load.sh"
+    ok "Installed: $HOME/.claude/hooks/session-load.sh (utility — run manually with: bash ~/.claude/hooks/session-load.sh)"
   fi
 }
 
@@ -394,7 +417,7 @@ if [ "$MODE" = "install" ]; then
     read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Commit now? [Y/n] ")" COMMIT_ANSWER
     COMMIT_ANSWER="${COMMIT_ANSWER:-Y}"
     if [[ "$COMMIT_ANSWER" =~ ^[Yy]$ ]]; then
-      git commit -m "chore: add Canuto Framework v1.3"
+      git commit -m "chore: add Canuto Framework v1.4"
       ok "Committed!"
     else
       warn "Files staged but not committed. Run 'git commit' when ready."
@@ -443,7 +466,7 @@ if [ "$MODE" = "update" ]; then
     read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Commit now? [Y/n] ")" COMMIT_ANSWER
     COMMIT_ANSWER="${COMMIT_ANSWER:-Y}"
     if [[ "$COMMIT_ANSWER" =~ ^[Yy]$ ]]; then
-      git commit -m "chore: update Canuto Framework to v1.3"
+      git commit -m "chore: update Canuto Framework to v1.4"
       ok "Committed!"
     else
       warn "Files staged but not committed. Run 'git commit' when ready."
@@ -452,7 +475,7 @@ if [ "$MODE" = "update" ]; then
 
   echo ""
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
-  echo -e "${GREEN}  Framework updated to v1.3 successfully.${RESET}"
+  echo -e "${GREEN}  Framework updated to v1.4 successfully.${RESET}"
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
   echo ""
 fi

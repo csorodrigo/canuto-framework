@@ -12,7 +12,7 @@ These skills ship with every install and update automatically.
 
 | Name | Description | Tags |
 |------|-------------|------|
-| `context-maintenance` | How to maintain `.context.md` and `FEATURE-MAP.md` | documentation |
+| `context-maintenance` | How to maintain `.context.md`, `FEATURE-MAP.md`, and Repo Index (evaluate-repo pipeline) | documentation, indexation |
 | `api-design` | How to design and evolve HTTP/JSON APIs | backend |
 | `frontend-implementation` | How to implement frontend features | frontend |
 | `cli-usage` | How to safely use CLI commands and scripts | devops |
@@ -24,6 +24,7 @@ These skills ship with every install and update automatically.
 | `squads` | Parallel domain-based workstreams | orchestration |
 | `pr-description` | Auto-generate PR descriptions after review | workflow |
 | `health-check` | Diagnose framework setup integrity | diagnostics |
+| `continuous-learning` | Extract, store, and evolve reusable patterns (instincts) from session experience | learning, memory |
 
 ---
 

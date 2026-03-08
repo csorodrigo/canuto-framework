@@ -1,7 +1,7 @@
-shortDescription: How to maintain .context.md files and docs/FEATURE-MAP.md as the project evolves.
-usedBy: [contextualizer, coder, architect]
-version: 1.0.0
-lastUpdated: 2026-02-25
+shortDescription: How to maintain .context.md, FEATURE-MAP.md, and the Repo Index (evaluate-repo pipeline) as the project evolves.
+usedBy: [contextualizer, coder, architect, maestro]
+version: 2.0.0
+lastUpdated: 2026-03-08
 copyright: Rodrigo Canuto © 2026.
 
 ## When to Use
@@ -150,6 +150,204 @@ Brief description of what this feature does from the user's perspective.
 
 ---
 
+## Evaluate Repo — Deep Indexation Pipeline
+
+A 4-stage pipeline inspired by AI knowledge-base systems. Produces a comprehensive, searchable index of the entire repository. Runs during bootstrap or on demand.
+
+**Output files:**
+- `docs/REPO-INDEX.md` — human-readable domain map with entities, tags, and relationships.
+- `.agents/memory/repo-index.json` — machine-readable index for programmatic queries by personas.
+
+Together with `.context.md` (per-directory) and `FEATURE-MAP.md` (per-feature), the Repo Index answers **"what entities exist, how are they related, and where do I find them?"**.
+
+### When to Run
+
+- **Bootstrap**: First session on a new project — run after generating `.context.md` and `FEATURE-MAP.md`.
+- **On demand**: User explicitly requests `evaluate-repo` or Maestro detects significant structural changes (new modules, renamed directories, major refactors).
+- **Periodic refresh**: When `repo-index.json` is older than 7 days and significant commits have landed.
+
+**NOT for:**
+- Minor bug fixes or style changes.
+- Projects with fewer than 10 source files (`.context.md` + `FEATURE-MAP.md` are sufficient).
+
+### Stage 1 — Entity Extraction
+
+Scan every meaningful source file and extract:
+
+| Entity Type | What to Extract |
+|-------------|-----------------|
+| `function` | Exported/public functions with signature summary |
+| `class` | Classes with key methods listed |
+| `component` | UI components (React, Vue, Svelte, etc.) |
+| `route` | API routes/endpoints with method and path |
+| `middleware` | Express/Koa/Fastify middleware |
+| `schema` | Database schemas, Zod/Yup validations, TypeScript interfaces |
+| `hook` | Custom hooks (React useX, Vue composables) |
+| `service` | Service classes/modules (business logic orchestrators) |
+| `config` | Configuration files with key settings |
+| `type` | Exported TypeScript types/interfaces that define contracts |
+
+**Rules:**
+- Skip internal/private helpers unless they are critical to understanding the domain.
+- Record file path and line number for each entity.
+- Use the function/class name as-is — do not rename or abbreviate.
+
+### Stage 2 — Dependency Analysis
+
+For each extracted entity, map:
+
+1. **Imports**: What does this entity depend on? (other entities, external libraries)
+2. **Dependents**: What depends on this entity? (reverse lookup)
+3. **External dependencies**: Which npm/pip/cargo packages does this entity use directly?
+
+**Output per entity:**
+- `dependencies`: list of entity names or `external:<package>` references.
+- `dependents`: list of entity names that import/call this entity.
+
+**Rules:**
+- Only map direct dependencies (1 level deep). Do not recurse transitively.
+- Mark external dependencies with the `external:` prefix (e.g., `external:zod`, `external:express`).
+- If a dependency cannot be resolved, tag it as `[UNCERTAIN]`.
+
+### Stage 3 — Semantic Tagging
+
+For each entity, generate 3–8 searchable tags from these categories:
+
+| Tag Category | Examples |
+|--------------|----------|
+| **domain** | `auth`, `payments`, `notifications`, `onboarding`, `dashboard` |
+| **layer** | `controller`, `service`, `repository`, `middleware`, `ui`, `hook`, `util` |
+| **pattern** | `singleton`, `factory`, `observer`, `pub-sub`, `middleware-chain`, `HOC` |
+| **tech** | `react`, `express`, `prisma`, `zod`, `redis`, `stripe`, `supabase` |
+| **concern** | `validation`, `error-handling`, `caching`, `rate-limiting`, `logging` |
+
+**Rules:**
+- Tags are lowercase, hyphenated (e.g., `error-handling`, not `Error Handling`).
+- Prefer specific over generic: `jwt-validation` is better than `validation`.
+- Do not invent tags — only tag what is observable in the code.
+
+### Stage 4 — Categorization
+
+Group all entities into **domains** with confidence scores:
+
+1. **Identify domains**: Analyze tags and directory structure to discover natural domain boundaries (e.g., `Authentication`, `Payments`, `User Management`, `Dashboard`).
+2. **Assign entities**: Each entity belongs to 1–2 domains. If ambiguous, assign to the most relevant and note the secondary.
+3. **Score confidence**: Rate each domain assignment:
+   - `0.9–1.0` — Entity clearly belongs here (file path + tags agree).
+   - `0.7–0.89` — Likely belongs here (tags match, path is ambiguous).
+   - `0.5–0.69` — Uncertain (cross-cutting concern, could belong elsewhere).
+4. **Map cross-domain dependencies**: Note which domains depend on which (e.g., `Payments → Authentication`).
+
+### Repo Index Schemas
+
+#### docs/REPO-INDEX.md (Canuto Schema)
+
+```markdown
+# Repo Index
+
+> Auto-generated deep index of the repository. Maps every significant entity, its tags, relationships, and domain.
+> Generated by the Evaluate Repo pipeline. Updated alongside major structural changes.
+
+**Stats:** X entities | Y domains | generated YYYY-MM-DD
+
+---
+
+## Domain: [Domain Name] [confidence: X.XX]
+
+[1-2 sentences describing what this domain covers]
+
+**Tags:** tag1, tag2, tag3
+
+| Entity | Type | File | Line | Tags |
+|--------|------|------|------|------|
+| entityName | function | path/to/file.ts | 15 | tag1, tag2 |
+| OtherEntity | class | path/to/other.ts | 8 | tag3, tag4 |
+
+**Dependencies → other domains:**
+- → [Other Domain] (reason: entity X calls entity Y)
+
+---
+
+## Cross-Domain Map
+
+| Domain | Depends On | Depended By |
+|--------|-----------|-------------|
+| Authentication | Config, Database | Payments, Dashboard |
+| Payments | Authentication, Database | — |
+```
+
+#### .agents/memory/repo-index.json (Canuto Schema)
+
+```json
+{
+  "version": "1.0.0",
+  "generated": "YYYY-MM-DD",
+  "stats": {
+    "entityCount": 47,
+    "domainCount": 6,
+    "tagCount": 82
+  },
+  "domains": [
+    {
+      "name": "Authentication",
+      "confidence": 0.95,
+      "description": "Handles JWT generation, validation, and session management.",
+      "tags": ["auth", "jwt", "session", "middleware"],
+      "entities": [
+        {
+          "name": "generateToken",
+          "type": "function",
+          "file": "src/auth/token-service.ts",
+          "line": 15,
+          "tags": ["jwt", "generation", "auth"],
+          "dependencies": ["external:jsonwebtoken", "config.jwtSecret"],
+          "dependents": ["authMiddleware", "refreshSession"]
+        }
+      ],
+      "domainDependencies": ["Config", "Database"],
+      "domainDependents": ["Payments", "Dashboard"]
+    }
+  ],
+  "crossDomainMap": [
+    {
+      "from": "Payments",
+      "to": "Authentication",
+      "reason": "verifyPaymentSession calls authMiddleware"
+    }
+  ]
+}
+```
+
+### Procedure
+
+1. **Run Stage 1** (Entity Extraction): Scan all source directories. Produce raw entity list.
+2. **Run Stage 2** (Dependency Analysis): For each entity, resolve imports and dependents.
+3. **Run Stage 3** (Semantic Tagging): Tag each entity with 3–8 tags.
+4. **Run Stage 4** (Categorization): Group into domains, assign confidence, map cross-domain dependencies.
+5. **Generate outputs**: Write `docs/REPO-INDEX.md` and `.agents/memory/repo-index.json`.
+6. **Present summary to user**:
+   ```
+   Evaluate Repo complete:
+   - X entities extracted across Y files
+   - Z domains identified: [list]
+   - Top cross-domain dependencies: [list]
+
+   Approve and save? (or request changes)
+   ```
+7. **Save only after user approval.**
+
+### How Personas Use the Repo Index
+
+| Persona | Usage |
+|---------|-------|
+| **Maestro** | Reads `repo-index.json` to understand project scope and route tasks to the right domain expert. |
+| **Architect** | Consults domain map and cross-domain dependencies before designing new features. Avoids creating redundant entities. |
+| **Coder** | Searches entities by tag to find existing code before writing new code. Prevents duplication. |
+| **Reviewer** | Validates that new code fits the domain boundaries. Flags cross-domain violations. |
+| **Contextualizer** | Uses as input when updating `.context.md` — ensures consistency between context files and the index. |
+
+---
+
 ## Examples
 
 ### ✅ Good — complete, useful .context.md
@@ -190,6 +388,38 @@ This folder contains authentication files.
 
 This is bad because: tells the agent nothing specific, doesn't list files, has no constraints or guidance — the next agent will read the raw source code anyway, defeating the purpose.
 
+### ✅ Good — rich, searchable repo-index.json entity
+
+```json
+{
+  "name": "authMiddleware",
+  "type": "middleware",
+  "file": "src/auth/middleware.ts",
+  "line": 8,
+  "tags": ["auth", "express", "guard", "jwt-validation"],
+  "dependencies": ["external:express", "generateToken", "config.jwtSecret"],
+  "dependents": ["createPayment", "getUserProfile", "updateSettings"]
+}
+```
+
+Precise location, specific tags, clear dependency chain. Any persona can find this instantly.
+
+### ❌ Bad — vague, untagged entity
+
+```json
+{
+  "name": "middleware",
+  "type": "function",
+  "file": "src/auth/middleware.ts",
+  "line": 1,
+  "tags": ["middleware"],
+  "dependencies": [],
+  "dependents": []
+}
+```
+
+This is bad because: generic name, no line precision, single vague tag, no dependencies mapped — provides no more value than reading the raw file.
+
 ---
 
 ## Guardrails
@@ -198,3 +428,7 @@ This is bad because: tells the agent nothing specific, doesn't list files, has n
 - Never add a feature to the map that you cannot trace end-to-end. If the path is unclear, say so.
 - Never update the `updated` date in a `.context.md` unless the content actually changed.
 - On non-standard projects: detect the existing schema, adapt to it, never overwrite with Canuto schema without explicit user instruction.
+- Never assign a domain confidence above 0.9 unless both file path and tags clearly agree.
+- Never generate a repo index for projects under 10 source files — `.context.md` and `FEATURE-MAP.md` are sufficient.
+- Never tag entities with generic-only tags. At least 2 tags must be domain-specific.
+- Always present the repo index summary to the user before saving. Never auto-save.
