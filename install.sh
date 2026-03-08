@@ -254,13 +254,13 @@ setup_hooks() {
   if grep -q "plan-review.sh" "$settings" 2>/dev/null; then
     ok "Hook ExitPlanMode already in settings.json — skipping."
   else
-    local new_hook='{"type":"command","command":"~/.claude/hooks/plan-review.sh","timeout":120}'
+    local new_entry='{"hooks":[{"type":"command","command":"~/.claude/hooks/plan-review.sh","timeout":120}]}'
     local updated
-    updated=$(jq --argjson hook "$new_hook" '
+    updated=$(jq --argjson entry "$new_entry" '
       if .hooks.ExitPlanMode then
-        .hooks.ExitPlanMode += [$hook]
+        .hooks.ExitPlanMode += [$entry]
       else
-        .hooks.ExitPlanMode = [$hook]
+        .hooks.ExitPlanMode = [$entry]
       end
     ' "$settings")
     if [[ -n "$updated" ]]; then
@@ -269,6 +269,47 @@ setup_hooks() {
     else
       warn "jq failed — settings.json not modified."
       return 1
+    fi
+  fi
+}
+
+# ── setup_search_tools ───────────────────────────────────────────────────────
+# Installs ast-grep and registers its MCP server in ~/.claude/settings.json
+setup_search_tools() {
+  local settings="$HOME/.claude/settings.json"
+
+  if ! command -v jq &> /dev/null; then
+    warn "jq not found — skipping search tools setup."
+    return
+  fi
+
+  log "Setting up search tools (ast-grep)..."
+
+  # Install ast-grep if missing
+  if command -v sg &> /dev/null; then
+    ok "ast-grep already installed ($(sg --version))"
+  elif command -v brew &> /dev/null; then
+    log "Installing ast-grep via Homebrew..."
+    brew install ast-grep 2>/dev/null && ok "ast-grep installed" || warn "Failed to install ast-grep — install manually: brew install ast-grep"
+  else
+    warn "ast-grep not found and brew unavailable. Install manually: brew install ast-grep"
+  fi
+
+  # Add ast-grep MCP server to settings.json
+  if [ ! -f "$settings" ]; then
+    echo '{}' > "$settings"
+  fi
+
+  if jq -e '.mcpServers["ast-grep"]' "$settings" &>/dev/null; then
+    ok "ast-grep MCP server already in settings.json"
+  else
+    local updated
+    updated=$(jq '.mcpServers["ast-grep"] = {"command":"npx","args":["-y","@ast-grep/mcp"],"type":"stdio"}' "$settings")
+    if [[ -n "$updated" ]]; then
+      echo "$updated" > "$settings"
+      ok "ast-grep MCP server added to $settings"
+    else
+      warn "jq failed — MCP server not added to settings.json."
     fi
   fi
 }
@@ -385,6 +426,7 @@ if [ "$MODE" = "install" ]; then
 
   merge_claude_md
   setup_hooks
+  setup_search_tools
 
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
@@ -434,6 +476,7 @@ if [ "$MODE" = "update" ]; then
 
   merge_claude_md
   setup_hooks
+  setup_search_tools
 
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""

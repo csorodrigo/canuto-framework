@@ -1,12 +1,23 @@
 {
-  "_comment": "Adicionar este bloco à chave 'ExitPlanMode' em ~/.claude/settings.json",
+  "_comment": "Adicionar este bloco à chave 'hooks' em ~/.claude/settings.json (formato novo)",
   "hooks": {
     "ExitPlanMode": [
       {
-        "type": "command",
-        "command": "~/.claude/hooks/plan-review.sh",
-        "timeout": 120
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/plan-review.sh",
+            "timeout": 120
+          }
+        ]
       }
     ]
+  },
+  "mcpServers": {
+    "ast-grep": {
+      "command": "npx",
+      "args": ["-y", "@ast-grep/mcp"],
+      "type": "stdio"
+    }
   }
 }
