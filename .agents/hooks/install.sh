@@ -35,12 +35,16 @@ chmod +x "$HOOKS_DIR/plan-review.sh"
 
 echo "⚙️  Atualizando ~/.claude/settings.json..."
 
-# Novo entry para o hook
-NEW_HOOK=$(cat <<'EOF'
+# Novo entry para o hook (formato novo: objeto com campo "hooks")
+NEW_ENTRY=$(cat <<'EOF'
 {
-  "type": "command",
-  "command": "~/.claude/hooks/plan-review.sh",
-  "timeout": 120
+  "hooks": [
+    {
+      "type": "command",
+      "command": "~/.claude/hooks/plan-review.sh",
+      "timeout": 120
+    }
+  ]
 }
 EOF
 )
@@ -49,11 +53,11 @@ EOF
 if grep -q "plan-review.sh" "$SETTINGS_FILE" 2>/dev/null; then
   echo "✓ Hook ExitPlanMode já presente em settings.json — pulando."
 else
-  UPDATED=$(jq --argjson hook "$NEW_HOOK" '
+  UPDATED=$(jq --argjson entry "$NEW_ENTRY" '
     if .hooks.ExitPlanMode then
-      .hooks.ExitPlanMode += [$hook]
+      .hooks.ExitPlanMode += [$entry]
     else
-      .hooks.ExitPlanMode = [$hook]
+      .hooks.ExitPlanMode = [$entry]
     end
   ' "$SETTINGS_FILE")
   if [[ -n "$UPDATED" ]]; then
@@ -64,6 +68,9 @@ else
     exit 1
   fi
 fi
+
+echo ""
+echo "ℹ️  Formato usado: novo (hooks como array aninhado em objeto)"
 
 echo ""
 echo "✅ Instalação concluída!"

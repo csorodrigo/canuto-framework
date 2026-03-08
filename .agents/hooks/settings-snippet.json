@@ -1,26 +1,45 @@
 {
-  "_comment": "Merge this into ~/.claude/settings.json. Each array entry is a hook.",
+  "_comment": "Merge this into ~/.claude/settings.json. Each array entry is a hook group (Claude Code v1.x format).",
   "hooks": {
     "ExitPlanMode": [
       {
-        "type": "command",
-        "command": "~/.claude/hooks/plan-review.sh",
-        "timeout": 120
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/plan-review.sh",
+            "timeout": 120
+          }
+        ]
       }
     ],
     "Stop": [
       {
-        "type": "command",
-        "command": "~/.claude/hooks/session-save.sh",
-        "timeout": 30
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/session-save.sh",
+            "timeout": 30
+          }
+        ]
       }
     ],
     "Notification": [
       {
-        "type": "command",
-        "command": "~/.claude/hooks/pre-compact-save.sh",
-        "timeout": 15
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/pre-compact-save.sh",
+            "timeout": 15
+          }
+        ]
       }
     ]
+  },
+  "mcpServers": {
+    "ast-grep": {
+      "command": "npx",
+      "args": ["-y", "@ast-grep/mcp"],
+      "type": "stdio"
+    }
   }
 }
