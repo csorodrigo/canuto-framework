@@ -40,7 +40,7 @@ Requires `OPENBRAND_API_KEY` from [openbrand.sh/dashboard](https://openbrand.sh/
 ```bash
 npm add openbrand
 ```
-No API key required for programmatic use.
+No API key required — extraction runs locally via headless browser (server-side only).
 
 ### Option C: Hosted API
 ```bash

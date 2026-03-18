@@ -38,6 +38,8 @@ Three tunable parameters that control the visual output globally. Default values
 | **MOTION_INTENSITY** | 5 | 1–10 | 1 = no animations, CSS hover only. 10 = choreographed Framer Motion sequences. |
 | **VISUAL_DENSITY** | 4 | 1–10 | 1 = art-gallery airy spacing. 10 = cockpit-mode packed data. |
 
+> Defaults (6, 5, 4) are more conservative than the Taste Skill reference (8, 6, 4) to suit production SaaS apps. Adjust per-project in `design-profile.md`.
+
 **How knobs affect decisions:**
 - **DESIGN_VARIANCE 1–3:** Centered layouts, symmetrical grids, equal paddings. Standard hero sections allowed.
 - **DESIGN_VARIANCE 4–7:** Offset margins, varied aspect ratios, left-aligned headers. Centered hero sections discouraged.
@@ -263,12 +265,10 @@ Premium interactive feel using Framer Motion spring physics instead of linear ea
 { staggerChildren: 0.08 }
 ```
 
-**Performance rules:**
-- Never animate `top`, `left`, `width`, or `height` — use `transform` and `opacity` only
-- Wrap dynamic lists in `<AnimatePresence>`
-- Isolate perpetual/infinite animations in their own memoized `React.memo` Client Components
+**Key rules:**
 - Never use `useState` for continuous hover animations — use `useMotionValue` + `useTransform`
-- Apply noise/grain filters only to `fixed inset-0 pointer-events-none` pseudo-elements, never to scroll containers
+- Wrap dynamic lists in `<AnimatePresence>`
+- See **Performance Guardrails** section for full animation performance rules.
 
 ### 5. Inspiration Ingestion Protocol
 

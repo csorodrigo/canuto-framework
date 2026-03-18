@@ -42,6 +42,8 @@ Verify with `chub --version`. If not installed, ask the user to install it befor
 
 ### 1. Search for Documentation
 
+> **MCP shortcut:** If the `context-hub` MCP server is configured (see `settings-snippet.json`), search and fetch tools are available directly as MCP tools — no need to run CLI commands manually.
+
 Before writing any code that calls an external API or SDK:
 
 ```bash
