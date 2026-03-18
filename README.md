@@ -1,4 +1,4 @@
-# Canuto Framework v1.2
+# Canuto Framework v1.3
 
 Personal multi-agent framework for AI-assisted development. Claude-first, provider-agnostic.
 
@@ -27,11 +27,16 @@ Personal multi-agent framework for AI-assisted development. Claude-first, provid
     squads.md                 — Parallel workstreams for larger projects.
     pr-description.md         — Auto-generate PR descriptions after review.
     health-check.md           — Diagnose framework setup integrity on demand.
+    frontend-design.md        — Visual design principles, knobs, and LLM bias correction.
+    api-docs-fetch.md         — Fetch current API docs via Context Hub before coding.
+    brand-bootstrap.md        — Extract brand assets from URLs via OpenBrand.
   memory/
     last-session.md     — Summary + goals of the last session (overwritten each time).
     decisions.md        — Append-only log of decisions.
     pending.md          — Specific unfinished tasks from previous sessions.
     metrics.md          — Append-only session metrics log.
+    design-profile.md   — Visual identity: mood, typography, colors, knobs, brand source.
+    component-inventory.md — Registry of approved UI components.
   plugins/              — Opt-in plugin extensions (see plugin-system skill).
   SPEC.md               — Full specification and design decisions.
 registry.md             — Skill registry for core and optional skills.
@@ -154,6 +159,24 @@ You are my coding orchestrator for this repository.
 
 **Multi-provider**: Maestro pode delegar personas tier-2 para Codex ou GLM.
 
+**Design knobs**: Três parâmetros tunáveis (DESIGN_VARIANCE, MOTION_INTENSITY, VISUAL_DENSITY) controlam o output visual globalmente. Configuráveis por projeto em `design-profile.md`.
+
+**LLM bias correction**: Regras anti-padrão que previnem UIs genéricas de AI (Inter banido, hero centrado proibido com variance alta, estados obrigatórios de loading/empty/error).
+
+**API docs fetch**: Busca docs atualizadas via Context Hub (`chub`) antes de codificar integrações — previne hallucination de APIs.
+
+**Brand bootstrap**: Extrai cores, logos e brand name de URLs via OpenBrand para popular `design-profile.md` automaticamente.
+
+## MCP Servers Incluídos
+
+| Server | Comando | Função |
+|--------|---------|--------|
+| ast-grep | `npx -y @ast-grep/mcp` | Análise AST do codebase |
+| openbrand | `npx -y openbrand-mcp` | Extração de assets de marca via URL |
+| context-hub | `npx -y @aisuite/chub-mcp` | Docs de API atualizadas |
+
+Configurados automaticamente pelo `install.sh` em `~/.claude/settings.json`.
+
 ## Design Principles
 
 - Small, predictable steps over big, risky jumps.
@@ -164,4 +187,4 @@ You are my coding orchestrator for this repository.
 
 ---
 
-*Canuto Framework v1.2 — Rodrigo Canuto © 2026*
+*Canuto Framework v1.3 — Rodrigo Canuto © 2026*
