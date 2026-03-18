@@ -1,7 +1,7 @@
 shortDescription: How to make frontend features visually distinctive and design-coherent.
 usedBy: [coder, reviewer, architect]
-version: 1.0.0
-lastUpdated: 2026-03-01
+version: 2.0.0
+lastUpdated: 2026-03-18
 copyright: Rodrigo Canuto © 2026.
 
 ## When to Use
@@ -25,6 +25,76 @@ Prevent generic-looking UI by encoding opinionated design principles within the 
 Works alongside `frontend-implementation` (which covers _where_ to put code). This skill covers _how it should look_.
 
 Includes a vocabulary of reference aesthetic patterns and protocols for ingesting user-provided visual inspirations and presenting design previews before implementation.
+
+---
+
+## Design Knobs
+
+Three tunable parameters that control the visual output globally. Default values are set below but can be overridden per-project in `design-profile.md` or dynamically by the user in conversation.
+
+| Knob | Default | Range | Description |
+|------|---------|-------|-------------|
+| **DESIGN_VARIANCE** | 6 | 1–10 | 1 = symmetric, predictable layouts. 10 = asymmetric, editorial layouts. |
+| **MOTION_INTENSITY** | 5 | 1–10 | 1 = no animations, CSS hover only. 10 = choreographed Framer Motion sequences. |
+| **VISUAL_DENSITY** | 4 | 1–10 | 1 = art-gallery airy spacing. 10 = cockpit-mode packed data. |
+
+**How knobs affect decisions:**
+- **DESIGN_VARIANCE 1–3:** Centered layouts, symmetrical grids, equal paddings. Standard hero sections allowed.
+- **DESIGN_VARIANCE 4–7:** Offset margins, varied aspect ratios, left-aligned headers. Centered hero sections discouraged.
+- **DESIGN_VARIANCE 8–10:** Masonry layouts, fractional CSS Grid (`2fr 1fr 1fr`), generous asymmetric whitespace.
+- **MOTION_INTENSITY 1–3:** No auto-animations. CSS `:hover` and `:active` states only.
+- **MOTION_INTENSITY 4–7:** CSS transitions with `cubic-bezier(0.16, 1, 0.3, 1)`. Staggered load-in delays. Only `transform` and `opacity`.
+- **MOTION_INTENSITY 8–10:** Framer Motion spring physics, scroll-triggered reveals, layout transitions with `layoutId`.
+- **VISUAL_DENSITY 1–3:** Large section gaps, generous whitespace, premium/editorial feel.
+- **VISUAL_DENSITY 4–7:** Standard web app spacing.
+- **VISUAL_DENSITY 8–10:** Compact padding, `border-t` / `divide-y` instead of cards, monospace for numbers.
+
+**Mobile override:** For DESIGN_VARIANCE 4+, any asymmetric layout above `md:` **must** collapse to single-column (`w-full`, `px-4`) on viewports < 768px.
+
+---
+
+## LLM Bias Correction
+
+LLMs have statistical biases toward generic UI patterns. Actively avoid these "AI tells" to produce premium, non-generic interfaces:
+
+### Forbidden Patterns (unless explicitly requested by user or design profile)
+
+**Visual:**
+- No default neon/outer `box-shadow` glows — use inner borders or tinted shadows instead
+- No pure `#000000` black — use off-black (Zinc-950, Slate-950, or Charcoal)
+- No oversaturated accents — desaturate to blend with neutrals
+- No excessive gradient text on large headers
+
+**Typography:**
+- Avoid Inter for premium/creative contexts — prefer Geist, Outfit, Cabinet Grotesk, Satoshi, or the design profile's specified fonts
+- No oversized H1s that scream — control hierarchy with weight and color, not just massive scale
+- Serif fonts are only for editorial/creative — never on dashboards or software UIs
+
+**Layout:**
+- No centered hero when DESIGN_VARIANCE > 4 — use split-screen, left-aligned, or asymmetric whitespace
+- No "3 equal cards in a row" feature sections — use zig-zag, asymmetric grid, or horizontal scroll
+- No `h-screen` for full-height sections — always use `min-h-[100dvh]` (prevents mobile viewport bugs)
+- No complex flexbox percentage math — use CSS Grid (`grid grid-cols-1 md:grid-cols-3 gap-6`)
+
+**Content & Data:**
+- No generic placeholder names ("John Doe", "Jane Smith") — use creative, realistic names
+- No predictable numbers (99.99%, 50%, 1234567) — use organic data (47.2%, +1 (312) 847-1928)
+- No filler AI copywriting ("Elevate", "Seamless", "Unleash", "Next-Gen") — use concrete verbs
+- No broken Unsplash links — use `https://picsum.photos/seed/{random}/800/600` or SVG placeholders
+
+**Components:**
+- shadcn/ui must always be customized (radii, colors, shadows) — never ship vanilla defaults
+- No generic circular loading spinners — use skeletal loaders matching layout sizes
+- Cards must have elevation purpose — for VISUAL_DENSITY > 7, prefer `border-t` / `divide-y` / negative space
+
+### Required UI States
+
+LLMs naturally generate only the "happy path" successful state. Every interactive component **must** implement:
+
+- **Loading:** Skeletal loaders matching the layout shape (not generic spinners)
+- **Empty:** Composed empty states indicating how to populate data
+- **Error:** Clear, inline error reporting (not just console.log)
+- **Tactile feedback:** On `:active`, apply `-translate-y-[1px]` or `scale-[0.98]` for physical push feel
 
 ---
 
@@ -165,6 +235,41 @@ Non-functional floating geometric or organic shapes for ambient decoration.
 
 Use sparingly. 1–2 decorators per section maximum. They create atmosphere, not content.
 
+#### Liquid Glass Refraction
+
+Enhanced glassmorphism with physical edge simulation. Goes beyond basic `backdrop-blur`.
+
+```
+backdrop-blur-md bg-white/10
+border border-white/10
+shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]
+rounded-2xl
+```
+
+The inner border + inner shadow simulates light refracting through a glass edge. Use on dark or gradient backgrounds.
+
+#### Spring Physics Motion (MOTION_INTENSITY > 5)
+
+Premium interactive feel using Framer Motion spring physics instead of linear easing.
+
+```tsx
+// Spring config for weighty, premium feel
+{ type: "spring", stiffness: 100, damping: 20 }
+
+// Layout transitions for smooth re-ordering
+<motion.div layout layoutId="card-1" />
+
+// Staggered orchestration for lists
+{ staggerChildren: 0.08 }
+```
+
+**Performance rules:**
+- Never animate `top`, `left`, `width`, or `height` — use `transform` and `opacity` only
+- Wrap dynamic lists in `<AnimatePresence>`
+- Isolate perpetual/infinite animations in their own memoized `React.memo` Client Components
+- Never use `useState` for continuous hover animations — use `useMotionValue` + `useTransform`
+- Apply noise/grain filters only to `fixed inset-0 pointer-events-none` pseudo-elements, never to scroll containers
+
 ### 5. Inspiration Ingestion Protocol
 
 When the user provides visual references (images, Pinterest/Dribbble links, screenshots):
@@ -270,6 +375,18 @@ This is bad because: default shadcn/ui `Card` with zero design application — n
 ## Golden Rule
 
 > "Make unexpected but contextually coherent choices. If the previous generation used a centered hero, try a split layout. If it used a gradient background, try a textured pattern. Always vary between generations — but stay within the design profile."
+
+---
+
+## Performance Guardrails
+
+- Never animate `top`, `left`, `width`, or `height`. Animate exclusively via `transform` and `opacity`.
+- Apply noise/grain filters only to fixed, `pointer-events-none` pseudo-elements — never to scrolling containers (prevents continuous GPU repaints).
+- Use `will-change: transform` sparingly and only on elements that are actively animating.
+- Do not use `z-50` or `z-10` arbitrarily — reserve z-index for systemic layers (sticky nav, modals, overlays).
+- Wrap perpetual/infinite animations in their own memoized Client Components (`React.memo`) to prevent parent re-renders.
+- For `staggerChildren`, parent variants and children must reside in the same Client Component tree.
+- Ensure all `useEffect` animations contain strict cleanup functions.
 
 ---
 

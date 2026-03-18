@@ -6,6 +6,15 @@
 
 ---
 
+## Design Knobs
+
+> Tunable parameters that control the visual output. Override `frontend-design` skill defaults per-project.
+> Adjust these during the design interview or dynamically in conversation.
+
+- DESIGN_VARIANCE: <!-- 1-10, default 6. 1=symmetric/predictable, 10=asymmetric/editorial -->
+- MOTION_INTENSITY: <!-- 1-10, default 5. 1=static, 10=choreographed spring physics -->
+- VISUAL_DENSITY: <!-- 1-10, default 4. 1=art-gallery airy, 10=cockpit packed -->
+
 ## Mood
 
 <!-- e.g., "Professional but bold", "Dark and dramatic", "Spatial and immersive", "Playful and energetic" -->
@@ -48,11 +57,26 @@
 ## Preferred Aesthetic Patterns
 
 <!-- Which patterns from the frontend-design skill (Step 4) to use in this project -->
-<!-- Options: glassmorphism, glow-accents, depth-layering, color-per-card, tactile-surfaces, spatial-decorators -->
+<!-- Options: glassmorphism, glow-accents, depth-layering, color-per-card, tactile-surfaces, spatial-decorators, liquid-glass, spring-physics -->
 
 ## References
 
 <!-- Links to designs, screenshots, existing pages, or images saved in .context/attachments/ -->
+
+## Anti-Patterns Override
+
+<!-- List any "forbidden patterns" from the LLM Bias Correction section that ARE allowed in this project -->
+<!-- e.g., "Inter font is approved", "centered hero is fine", "3-column cards allowed for pricing page" -->
+
+## Required UI States
+
+<!-- Override default requirement of loading/empty/error/tactile states -->
+<!-- e.g., "skip empty states for admin-only views", "tactile feedback not needed for data tables" -->
+
+## Brand Source
+
+<!-- If brand assets were extracted from a URL using brand-bootstrap skill -->
+<!-- e.g., "Extracted from https://acme.com via OpenBrand on 2026-03-18" -->
 
 ## Feedback Log
 
