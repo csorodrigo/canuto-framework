@@ -1,4 +1,4 @@
-# Canuto Framework v1.3
+# Canuto Framework v1.4
 
 Personal multi-agent framework for AI-assisted development. Claude-first, provider-agnostic.
 
@@ -30,11 +30,21 @@ Personal multi-agent framework for AI-assisted development. Claude-first, provid
     frontend-design.md        — Visual design principles, knobs, and LLM bias correction.
     api-docs-fetch.md         — Fetch current API docs via Context Hub before coding.
     brand-bootstrap.md        — Extract brand assets from URLs via OpenBrand.
+    absence-reporting.md      — Personas report what they searched and didn't find.
+    cross-persona-flags.md    — Outbound flags between personas for lateral discovery.
+    coverage-tracking.md      — Track exploration depth for M/L tasks.
+    budget-controls.md        — Token/cost budgets per persona and session.
+    governance.md             — Approval gates for high-impact actions.
+    audit-trail.md            — Immutable log of session events.
+    runtime-flags.md          — Session-scoped behavioral overrides.
+    convergence-detection.md  — Multi-persona agreement detection.
+    heartbeat.md              — Foundation for autonomous agent activation.
   memory/
     last-session.md     — Summary + goals of the last session (overwritten each time).
     decisions.md        — Append-only log of decisions.
     pending.md          — Specific unfinished tasks from previous sessions.
     metrics.md          — Append-only session metrics log.
+    audit-log.md        — Append-only log of significant session events.
     design-profile.md   — Visual identity: mood, typography, colors, knobs, brand source.
     component-inventory.md — Registry of approved UI components.
   plugins/              — Opt-in plugin extensions (see plugin-system skill).
@@ -167,6 +177,26 @@ You are my coding orchestrator for this repository.
 
 **Brand bootstrap**: Extrai cores, logos e brand name de URLs via OpenBrand para popular `design-profile.md` automaticamente.
 
+**Absence reporting**: Personas reportam explicitamente o que buscaram e NÃO encontraram — eliminando ambiguidade de silêncio.
+
+**Cross-persona flags**: Personas emitem flags sugerindo que outra persona investigue uma descoberta — lateral discovery via Maestro.
+
+**Coverage tracking**: Maestro rastreia profundidade de exploração (personas, áreas, concerns) para tasks M/L.
+
+**Budget controls**: Limites de token/custo por persona e sessão com warnings advisórios.
+
+**Governance gates**: Checkpoints de aprovação humana para ações de alto impacto (deploy, migration, breaking changes).
+
+**Audit trail**: Log imutável de eventos significativos (handoffs, gates, rework, escalations) em `audit-log.md`.
+
+**Runtime flags**: Overrides de comportamento por sessão (FAST_MODE, STRICT_MODE, etc.) sem editar config.
+
+**Convergence detection**: Quando 2+ personas chegam à mesma conclusão independentemente, Maestro marca como alta confiança.
+
+**Session modes**: 3 modos de sessão — `full` (do zero), `continue` (retomar pending), `targeted` (foco específico).
+
+**Heartbeat** (futuro): Padrão para ativação autônoma de agentes via wake-ups agendados.
+
 ## MCP Servers Incluídos
 
 | Server | Comando | Função |
@@ -187,4 +217,4 @@ Configurados automaticamente pelo `install.sh` em `~/.claude/settings.json`.
 
 ---
 
-*Canuto Framework v1.3 — Rodrigo Canuto © 2026*
+*Canuto Framework v1.4 — Rodrigo Canuto © 2026*
