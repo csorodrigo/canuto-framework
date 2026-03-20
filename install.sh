@@ -434,10 +434,22 @@ setup_gstack() {
 # Uses the existing download() helper — no duplicate curl/wget logic.
 setup_global_skills() {
   local -a global_skills=(
+    # Canuto originals
     "office-hours"
     "investigate"
     "document-release"
     "retro"
+    # Impeccable design skills
+    "audit"
+    "animate"
+    "bolder"
+    "polish"
+    "critique"
+    "typeset"
+    "harden"
+    "colorize"
+    "overdrive"
+    "clarify"
   )
 
   log "Installing Canuto global skills to ~/.claude/skills/..."

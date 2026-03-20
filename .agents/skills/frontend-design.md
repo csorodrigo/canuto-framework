@@ -1,7 +1,7 @@
 shortDescription: How to make frontend features visually distinctive and design-coherent.
 usedBy: [coder, reviewer, architect]
-version: 2.0.0
-lastUpdated: 2026-03-18
+version: 3.0.0
+lastUpdated: 2026-03-20
 copyright: Rodrigo Canuto © 2026.
 
 ## When to Use
@@ -25,6 +25,21 @@ Prevent generic-looking UI by encoding opinionated design principles within the 
 Works alongside `frontend-implementation` (which covers _where_ to put code). This skill covers _how it should look_.
 
 Includes a vocabulary of reference aesthetic patterns and protocols for ingesting user-provided visual inspirations and presenting design previews before implementation.
+
+---
+
+## Context Gathering Protocol
+
+Before any visual work on a **new project or unfamiliar codebase**, gather the following context. This feeds `design-profile.md` creation during the Architect's interview. For S/XS tasks without an Architect, the Coder asks these 4 questions before generating design variations.
+
+| Question | Why it matters |
+|----------|----------------|
+| **Target audience** — Who uses this product? | Shapes tone: clinical (medical tools), playful (consumer apps), premium (B2B SaaS) |
+| **Primary use cases** — Top 3 user workflows? | Determines density, information hierarchy, and which UI patterns earn their place |
+| **Brand personality** — 3–5 adjectives (e.g. "precise, calm, modern" or "bold, irreverent, fast") | Translates to font weight, color saturation, motion intensity |
+| **Competitive context** — What does this need to stand out from? | Identifies clichés to actively avoid in this vertical |
+
+If the design-profile already exists and answers these, skip directly to reading it.
 
 ---
 
@@ -61,11 +76,13 @@ LLMs have statistical biases toward generic UI patterns. Actively avoid these "A
 
 ### Forbidden Patterns (unless explicitly requested by user or design profile)
 
-**Visual:**
+**Visual — AI slop palette:**
+- No cyan-on-dark, purple-to-blue gradients, or neon accents on dark backgrounds — this is the predictable "AI color palette"
 - No default neon/outer `box-shadow` glows — use inner borders or tinted shadows instead
 - No pure `#000000` black — use off-black (Zinc-950, Slate-950, or Charcoal)
 - No oversaturated accents — desaturate to blend with neutrals
 - No excessive gradient text on large headers
+- No lazy glassmorphism without intent — `backdrop-blur` is only valid when the design profile specifies it AND the background justifies frosted glass (dark or gradient). Glassmorphism on a solid white background is meaningless.
 
 **Typography:**
 - Avoid Inter for premium/creative contexts — prefer Geist, Outfit, Cabinet Grotesk, Satoshi, or the design profile's specified fonts
@@ -74,7 +91,8 @@ LLMs have statistical biases toward generic UI patterns. Actively avoid these "A
 
 **Layout:**
 - No centered hero when DESIGN_VARIANCE > 4 — use split-screen, left-aligned, or asymmetric whitespace
-- No "3 equal cards in a row" feature sections — use zig-zag, asymmetric grid, or horizontal scroll
+- No "hero metric layout": large number + small label + supporting stats row as dashboard card — the single most repeated AI dashboard cliché
+- No "icon + heading + body text" in a 3-column equal grid for feature sections — use zig-zag, asymmetric grid, or horizontal scroll
 - No `h-screen` for full-height sections — always use `min-h-[100dvh]` (prevents mobile viewport bugs)
 - No complex flexbox percentage math — use CSS Grid (`grid grid-cols-1 md:grid-cols-3 gap-6`)
 
@@ -130,14 +148,20 @@ Every user-facing UI must intentionally apply at least 3 of these 5 principles. 
 - Create clear size hierarchies with noticeable jumps between heading levels (e.g., 14px / 20px / 36px — not 16px / 18px / 20px).
 - Combine serif + sans-serif for contrast when the profile allows (e.g., Playfair Display italic for emphasis + sans-serif for body).
 - Define custom fonts in `tailwind.config.ts` if the design profile specifies them.
+- Body text minimum 16px. Line length 45–75 characters (use `max-w-prose` or explicit `ch` units).
+
+> For a focused typography audit (scale, pairing, hierarchy, line-length), run `/typeset`.
 
 #### Color
 
 - Use CSS custom properties (HSL variables in `:root`), following shadcn/ui's theming convention.
+- For new palettes: prefer OKLCH (`oklch(65% 0.15 230)`) over HSL — perceptually uniform, doesn't distort lightness when rotating hue, supported in all modern browsers. Use `color-mix(in oklch, ...)` for tint/shade variants.
 - Never hardcode hex values in components. Always reference design tokens.
 - The design profile defines the palette: a dominant color, at least one strong accent, and a background treatment.
 - Each section or card can have its own chromatic identity — avoid uniform monochrome. Use harmonious palette variants (e.g., orange card, green card, blue card).
 - No timid pastels unless the design profile explicitly calls for them.
+
+> For strategic color introduction on a monochromatic design, run `/colorize`.
 
 #### Motion
 
@@ -147,6 +171,9 @@ Every user-facing UI must intentionally apply at least 3 of these 5 principles. 
 - Staggered reveals for lists and grids: items enter sequentially, not all at once.
 - Every animation must have a purpose (draw attention, provide feedback, guide flow). No decorative-only animations.
 - Always respect `prefers-reduced-motion`.
+- No bounce or elastic easing (`spring` with high stiffness and low damping) — looks dated and amateur. Use `ease-out-quart/quint/expo` for CSS, or `{ stiffness: 100, damping: 20 }` for Framer spring.
+
+> For strategic motion analysis and improvement, run `/animate`.
 
 #### Backgrounds and Surfaces
 
@@ -335,6 +362,9 @@ When reviewing code that includes user-facing UI changes:
   - Does this new UI feel consistent with existing pages in the app?
   - Was a design preview approved before full implementation?
 - Design issues are **SHOULD FIX**, never MUST FIX. Design is important but does not block shipping.
+- For holistic UX/design evaluation before shipping (hierarchy, IA, emotion, discoverability), run `/critique`.
+- For a comprehensive multi-dimensional quality scan (a11y, performance, responsiveness, anti-patterns), run `/audit`.
+- For the final pixel-perfect pass (spacing consistency, all states, keyboard nav), run `/polish`.
 
 ---
 
