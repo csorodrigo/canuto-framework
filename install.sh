@@ -167,6 +167,15 @@ FRAMEWORK_FILES=(
   ".agents/hooks/session-load.sh"
   ".agents/hooks/pre-compact-save.sh"
   ".agents/skills/continuous-learning.md"
+  ".agents/skills/absence-reporting.md"
+  ".agents/skills/cross-persona-flags.md"
+  ".agents/skills/coverage-tracking.md"
+  ".agents/skills/budget-controls.md"
+  ".agents/skills/governance.md"
+  ".agents/skills/audit-trail.md"
+  ".agents/skills/runtime-flags.md"
+  ".agents/skills/convergence-detection.md"
+  ".agents/skills/heartbeat.md"
   ".agents/SPEC.md"
 )
 
@@ -177,6 +186,7 @@ INSTALL_ONLY_FILES=(
   ".agents/memory/metrics.md"
   ".agents/memory/repo-index.json"
   ".agents/memory/instincts.md"
+  ".agents/memory/audit-log.md"
   ".agents/stack.md"
 )
 

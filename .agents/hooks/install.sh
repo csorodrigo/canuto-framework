@@ -24,6 +24,36 @@ echo "📋 Copiando plan-review.sh..."
 cp "$SCRIPT_DIR/plan-review.sh" "$HOOKS_DIR/plan-review.sh"
 chmod +x "$HOOKS_DIR/plan-review.sh"
 
+# ──────────────────────────────────────────────────────
+# MCP Servers — merge into ~/.claude/settings.json
+# ──────────────────────────────────────────────────────
+SETTINGS_FILE="$HOME/.claude/settings.json"
+
+echo ""
+echo "🔌 Configurando MCP servers..."
+
+if [ -f "$SETTINGS_FILE" ]; then
+  # Merge mcpServers from snippet into existing settings
+  SNIPPET="$SCRIPT_DIR/settings-snippet.json"
+  if [ -f "$SNIPPET" ] && command -v jq &> /dev/null; then
+    # Extract mcpServers from snippet and merge with existing
+    MERGED=$(jq -s '.[0] * { mcpServers: (.[0].mcpServers // {} ) * .[1].mcpServers }' "$SETTINGS_FILE" "$SNIPPET")
+    echo "$MERGED" > "$SETTINGS_FILE"
+    echo "   ✅ MCP servers adicionados ao settings.json existente:"
+  else
+    echo "   ⚠️  Não foi possível fazer merge. Adicione manualmente de settings-snippet.json."
+  fi
+else
+  # Create settings.json from snippet
+  mkdir -p "$HOME/.claude"
+  cp "$SCRIPT_DIR/settings-snippet.json" "$SETTINGS_FILE"
+  echo "   ✅ settings.json criado com MCP servers:"
+fi
+
+echo "      - ast-grep (análise AST)"
+echo "      - openbrand (extração de assets de marca)"
+echo "      - context-hub (docs de API atualizadas)"
+
 echo ""
 echo "✅ Instalação concluída!"
 echo ""

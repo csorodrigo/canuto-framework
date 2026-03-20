@@ -25,6 +25,15 @@ These skills ship with every install and update automatically.
 | `pr-description` | Auto-generate PR descriptions after review | workflow |
 | `health-check` | Diagnose framework setup integrity | diagnostics |
 | `continuous-learning` | Extract, store, and evolve reusable patterns (instincts) from session experience | learning, memory |
+| `absence-reporting` | Personas report what they searched and did NOT find, eliminating silence ambiguity | observability |
+| `cross-persona-flags` | Outbound flags between personas for lateral discovery via Maestro | orchestration |
+| `coverage-tracking` | Track exploration depth across personas, areas, and concerns for M/L tasks | observability |
+| `budget-controls` | Token/cost budgets per persona and session with advisory warnings | cost-management |
+| `governance` | Approval gates for high-impact actions (deploy, migration, breaking changes) | governance |
+| `audit-trail` | Immutable append-only log of all significant session events | observability |
+| `runtime-flags` | Session-scoped behavioral overrides (FAST_MODE, STRICT_MODE, etc.) | configuration |
+| `convergence-detection` | Detect when multiple personas independently reach the same conclusion | observability |
+| `heartbeat` | Foundation for scheduled agent activation in autonomous setups | orchestration, future |
 
 ---
 

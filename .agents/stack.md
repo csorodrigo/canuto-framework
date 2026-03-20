@@ -57,3 +57,8 @@
 <!-- lucide-animated + lucide-react | heroicons | outro -->
 - [x] lucide-animated (padrão — `pnpm dlx shadcn add @lucide-animated/{icon-name}`)
 - [x] lucide-react (fallback para ícones estáticos sem necessidade de animação)
+
+## Ferramentas de Agente (opcionais)
+<!-- Ferramentas CLI que os agentes podem usar durante o desenvolvimento -->
+- [x] Context Hub (`npm install -g @aisuite/chub`) — docs de API atualizadas para evitar hallucination
+- [x] OpenBrand (`npx -y openbrand-mcp` ou `npm add openbrand`) — extração de assets de marca via URL

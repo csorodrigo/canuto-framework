@@ -29,6 +29,16 @@
       "command": "npx",
       "args": ["-y", "@ast-grep/mcp"],
       "type": "stdio"
+    },
+    "openbrand": {
+      "command": "npx",
+      "args": ["-y", "openbrand-mcp"],
+      "type": "stdio"
+    },
+    "context-hub": {
+      "command": "npx",
+      "args": ["-y", "@aisuite/chub-mcp"],
+      "type": "stdio"
     }
   }
 }

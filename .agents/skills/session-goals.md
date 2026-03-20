@@ -10,6 +10,7 @@ copyright: Rodrigo Canuto © 2026.
 - Session start — Maestro always prompts for goals after the session briefing
 - Session end — Maestro marks each goal ✅ / ⏳ / ❌ before writing `last-session.md`
 - User skips goals prompt — Maestro infers and records goals from conversation
+- User says: `"continue"`, `"pick up where we left off"`, `"targeted session"`, `"fresh start"`
 
 **Not for:**
 - Mid-task goal changes (capture those as deviations in the session, not as new goals)
@@ -109,6 +110,74 @@ Outcome-oriented ("works end-to-end"), not task-oriented ("write auth code"). Ma
 ```
 
 This is bad because: "write auth code" is a task, not an outcome — you can write code that doesn't work. Marking everything ✅ without evidence (Reviewer APPROVE, tests passing) obscures real progress.
+
+---
+
+---
+
+## Session Continuation Modes
+
+> Inspired by pgs-engine's execution modes (full, continue, targeted) — applied to session lifecycle.
+
+When starting a session, Maestro detects or asks for the session mode:
+
+### Mode: `full` (default)
+
+Fresh start. New goals, clean slate. Previous pending tasks are surfaced in the briefing but don't auto-carry.
+
+**When to use:** New feature work, new sprint, or when previous context is no longer relevant.
+
+```
+Session mode: full (fresh start)
+Goals: [user provides new goals]
+```
+
+### Mode: `continue`
+
+Resume where the last session left off. Pending tasks become the session's goals. Maestro skips the goals prompt and uses `pending.md` directly.
+
+**When to use:** User says "continue", "pick up where I left off", or there are significant pending tasks.
+
+```
+Session mode: continue
+Resuming from last session (2026-03-17):
+- ⏳ Write integration tests for refresh token endpoint
+- ⏳ Add rate limiting to auth endpoints
+- ❌ Update API documentation
+
+These become your session goals. Adjust? [Y/n]
+```
+
+### Mode: `targeted`
+
+Focus on a specific area or concern. Maestro narrows scope and skips unrelated pending tasks.
+
+**When to use:** User has a specific urgent fix, investigation, or focused task.
+
+```
+Session mode: targeted
+Focus: Debug the payment webhook timeout issue
+Pending tasks deferred: [3 items from pending.md — not relevant to this focus]
+```
+
+### Mode Detection
+
+Maestro infers the mode from user signals:
+
+| Signal | Inferred Mode |
+|--------|---------------|
+| "Continue", "pick up", "where we left off" | `continue` |
+| "Quick fix", "just this one thing", "focused on X" | `targeted` |
+| New goals, no reference to previous work | `full` |
+| Ambiguous | Ask the user |
+
+### Mode Logging
+
+Session mode is recorded in `last-session.md` and `audit-log.md`:
+
+```markdown
+- Session mode: continue (resumed 2 pending tasks from 2026-03-17)
+```
 
 ---
 

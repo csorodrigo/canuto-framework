@@ -196,6 +196,7 @@ Step 2 — Add rate limiting middleware
     metrics.md             — Append-only session metrics log
     design-profile.md      — Visual identity for the project (optional, for frontend projects)
     component-inventory.md — Registry of approved UI components (optional, for frontend projects)
+    audit-log.md           — Append-only log of significant session events (handoffs, gates, rework, etc.)
 ```
 
 ### 5.2 Session Start Briefing
@@ -378,6 +379,18 @@ The template generates a default `CLAUDE.md` with these configurable sections:
 21. **Component inventory** — `component-inventory.md` in memory. Registry of existing UI components. Prevents duplication and promotes reuse.
 22. **Design integration** — Architect interviews about visual design and presents 3 variations (Design Preview Protocol). Coder reads design profile and applies design principles. Reviewer checks design adherence (Design Lens — Pass 3). Inspiration Ingestion Protocol processes user-provided visual references.
 
+### Phase 8 — Observability & Governance ✅
+27. **Absence Reporting** — Personas report what they searched and didn't find. Convergent absence detection across personas.
+28. **Cross-Persona Flags** — Outbound flags between personas for lateral discovery, routed through Maestro.
+29. **Coverage Tracking** — Maestro tracks exploration depth across personas, areas, concerns, and absences for M/L tasks.
+30. **Budget Controls** — Token/cost budgets per persona and session with advisory warnings and optional hard-stop.
+31. **Governance Gates** — Approval checkpoints for high-impact actions (deploy, migration, breaking changes). Immutable audit logging.
+32. **Audit Trail** — Append-only log of all significant session events in `.agents/memory/audit-log.md`.
+33. **Runtime Flags** — Session-scoped behavioral overrides (FAST_MODE, STRICT_MODE, etc.) without editing config files.
+34. **Convergence Detection** — Multi-persona agreement detection with elevated confidence scoring for instinct extraction.
+35. **Session Continuation Modes** — Full/continue/targeted modes for session lifecycle flexibility.
+36. **Heartbeat Pattern** — Foundation for future autonomous agent activation via scheduled wake-ups.
+
 ### Phase 7 — Prompting Quality ✅
 23. **Anti-Hallucination Protocol** — Universal rule set (§3.6) requiring all personas to verify before stating, cite sources, and stop rather than invent.
 24. **Confidence Tagging** — `[CONFIRMED]` / `[ASSUMED]` / `[UNCERTAIN]` tags (§3.7) in plans, diagnoses, and handoffs. Makes uncertainty explicit. Architect resolves `[ASSUMED]` before implementation; Debugger must `[CONFIRM]` root cause before fixing.
@@ -408,9 +421,84 @@ The template generates a default `CLAUDE.md` with these configurable sections:
 | `squads` | How to group personas into parallel workstreams |
 | `stack-lock` | How to enforce approved library choices via `.agents/stack.md` |
 
+### Observability & Governance Skills
+| Skill | Purpose |
+|-------|--------|
+| `absence-reporting` | Personas report what they searched and didn't find |
+| `cross-persona-flags` | Outbound flags between personas for lateral discovery |
+| `coverage-tracking` | Track exploration depth across personas, areas, and concerns |
+| `budget-controls` | Token/cost budgets per persona and session |
+| `governance` | Approval gates for high-impact actions |
+| `audit-trail` | Immutable append-only log of session events |
+| `runtime-flags` | Session-scoped behavioral overrides |
+| `convergence-detection` | Multi-persona agreement detection |
+| `heartbeat` | Foundation for autonomous agent activation |
+
 ---
 
-## 11. Open Questions (Remaining)
+## 11. Observability & Governance (Phase 8)
+
+### 11.1 Absence Reporting
+
+Personas explicitly report what they searched and did NOT find, eliminating silence ambiguity. Every handoff involving investigation includes an `## Absences` section with `[ABSENCE]` (confirmed negative) and `[NOT CHECKED]` (unexplored) tags. Maestro aggregates absences and detects convergent absences (2+ personas report the same gap).
+
+Skill: `absence-reporting.md`
+
+### 11.2 Cross-Persona Flags
+
+Personas emit non-blocking suggestions for other personas via `## Outbound Flags` sections. Flags have priority (`info`, `suggest`, `urgent`) and a target persona. Maestro routes flags to targets and tracks resolution. This enables lateral discovery between personas that don't normally interact.
+
+Skill: `cross-persona-flags.md`
+
+### 11.3 Coverage Tracking
+
+For M/L tasks, Maestro tracks exploration depth across 4 dimensions: persona coverage, area coverage, concern coverage, and absence coverage. Coverage thresholds: ≥80% proceed, 50-79% surface gaps, <50% warn.
+
+Skill: `coverage-tracking.md`
+
+### 11.4 Budget Controls
+
+Token/cost budgets per persona and per session. Default session limit: 200K tokens. Maestro checks budget before each handoff and warns at 80%. Advisory by default (hard-stop opt-in). Multi-provider cost estimation supported.
+
+Skill: `budget-controls.md`
+
+### 11.5 Governance Gates
+
+Approval checkpoints for high-impact actions. Default gates (always active): deploy, migration, api-breaking, dependency-major, security-config. Custom gates configurable in `CLAUDE.md`. Every gate decision logged in `audit-log.md`. Maestro never auto-approves.
+
+Skill: `governance.md`
+
+### 11.6 Audit Trail
+
+Append-only log of all significant session mutations: handoffs, gates, rework, escalations, flags, budget warnings. Stored in `.agents/memory/audit-log.md`. Complements `decisions.md` (architectural) and `metrics.md` (numbers) with a forensic timeline.
+
+Skill: `audit-trail.md`
+
+### 11.7 Runtime Flags
+
+Session-scoped behavioral overrides: FAST_MODE, STRICT_MODE, SKIP_TESTER, SKIP_DESIGN_REVIEW, VERBOSE_HANDOFFS, QUIET_MODE, DRY_RUN, BUDGET_STRICT. Set via natural language or explicit syntax. Expire at session end. STRICT_MODE wins conflicts.
+
+Skill: `runtime-flags.md`
+
+### 11.8 Convergence Detection
+
+When 2+ personas independently reach the same conclusion, Maestro marks it as high-confidence. Convergent findings start at `medium` confidence for instinct extraction. Independence is required — directed findings don't count.
+
+Skill: `convergence-detection.md`
+
+### 11.9 Heartbeat Pattern (Future)
+
+Foundation for autonomous agent activation via scheduled wake-ups. Currently implemented as manual session-start checks. Future: `.agents/heartbeats.yml` config with interval-based triggers. Built-in patterns: test-watcher, dependency-checker, context-freshness.
+
+Skill: `heartbeat.md`
+
+### 11.10 Session Continuation Modes
+
+Three modes: `full` (fresh start), `continue` (resume pending.md), `targeted` (narrow focus). Maestro detects mode from user signals or asks explicitly. Integrated into `session-goals.md` skill.
+
+---
+
+## 12. Open Questions (Remaining)
 
 - Multi-provider API delegation: actual integration depends on API access and tool capabilities per environment.
 - Squads in practice: needs real-world testing to validate the 30% overlap threshold and max-parallel defaults.
