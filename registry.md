@@ -45,6 +45,21 @@ Useful in specific project types. Install with `bash install.sh --skill <name>`.
 |------|-------------|----------|------|
 | `session-goals` | Track session goals explicitly in a separate skill file | Teams or highly structured workflows | productivity |
 | `adr` | Architecture Decision Records | Long-lived projects with multiple contributors | architecture |
+| `product-review` | When/how to run /office-hours + /plan-ceo-review before Architect on L/XL features | Product-heavy projects, new features with uncertain scope | product, planning |
+| `browser-qa` | When/how to use gstack's /qa + /browse for real-browser UI testing | Projects with web frontends, critical user flows | testing, quality |
+
+---
+
+## Global Skills (deployed to ~/.claude/skills/ by install.sh)
+
+These skills are slash commands invokable directly in Claude Code. Installed automatically via `bash .agents/hooks/install.sh`.
+
+| Command | Description | Tags |
+|---------|-------------|------|
+| `/office-hours` | YC Office Hours — reframe product idea before coding. Asks forcing questions, generates 3 approaches, saves context for Architect. | product, planning |
+| `/investigate` | Forensic debugger — Iron Law: no fix without confirmed root cause. Read-only investigation phase first. | debugging |
+| `/document-release` | Post-ship documentation sweep — updates README, FEATURE-MAP.md, .context.md, CHANGELOG after a deploy. | documentation, workflow |
+| `/retro` | Weekly retrospective — reads metrics.md, audit-log.md, instincts.md to generate Shipped / Delayed / Learned / Next. | learning, memory |
 
 ---
 

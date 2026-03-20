@@ -1,4 +1,4 @@
-# Canuto Framework v1.4
+# Canuto Framework v1.5
 
 Personal multi-agent framework for AI-assisted development. Claude-first, provider-agnostic.
 
@@ -39,6 +39,8 @@ Personal multi-agent framework for AI-assisted development. Claude-first, provid
     runtime-flags.md          — Session-scoped behavioral overrides.
     convergence-detection.md  — Multi-persona agreement detection.
     heartbeat.md              — Foundation for autonomous agent activation.
+    browser-qa.md             — When/how to use /qa + /browse (gstack) in QA flow.
+    product-review.md         — When/how to run /office-hours + /plan-ceo-review for L/XL tasks.
   memory/
     last-session.md     — Summary + goals of the last session (overwritten each time).
     decisions.md        — Append-only log of decisions.
@@ -50,6 +52,18 @@ Personal multi-agent framework for AI-assisted development. Claude-first, provid
   plugins/              — Opt-in plugin extensions (see plugin-system skill).
   SPEC.md               — Full specification and design decisions.
 registry.md             — Skill registry for core and optional skills.
+global-skills/          — Global slash commands installed to ~/.claude/skills/
+  office-hours/         — Product reframe (YC-style) before writing a line of code.
+  investigate/          — Forensic debugging with Iron Law (no patch without root cause).
+  document-release/     — Update docs and changelog post-ship.
+  retro/                — Weekly retrospective with framework metrics.
+~/.claude/skills/gstack/  — Garry Tan's 21 engineering skills (auto-installed).
+  /plan-ceo-review      — CEO-level scope review.
+  /plan-eng-review      — Architecture review.
+  /qa                   — QA with real Chromium browser.
+  /careful              — Guardrails against destructive operations.
+  /browse               — In-browser research (requires bun).
+  … (+16 more)
 ```
 
 ## Standard Flow
@@ -79,10 +93,10 @@ O script:
 ### Atualizar o framework num projeto existente
 
 ```bash
-bash install.sh --update
+curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --update
 ```
 
-O `--update` **nunca sobrescreve** `memory/`, `plugins/`, ou `CLAUDE.md` — só atualiza personas e skills.
+O `--update` **nunca sobrescreve** `memory/`, `plugins/`, ou `CLAUDE.md` — só atualiza personas e skills. Também atualiza gstack e global skills.
 
 ### Verificar se está atualizado
 
@@ -207,6 +221,25 @@ You are my coding orchestrator for this repository.
 
 Configurados automaticamente pelo `install.sh` em `~/.claude/settings.json`.
 
+## Global Skills (~/.claude/skills/)
+
+Instalados globalmente — disponíveis em qualquer projeto.
+
+| Skill | Origem | Descrição |
+|-------|--------|-----------|
+| `/office-hours` | Canuto | Reframe de produto YC-style antes de codar |
+| `/investigate` | Canuto | Debugging forense com Iron Law |
+| `/document-release` | Canuto | Atualizar docs e changelog pós-ship |
+| `/retro` | Canuto | Retrospectiva semanal com métricas do framework |
+| `/plan-ceo-review` | gstack | Revisão de escopo nível CEO |
+| `/plan-eng-review` | gstack | Revisão de arquitetura |
+| `/qa` | gstack | QA com browser Chromium real |
+| `/careful` | gstack | Guardrails contra operações destrutivas |
+| `/browse` | gstack | Pesquisa in-browser (requer bun) |
+| `+16 mais` | gstack | Ver `~/.claude/skills/gstack/` |
+
+**gstack** (Garry Tan's engineering skills) é clonado automaticamente em `~/.claude/skills/gstack` e requer `git`. O binário `/browse` requer `bun`.
+
 ## Design Principles
 
 - Small, predictable steps over big, risky jumps.
@@ -217,4 +250,4 @@ Configurados automaticamente pelo `install.sh` em `~/.claude/settings.json`.
 
 ---
 
-*Canuto Framework v1.4 — Rodrigo Canuto © 2026*
+*Canuto Framework v1.5 — Rodrigo Canuto © 2026*
