@@ -131,7 +131,7 @@ A canvas file (`.canvas`) contains two top-level arrays following the [JSON Canv
 
 ## Examples
 
-See [references/EXAMPLES.md](references/EXAMPLES.md) for complete canvas examples.
+See [references/EXAMPLES.md](json-canvas/references/EXAMPLES.md) for complete canvas examples.
 
 ## References
 

@@ -1,7 +1,7 @@
 shortDescription: Diagnose framework setup integrity and detect misconfigurations before they cause session failures.
 usedBy: [maestro]
-version: 1.0.0
-lastUpdated: 2026-02-25
+version: 1.1.0
+lastUpdated: 2026-03-21
 copyright: Rodrigo Canuto © 2026.
 
 ## When to Use
@@ -51,13 +51,32 @@ Detect broken or missing framework components before they silently degrade sessi
 - [ ] `.agents/vault/` directory exists.
 - [ ] `.agents/vault/_index.md` exists.
 - [ ] `.agents/vault/.obsidian/` config exists.
+
+### Vault Directories
 - [ ] `.agents/vault/sessions/` directory exists.
 - [ ] `.agents/vault/decisions/` directory exists.
 - [ ] `.agents/vault/instincts/` directory exists.
+- [ ] `.agents/vault/pending/` directory exists.
+- [ ] `.agents/vault/audit/` directory exists.
+- [ ] `.agents/vault/metrics/` directory exists.
+- [ ] `.agents/vault/design/` directory exists.
+- [ ] `.agents/vault/bases/` directory exists.
+- [ ] `.agents/vault/canvas/` directory exists.
 
 ### MCP
 - [ ] `.agents/mcp/server.json` exists.
 - [ ] `.agents/mcp/setup.md` exists.
+- [ ] MCP connectivity: attempt `obsidian_list_notes(path="/")`. If MCP tools are available and Obsidian is running, this should return a list. If it fails, report as warning (not failure) — Obsidian may not be running.
+
+### Obsidian Skills
+- [ ] `.agents/skills/obsidian-markdown.md` exists (flat file, not in subdirectory).
+- [ ] `.agents/skills/obsidian-bases.md` exists (flat file, not in subdirectory).
+- [ ] `.agents/skills/json-canvas.md` exists (flat file, not in subdirectory).
+- [ ] `.agents/skills/mcp-obsidian.md` exists.
+
+### Legacy Check
+- [ ] `.agents/memory/` directory does NOT exist. If it does, warn: "Old flat-file memory detected. Run `bash install.sh --migrate` to upgrade."
+- [ ] `.agents/skills/obsidian-markdown/SKILL.md` does NOT exist. If it does, warn: "Old skill directory structure detected. Update framework files."
 
 ### SPEC
 - [ ] `.agents/SPEC.md` exists.
@@ -101,26 +120,34 @@ Detect broken or missing framework components before they silently degrade sessi
 | Persona files missing | `bash install.sh --update` |
 | Skill files missing | `bash install.sh --update` |
 | Vault missing | `bash install.sh` (install mode) |
+| Vault directories missing | `bash install.sh --migrate` |
 | MCP config missing | Copy from `.agents/mcp/server.json` template |
+| MCP not connecting | Check: Obsidian open? Local REST API plugin enabled? API key correct? See `.agents/mcp/setup.md` |
+| Old memory/ exists | `bash install.sh --migrate` |
+| Old skill SKILL.md in subdir | `bash install.sh --update` |
 | SPEC.md missing | `bash install.sh --update` |
 
 ---
 
 ## Examples
 
-### ✅ Good — structured report with verdict and remediation
+### Good — structured report with verdict and remediation
 
 ```markdown
-## Framework Health Check — 2026-03-02
+## Framework Health Check — 2026-03-21
 
-### ✅ Passing (4 items)
+### Passing (6 items)
 - CLAUDE.md: all required sections present
 - Personas: all 7 present
-- Vault: structure intact, _index.md present
+- Vault: structure intact, _index.md present, all 9 directories exist
+- MCP: server.json and setup.md present, connectivity OK
+- Obsidian skills: all 4 present (flat files)
 - SPEC.md: present
 
-### ⚠️ Warnings (1 item)
+### Warnings (1 item)
 - .agents/vault/metrics/ empty (will be populated on first session end)
+
+### Failures (0 items)
 
 ### Verdict: HEALTHY
 ```

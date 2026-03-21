@@ -7,6 +7,7 @@
 #   Update only:      bash install.sh --update
 #   Update via curl:  curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --update
 #   Check versions:   bash install.sh --check
+#   Migrate from v1:  bash install.sh --migrate
 #   Install a skill:  bash install.sh --skill pr-description --skill health-check
 # =============================================================================
 
@@ -16,7 +17,7 @@ REPO_URL="https://raw.githubusercontent.com/csorodrigo/canuto-framework/main"
 AGENTS_DIR=".agents"
 CLAUDE_MD="CLAUDE.md"
 TMP_DIR=$(mktemp -d)
-MODE="auto" # auto | install | update | check | skill
+MODE="auto" # auto | install | update | check | skill | migrate
 SKILLS_TO_INSTALL=()
 
 # ── Colors ─────────────────────────────────────────────────────────────────
@@ -35,7 +36,8 @@ error()  { echo -e "${RED}[canuto]${RESET} \u2717 $1"; exit 1; }
 while [[ $# -gt 0 ]]; do
   case $1 in
     --update) MODE="update" ;;
-    --check)  MODE="check"  ;;
+    --check)   MODE="check"   ;;
+    --migrate) MODE="migrate" ;;
     --skill)
       shift
       SKILLS_TO_INSTALL+=("$1")
@@ -178,6 +180,22 @@ FRAMEWORK_FILES=(
   ".agents/skills/heartbeat.md"
   ".agents/skills/product-review.md"
   ".agents/skills/browser-qa.md"
+  ".agents/skills/session-goals.md"
+  ".agents/skills/adr.md"
+  ".agents/skills/brand-bootstrap.md"
+  ".agents/skills/frontend-design.md"
+  ".agents/skills/api-docs-fetch.md"
+  ".agents/skills/defuddle.md"
+  ".agents/skills/obsidian-markdown.md"
+  ".agents/skills/obsidian-bases.md"
+  ".agents/skills/json-canvas.md"
+  ".agents/skills/mcp-obsidian.md"
+  ".agents/skills/obsidian-cli.md"
+  ".agents/skills/obsidian-markdown/references/CALLOUTS.md"
+  ".agents/skills/obsidian-markdown/references/EMBEDS.md"
+  ".agents/skills/obsidian-markdown/references/PROPERTIES.md"
+  ".agents/skills/obsidian-bases/references/FUNCTIONS_REFERENCE.md"
+  ".agents/skills/json-canvas/references/EXAMPLES.md"
   ".agents/SPEC.md"
 )
 
@@ -191,6 +209,20 @@ INSTALL_ONLY_FILES=(
   ".agents/mcp/server.json"
   ".agents/mcp/setup.md"
   ".agents/stack.md"
+)
+
+# Vault directories to create (no files to download, just mkdir)
+VAULT_DIRS=(
+  ".agents/vault/sessions"
+  ".agents/vault/decisions"
+  ".agents/vault/instincts"
+  ".agents/vault/pending"
+  ".agents/vault/audit"
+  ".agents/vault/metrics"
+  ".agents/vault/design"
+  ".agents/vault/design/components"
+  ".agents/vault/bases"
+  ".agents/vault/canvas"
 )
 
 # ── merge_claude_md ─────────────────────────────────────────────────────────
@@ -550,6 +582,125 @@ if [ "$MODE" = "skill" ]; then
   exit 0
 fi
 
+# ── MIGRATE ─────────────────────────────────────────────────────────────────
+# Upgrades from old flat-file memory (.agents/memory/) to Obsidian vault.
+# Safe to run multiple times. Backs up old memory/ before touching anything.
+if [ "$MODE" = "migrate" ]; then
+  echo ""
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo -e "${CYAN}  Canuto Framework — Migrate to v1.5${RESET}"
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo ""
+
+  # ── Step 1: Backup ────────────────────────────────────────────────────────
+  BACKUP_DIR=".agents/memory-backup-$(date +%Y%m%d-%H%M%S)"
+  if [ -d ".agents/memory" ]; then
+    cp -r ".agents/memory" "$BACKUP_DIR"
+    ok "Backup created: $BACKUP_DIR"
+  else
+    log "No .agents/memory/ found — skipping backup."
+  fi
+
+  # ── Step 2: Update framework files (personas, skills, hooks, SPEC) ───────
+  log "Downloading updated framework files..."
+  for file in "${FRAMEWORK_FILES[@]}"; do
+    download "$file" "$file"
+  done
+  ok "Framework files updated"
+
+  # ── Step 3: Create vault structure ───────────────────────────────────────
+  log "Creating vault structure..."
+  for file in "${INSTALL_ONLY_FILES[@]}"; do
+    if [ ! -f "$file" ]; then
+      download "$file" "$file"
+      ok "Created: $file"
+    else
+      ok "Already exists: $file (skipped)"
+    fi
+  done
+
+  for dir in "${VAULT_DIRS[@]}"; do
+    mkdir -p "$dir"
+    touch "$dir/.gitkeep"
+  done
+  ok "Vault directories ready"
+
+  # ── Step 4: Migrate data from flat files to vault notes ──────────────────
+  MIGRATED=0
+
+  migrate_flat_file() {
+    local src="$1"    # e.g. ".agents/memory/decisions.md"
+    local dst_dir="$2" # e.g. ".agents/vault/decisions"
+    local dst_file="$3" # e.g. "migrated-from-flat.md"
+
+    if [ -f "$src" ]; then
+      local content
+      content=$(cat "$src")
+      # Skip if file is just a template (< 200 bytes or only has headers)
+      local size
+      size=$(wc -c < "$src" | tr -d ' ')
+      if [ "$size" -gt 200 ]; then
+        mkdir -p "$dst_dir"
+        cp "$src" "$dst_dir/$dst_file"
+        ok "Migrated: $src → $dst_dir/$dst_file"
+        MIGRATED=$((MIGRATED + 1))
+      else
+        log "Skipped: $src (template only, ${size} bytes)"
+      fi
+    fi
+  }
+
+  migrate_flat_file ".agents/memory/decisions.md"           ".agents/vault/decisions"  "migrated-decisions.md"
+  migrate_flat_file ".agents/memory/instincts.md"           ".agents/vault/instincts"  "migrated-instincts.md"
+  migrate_flat_file ".agents/memory/last-session.md"        ".agents/vault/sessions"   "migrated-last-session.md"
+  migrate_flat_file ".agents/memory/pending.md"             ".agents/vault/pending"    "migrated-pending.md"
+  migrate_flat_file ".agents/memory/metrics.md"             ".agents/vault/metrics"    "migrated-metrics.md"
+  migrate_flat_file ".agents/memory/audit-log.md"           ".agents/vault/audit"      "migrated-audit-log.md"
+  migrate_flat_file ".agents/memory/design-profile.md"      ".agents/vault/design"     "profile.md"
+  migrate_flat_file ".agents/memory/component-inventory.md" ".agents/vault/design/components" "migrated-inventory.md"
+
+  # ── Step 5: Setup deps, hooks, tools ─────────────────────────────────────
+  setup_deps
+  merge_claude_md
+  setup_hooks
+  setup_search_tools
+
+  # ── Step 6: Clean up old memory dir ──────────────────────────────────────
+  if [ -d ".agents/memory" ] && [ "$MIGRATED" -gt 0 ]; then
+    echo ""
+    warn "Old .agents/memory/ still exists (backup at $BACKUP_DIR)."
+    read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Delete old .agents/memory/? [y/N] ")" DELETE_OLD
+    if [[ "$DELETE_OLD" =~ ^[Yy]$ ]]; then
+      rm -rf ".agents/memory"
+      ok "Deleted .agents/memory/"
+    else
+      log "Kept .agents/memory/ — delete manually when ready."
+    fi
+  fi
+
+  # ── Step 7: Commit ──────────────────────────────────────────────────────
+  if [ "$GIT_AVAILABLE" = true ]; then
+    echo ""
+    git add "$AGENTS_DIR/" "$CLAUDE_MD" 2>/dev/null || true
+    read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Commit migration? [Y/n] ")" COMMIT_ANSWER
+    COMMIT_ANSWER="${COMMIT_ANSWER:-Y}"
+    if [[ "$COMMIT_ANSWER" =~ ^[Yy]$ ]]; then
+      git commit -m "chore: migrate Canuto Framework to v1.5 (Obsidian vault)"
+      ok "Committed!"
+    fi
+  fi
+
+  echo ""
+  echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo -e "${GREEN}  Migration complete! $MIGRATED files migrated.${RESET}"
+  echo -e "${GREEN}  Next: open .agents/vault/ in Obsidian and${RESET}"
+  echo -e "${GREEN}  configure MCP (see .agents/mcp/setup.md).${RESET}"
+  echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo ""
+  rm -rf "$TMP_DIR"
+  exit 0
+fi
+
 # ── INSTALL ─────────────────────────────────────────────────────────────────
 if [ "$MODE" = "install" ]; then
   echo ""
@@ -573,6 +724,12 @@ if [ "$MODE" = "install" ]; then
   mkdir -p ".agents/plugins"
   touch ".agents/plugins/.gitkeep"
   ok ".agents/plugins/ (empty, ready for plugins)"
+
+  for dir in "${VAULT_DIRS[@]}"; do
+    mkdir -p "$dir"
+    touch "$dir/.gitkeep"
+  done
+  ok "Vault directories created"
 
   setup_deps
   merge_claude_md
@@ -611,8 +768,8 @@ if [ "$MODE" = "update" ]; then
   echo -e "${CYAN}  Canuto Framework \u2014 Update${RESET}"
   echo -e "${CYAN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
   echo ""
-  warn "This will update personas and skills only."
-  warn "memory/ and plugins/ will NOT be touched."
+  warn "This will update personas, skills, hooks, and SPEC.md."
+  warn "vault/ and plugins/ will NOT be touched."
   echo ""
   read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Proceed? [Y/n] ")" PROCEED
   PROCEED="${PROCEED:-Y}"

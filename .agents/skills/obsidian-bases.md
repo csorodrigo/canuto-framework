@@ -164,7 +164,7 @@ When subtracting two dates, the result is a **Duration** type (not a number). Ac
 # "(now() - file.ctime).round(0)"
 ```
 
-See [FUNCTIONS_REFERENCE.md](references/FUNCTIONS_REFERENCE.md) for the complete function reference.
+See [FUNCTIONS_REFERENCE.md](obsidian-bases/references/FUNCTIONS_REFERENCE.md) for the complete function reference.
 
 ## View Types
 
@@ -233,7 +233,7 @@ views:
 
 ## Examples
 
-### ✅ Good — Canuto instincts query base
+### Good — Canuto instincts query base
 
 ```yaml
 filters:
@@ -265,7 +265,7 @@ views:
       direction: DESC
 ```
 
-### ❌ Bad — Missing null checks, wrong duration handling
+### Bad — Missing null checks, wrong duration handling
 
 ```yaml
 formulas:
@@ -277,4 +277,4 @@ formulas:
 
 - [Bases Syntax](https://help.obsidian.md/bases/syntax)
 - [Functions](https://help.obsidian.md/bases/functions)
-- [Complete Functions Reference](references/FUNCTIONS_REFERENCE.md)
+- [Complete Functions Reference](obsidian-bases/references/FUNCTIONS_REFERENCE.md)
