@@ -781,18 +781,17 @@ if [ "$MODE" = "migrate" ]; then
     fi
   }
 
-  local project_slug
-  project_slug=$(basename "$(pwd)")
-  local project_vault="$HOME/.canuto/vault/projects/$project_slug"
+  PROJECT_SLUG=$(basename "$(pwd)")
+  PROJECT_VAULT="$HOME/.canuto/vault/projects/$PROJECT_SLUG"
 
-  migrate_flat_file ".agents/memory/decisions.md"           "$project_vault/decisions"  "migrated-decisions.md"
-  migrate_flat_file ".agents/memory/instincts.md"           "$project_vault/instincts"  "migrated-instincts.md"
-  migrate_flat_file ".agents/memory/last-session.md"        "$project_vault/sessions"   "migrated-last-session.md"
-  migrate_flat_file ".agents/memory/pending.md"             "$project_vault/pending"    "migrated-pending.md"
-  migrate_flat_file ".agents/memory/metrics.md"             "$project_vault/metrics"    "migrated-metrics.md"
-  migrate_flat_file ".agents/memory/audit-log.md"           "$project_vault/audit"      "migrated-audit-log.md"
-  migrate_flat_file ".agents/memory/design-profile.md"      "$project_vault/design"     "profile.md"
-  migrate_flat_file ".agents/memory/component-inventory.md" "$project_vault/design/components" "migrated-inventory.md"
+  migrate_flat_file ".agents/memory/decisions.md"           "$PROJECT_VAULT/decisions"  "migrated-decisions.md"
+  migrate_flat_file ".agents/memory/instincts.md"           "$PROJECT_VAULT/instincts"  "migrated-instincts.md"
+  migrate_flat_file ".agents/memory/last-session.md"        "$PROJECT_VAULT/sessions"   "migrated-last-session.md"
+  migrate_flat_file ".agents/memory/pending.md"             "$PROJECT_VAULT/pending"    "migrated-pending.md"
+  migrate_flat_file ".agents/memory/metrics.md"             "$PROJECT_VAULT/metrics"    "migrated-metrics.md"
+  migrate_flat_file ".agents/memory/audit-log.md"           "$PROJECT_VAULT/audit"      "migrated-audit-log.md"
+  migrate_flat_file ".agents/memory/design-profile.md"      "$PROJECT_VAULT/design"     "profile.md"
+  migrate_flat_file ".agents/memory/component-inventory.md" "$PROJECT_VAULT/design/components" "migrated-inventory.md"
 
   # ── Step 5: Setup deps, hooks, tools ─────────────────────────────────────
   setup_deps

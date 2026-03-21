@@ -1,6 +1,6 @@
-# Canuto Framework v1.5
+# Canuto Framework v1.6
 
-Personal multi-agent framework for AI-assisted development. Claude-first, provider-agnostic.
+Personal multi-agent framework for AI-assisted development. Claude-first, provider-agnostic. Obsidian-native memory.
 
 ## Structure
 
@@ -30,6 +30,12 @@ Personal multi-agent framework for AI-assisted development. Claude-first, provid
     frontend-design.md        — Visual design principles, knobs, and LLM bias correction.
     api-docs-fetch.md         — Fetch current API docs via Context Hub before coding.
     brand-bootstrap.md        — Extract brand assets from URLs via OpenBrand.
+    obsidian-markdown.md      — Wikilinks, embeds, callouts, properties, tags.
+    obsidian-bases.md         — Database views over notes (.base files).
+    json-canvas.md            — Visual maps and flowcharts (.canvas files).
+    mcp-obsidian.md           — How the framework uses MCP to interact with the vault.
+    obsidian-cli.md           — Interact with vault via Obsidian CLI.
+    defuddle.md               — Extract clean markdown from web pages.
     absence-reporting.md      — Personas report what they searched and didn't find.
     cross-persona-flags.md    — Outbound flags between personas for lateral discovery.
     coverage-tracking.md      — Track exploration depth for M/L tasks.
@@ -40,30 +46,33 @@ Personal multi-agent framework for AI-assisted development. Claude-first, provid
     convergence-detection.md  — Multi-persona agreement detection.
     heartbeat.md              — Foundation for autonomous agent activation.
     browser-qa.md             — When/how to use /qa + /browse (gstack) in QA flow.
-    product-review.md         — When/how to run /office-hours + /plan-ceo-review for L/XL tasks.
-  memory/
-    last-session.md     — Summary + goals of the last session (overwritten each time).
-    decisions.md        — Append-only log of decisions.
-    pending.md          — Specific unfinished tasks from previous sessions.
-    metrics.md          — Append-only session metrics log.
-    audit-log.md        — Append-only log of significant session events.
-    design-profile.md   — Visual identity: mood, typography, colors, knobs, brand source.
-    component-inventory.md — Registry of approved UI components.
+    product-review.md         — When/how to run /office-hours for L/XL tasks.
+  mcp/
+    server.json         — MCP server config template (obsidian-mcp-server).
+    setup.md            — Setup guide for Obsidian + MCP integration.
+  hooks/
+    session-save.sh     — Auto-backup vault on Stop.
+    session-load.sh     — Load session context on start.
+    pre-compact-save.sh — Save context before token compaction.
   plugins/              — Opt-in plugin extensions (see plugin-system skill).
   SPEC.md               — Full specification and design decisions.
+
+~/.canuto/vault/          — Global Obsidian vault (one for all projects)
+  projects/
+    my-app/               — Per-project memory
+      sessions/           — Daily session notes
+      decisions/          — One note per architectural decision
+      instincts/          — Learned patterns from sessions
+      pending/            — Unfinished tasks
+      audit/              — Event log (handoffs, gates, rework)
+      metrics/            — Session metrics
+      design/             — Design profile + component inventory
+  bases/                  — Database views (query across projects)
+  canvas/                 — Visual maps (persona flow, memory map)
+
 registry.md             — Skill registry for core and optional skills.
 global-skills/          — Global slash commands installed to ~/.claude/skills/
-  office-hours/         — Product reframe (YC-style) before writing a line of code.
-  investigate/          — Forensic debugging with Iron Law (no patch without root cause).
-  document-release/     — Update docs and changelog post-ship.
-  retro/                — Weekly retrospective with framework metrics.
 ~/.claude/skills/gstack/  — Garry Tan's 21 engineering skills (auto-installed).
-  /plan-ceo-review      — CEO-level scope review.
-  /plan-eng-review      — Architecture review.
-  /qa                   — QA with real Chromium browser.
-  /careful              — Guardrails against destructive operations.
-  /browse               — In-browser research (requires bun).
-  … (+16 more)
 ```
 
 ## Standard Flow
@@ -76,35 +85,48 @@ Maestro → Architect → Coder → Tester → Reviewer
 
 ## Installation
 
-### Projeto existente — fresh install
-
-Na raiz do seu projeto:
+### Fresh install (new project)
 
 ```bash
+cd my-project
 curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash
 ```
 
 O script:
 - Baixa todas as personas e skills
-- Cria os arquivos de memória (last-session, decisions, pending, metrics)
-- Cria o `CLAUDE.md` se não existir, ou adiciona as seções faltando se já existir
+- Cria `~/.canuto/vault/projects/{project-name}/` com toda a estrutura de memoria
+- Cria o `CLAUDE.md` se nao existir, ou adiciona as secoes faltando
+- Configura MCP (pede a API key do Obsidian Local REST API)
+- Instala hooks, ast-grep, gstack, e global skills
 - Oferece commit ao final
 
-### Atualizar o framework num projeto existente
+### Migrar de v1.5 (flat-file memory) para v1.6 (Obsidian vault)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --migrate
+```
+
+O `--migrate`:
+- Faz backup de `.agents/memory/`
+- Atualiza framework files (personas, skills, hooks)
+- Cria o vault global em `~/.canuto/vault/`
+- Migra dados do memory antigo para o vault (pula templates vazios)
+- Configura MCP e hooks
+- Oferece deletar o `memory/` antigo
+
+### Atualizar o framework
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --update
 ```
 
-O `--update` **nunca sobrescreve** `memory/`, `plugins/`, ou `CLAUDE.md` — só atualiza personas e skills. Também atualiza gstack e global skills.
+O `--update` **nunca sobrescreve** `vault/`, `plugins/`, ou `CLAUDE.md` — so atualiza personas, skills, hooks, e SPEC.
 
-### Verificar se está atualizado
+### Verificar se esta atualizado
 
 ```bash
 bash install.sh --check
 ```
-
-Lista cada arquivo: `✓ OK`, `⚠ OUTDATED`, ou `✗ MISSING`.
 
 ### Instalar uma skill opcional
 
@@ -117,27 +139,40 @@ Veja `registry.md` para a lista completa.
 
 ### Projeto novo (via GitHub Template)
 
-Clica em **"Use this template"** no topo do repositório.
+Clica em **"Use this template"** no topo do repositorio.
+
+---
+
+## Obsidian Setup (uma vez)
+
+O framework usa um vault Obsidian global em `~/.canuto/vault/` para memoria. Setup unico:
+
+1. **Instale o Obsidian** — [obsidian.md](https://obsidian.md)
+2. **Abra o vault** — File → Open folder as vault → `~/.canuto/vault/`
+3. **Instale o plugin Local REST API** — Settings → Community Plugins → Browse → "Local REST API" → Install → Enable
+4. **Rode `install.sh`** em qualquer projeto — ele pede a API key e configura o MCP automaticamente
+
+Depois disso, nunca mais precisa mexer. O vault fica aberto no Obsidian e todos os projetos gravam memoria ali, cada um na sua pasta `projects/{nome}/`.
 
 ---
 
 ## Como Funciona
 
-Após a instalação, abre o projeto em Claude. O Maestro vai:
-1. Carregar a memória e apresentar o briefing da sessão (goals deferidos + tarefas pendentes).
-2. Pedir os objetivos da sessão (até 3 goals).
+Apos a instalacao, abre o projeto em Claude. O Maestro vai:
+1. Carregar a memoria do vault via MCP e apresentar o briefing da sessao.
+2. Pedir os objetivos da sessao (ate 3 goals).
 3. Detectar o estilo do projeto (Canuto / foreign-schema / novo).
 4. Orquestrar as personas para a sua tarefa.
-5. Ao encerrar: marcar goals, gravar memória, gerar métricas.
+5. Ao encerrar: marcar goals, gravar memoria no vault, gerar metricas.
 
 ## Goals vs Pending Tasks
 
 | | Goals | Pending Tasks |
 |--|-------|---------------|
-| **O quê** | Intenções da sessão | Tarefas específicas não finalizadas |
+| **O que** | Intencoes da sessao | Tarefas especificas nao finalizadas |
 | **Exemplo** | "Auth funcionando end-to-end" | "Escrever testes do refresh token" |
-| **Onde fica** | `last-session.md` | `pending.md` |
-| **Máximo** | 3 por sessão | ilimitado |
+| **Onde fica** | `sessions/YYYY-MM-DD.md` | `pending/task-slug.md` |
+| **Maximo** | 3 por sessao | ilimitado |
 
 ## CLAUDE.md Template
 
@@ -157,10 +192,16 @@ You are my coding orchestrator for this repository.
 - session-briefing: true
 
 ## Project Rules
+- Before finalizing any plan, always interview the user in detail using AskUserQuestion about implementation choices, UI/UX decisions, trade-offs, and concerns. Never assume — always ask first.
 - Read any .context.md and docs/FEATURE-MAP.md files if they exist.
 - If they do not exist, have the Contextualizer create them (with approval).
 - Never run Git or shell commands without explicit confirmation.
 - When in doubt, ask questions instead of guessing.
+
+## Memory System
+- Global Obsidian vault at `~/.canuto/vault/`
+- MCP server (obsidian-mcp-server) required for vault access
+- See `.agents/mcp/setup.md` for configuration
 
 ## On Session Start
 1. Query vault via MCP: latest session note, pending tasks, high-confidence instincts
@@ -171,74 +212,75 @@ You are my coding orchestrator for this repository.
 
 ## Key Concepts
 
-**Session memory**: O `memory/` persiste contexto entre sessões, reduzindo tokens e evitando retrabalho.
+**Obsidian vault**: Memoria global em `~/.canuto/vault/`, acessada via MCP. Cada projeto tem sua pasta. Um vault, todos os projetos.
 
-**Rework detection**: Maestro avisa quando o mesmo arquivo é modificado 3+ vezes na sessão.
+**Session memory**: O vault persiste contexto entre sessoes como notas atomizadas com frontmatter, reduzindo tokens e evitando retrabalho.
+
+**Rework detection**: Maestro avisa quando o mesmo arquivo e modificado 3+ vezes na sessao.
 
 **PR description auto**: Reviewer gera o body do PR automaticamente no APPROVE.
 
-**Health check**: Diga "health check" pro Maestro rodar um diagnóstico completo do framework.
+**Health check**: Diga "health check" pro Maestro rodar um diagnostico completo do framework.
 
-**Plugins**: Extensões opcionais em `.agents/plugins/` sem tocar nos arquivos core.
+**Plugins**: Extensoes opcionais em `.agents/plugins/` sem tocar nos arquivos core.
 
 **Multi-provider**: Maestro pode delegar personas tier-2 para Codex ou GLM.
 
-**Design knobs**: Três parâmetros tunáveis (DESIGN_VARIANCE, MOTION_INTENSITY, VISUAL_DENSITY) controlam o output visual globalmente. Configuráveis por projeto em `design-profile.md`.
+**Design knobs**: Tres parametros tunaveis (DESIGN_VARIANCE, MOTION_INTENSITY, VISUAL_DENSITY) controlam o output visual globalmente. Configuraveis por projeto em `design/profile.md`.
 
-**LLM bias correction**: Regras anti-padrão que previnem UIs genéricas de AI (Inter banido, hero centrado proibido com variance alta, estados obrigatórios de loading/empty/error).
+**LLM bias correction**: Regras anti-padrao que previnem UIs genericas de AI.
 
-**API docs fetch**: Busca docs atualizadas via Context Hub (`chub`) antes de codificar integrações — previne hallucination de APIs.
+**API docs fetch**: Busca docs atualizadas via Context Hub antes de codificar integracoes.
 
-**Brand bootstrap**: Extrai cores, logos e brand name de URLs via OpenBrand para popular `design-profile.md` automaticamente.
+**Brand bootstrap**: Extrai cores, logos e brand name de URLs via OpenBrand para popular `design/profile.md` automaticamente.
 
-**Absence reporting**: Personas reportam explicitamente o que buscaram e NÃO encontraram — eliminando ambiguidade de silêncio.
+**Absence reporting**: Personas reportam o que buscaram e NAO encontraram.
 
-**Cross-persona flags**: Personas emitem flags sugerindo que outra persona investigue uma descoberta — lateral discovery via Maestro.
+**Cross-persona flags**: Personas emitem flags sugerindo que outra persona investigue uma descoberta.
 
-**Coverage tracking**: Maestro rastreia profundidade de exploração (personas, áreas, concerns) para tasks M/L.
+**Coverage tracking**: Maestro rastreia profundidade de exploracao para tasks M/L.
 
-**Budget controls**: Limites de token/custo por persona e sessão com warnings advisórios.
+**Budget controls**: Limites de token/custo por persona e sessao com warnings advisorios.
 
-**Governance gates**: Checkpoints de aprovação humana para ações de alto impacto (deploy, migration, breaking changes).
+**Governance gates**: Checkpoints de aprovacao humana para acoes de alto impacto.
 
-**Audit trail**: Log imutável de eventos significativos (handoffs, gates, rework, escalations) em `audit-log.md`.
+**Audit trail**: Log imutavel de eventos significativos como notas individuais no vault.
 
-**Runtime flags**: Overrides de comportamento por sessão (FAST_MODE, STRICT_MODE, etc.) sem editar config.
+**Runtime flags**: Overrides de comportamento por sessao (FAST_MODE, STRICT_MODE, etc.) sem editar config.
 
-**Convergence detection**: Quando 2+ personas chegam à mesma conclusão independentemente, Maestro marca como alta confiança.
+**Convergence detection**: Quando 2+ personas chegam a mesma conclusao independentemente, Maestro marca como alta confianca.
 
-**Session modes**: 3 modos de sessão — `full` (do zero), `continue` (retomar pending), `targeted` (foco específico).
+**Session modes**: 3 modos — `full` (do zero), `continue` (retomar pending), `targeted` (foco especifico).
 
-**Heartbeat** (futuro): Padrão para ativação autônoma de agentes via wake-ups agendados.
+## MCP Servers
 
-## MCP Servers Incluídos
-
-| Server | Comando | Função |
+| Server | Comando | Funcao |
 |--------|---------|--------|
-| ast-grep | `npx -y @ast-grep/mcp` | Análise AST do codebase |
-| openbrand | `npx -y openbrand-mcp` | Extração de assets de marca via URL |
+| obsidian-mcp-server | `npx obsidian-mcp-server` | Leitura/escrita do vault via Obsidian Local REST API |
+| ast-grep | `npx -y @ast-grep/mcp` | Analise AST do codebase |
+| openbrand | `npx -y openbrand-mcp` | Extracao de assets de marca via URL |
 | context-hub | `npx -y @aisuite/chub-mcp` | Docs de API atualizadas |
 
 Configurados automaticamente pelo `install.sh` em `~/.claude/settings.json`.
 
 ## Global Skills (~/.claude/skills/)
 
-Instalados globalmente — disponíveis em qualquer projeto.
+Instalados globalmente — disponiveis em qualquer projeto.
 
-| Skill | Origem | Descrição |
+| Skill | Origem | Descricao |
 |-------|--------|-----------|
 | `/office-hours` | Canuto | Reframe de produto YC-style antes de codar |
 | `/investigate` | Canuto | Debugging forense com Iron Law |
-| `/document-release` | Canuto | Atualizar docs e changelog pós-ship |
-| `/retro` | Canuto | Retrospectiva semanal com métricas do framework |
-| `/plan-ceo-review` | gstack | Revisão de escopo nível CEO |
-| `/plan-eng-review` | gstack | Revisão de arquitetura |
+| `/document-release` | Canuto | Atualizar docs e changelog pos-ship |
+| `/retro` | Canuto | Retrospectiva semanal com metricas do framework |
+| `/plan-ceo-review` | gstack | Revisao de escopo nivel CEO |
+| `/plan-eng-review` | gstack | Revisao de arquitetura |
 | `/qa` | gstack | QA com browser Chromium real |
-| `/careful` | gstack | Guardrails contra operações destrutivas |
+| `/careful` | gstack | Guardrails contra operacoes destrutivas |
 | `/browse` | gstack | Pesquisa in-browser (requer bun) |
 | `+16 mais` | gstack | Ver `~/.claude/skills/gstack/` |
 
-**gstack** (Garry Tan's engineering skills) é clonado automaticamente em `~/.claude/skills/gstack` e requer `git`. O binário `/browse` requer `bun`.
+**gstack** (Garry Tan's engineering skills) e clonado automaticamente em `~/.claude/skills/gstack` e requer `git`. O binario `/browse` requer `bun`.
 
 ## Design Principles
 
@@ -250,4 +292,4 @@ Instalados globalmente — disponíveis em qualquer projeto.
 
 ---
 
-*Canuto Framework v1.5 — Rodrigo Canuto © 2026*
+*Canuto Framework v1.6 — Rodrigo Canuto &copy; 2026*
