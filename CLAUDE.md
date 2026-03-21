@@ -27,6 +27,12 @@ You are my coding orchestrator for this repository.
 - Database views: bases/*.base
 - Visual maps: canvas/*.canvas
 
+## Development Rules
+- Always test scripts with both TTY and piped/non-interactive stdin (`[[ -t 0 ]]`) before finalizing
+- After any migration or structural change, run a pass for orphan references and broken links
+- Never push directly to main — always use feature branch + PR workflow
+- When modifying install.sh or hooks, test with `bash install.sh` locally before committing
+
 ## On Session Start
 1. Query vault via MCP: latest session note, pending tasks, high-confidence instincts
 2. Check for stale contexts (git diff)

@@ -95,6 +95,8 @@ CORE_SKILLS=(
   mcp-obsidian
   plugin-system
   vault-maintenance
+  research
+  headless-validation
 )
 
 for skill in "${CORE_SKILLS[@]}"; do
@@ -112,7 +114,7 @@ echo ""
 # ═══════════════════════════════════════════════════════════════════════════
 echo "── Test 3: Hook Scripts ──"
 
-HOOKS=(session-load session-save pre-compact-save)
+HOOKS=(session-load session-save pre-compact-save check-references check-orphans)
 for hook in "${HOOKS[@]}"; do
   HFILE="$AGENTS_DIR/hooks/$hook.sh"
   if [ ! -f "$HFILE" ]; then
@@ -281,6 +283,30 @@ for canvas in persona-flow memory-map; do
     warn "Canvas template missing: $canvas.canvas"
   fi
 done
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TEST 8.5: CI Workflow
+# ═══════════════════════════════════════════════════════════════════════════
+echo "── Test 8.5: CI Workflow ──"
+
+CI_FILE="$FRAMEWORK_DIR/.github/workflows/validate-framework.yml"
+if [ -f "$CI_FILE" ]; then
+  pass "CI workflow exists"
+  # Check for required steps
+  if grep -q "test-framework.sh" "$CI_FILE" 2>/dev/null; then
+    pass "CI workflow runs test-framework.sh"
+  else
+    warn "CI workflow missing test-framework.sh step"
+  fi
+  if grep -q "install.sh" "$CI_FILE" 2>/dev/null; then
+    pass "CI workflow runs install check"
+  else
+    warn "CI workflow missing install check step"
+  fi
+else
+  warn "CI workflow not found (.github/workflows/validate-framework.yml)"
+fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -37,6 +37,7 @@ Execute these steps **every time** a new session begins:
 3. **Check for stale contexts**:
    - Run `git diff --name-only` comparing file modification dates against `.context.md` timestamps.
    - List any directories where source files changed but `.context.md` was not updated.
+   - If vault files were modified since last session, suggest running `check-references.sh` to detect broken wikilinks.
 
 4. **Check for stale instincts** (continuous-learning skill):
    - `obsidian_global_search(query="confidence: low")` → find low-confidence instincts.
@@ -148,6 +149,12 @@ For **health check** (user says "health check", "diagnose", "is the framework ok
 
 ```
 Maestro → [run health-check skill inline]
+```
+
+For **research / investigation** (user says "research", "investigate", "analyze", "migration plan"):
+
+```
+Maestro → [run research skill] → Architect (if plan approved) → Coder
 ```
 
 ### Delegating Work
