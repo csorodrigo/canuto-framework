@@ -483,8 +483,8 @@ EOF
     ok "Created vault _index.md"
   fi
 
-  # Create global dirs (bases, canvas)
-  mkdir -p "$vault/bases" "$vault/canvas"
+  # Create global dirs (bases, canvas, global-instincts, reports)
+  mkdir -p "$vault/bases" "$vault/canvas" "$vault/global-instincts" "$vault/reports"
 
   # Create project-specific directories
   local project_dir="$vault/projects/$project_slug"

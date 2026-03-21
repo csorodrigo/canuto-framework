@@ -32,6 +32,7 @@ Execute these steps **every time** a new session begins:
    - `obsidian_list_notes(path="projects/{project-slug}/pending/")` → check for unfinished tasks.
    - `obsidian_global_search(query="confidence: high", contextLength=100)` → find high-confidence instincts (filter results to current project's path).
    - `obsidian_global_search(query="confidence: medium", contextLength=100)` → find medium-confidence instincts.
+   - `obsidian_list_notes(path="global-instincts/")` → load **global instincts** (cross-project patterns). These are high-confidence instincts promoted from any project. Present them alongside project instincts in the briefing, tagged as `[GLOBAL]`.
 
 2. **Check for stale contexts**:
    - Run `git diff --name-only` comparing file modification dates against `.context.md` timestamps.
