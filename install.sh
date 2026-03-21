@@ -765,6 +765,676 @@ setup_global_skills() {
   done
 }
 
+# ── post_install_analysis ─────────────────────────────────────────────────────
+# Generates project-index.json (deep scan) and onboarding-report.md
+# by cross-referencing with other indexed projects in the vault.
+post_install_analysis() {
+  local project_dir="${1:-.}"
+  local project_slug
+  project_slug=$(basename "$project_dir")
+  local vault="$HOME/.canuto/vault"
+  local project_vault="$vault/projects/$project_slug"
+
+  if ! command -v python3 &> /dev/null; then
+    warn "python3 required for auto-analysis. Skipping."
+    return
+  fi
+
+  log "Running deep project analysis..."
+
+  python3 << 'PYEOF'
+import os, sys, json, glob, re
+from pathlib import Path
+from datetime import datetime
+from collections import defaultdict, Counter
+
+project_dir = os.environ.get("PROJECT_DIR", os.getcwd())
+project_slug = os.path.basename(project_dir)
+vault = os.path.expanduser("~/.canuto/vault")
+project_vault = f"{vault}/projects/{project_slug}"
+today = datetime.now().isoformat()[:19]
+
+# ═══════════════════════════════════════════════════════════════════════
+# PHASE 1: Generate project-index.json (deep scan)
+# ═══════════════════════════════════════════════════════════════════════
+
+index = {
+    "slug": project_slug,
+    "path": project_dir,
+    "last_scanned": today,
+    "stack": {},
+    "dependencies": {"production": {}, "development": {}},
+    "structure": {},
+    "domains": [],
+    "patterns_detected": [],
+    "ci": {"has_ci": False},
+    "scripts": {},
+    "env_vars": [],
+    "api_surface": {}
+}
+
+# ── Detect stack ─────────────────────────────────────────────────────
+pkg_json = f"{project_dir}/package.json"
+pyproject = f"{project_dir}/pyproject.toml"
+requirements = f"{project_dir}/requirements.txt"
+go_mod = f"{project_dir}/go.mod"
+cargo_toml = f"{project_dir}/Cargo.toml"
+
+if os.path.exists(pkg_json):
+    try:
+        with open(pkg_json) as f:
+            pkg = json.load(f)
+
+        prod_deps = pkg.get("dependencies", {})
+        dev_deps = pkg.get("devDependencies", {})
+        all_deps = {**prod_deps, **dev_deps}
+        index["dependencies"]["production"] = prod_deps
+        index["dependencies"]["development"] = dev_deps
+
+        # Detect language
+        has_ts = "typescript" in dev_deps or os.path.exists(f"{project_dir}/tsconfig.json")
+        index["stack"]["primary_language"] = "typescript" if has_ts else "javascript"
+        langs = ["javascript"]
+        if has_ts: langs.insert(0, "typescript")
+        if glob.glob(f"{project_dir}/**/*.css", recursive=True): langs.append("css")
+        if glob.glob(f"{project_dir}/**/*.scss", recursive=True): langs.append("scss")
+        index["stack"]["languages"] = langs
+        index["stack"]["runtime"] = "node"
+
+        # Detect framework
+        frameworks = {
+            "next": "next", "nuxt": "nuxt", "express": "express",
+            "fastify": "fastify", "koa": "koa", "hapi": "@hapi/hapi",
+            "nest": "@nestjs/core", "remix": "@remix-run/react",
+            "astro": "astro", "gatsby": "gatsby", "svelte": "svelte",
+            "angular": "@angular/core"
+        }
+        for name, dep in frameworks.items():
+            if dep in all_deps:
+                index["stack"]["framework"] = name
+                break
+
+        # Detect UI framework
+        ui_fws = {"react": "react", "vue": "vue", "svelte": "svelte", "angular": "@angular/core", "solid": "solid-js"}
+        for name, dep in ui_fws.items():
+            if dep in all_deps:
+                index["stack"]["ui_framework"] = name
+                break
+
+        # Detect ORM
+        orms = {"prisma": "prisma", "typeorm": "typeorm", "sequelize": "sequelize",
+                "drizzle": "drizzle-orm", "mongoose": "mongoose", "knex": "knex"}
+        for name, dep in orms.items():
+            if dep in all_deps:
+                index["stack"]["orm"] = name
+                break
+
+        # Detect test framework
+        test_fws = {"vitest": "vitest", "jest": "jest", "mocha": "mocha",
+                    "ava": "ava", "tap": "tap", "playwright": "@playwright/test",
+                    "cypress": "cypress"}
+        for name, dep in test_fws.items():
+            if dep in all_deps:
+                index["stack"]["test_framework"] = name
+                break
+
+        # Detect bundler
+        bundlers = {"vite": "vite", "webpack": "webpack", "esbuild": "esbuild",
+                    "rollup": "rollup", "parcel": "parcel", "turbopack": "turbopack", "tsup": "tsup"}
+        for name, dep in bundlers.items():
+            if dep in all_deps:
+                index["stack"]["bundler"] = name
+                break
+
+        # Detect package manager
+        if os.path.exists(f"{project_dir}/pnpm-lock.yaml"):
+            index["stack"]["package_manager"] = "pnpm"
+        elif os.path.exists(f"{project_dir}/yarn.lock"):
+            index["stack"]["package_manager"] = "yarn"
+        elif os.path.exists(f"{project_dir}/bun.lockb"):
+            index["stack"]["package_manager"] = "bun"
+        else:
+            index["stack"]["package_manager"] = "npm"
+
+        # Scripts
+        index["scripts"] = pkg.get("scripts", {})
+
+    except Exception as e:
+        pass
+
+elif os.path.exists(pyproject):
+    index["stack"]["primary_language"] = "python"
+    index["stack"]["languages"] = ["python"]
+    index["stack"]["runtime"] = "python"
+    try:
+        with open(pyproject) as f:
+            content = f.read()
+        # Simple TOML parsing for deps
+        deps = re.findall(r'"([a-zA-Z0-9_-]+)[><=!~]*', content)
+        index["dependencies"]["production"] = {d: "*" for d in deps[:30]}
+
+        py_fws = {"fastapi": "fastapi", "django": "django", "flask": "flask",
+                  "starlette": "starlette", "sanic": "sanic"}
+        for name, dep in py_fws.items():
+            if dep in content.lower():
+                index["stack"]["framework"] = name
+                break
+
+        py_orms = {"sqlalchemy": "sqlalchemy", "tortoise": "tortoise", "peewee": "peewee",
+                   "django": "django"}
+        for name, dep in py_orms.items():
+            if dep in content.lower():
+                index["stack"]["orm"] = name
+                break
+
+        if "pytest" in content: index["stack"]["test_framework"] = "pytest"
+        elif "unittest" in content: index["stack"]["test_framework"] = "unittest"
+    except:
+        pass
+
+elif os.path.exists(requirements):
+    index["stack"]["primary_language"] = "python"
+    index["stack"]["languages"] = ["python"]
+    index["stack"]["runtime"] = "python"
+    try:
+        with open(requirements) as f:
+            deps = [l.split("==")[0].split(">=")[0].split("<=")[0].strip()
+                    for l in f if l.strip() and not l.startswith("#")]
+        index["dependencies"]["production"] = {d: "*" for d in deps}
+    except:
+        pass
+
+elif os.path.exists(go_mod):
+    index["stack"]["primary_language"] = "go"
+    index["stack"]["languages"] = ["go"]
+    index["stack"]["runtime"] = "go"
+    try:
+        with open(go_mod) as f:
+            content = f.read()
+        deps = re.findall(r'^\s+(\S+)\s+v', content, re.MULTILINE)
+        index["dependencies"]["production"] = {d: "*" for d in deps}
+        if "gin-gonic" in content: index["stack"]["framework"] = "gin"
+        elif "gofiber" in content: index["stack"]["framework"] = "fiber"
+        elif "echo" in content: index["stack"]["framework"] = "echo"
+    except:
+        pass
+
+elif os.path.exists(cargo_toml):
+    index["stack"]["primary_language"] = "rust"
+    index["stack"]["languages"] = ["rust"]
+    index["stack"]["runtime"] = "rust"
+    try:
+        with open(cargo_toml) as f:
+            content = f.read()
+        deps = re.findall(r'^(\w[\w-]*)\s*=', content, re.MULTILINE)
+        index["dependencies"]["production"] = {d: "*" for d in deps if d not in ("name", "version", "edition", "authors")}
+        if "actix" in content: index["stack"]["framework"] = "actix"
+        elif "axum" in content: index["stack"]["framework"] = "axum"
+        elif "rocket" in content: index["stack"]["framework"] = "rocket"
+    except:
+        pass
+
+# ── Analyze structure ────────────────────────────────────────────────
+IGNORE = {'.git', 'node_modules', '.next', 'dist', 'build', '__pycache__',
+          '.venv', 'venv', 'target', '.agents', '.obsidian', 'vendor', 'coverage'}
+SOURCE_EXTS = {'.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.java', '.kt', '.rb', '.php', '.swift'}
+TEST_PATTERNS = {'test', 'spec', '__tests__', 'tests', '_test'}
+CONFIG_EXTS = {'.json', '.yaml', '.yml', '.toml', '.ini', '.env', '.config.js', '.config.ts'}
+
+source_files = []
+test_files = []
+config_files = []
+source_dirs = set()
+test_dirs = set()
+total_loc = 0
+source_loc = 0
+test_loc = 0
+
+for root, dirs, files in os.walk(project_dir):
+    dirs[:] = [d for d in dirs if d not in IGNORE]
+    rel_root = os.path.relpath(root, project_dir)
+
+    for fname in files:
+        fpath = os.path.join(root, fname)
+        rel_path = os.path.relpath(fpath, project_dir)
+        ext = Path(fname).suffix
+
+        if ext in SOURCE_EXTS:
+            try:
+                lc = sum(1 for _ in open(fpath, errors='ignore'))
+            except:
+                lc = 0
+
+            is_test = any(p in rel_path.lower() for p in TEST_PATTERNS)
+            if is_test:
+                test_files.append(rel_path)
+                test_dirs.add(os.path.dirname(rel_path) + "/")
+                test_loc += lc
+            else:
+                source_files.append(rel_path)
+                source_dirs.add(os.path.dirname(rel_path) + "/")
+                source_loc += lc
+            total_loc += lc
+
+        elif ext in CONFIG_EXTS or fname.startswith('.env'):
+            config_files.append(rel_path)
+
+# Entry points
+entry_candidates = ['src/index.ts', 'src/index.js', 'src/main.ts', 'src/main.py',
+                    'src/app.ts', 'src/app.py', 'main.go', 'src/main.rs',
+                    'src/server.ts', 'src/server.js', 'app.py', 'manage.py',
+                    'index.ts', 'index.js']
+entry_points = [e for e in entry_candidates if os.path.exists(f"{project_dir}/{e}")]
+
+index["structure"] = {
+    "entry_points": entry_points,
+    "source_dirs": sorted(list(source_dirs))[:20],
+    "test_dirs": sorted(list(test_dirs))[:10],
+    "config_files": sorted(config_files)[:15],
+    "loc": {"total": total_loc, "source": source_loc, "test": test_loc},
+    "file_count": {"total": len(source_files) + len(test_files) + len(config_files),
+                   "source": len(source_files), "test": len(test_files), "config": len(config_files)}
+}
+
+# ── Detect domains ───────────────────────────────────────────────────
+domain_keywords = {
+    "auth": ["auth", "login", "signup", "jwt", "token", "session", "oauth", "password", "bcrypt"],
+    "api": ["route", "controller", "endpoint", "handler", "middleware", "api"],
+    "data": ["model", "schema", "migration", "repository", "database", "db", "prisma", "orm"],
+    "payments": ["payment", "billing", "stripe", "invoice", "subscription", "checkout"],
+    "notifications": ["notification", "email", "sms", "push", "mailer", "sendgrid"],
+    "storage": ["upload", "storage", "s3", "bucket", "file", "media", "image"],
+    "admin": ["admin", "dashboard", "backoffice", "panel"],
+    "testing": ["test", "spec", "mock", "fixture", "factory", "seed"],
+    "config": ["config", "env", "settings", "constants"],
+    "ui": ["component", "page", "layout", "view", "template", "widget"],
+}
+
+domain_files = defaultdict(list)
+domain_deps = defaultdict(set)
+all_deps_flat = set(index["dependencies"]["production"].keys()) | set(index["dependencies"]["development"].keys())
+
+for sf in source_files:
+    sf_lower = sf.lower()
+    for domain, keywords in domain_keywords.items():
+        if any(kw in sf_lower for kw in keywords):
+            domain_files[domain].append(sf)
+            break
+
+# Map deps to domains
+dep_domain_map = {
+    "auth": ["jsonwebtoken", "bcrypt", "passport", "next-auth", "clerk", "auth0", "jose"],
+    "data": ["prisma", "@prisma/client", "typeorm", "sequelize", "mongoose", "knex", "drizzle-orm", "sqlalchemy"],
+    "payments": ["stripe", "@stripe/stripe-js", "paypal"],
+    "notifications": ["nodemailer", "sendgrid", "@sendgrid/mail", "twilio"],
+    "storage": ["@aws-sdk/client-s3", "multer", "sharp", "cloudinary"],
+}
+for domain, deps in dep_domain_map.items():
+    for dep in deps:
+        if dep in all_deps_flat:
+            domain_deps[domain].add(dep)
+
+domains = []
+for domain, files in domain_files.items():
+    confidence = min(0.5 + len(files) * 0.1 + len(domain_deps.get(domain, [])) * 0.15, 1.0)
+    domains.append({
+        "name": domain,
+        "files": files[:10],
+        "deps": list(domain_deps.get(domain, [])),
+        "confidence": round(confidence, 2)
+    })
+index["domains"] = sorted(domains, key=lambda d: d["confidence"], reverse=True)
+
+# ── Detect patterns ──────────────────────────────────────────────────
+patterns = []
+all_source_lower = " ".join(source_files).lower()
+all_config_lower = " ".join(config_files).lower()
+
+if "middleware" in all_source_lower: patterns.append("middleware-chain")
+if "repository" in all_source_lower or "repo" in all_source_lower: patterns.append("repository-pattern")
+if "factory" in all_source_lower: patterns.append("factory-pattern")
+if "service" in all_source_lower: patterns.append("service-layer")
+if "controller" in all_source_lower: patterns.append("controller-pattern")
+if "hook" in all_source_lower or "use" in " ".join(f for f in source_files if f.endswith(('.ts', '.tsx', '.js', '.jsx'))): patterns.append("custom-hooks")
+if ".env" in all_config_lower: patterns.append("env-validation")
+if "singleton" in all_source_lower: patterns.append("singleton")
+if "observer" in all_source_lower or "event" in all_source_lower: patterns.append("event-driven")
+if "queue" in all_source_lower or "worker" in all_source_lower: patterns.append("queue-worker")
+if "cache" in all_source_lower or "redis" in all_source_lower: patterns.append("caching")
+if "graphql" in all_source_lower or "gql" in all_source_lower: patterns.append("graphql")
+if "websocket" in all_source_lower or "socket" in all_source_lower: patterns.append("websockets")
+index["patterns_detected"] = patterns
+
+# ── Detect CI ────────────────────────────────────────────────────────
+ci = {"has_ci": False}
+gh_workflows = glob.glob(f"{project_dir}/.github/workflows/*.yml") + glob.glob(f"{project_dir}/.github/workflows/*.yaml")
+if gh_workflows:
+    ci["has_ci"] = True
+    ci["provider"] = "github-actions"
+    ci["workflows"] = [os.path.basename(w) for w in gh_workflows]
+    # Detect steps
+    all_wf_content = ""
+    for wf in gh_workflows:
+        try:
+            with open(wf) as f: all_wf_content += f.read().lower()
+        except: pass
+    ci["has_lint"] = "lint" in all_wf_content or "eslint" in all_wf_content
+    ci["has_tests"] = "test" in all_wf_content
+    ci["has_deploy"] = "deploy" in all_wf_content or "release" in all_wf_content
+elif os.path.exists(f"{project_dir}/.gitlab-ci.yml"):
+    ci = {"has_ci": True, "provider": "gitlab-ci", "workflows": [".gitlab-ci.yml"]}
+elif os.path.exists(f"{project_dir}/.circleci"):
+    ci = {"has_ci": True, "provider": "circleci", "workflows": ["config.yml"]}
+index["ci"] = ci
+
+# ── Detect env vars ──────────────────────────────────────────────────
+env_vars = set()
+for env_file in ['.env.example', '.env.sample', '.env.template', '.env.local.example']:
+    env_path = f"{project_dir}/{env_file}"
+    if os.path.exists(env_path):
+        try:
+            with open(env_path) as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        env_vars.add(line.split('=')[0].strip())
+        except:
+            pass
+
+# Also scan source for process.env / os.environ
+for sf in source_files[:100]:
+    try:
+        with open(f"{project_dir}/{sf}", errors='ignore') as f:
+            content = f.read()
+        env_vars.update(re.findall(r'process\.env\.([A-Z_][A-Z0-9_]*)', content))
+        env_vars.update(re.findall(r'os\.environ\.get\(["\']([A-Z_][A-Z0-9_]*)', content))
+        env_vars.update(re.findall(r'os\.getenv\(["\']([A-Z_][A-Z0-9_]*)', content))
+    except:
+        pass
+index["env_vars"] = sorted(list(env_vars))
+
+# ── API surface ──────────────────────────────────────────────────────
+routes_count = 0
+middleware_count = 0
+models_count = 0
+for sf in source_files:
+    try:
+        with open(f"{project_dir}/{sf}", errors='ignore') as f:
+            content = f.read()
+        routes_count += len(re.findall(r'\.(get|post|put|patch|delete|all)\s*\(', content, re.I))
+        routes_count += len(re.findall(r'@(Get|Post|Put|Patch|Delete|Route)\s*\(', content))
+        middleware_count += len(re.findall(r'\.use\s*\(', content))
+        models_count += len(re.findall(r'model\s+\w+\s*\{', content))
+    except:
+        pass
+index["api_surface"] = {
+    "routes_count": routes_count,
+    "middleware_count": middleware_count,
+    "models_count": models_count
+}
+
+# ── Save project-index.json ──────────────────────────────────────────
+os.makedirs(project_vault, exist_ok=True)
+index_path = f"{project_vault}/project-index.json"
+with open(index_path, 'w') as f:
+    json.dump(index, f, indent=2)
+print(f"\033[0;32m[canuto]\033[0m \u2713 project-index.json ({index['structure'].get('file_count', {}).get('total', 0)} files, {total_loc} LOC, {len(domains)} domains)")
+
+# ═══════════════════════════════════════════════════════════════════════
+# PHASE 2: Cross-reference with other projects → onboarding-report.md
+# ═══════════════════════════════════════════════════════════════════════
+
+projects_dir = f"{vault}/projects"
+other_projects = []
+
+if os.path.exists(projects_dir):
+    for p in os.listdir(projects_dir):
+        if p == project_slug or p == '.obsidian':
+            continue
+        p_index = f"{projects_dir}/{p}/project-index.json"
+        if os.path.exists(p_index):
+            try:
+                with open(p_index) as f:
+                    other_projects.append(json.load(f))
+            except:
+                pass
+
+if not other_projects:
+    print(f"\033[1;33m[canuto]\033[0m No other indexed projects in vault. Onboarding report skipped.")
+    print(f"\033[1;33m[canuto]\033[0m Run install.sh in other projects first, then re-run /auto-analysis.")
+    sys.exit(0)
+
+# ── Calculate stack match ────────────────────────────────────────────
+my_deps = set(index["dependencies"]["production"].keys()) | set(index["dependencies"]["development"].keys())
+my_domains = set(d["name"] for d in index["domains"])
+my_patterns = set(index["patterns_detected"])
+
+matches = []
+for other in other_projects:
+    other_deps = set(other.get("dependencies", {}).get("production", {}).keys()) | \
+                 set(other.get("dependencies", {}).get("development", {}).keys())
+    other_domains = set(d["name"] for d in other.get("domains", []))
+    other_patterns = set(other.get("patterns_detected", []))
+
+    shared_deps = my_deps & other_deps
+    dep_match = len(shared_deps) / max(len(my_deps | other_deps), 1)
+    domain_match = len(my_domains & other_domains) / max(len(my_domains | other_domains), 1)
+    pattern_match = len(my_patterns & other_patterns) / max(len(my_patterns | other_patterns), 1)
+
+    overall = dep_match * 0.5 + domain_match * 0.3 + pattern_match * 0.2
+    matches.append({
+        "slug": other["slug"],
+        "dep_match": round(dep_match * 100),
+        "domain_match": round(domain_match * 100),
+        "overall": round(overall * 100),
+        "shared_deps": sorted(list(shared_deps))[:15],
+        "shared_domains": sorted(list(my_domains & other_domains)),
+        "stack": other.get("stack", {}),
+    })
+
+matches.sort(key=lambda m: m["overall"], reverse=True)
+
+# ── Collect instincts from similar projects ──────────────────────────
+def read_frontmatter(filepath):
+    fm = {}
+    try:
+        with open(filepath) as f:
+            lines = f.readlines()
+        if not lines or lines[0].strip() != '---':
+            return fm
+        for line in lines[1:]:
+            if line.strip() == '---':
+                break
+            if ':' in line:
+                key, _, val = line.partition(':')
+                fm[key.strip()] = val.strip().strip('"')
+        # Also grab first heading after frontmatter as title
+        in_body = False
+        for line in lines:
+            if in_body and line.startswith('# '):
+                fm['_title'] = line.lstrip('# ').strip()
+                break
+            if line.strip() == '---':
+                if in_body:
+                    break
+                in_body = True
+    except:
+        pass
+    return fm
+
+recommended_instincts = []
+relevant_decisions = []
+common_issues = Counter()
+
+for match in matches[:5]:  # Top 5 similar projects
+    if match["overall"] < 40:
+        continue
+    slug = match["slug"]
+    p_dir = f"{projects_dir}/{slug}"
+
+    # Instincts
+    for ifile in glob.glob(f"{p_dir}/instincts/*.md"):
+        if '.gitkeep' in ifile:
+            continue
+        fm = read_frontmatter(ifile)
+        conf = fm.get("confidence", "low")
+        if conf in ("high", "medium"):
+            recommended_instincts.append({
+                "project": slug,
+                "name": os.path.basename(ifile).replace('.md', ''),
+                "title": fm.get('_title', fm.get('id', 'unknown')),
+                "category": fm.get('category', 'unknown'),
+                "confidence": conf,
+                "applied": int(fm.get('applied', '0') or '0'),
+                "match": match["overall"],
+            })
+
+    # Decisions
+    for dfile in glob.glob(f"{p_dir}/decisions/*.md"):
+        if '.gitkeep' in dfile or 'migrated' in dfile:
+            continue
+        fm = read_frontmatter(dfile)
+        relevant_decisions.append({
+            "project": slug,
+            "name": os.path.basename(dfile).replace('.md', ''),
+            "title": fm.get('_title', fm.get('id', 'unknown')),
+            "domain": fm.get('domain', 'unknown'),
+            "status": fm.get('status', 'unknown'),
+            "match": match["overall"],
+        })
+
+    # Session rework patterns
+    for sfile in glob.glob(f"{p_dir}/sessions/*.md"):
+        if '.gitkeep' in sfile:
+            continue
+        try:
+            with open(sfile) as f:
+                content = f.read().lower()
+            if 'rework' in content:
+                common_issues['rework detected'] += 1
+            if 'error' in content and 'swallow' in content:
+                common_issues['silent error swallowing'] += 1
+            if 'flak' in content or 'intermittent' in content:
+                common_issues['test flakiness'] += 1
+            if 'timeout' in content:
+                common_issues['timeout issues'] += 1
+            if 'memory' in content and ('leak' in content or 'oom' in content):
+                common_issues['memory issues'] += 1
+        except:
+            pass
+
+# Also check global instincts
+for ifile in glob.glob(f"{vault}/global-instincts/*.md"):
+    if '.gitkeep' in ifile:
+        continue
+    fm = read_frontmatter(ifile)
+    recommended_instincts.append({
+        "project": "GLOBAL",
+        "name": os.path.basename(ifile).replace('.md', ''),
+        "title": fm.get('_title', fm.get('id', 'unknown')),
+        "category": fm.get('category', 'unknown'),
+        "confidence": fm.get('confidence', 'high'),
+        "applied": int(fm.get('applied', '0') or '0'),
+        "match": 100,
+    })
+
+# Sort by relevance
+recommended_instincts.sort(key=lambda i: (i["match"], i["applied"]), reverse=True)
+relevant_decisions.sort(key=lambda d: d["match"], reverse=True)
+
+# ── Generate onboarding-report.md ────────────────────────────────────
+report = []
+report.append("---")
+report.append(f"title: Auto-Analysis — {project_slug}")
+report.append(f"date: {today[:10]}")
+report.append("type: onboarding-report")
+report.append("tags:")
+report.append("  - auto-analysis")
+report.append("  - cross-project")
+report.append("---")
+report.append("")
+report.append(f"# Auto-Analysis: {project_slug}")
+report.append("")
+report.append(f"Generated: {today}")
+report.append("")
+
+# Stack summary
+st = index.get("stack", {})
+report.append("## Project Stack")
+report.append("")
+report.append(f"- **Language**: {st.get('primary_language', 'unknown')}")
+if st.get("framework"): report.append(f"- **Framework**: {st['framework']}")
+if st.get("orm"): report.append(f"- **ORM**: {st['orm']}")
+if st.get("test_framework"): report.append(f"- **Tests**: {st['test_framework']}")
+if st.get("ui_framework"): report.append(f"- **UI**: {st['ui_framework']}")
+report.append(f"- **LOC**: {total_loc:,}")
+report.append(f"- **Domains**: {', '.join(d['name'] for d in index['domains'])}")
+report.append(f"- **Patterns**: {', '.join(index['patterns_detected']) or 'none detected'}")
+report.append("")
+
+# Similar projects
+report.append("## Similar Projects in Vault")
+report.append("")
+if matches and matches[0]["overall"] >= 20:
+    report.append("| Project | Overall Match | Deps Match | Domains Match | Shared Deps |")
+    report.append("|---------|--------------|------------|---------------|-------------|")
+    for m in matches[:5]:
+        if m["overall"] < 20:
+            break
+        deps_preview = ", ".join(m["shared_deps"][:5])
+        if len(m["shared_deps"]) > 5:
+            deps_preview += f" +{len(m['shared_deps'])-5} more"
+        report.append(f"| [[projects/{m['slug']}\\|{m['slug']}]] | {m['overall']}% | {m['dep_match']}% | {m['domain_match']}% | {deps_preview} |")
+    report.append("")
+else:
+    report.append("No similar projects found (all matches < 20%).")
+    report.append("")
+
+# Recommended instincts
+report.append("## Recommended Instincts")
+report.append("")
+if recommended_instincts:
+    for inst in recommended_instincts[:10]:
+        icon = {"high": "\U0001f7e2", "medium": "\U0001f7e1"}.get(inst["confidence"], "\u26aa")
+        src = f"[{inst['project']}]" if inst["project"] != "GLOBAL" else "[GLOBAL]"
+        report.append(f"- {icon} {src} **{inst['title']}** ({inst['category']}) — confidence: {inst['confidence']}, applied: {inst['applied']}x")
+    report.append("")
+else:
+    report.append("No instincts found in similar projects yet.")
+    report.append("")
+
+# Relevant decisions
+report.append("## Relevant Decisions")
+report.append("")
+if relevant_decisions:
+    for dec in relevant_decisions[:8]:
+        report.append(f"- [{dec['project']}] **{dec['title']}** (domain: {dec['domain']}, status: {dec['status']})")
+    report.append("")
+else:
+    report.append("No decisions found in similar projects yet.")
+    report.append("")
+
+# Common issues
+report.append("## Common Issues in Similar Projects")
+report.append("")
+if common_issues:
+    for issue, count in common_issues.most_common(5):
+        report.append(f"- **{issue}** — seen in {count} session(s)")
+    report.append("")
+else:
+    report.append("No common issues detected.")
+    report.append("")
+
+# Save
+report_path = f"{project_vault}/onboarding-report.md"
+with open(report_path, 'w') as f:
+    f.write('\n'.join(report))
+
+print(f"\033[0;32m[canuto]\033[0m \u2713 onboarding-report.md ({len(matches)} projects compared, {len(recommended_instincts)} instincts, {len(relevant_decisions)} decisions)")
+
+PYEOF
+}
+
 # ── CHECK ───────────────────────────────────────────────────────────────────
 if [ "$MODE" = "check" ]; then
   echo ""
@@ -966,6 +1636,14 @@ if [ "$MODE" = "migrate" ]; then
 
   echo ""
   echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  # ── Post-migrate analysis ────────────────────────────────────────────────
+  echo ""
+  read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Run cross-project auto-analysis? [Y/n] ")" ANALYSIS_ANSWER
+  ANALYSIS_ANSWER="${ANALYSIS_ANSWER:-Y}"
+  if [[ "$ANALYSIS_ANSWER" =~ ^[Yy]$ ]]; then
+    PROJECT_DIR="$(pwd)" post_install_analysis "$(pwd)"
+  fi
+
   echo -e "${GREEN}  Migration complete! $MIGRATED files migrated.${RESET}"
   echo -e "${GREEN}  Next: open ~/.canuto/vault/ in Obsidian${RESET}"
   echo -e "${GREEN}  (if not already open) and you're done.${RESET}"
@@ -1031,6 +1709,14 @@ if [ "$MODE" = "install" ]; then
 
   echo ""
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
+  # ── Post-install analysis ─────────────────────────────────────────────────
+  echo ""
+  read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Run cross-project auto-analysis? [Y/n] ")" ANALYSIS_ANSWER
+  ANALYSIS_ANSWER="${ANALYSIS_ANSWER:-Y}"
+  if [[ "$ANALYSIS_ANSWER" =~ ^[Yy]$ ]]; then
+    PROJECT_DIR="$(pwd)" post_install_analysis "$(pwd)"
+  fi
+
   echo -e "${GREEN}  Done! v1.5 installed. Open the project in Claude and${RESET}"
   echo -e "${GREEN}  the Maestro will take it from here.${RESET}"
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"

@@ -47,6 +47,10 @@ Execute these steps **every time** a new session begins:
    - Offer to sync them to the vault now (read each file, write to appropriate vault directory).
    - After successful sync, delete the pending-sync files.
 
+3c. **Check for cross-project insights**:
+   - If `~/.canuto/vault/projects/{project-slug}/onboarding-report.md` exists, note it for the briefing.
+   - Count total projects in `~/.canuto/vault/projects/`. If 3+, cross-reference data is available.
+
 4. **Present the session briefing** to the user:
    ```
    Session Briefing:
@@ -54,7 +58,9 @@ Execute these steps **every time** a new session begins:
    - Deferred goals: <goals marked ⏳ or ❌ last session, or "none">.
    - Pending tasks: <specific unfinished work items from pending/, or "none">.
    - Active instincts: <count of high/medium instincts, or "none">.
+   - Global instincts: <count of global instincts, or "none"> [GLOBAL].
    - Stale contexts: <list of directories, or "none">.
+   - Cross-project: <"Onboarding report available" if exists, or "Run /auto-analysis for cross-project insights" if 3+ projects>.
    ```
 
    > **Goals vs Pending — the distinction:**
