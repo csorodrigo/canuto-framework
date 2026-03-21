@@ -473,7 +473,7 @@ setup_obsidian_mcp() {
       "args": ["obsidian-mcp-server"],
       "env": {
         "OBSIDIAN_API_KEY": $key,
-        "OBSIDIAN_BASE_URL": "http://127.0.0.1:27123",
+        "OBSIDIAN_BASE_URL": "https://127.0.0.1:27124",
         "MCP_TRANSPORT_TYPE": "stdio",
         "OBSIDIAN_VERIFY_SSL": "false"
       }

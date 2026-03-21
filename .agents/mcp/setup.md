@@ -35,7 +35,8 @@ Add to `~/.claude/settings.json` or copy from `.agents/mcp/server.json`:
       "args": ["obsidian-mcp-server"],
       "env": {
         "OBSIDIAN_API_KEY": "YOUR_API_KEY_HERE",
-        "OBSIDIAN_BASE_URL": "http://127.0.0.1:27123"
+        "OBSIDIAN_BASE_URL": "https://127.0.0.1:27124",
+        "OBSIDIAN_VERIFY_SSL": "false"
       }
     }
   }
@@ -53,7 +54,7 @@ Add to your MCP settings following the same format above.
 Test that the MCP server can reach Obsidian:
 
 ```bash
-curl -H "Authorization: Bearer YOUR_API_KEY" http://127.0.0.1:27123/
+curl -k -H "Authorization: Bearer YOUR_API_KEY" https://127.0.0.1:27124/
 ```
 
 You should get a JSON response with vault info.
@@ -78,9 +79,10 @@ You should get a JSON response with vault info.
 - Check the API key is correct
 - Default port is 27123 — verify it's not blocked
 
-### HTTPS errors
-- Set `OBSIDIAN_VERIFY_SSL=false` (the plugin uses a self-signed cert on port 27124)
-- Or use HTTP on port 27123 (recommended for local use)
+### HTTPS / SSL errors
+- The Local REST API plugin uses HTTPS with a self-signed certificate on port **27124**
+- Set `OBSIDIAN_VERIFY_SSL=false` in the MCP server config (already set in the template)
+- Use `-k` flag with curl for manual testing
 
 ### Cache staleness
 - The MCP server caches vault contents and refreshes every 10 minutes
