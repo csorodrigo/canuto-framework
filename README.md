@@ -163,7 +163,7 @@ You are my coding orchestrator for this repository.
 - When in doubt, ask questions instead of guessing.
 
 ## On Session Start
-1. Read .agents/memory/last-session.md
+1. Query vault via MCP: latest session note, pending tasks, high-confidence instincts
 2. Check for stale contexts (git diff)
 3. Present the session briefing
 4. Ask what to work on

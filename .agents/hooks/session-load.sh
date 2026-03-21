@@ -3,7 +3,7 @@
 # Can be called manually or via CLAUDE.md instructions.
 #
 # What it does:
-#   1. Reads all memory files
+#   1. Reads vault notes (sessions, pending, instincts)
 #   2. Outputs a formatted briefing block ready for context injection
 #   3. Detects stale .context.md files via git diff
 #
@@ -15,13 +15,19 @@
 
 set -euo pipefail
 
-# ── Locate project ──────────────────────────────────────────────────────────
+# ── Locate vault ──────────────────────────────────────────────────────────
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-MEMORY_DIR="$PROJECT_DIR/.agents/memory"
+PROJECT_SLUG=$(basename "$PROJECT_DIR")
+GLOBAL_VAULT="$HOME/.canuto/vault"
+LOCAL_VAULT="$PROJECT_DIR/.agents/vault"
 
-# Exit silently if not a Canuto project
-if [ ! -d "$MEMORY_DIR" ]; then
-  echo "Not a Canuto project (no .agents/memory/ found)."
+# Use global vault if it exists, fallback to local
+if [ -d "$GLOBAL_VAULT/projects/$PROJECT_SLUG" ]; then
+  VAULT_DIR="$GLOBAL_VAULT/projects/$PROJECT_SLUG"
+elif [ -d "$LOCAL_VAULT" ]; then
+  VAULT_DIR="$LOCAL_VAULT"
+else
+  echo "Not a Canuto project (no vault found)."
   exit 0
 fi
 
@@ -32,9 +38,10 @@ echo "╚═══════════════════════�
 echo ""
 
 # ── Last Session ────────────────────────────────────────────────────────────
-LAST_SESSION="$MEMORY_DIR/last-session.md"
-if [ -f "$LAST_SESSION" ] && grep -q "^## Date" "$LAST_SESSION" 2>/dev/null; then
-  SESSION_DATE=$(grep -A2 "^## Date" "$LAST_SESSION" | grep -v "^## Date" | grep -v "^$" | head -1 | tr -d '[:space:]')
+SESSIONS_DIR="$VAULT_DIR/sessions"
+LAST_SESSION=$(ls -t "$SESSIONS_DIR"/*.md 2>/dev/null | head -1)
+if [ -n "$LAST_SESSION" ] && [ -f "$LAST_SESSION" ]; then
+  SESSION_DATE=$(basename "$LAST_SESSION" .md)
   if [ "$SESSION_DATE" != "YYYY-MM-DD" ] && [ -n "$SESSION_DATE" ]; then
     echo "── Last Session ($SESSION_DATE) ──"
     # Extract summary (exclude the next section's header)
@@ -50,27 +57,33 @@ else
 fi
 
 # ── Pending Tasks ───────────────────────────────────────────────────────────
-PENDING="$MEMORY_DIR/pending.md"
-if [ -f "$PENDING" ]; then
-  # Strip HTML comments before counting (template has examples inside <!-- -->)
-  TASK_COUNT=$(sed '/<!--/,/-->/d' "$PENDING" | grep -c '^\- \[' 2>/dev/null) || TASK_COUNT=0
+PENDING_DIR="$VAULT_DIR/pending"
+if [ -d "$PENDING_DIR" ]; then
+  TASK_COUNT=$(ls "$PENDING_DIR"/*.md 2>/dev/null | grep -cv '.gitkeep' 2>/dev/null) || TASK_COUNT=0
   if [ "$TASK_COUNT" -gt 0 ]; then
     echo "── Pending Tasks ($TASK_COUNT) ──"
-    sed '/<!--/,/-->/d' "$PENDING" | grep '^\- \['
+    for f in "$PENDING_DIR"/*.md; do
+      [ -f "$f" ] && echo "  - $(basename "$f" .md)"
+    done
     echo ""
   else
     echo "── Pending Tasks: none ──"
     echo ""
   fi
+else
+  echo "── Pending Tasks: none ──"
+  echo ""
 fi
 
 # ── Instincts (if learning system is active) ────────────────────────────────
-INSTINCTS="$MEMORY_DIR/instincts.md"
-if [ -f "$INSTINCTS" ]; then
-  INSTINCT_COUNT=$(grep -c '^### ' "$INSTINCTS" 2>/dev/null) || INSTINCT_COUNT=0
+INSTINCTS_DIR="$VAULT_DIR/instincts"
+if [ -d "$INSTINCTS_DIR" ]; then
+  INSTINCT_COUNT=$(ls "$INSTINCTS_DIR"/*.md 2>/dev/null | grep -cv '.gitkeep' 2>/dev/null) || INSTINCT_COUNT=0
   if [ "$INSTINCT_COUNT" -gt 0 ]; then
     echo "── Active Instincts ($INSTINCT_COUNT) ──"
-    grep '^### ' "$INSTINCTS" | head -5
+    ls "$INSTINCTS_DIR"/*.md 2>/dev/null | head -5 | while read -r f; do
+      echo "  - $(basename "$f" .md)"
+    done
     if [ "$INSTINCT_COUNT" -gt 5 ]; then
       echo "  ... and $((INSTINCT_COUNT - 5)) more"
     fi
@@ -108,7 +121,7 @@ if command -v git &> /dev/null && git rev-parse --git-dir > /dev/null 2>&1; then
 fi
 
 # ── Last Save Timestamp ────────────────────────────────────────────────────
-LAST_SAVE="$MEMORY_DIR/.last-save-timestamp"
+LAST_SAVE="$VAULT_DIR/.last-save-timestamp"
 if [ -f "$LAST_SAVE" ]; then
   echo "── Last auto-save: $(cat "$LAST_SAVE") ──"
   echo ""

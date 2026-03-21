@@ -121,5 +121,5 @@ Somente agora que a causa raiz está confirmada:
 Ao final da Fase 4:
 - Causa raiz: `arquivo:linha` com descrição
 - Fix implementado: lista de arquivos modificados
-- Entrada adicionada em `.agents/memory/decisions.md`
-- Padrão a evitar (para instincts.md): sugestão opcional ao usuário
+- Entrada adicionada em `.agents/vault/decisions/`
+- Padrão a evitar (para instincts): sugestão opcional ao usuário

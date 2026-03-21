@@ -60,7 +60,7 @@ Observation → Extraction → Storage → Reinforcement → Promotion (optional
 
 1. **Observation**: Something notable happens (rework, bug pattern, review feedback)
 2. **Extraction**: Maestro identifies and formalizes the pattern at session end
-3. **Storage**: Written to `.agents/memory/instincts.md`
+3. **Storage**: Written as individual note in `~/.canuto/vault/projects/{project-slug}/instincts/I-XXX-slug.md`
 4. **Reinforcement**: Same pattern observed again → confidence increases
 5. **Promotion** (optional): User can promote a `high` instinct to a project rule in `stack.md` or a custom skill
 
@@ -68,27 +68,37 @@ Observation → Extraction → Storage → Reinforcement → Promotion (optional
 
 ## Storage
 
-### File: `.agents/memory/instincts.md`
+### Vault: `~/.canuto/vault/projects/{project-slug}/instincts/`
+
+Each instinct is an individual note with frontmatter:
 
 ```markdown
-# Instincts
-
-> Learned patterns from project experience. Auto-maintained by Maestro.
-> Confidence: low (1x) → medium (2-3x) → high (4+x)
-
+---
+type: instinct
+id: I-001
+category: code-pattern
+confidence: low
+applied: 0
+source-session: "[[sessions/2026-03-21]]"
+last-seen: 2026-03-21
+status: active
+promoted-to: ""
+tags:
+  - instinct
+  - confidence/low
+  - category/code-pattern
 ---
 
-### I-001 — [Category] Short title
-- **Pattern:** When/where this occurs
-- **Learning:** What to do about it
-- **Confidence:** low | medium | high
-- **Source:** Session YYYY-MM-DD — context
-- **Applied:** 0
-- **Last seen:** YYYY-MM-DD
+# [Category] Short title
 
-### I-002 — [Category] Short title
-...
+**Pattern:** When/where this occurs.
+
+**Learning:** What to do about it.
+
+**Source:** [[sessions/2026-03-21]]
 ```
+
+Query instincts via `bases/instincts-by-confidence.base` for grouped views.
 
 ---
 
@@ -140,9 +150,9 @@ Personas should consult instincts when relevant:
 
 When the user asks to see instincts:
 
-1. Read `.agents/memory/instincts.md`
-2. Group by confidence level (high → medium → low)
-3. Show applied count and last-seen date
+1. `obsidian_list_notes(path="instincts/")` → list all instinct notes
+2. Or query via `bases/instincts-by-confidence.base` for grouped view
+3. Show applied count and last-seen date from frontmatter
 4. Suggest pruning instincts not seen in 10+ sessions
 5. Suggest promoting `high` instincts to project rules
 
@@ -173,7 +183,7 @@ Instincts with `low` confidence that haven't been seen in 5+ sessions are candid
    Prune them? [Y/n]
    ```
 
-2. On prune: remove from `instincts.md` (no backup needed — they were never reinforced)
+2. On prune: set `status: pruned` in the instinct note's frontmatter (keep for history, stops appearing in active views)
 
 ---
 

@@ -23,7 +23,7 @@ Invoque `/office-hours` antes de começar qualquer feature nova (especialmente t
 
 Antes de qualquer pergunta, leia:
 - `docs/FEATURE-MAP.md` — o que já existe (evitar duplicação)
-- `.agents/memory/decisions.md` — decisões passadas relevantes
+- `.agents/vault/decisions/` — decisões passadas relevantes (ou busca via MCP)
 - `.context.md` do diretório impactado (se existir)
 
 Informe o que encontrou: [CONFIRMADO] / [NÃO ENCONTRADO].

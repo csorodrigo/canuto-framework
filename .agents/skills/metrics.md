@@ -97,41 +97,53 @@ Tracked per file per session:
 
 ## Storage
 
-### File: `.agents/memory/metrics.md`
+### Vault: `~/.canuto/vault/projects/{project-slug}/metrics/`
 
-Metrics are appended to this file at the end of each session.
+Each session's metrics are stored as an individual note with structured frontmatter:
 
 ```markdown
-# Metrics Log
-
+---
+type: metric
+session: "[[sessions/2026-03-21]]"
+date: 2026-03-21
+quality-verdict: APPROVE
+must-fix-count: 1
+test-failures: 0
+debugger-invocations: 0
+rework-cycles: 1
+tasks-completed: 2
+persona-transitions: 8
+escalations: 0
+format-compliance: 100
+scope-violations: 0
+tags:
+  - metric
 ---
 
-## Session: YYYY-MM-DD
+# Metrics — 2026-03-21
 
-### Quality
-- Review verdict: APPROVE | REQUEST CHANGES
-- MUST FIX count: N
-- Test failures: N/M
-- Debugger invocations: N
-- Rework cycles: N
-- Rework files: path/to/file (N modifications), ...
+## Quality
+- Review verdict: APPROVE
+- MUST FIX count: 1
+- Test failures: 0/12
+- Debugger invocations: 0
+- Rework cycles: 1
+- Rework files: src/auth/token-service.ts (3 modifications)
 
-### Velocity
-- Tasks completed: N
-- Steps executed: N
-- Persona transitions: N
-- Escalations: N
-- Goals: N/M achieved (✅ Goal 1, ⏳ Goal 2, ❌ Goal 3)
+## Velocity
+- Tasks completed: 2
+- Persona transitions: 8
+- Escalations: 0
+- Goals: 2/2 achieved (✅ Add JWT auth, ✅ Write integration tests)
 
-### Compliance
-- Format compliance: N/N personas compliant
-- Scope violations: N
-- Handoff quality: N/N complete
-- Anti-pattern violations: N (details: ...)
-
-### Provider Performance (if multi-provider)
-- Provider: <name> — Tasks: N — First-try success: N — Fallbacks: N
+## Compliance
+- Format compliance: 4/4 personas compliant
+- Scope violations: 0
 ```
+
+Naming convention: `metrics/YYYY-MM-DD-metrics.md`
+
+Query metrics via `bases/metrics-dashboard.base` for aggregated summaries (Sum, Average, trends).
 
 ---
 
@@ -142,14 +154,14 @@ Metrics are appended to this file at the end of each session.
 1. **During the session**: Maestro keeps a running tally of transitions, escalations, file modifications, and provider usage.
 2. **After Reviewer's verdict**: Maestro records quality metrics.
 3. **After Tester's report**: Maestro records test metrics.
-4. **At session end**: Maestro writes the full metrics entry to `metrics.md` and marks goals.
+4. **At session end**: Maestro creates a metric note in `vault/metrics/YYYY-MM-DD-metrics.md` and marks goals.
 
 ### Reviewing Trends
 
 When the user asks about metrics or trends:
 
-1. Read `.agents/memory/metrics.md`.
-2. Summarize the last 5-10 sessions.
+1. Query `bases/metrics-dashboard.base` or `obsidian_list_notes(path="metrics/")`.
+2. Read the last 5-10 metric notes and summarize.
 3. Highlight:
    - Improving or worsening trends.
    - Recurring rework files (files that appear in rework across multiple sessions → likely a design issue).
@@ -198,4 +210,4 @@ This is bad because: no structured fields, unmeasurable, cannot be compared acro
 - Metrics collection MUST NOT slow down the session. If a metric is hard to measure, skip it and note "N/A".
 - Metrics are descriptive, not prescriptive. They inform decisions but do not automatically change behavior.
 - Never fabricate metrics. If a persona was not invoked, do not record metrics for it.
-- The metrics file is committed alongside code changes (it's part of `.agents/memory/`).
+- The metrics notes are committed alongside code changes (they're part of `~/.canuto/vault/projects/{project-slug}/metrics/`).

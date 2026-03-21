@@ -59,66 +59,79 @@ This creates a forensic timeline of the session, enabling post-mortem analysis a
 
 ### Storage
 
-File: `.agents/memory/audit-log.md`
+Vault: `~/.canuto/vault/projects/{project-slug}/audit/`
 
-Structure:
+Each audit event is an individual note with frontmatter:
+
 ```markdown
-# Audit Log
-
-> Append-only record of significant session events.
-> Each session appends a dated section. Never edit previous entries.
-
+---
+type: audit-event
+event: HANDOFF
+date: 2026-03-18T10:05:00
+actor: maestro
+session: "[[sessions/2026-03-18]]"
+impact: low
+tags:
+  - audit
+  - handoff
 ---
 
-## Session 2026-03-18
+# Maestro → Architect
 
-#### [2026-03-18 10:00] SESSION_START — Session opened
-- **Goals:** Implement user registration, add email validation
-- **Pending from last session:** Write integration tests for auth
+**Detail:** Planning user registration feature (Task M).
 
-#### [2026-03-18 10:05] HANDOFF — Maestro → Architect
-- **Detail:** Planning user registration feature (Task M)
-- **Actor:** Maestro
-- **Impact:** Architect interview started
+**Actor:** Maestro
 
-#### [2026-03-18 10:25] GATE — migration approved
-- **Detail:** Add users table with email uniqueness constraint
-- **Actor:** User (via governance gate)
-- **Impact:** Coder proceeds with migration
-
-#### [2026-03-18 11:15] REWORK — src/api/auth/register.ts modified 3 times
-- **Detail:** First attempt had validation bug, second had type error
-- **Actor:** Coder (triggered by Debugger diagnosis)
-- **Impact:** Rework warning issued, consider re-planning
-
-#### [2026-03-18 12:00] SESSION_END — Session closed
-- **Goals:** ✅ User registration, ⏳ Email validation (deferred)
-- **Events logged:** 8
-- **Rework incidents:** 1
+**Impact:** Architect interview started.
 ```
+
+Naming convention: `audit/YYYY-MM-DD-HHmm-EVENT-summary.md`
+
+Include the time (HHmm) to avoid collisions when multiple events of the same type occur on the same day.
+
+Examples:
+- `audit/2026-03-18-1000-SESSION_START.md`
+- `audit/2026-03-18-1005-HANDOFF-maestro-architect.md`
+- `audit/2026-03-18-1025-GATE-migration-approved.md`
+- `audit/2026-03-18-1200-SESSION_END.md`
+
+Query audit events via `bases/audit-by-type.base` for grouped views by event type or actor.
 
 ### Writing Entries
 
-Maestro appends entries in real-time as events occur. Rules:
+Maestro creates individual audit notes in real-time as events occur. Rules:
 
-1. **Never edit previous entries.** Append only.
-2. **Timestamp every entry.** Use `[YYYY-MM-DD HH:MM]` format.
-3. **Keep entries concise.** 2-3 lines max per entry.
-4. **Log failures too.** Failed handoffs, rejected gates, dismissed flags — all are logged.
+1. **Never edit previous notes.** Create new notes only.
+2. **Timestamp in frontmatter.** Use ISO format `YYYY-MM-DDTHH:mm:ss`.
+3. **Keep entries concise.** 2-3 lines max per note body.
+4. **Log failures too.** Failed handoffs, rejected gates, dismissed flags — all get their own note.
+5. **Use wikilinks** to reference the session: `[[sessions/YYYY-MM-DD]]`.
 
 ### Session Summary
 
-At session end, Maestro adds a summary entry:
+At session end, Maestro creates a SESSION_END audit note with summary:
 
 ```markdown
-#### [2026-03-18 12:00] SESSION_END — Summary
-- **Duration:** ~2 hours
-- **Events logged:** 12
-- **Handoffs:** 6 (Maestro→Architect, Architect→Coder, Coder→Tester, Tester→Reviewer, Maestro→Debugger, Debugger→Coder)
-- **Gates triggered:** 1 (migration — approved)
-- **Rework incidents:** 1 (src/api/auth/register.ts)
-- **Flags emitted:** 2 (1 resolved, 1 deferred)
-- **Goals:** 1/2 completed
+---
+type: audit-event
+event: SESSION_END
+date: 2026-03-18T12:00:00
+actor: maestro
+session: "[[sessions/2026-03-18]]"
+impact: low
+tags:
+  - audit
+  - session-end
+---
+
+# Session closed
+
+**Duration:** ~2 hours
+**Events logged:** 12
+**Handoffs:** 6
+**Gates triggered:** 1 (migration — approved)
+**Rework incidents:** 1 (src/api/auth/register.ts)
+**Goals:** 1/2 completed
 ```
 
 ---
@@ -154,9 +167,11 @@ This is bad because: not structured, no timestamps, no event types, not searchab
 
 ## Guardrails
 
-- **Append-only.** Never modify or delete previous entries. The audit trail is immutable.
-- **Keep it lean.** Each entry is 2-3 lines. The audit log should not become a session transcript.
+- **Immutable notes.** Never modify or delete previous audit notes. Create new notes only.
+- **Keep it lean.** Each note body is 2-3 lines. Audit notes should not become session transcripts.
 - **Log events, not content.** Don't duplicate the handoff content — just note that a handoff happened.
-- **One session per section.** Use `## Session YYYY-MM-DD` headers to separate sessions.
+- **One note per event.** Each event gets its own file in `audit/`.
 - **Don't log routine messages.** Only log the event types defined above. Not every Maestro message is an audit event.
-- **Audit log is for forensics.** It complements, not replaces, `decisions.md` (for decisions) and `metrics.md` (for numbers).
+- **Audit notes are for forensics.** They complement, not replace, `decisions/` (for decisions) and `metrics/` (for numbers).
+- **Use wikilinks.** Always link to the session note: `[[sessions/YYYY-MM-DD]]`.
+- **Query via Bases.** Use `bases/audit-by-type.base` for filtered/grouped views.

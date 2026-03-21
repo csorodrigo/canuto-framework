@@ -1,0 +1,39 @@
+filters:
+  and:
+    - file.inFolder("pending")
+    - 'file.ext == "md"'
+
+formulas:
+  priority_icon: 'if(priority == "high", "🔴", if(priority == "medium", "🟡", "🟢"))'
+  is_blocked: 'if(blocked-by, "🚫 " + blocked-by, "")'
+
+properties:
+  formula.priority_icon:
+    displayName: ""
+  formula.is_blocked:
+    displayName: "Blocked By"
+
+views:
+  - type: table
+    name: "Active Tasks"
+    filters:
+      and:
+        - 'status == "pending"'
+    order:
+      - formula.priority_icon
+      - file.name
+      - priority
+      - formula.is_blocked
+      - created-session
+    groupBy:
+      property: priority
+      direction: ASC
+
+  - type: table
+    name: "Completed"
+    filters:
+      and:
+        - 'status == "done"'
+    order:
+      - file.name
+      - created-session

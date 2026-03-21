@@ -183,55 +183,113 @@ Step 2 — Add rate limiting middleware
 
 ---
 
-## 5. Memory & Session Persistence
+## 5. Memory & Session Persistence (Obsidian-Native)
 
 ### 5.1 Memory Structure
 
+All memory lives in a **global** Obsidian vault at `~/.canuto/vault/`. Each project's memory is scoped under `projects/{project-slug}/` (where project-slug = basename of the project directory). Each memory type is atomized — one note per item, with rich frontmatter for querying via Bases.
+
 ```
-.agents/
-  memory/
-    last-session.md        — Summary of last session (overwritten each time)
-    decisions.md           — Append-only log of architectural/business decisions
-    pending.md             — Tasks pending from previous sessions
-    metrics.md             — Append-only session metrics log
-    design-profile.md      — Visual identity for the project (optional, for frontend projects)
-    component-inventory.md — Registry of approved UI components (optional, for frontend projects)
-    audit-log.md           — Append-only log of significant session events (handoffs, gates, rework, etc.)
+~/.canuto/vault/                      — Global vault (opened once in Obsidian)
+  .obsidian/                          — Obsidian config (plugins, templates)
+  _index.md                           — MOC (Map of Content) — vault entry point
+
+  projects/
+    my-app/                           — Per-project memory (project-slug)
+      _index.md                       — Project entry point
+      sessions/                       — Daily session notes
+        2026-03-21.md
+      decisions/                      — One note per decision
+        D-001-lucide-animated.md
+      instincts/                      — One note per instinct
+        I-001-slug.md
+      pending/                        — One note per pending task
+        task-slug.md
+      audit/                          — One note per event
+        2026-03-21-SESSION_START.md
+      metrics/                        — One note per session metrics
+        2026-03-21-metrics.md
+      design/                         — Design profile + component inventory
+        profile.md
+        components/
+          button.md
+
+  canvas/                             — Visual maps (global, JSON Canvas format)
+    persona-flow.canvas
+    memory-map.canvas
+
+  bases/                              — Database views (global, query across projects)
+    instincts-by-confidence.base
+    decisions-timeline.base
+    pending-tasks.base
+    audit-by-type.base
+    metrics-dashboard.base
+    components-registry.base
 ```
 
-### 5.2 Session Start Briefing
+### 5.2 MCP Integration (Required)
+
+The vault is accessed via the `obsidian-mcp-server` (cyanheads), which connects to Obsidian's Local REST API plugin. This enables:
+
+- **Full-text search** across all memory notes
+- **Frontmatter CRUD** for atomic property updates (confidence, applied count, etc.)
+- **Tag management** for cross-cutting queries
+- **Note creation/update** for session lifecycle operations
+
+See `.agents/mcp/setup.md` for configuration and `.agents/skills/mcp-obsidian.md` for usage patterns.
+
+### 5.3 Session Start Briefing
 
 When Maestro starts a new session:
 
-1. Read `.agents/memory/last-session.md` → show **short summary** of what changed.
-2. Check for **stale contexts** (git-based diff: compare `.context.md` timestamps vs file changes).
-3. Scan `.agents/plugins/` for active plugins.
-4. Report all to user before starting work.
+1. Query `sessions/` via MCP → find and read latest session note.
+2. Query `pending/` via MCP → list unfinished tasks.
+3. Search for high/medium confidence instincts via MCP.
+4. Check for **stale contexts** (git-based diff).
+5. Scan `.agents/plugins/` for active plugins.
+6. Report all to user before starting work.
 
 Format:
 ```
 Session Briefing:
-- Last session (2025-02-24): Implemented user auth flow, added JWT middleware.
+- Last session (2026-03-21): Implemented user auth flow, added JWT middleware.
 - Stale contexts: src/api/ (3 files changed since last .context.md update)
-- Pending: Integration tests for auth flow.
+- Pending: 2 tasks in vault/pending/
+- Active instincts: 3 high, 5 medium
 - Active plugins: ci-pipeline, database-migrations.
 ```
 
-### 5.3 Session End
+### 5.4 Session End
 
 Before closing, Maestro:
 
-1. Writes `last-session.md` with: date, what was done, decisions made, what's pending.
-2. Updates `pending.md` if there are unfinished tasks.
-3. Appends to `decisions.md` if any architectural decisions were made.
-4. Appends session metrics to `metrics.md`.
+1. Creates session note in `sessions/YYYY-MM-DD.md` with goals, outcomes, wikilinks.
+2. Creates/updates pending task notes in `pending/`.
+3. Creates decision notes in `decisions/` if any decisions were made.
+4. Creates metric note in `metrics/YYYY-MM-DD-metrics.md`.
+5. Creates audit events in `audit/` for SESSION_END.
+6. Extracts instincts to individual notes in `instincts/`.
 
-### 5.4 Token Economy Strategy
+### 5.5 Token Economy Strategy
 
 - **Invest in bootstrap**: first session scans thoroughly and generates rich context files.
 - Subsequent sessions: Maestro reads **only `.context.md` files** instead of raw code.
 - `.context.md` files are the "compiled knowledge" of the codebase.
 - Raw code is only read when the context file is stale or insufficient.
+- **Obsidian advantage**: MCP search (`obsidian_global_search`) enables reading only relevant memory notes instead of loading entire monolithic files. For vaults with 10+ sessions of accumulated memory, this provides significant token savings.
+
+### 5.6 Obsidian Skills
+
+Five imported skills from `kepano/obsidian-skills` teach agents to work with Obsidian formats:
+
+| Skill | Purpose |
+|-------|---------|
+| `obsidian-markdown` | Wikilinks, embeds, callouts, properties, tags |
+| `obsidian-bases` | Database views over notes (.base files) |
+| `json-canvas` | Visual maps and flowcharts (.canvas files) |
+| `obsidian-cli` | Interact with vault via Obsidian CLI |
+| `defuddle` | Extract clean markdown from web pages |
+| `mcp-obsidian` | How the framework uses MCP to interact with the vault |
 
 ---
 
@@ -334,7 +392,7 @@ The template generates a default `CLAUDE.md` with these configurable sections:
 - [Project-specific rules go here]
 
 ## On Session Start
-1. Read .agents/memory/last-session.md
+1. Query vault via MCP: latest session note, pending tasks, high-confidence instincts
 2. Check for stale contexts
 3. Scan plugins
 4. Brief the user
@@ -385,7 +443,7 @@ The template generates a default `CLAUDE.md` with these configurable sections:
 29. **Coverage Tracking** — Maestro tracks exploration depth across personas, areas, concerns, and absences for M/L tasks.
 30. **Budget Controls** — Token/cost budgets per persona and session with advisory warnings and optional hard-stop.
 31. **Governance Gates** — Approval checkpoints for high-impact actions (deploy, migration, breaking changes). Immutable audit logging.
-32. **Audit Trail** — Append-only log of all significant session events in `.agents/memory/audit-log.md`.
+32. **Audit Trail** — Immutable audit event notes in `projects/{project-slug}/audit/`.
 33. **Runtime Flags** — Session-scoped behavioral overrides (FAST_MODE, STRICT_MODE, etc.) without editing config files.
 34. **Convergence Detection** — Multi-persona agreement detection with elevated confidence scoring for instinct extraction.
 35. **Session Continuation Modes** — Full/continue/targeted modes for session lifecycle flexibility.
@@ -470,7 +528,7 @@ Skill: `governance.md`
 
 ### 11.6 Audit Trail
 
-Append-only log of all significant session mutations: handoffs, gates, rework, escalations, flags, budget warnings. Stored in `.agents/memory/audit-log.md`. Complements `decisions.md` (architectural) and `metrics.md` (numbers) with a forensic timeline.
+Immutable audit event notes for all significant session mutations: handoffs, gates, rework, escalations, flags, budget warnings. Stored as individual notes in `projects/{project-slug}/audit/`. Complements `decisions/` (architectural) and `metrics/` (numbers) with a forensic timeline. Query via `bases/audit-by-type.base`.
 
 Skill: `audit-trail.md`
 

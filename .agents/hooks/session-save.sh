@@ -13,26 +13,33 @@
 
 set -euo pipefail
 
-# ── Locate project ──────────────────────────────────────────────────────────
+# ── Locate vault ──────────────────────────────────────────────────────────
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-MEMORY_DIR="$PROJECT_DIR/.agents/memory"
+PROJECT_SLUG=$(basename "$PROJECT_DIR")
+GLOBAL_VAULT="$HOME/.canuto/vault"
+LOCAL_VAULT="$PROJECT_DIR/.agents/vault"
 
-# Exit silently if not a Canuto project
-if [ ! -d "$MEMORY_DIR" ]; then
+# Use global vault if it exists, fallback to local
+if [ -d "$GLOBAL_VAULT/projects/$PROJECT_SLUG" ]; then
+  VAULT_DIR="$GLOBAL_VAULT/projects/$PROJECT_SLUG"
+elif [ -d "$LOCAL_VAULT" ]; then
+  VAULT_DIR="$LOCAL_VAULT"
+else
   exit 0
 fi
 
 # ── Create backup snapshot ──────────────────────────────────────────────────
-SNAPSHOT_DIR="$MEMORY_DIR/.snapshots"
+SNAPSHOT_DIR="$VAULT_DIR/.snapshots"
 TIMESTAMP=$(date +%Y-%m-%d_%H%M%S)
 SNAPSHOT_PATH="$SNAPSHOT_DIR/$TIMESTAMP"
 
 mkdir -p "$SNAPSHOT_PATH"
 
-# Copy current memory state (ignore errors for empty/missing files)
-for file in last-session.md pending.md decisions.md metrics.md instincts.md; do
-  if [ -f "$MEMORY_DIR/$file" ]; then
-    cp "$MEMORY_DIR/$file" "$SNAPSHOT_PATH/$file" 2>/dev/null || true
+# Copy current vault state (key directories only)
+for dir in sessions decisions instincts pending metrics audit; do
+  if [ -d "$VAULT_DIR/$dir" ]; then
+    mkdir -p "$SNAPSHOT_PATH/$dir"
+    cp "$VAULT_DIR/$dir"/*.md "$SNAPSHOT_PATH/$dir/" 2>/dev/null || true
   fi
 done
 
@@ -42,17 +49,17 @@ if [ -d "$SNAPSHOT_DIR" ]; then
 fi
 
 # ── Write session marker ────────────────────────────────────────────────────
-echo "$TIMESTAMP" > "$MEMORY_DIR/.last-save-timestamp"
+echo "$TIMESTAMP" > "$VAULT_DIR/.last-save-timestamp"
 
 # ── Output reminder (visible to user) ───────────────────────────────────────
 echo ""
 echo "════════════════════════════════════════"
 echo "  Canuto — Session State Saved"
 echo "════════════════════════════════════════"
-echo "  Snapshot: .agents/memory/.snapshots/$TIMESTAMP"
+echo "  Snapshot: $VAULT_DIR/.snapshots/$TIMESTAMP"
 echo ""
 echo "  Reminder: If the Maestro did not finalize"
-echo "  last-session.md, pending.md, and metrics.md,"
+echo "  the session note, pending tasks, and metrics,"
 echo "  the backup above can be used to recover state."
 echo "════════════════════════════════════════"
 echo ""
