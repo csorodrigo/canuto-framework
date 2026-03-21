@@ -3,7 +3,7 @@
 # Can be called manually or via CLAUDE.md instructions.
 #
 # What it does:
-#   1. Reads all memory files
+#   1. Reads vault notes (sessions, pending, instincts)
 #   2. Outputs a formatted briefing block ready for context injection
 #   3. Detects stale .context.md files via git diff
 #
@@ -51,27 +51,33 @@ else
 fi
 
 # ── Pending Tasks ───────────────────────────────────────────────────────────
-PENDING="$MEMORY_DIR/pending.md"
-if [ -f "$PENDING" ]; then
-  # Strip HTML comments before counting (template has examples inside <!-- -->)
-  TASK_COUNT=$(sed '/<!--/,/-->/d' "$PENDING" | grep -c '^\- \[' 2>/dev/null) || TASK_COUNT=0
+PENDING_DIR="$VAULT_DIR/pending"
+if [ -d "$PENDING_DIR" ]; then
+  TASK_COUNT=$(ls "$PENDING_DIR"/*.md 2>/dev/null | grep -cv '.gitkeep' 2>/dev/null) || TASK_COUNT=0
   if [ "$TASK_COUNT" -gt 0 ]; then
     echo "── Pending Tasks ($TASK_COUNT) ──"
-    sed '/<!--/,/-->/d' "$PENDING" | grep '^\- \['
+    for f in "$PENDING_DIR"/*.md; do
+      [ -f "$f" ] && echo "  - $(basename "$f" .md)"
+    done
     echo ""
   else
     echo "── Pending Tasks: none ──"
     echo ""
   fi
+else
+  echo "── Pending Tasks: none ──"
+  echo ""
 fi
 
 # ── Instincts (if learning system is active) ────────────────────────────────
-INSTINCTS="$MEMORY_DIR/instincts.md"
-if [ -f "$INSTINCTS" ]; then
-  INSTINCT_COUNT=$(grep -c '^### ' "$INSTINCTS" 2>/dev/null) || INSTINCT_COUNT=0
+INSTINCTS_DIR="$VAULT_DIR/instincts"
+if [ -d "$INSTINCTS_DIR" ]; then
+  INSTINCT_COUNT=$(ls "$INSTINCTS_DIR"/*.md 2>/dev/null | grep -cv '.gitkeep' 2>/dev/null) || INSTINCT_COUNT=0
   if [ "$INSTINCT_COUNT" -gt 0 ]; then
     echo "── Active Instincts ($INSTINCT_COUNT) ──"
-    grep '^### ' "$INSTINCTS" | head -5
+    ls "$INSTINCTS_DIR"/*.md 2>/dev/null | head -5 | while read -r f; do
+      echo "  - $(basename "$f" .md)"
+    done
     if [ "$INSTINCT_COUNT" -gt 5 ]; then
       echo "  ... and $((INSTINCT_COUNT - 5)) more"
     fi
@@ -109,7 +115,7 @@ if command -v git &> /dev/null && git rev-parse --git-dir > /dev/null 2>&1; then
 fi
 
 # ── Last Save Timestamp ────────────────────────────────────────────────────
-LAST_SAVE="$MEMORY_DIR/.last-save-timestamp"
+LAST_SAVE="$VAULT_DIR/.last-save-timestamp"
 if [ -f "$LAST_SAVE" ]; then
   echo "── Last auto-save: $(cat "$LAST_SAVE") ──"
   echo ""
