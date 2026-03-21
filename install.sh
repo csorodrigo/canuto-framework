@@ -8,6 +8,8 @@
 #   Update via curl:  curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --update
 #   Check versions:   bash install.sh --check
 #   Migrate from v1:  bash install.sh --migrate
+#   With API key:     bash install.sh --migrate --api-key YOUR_OBSIDIAN_API_KEY
+#   Via curl + key:   curl ... | bash -s -- --migrate --api-key YOUR_KEY
 #   Install a skill:  bash install.sh --skill pr-description --skill health-check
 # =============================================================================
 
@@ -41,6 +43,10 @@ while [[ $# -gt 0 ]]; do
     --skill)
       shift
       SKILLS_TO_INSTALL+=("$1")
+      ;;
+    --api-key)
+      shift
+      OBSIDIAN_API_KEY_ARG="$1"
       ;;
   esac
   shift
@@ -528,15 +534,24 @@ setup_obsidian_mcp() {
     return
   fi
 
-  echo ""
-  echo -e "${CYAN}  Obsidian MCP requires the Local REST API plugin.${RESET}"
-  echo -e "${CYAN}  In Obsidian: Settings → Community Plugins → Browse → \"Local REST API\" → Install → Enable${RESET}"
-  echo -e "${CYAN}  Then copy the API Key from the plugin settings.${RESET}"
-  echo ""
-  read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Paste your Obsidian Local REST API key (or press Enter to skip): ")" API_KEY
+  # Use --api-key arg if provided
+  local API_KEY="${OBSIDIAN_API_KEY_ARG:-}"
 
   if [ -z "$API_KEY" ]; then
-    warn "Skipped Obsidian MCP setup. Configure manually later (see .agents/mcp/setup.md)."
+    # Try interactive prompt (won't work when piped via curl)
+    if [ -t 0 ]; then
+      echo ""
+      echo -e "${CYAN}  Obsidian MCP requires the Local REST API plugin.${RESET}"
+      echo -e "${CYAN}  In Obsidian: Settings → Community Plugins → Browse → \"Local REST API\" → Install → Enable${RESET}"
+      echo -e "${CYAN}  Then copy the API Key from the plugin settings.${RESET}"
+      echo ""
+      read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Paste your Obsidian Local REST API key (or press Enter to skip): ")" API_KEY
+    fi
+  fi
+
+  if [ -z "$API_KEY" ]; then
+    warn "Obsidian MCP not configured. Run again with: bash install.sh --api-key YOUR_KEY"
+    warn "Or pass it via curl: curl ... | bash -s -- --migrate --api-key YOUR_KEY"
     return
   fi
 
