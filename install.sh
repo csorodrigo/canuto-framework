@@ -431,6 +431,80 @@ setup_search_tools() {
   fi
 }
 
+# ── setup_global_vault ────────────────────────────────────────────────────────
+# Creates a global Obsidian vault at ~/.canuto/vault/ (one vault for all projects).
+# Each project gets its own subdirectory under projects/{project-slug}/.
+# Safe to run multiple times.
+setup_global_vault() {
+  local vault="$HOME/.canuto/vault"
+  local project_slug
+  project_slug=$(basename "$(pwd)")
+
+  log "Setting up global vault at $vault..."
+
+  # Create vault root with Obsidian config
+  mkdir -p "$vault/.obsidian"
+  mkdir -p "$vault/projects"
+
+  # Copy Obsidian config if not already present
+  if [ ! -f "$vault/.obsidian/app.json" ]; then
+    for cfg in app.json community-plugins.json core-plugins.json .gitignore; do
+      if [ -f ".agents/vault/.obsidian/$cfg" ]; then
+        cp ".agents/vault/.obsidian/$cfg" "$vault/.obsidian/$cfg"
+      fi
+    done
+    ok "Obsidian config installed"
+  else
+    ok "Obsidian config already exists"
+  fi
+
+  # Create vault index
+  if [ ! -f "$vault/_index.md" ]; then
+    cat > "$vault/_index.md" << 'EOF'
+---
+title: Canuto Vault
+tags:
+  - vault
+  - index
+---
+
+# Canuto Vault
+
+Global memory vault for all projects. Each project's memory lives under `projects/{project-name}/`.
+
+Use the graph view and bases to explore cross-project patterns.
+EOF
+    ok "Created vault _index.md"
+  fi
+
+  # Create global dirs (bases, canvas)
+  mkdir -p "$vault/bases" "$vault/canvas"
+
+  # Create project-specific directories
+  local project_dir="$vault/projects/$project_slug"
+  for dir in sessions decisions instincts pending audit metrics design design/components; do
+    mkdir -p "$project_dir/$dir"
+  done
+  ok "Project directory ready: projects/$project_slug/"
+
+  # Create project index if not present
+  if [ ! -f "$project_dir/_index.md" ]; then
+    cat > "$project_dir/_index.md" << PEOF
+---
+title: $project_slug
+tags:
+  - project
+created: $(date +%Y-%m-%d)
+---
+
+# $project_slug
+
+Project memory for \`$project_slug\`.
+PEOF
+    ok "Created project index: projects/$project_slug/_index.md"
+  fi
+}
+
 # ── setup_obsidian_mcp ────────────────────────────────────────────────────────
 # Registers the obsidian-mcp-server in ~/.claude/settings.json.
 # Prompts for API key if not already configured.
@@ -707,20 +781,25 @@ if [ "$MODE" = "migrate" ]; then
     fi
   }
 
-  migrate_flat_file ".agents/memory/decisions.md"           ".agents/vault/decisions"  "migrated-decisions.md"
-  migrate_flat_file ".agents/memory/instincts.md"           ".agents/vault/instincts"  "migrated-instincts.md"
-  migrate_flat_file ".agents/memory/last-session.md"        ".agents/vault/sessions"   "migrated-last-session.md"
-  migrate_flat_file ".agents/memory/pending.md"             ".agents/vault/pending"    "migrated-pending.md"
-  migrate_flat_file ".agents/memory/metrics.md"             ".agents/vault/metrics"    "migrated-metrics.md"
-  migrate_flat_file ".agents/memory/audit-log.md"           ".agents/vault/audit"      "migrated-audit-log.md"
-  migrate_flat_file ".agents/memory/design-profile.md"      ".agents/vault/design"     "profile.md"
-  migrate_flat_file ".agents/memory/component-inventory.md" ".agents/vault/design/components" "migrated-inventory.md"
+  local project_slug
+  project_slug=$(basename "$(pwd)")
+  local project_vault="$HOME/.canuto/vault/projects/$project_slug"
+
+  migrate_flat_file ".agents/memory/decisions.md"           "$project_vault/decisions"  "migrated-decisions.md"
+  migrate_flat_file ".agents/memory/instincts.md"           "$project_vault/instincts"  "migrated-instincts.md"
+  migrate_flat_file ".agents/memory/last-session.md"        "$project_vault/sessions"   "migrated-last-session.md"
+  migrate_flat_file ".agents/memory/pending.md"             "$project_vault/pending"    "migrated-pending.md"
+  migrate_flat_file ".agents/memory/metrics.md"             "$project_vault/metrics"    "migrated-metrics.md"
+  migrate_flat_file ".agents/memory/audit-log.md"           "$project_vault/audit"      "migrated-audit-log.md"
+  migrate_flat_file ".agents/memory/design-profile.md"      "$project_vault/design"     "profile.md"
+  migrate_flat_file ".agents/memory/component-inventory.md" "$project_vault/design/components" "migrated-inventory.md"
 
   # ── Step 5: Setup deps, hooks, tools ─────────────────────────────────────
   setup_deps
   merge_claude_md
   setup_hooks
   setup_search_tools
+  setup_global_vault
   setup_obsidian_mcp
 
   # ── Step 6: Clean up old memory dir ──────────────────────────────────────
@@ -751,8 +830,8 @@ if [ "$MODE" = "migrate" ]; then
   echo ""
   echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
   echo -e "${GREEN}  Migration complete! $MIGRATED files migrated.${RESET}"
-  echo -e "${GREEN}  Next: open .agents/vault/ in Obsidian and${RESET}"
-  echo -e "${GREEN}  configure MCP (see .agents/mcp/setup.md).${RESET}"
+  echo -e "${GREEN}  Next: open ~/.canuto/vault/ in Obsidian${RESET}"
+  echo -e "${GREEN}  (if not already open) and you're done.${RESET}"
   echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
   echo ""
   rm -rf "$TMP_DIR"
@@ -793,6 +872,7 @@ if [ "$MODE" = "install" ]; then
   merge_claude_md
   setup_hooks
   setup_search_tools
+  setup_global_vault
   setup_obsidian_mcp
   setup_gstack
   setup_global_skills
@@ -847,6 +927,7 @@ if [ "$MODE" = "update" ]; then
   merge_claude_md
   setup_hooks
   setup_search_tools
+  setup_global_vault
   setup_obsidian_mcp
   setup_gstack
   setup_global_skills

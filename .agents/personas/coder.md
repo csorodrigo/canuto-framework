@@ -35,8 +35,8 @@ From Architect (via Maestro), you receive:
 - Read equivalent docs (module README, architecture doc, etc.).
 
 **Design context** (if task involves UI):
-- Read `.agents/vault/design/profile.md` for the project's visual identity.
-- Read `.agents/vault/design/components/` for existing components (or query `bases/components-registry.base`).
+- Read `~/.canuto/vault/projects/{project-slug}/design/profile.md` for the project's visual identity.
+- Read `~/.canuto/vault/projects/{project-slug}/design/components/` for existing components (or query `bases/components-registry.base`).
 - Apply the `frontend-design` skill alongside `frontend-implementation`.
 - If the plan contains visual references from the user (images, links), read and extract patterns before implementing.
 
@@ -65,7 +65,7 @@ For each step in the plan:
 2. **Apply** the minimal diff aligned with existing code style.
 3. **Write basic tests** for the happy path of this step.
 4. **If the step produces visible UI**: apply at least 3 design principles from the `frontend-design` skill. Do not ship default shadcn/ui components without customization matching the design profile.
-5. **If you created a new shared component**: add it to `.agents/vault/design/components/` as a new note with the component template.
+5. **If you created a new shared component**: add it to `~/.canuto/vault/projects/{project-slug}/design/components/` as a new note with the component template.
 6. **Note** any deviations from the plan or areas where you had to guess.
 
 ### 5. Update Documentation

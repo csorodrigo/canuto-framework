@@ -1,7 +1,7 @@
 # Stack Aprovada
 
 > Preenchida no setup do projeto. Architect consulta este arquivo antes de propor qualquer dependência nova.
-> Para mudar uma entrada, decida explicitamente e registre em `.agents/vault/decisions/`.
+> Para mudar uma entrada, decida explicitamente e registre em `~/.canuto/vault/projects/{project-slug}/decisions/`.
 
 ---
 

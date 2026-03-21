@@ -21,11 +21,18 @@ if ! echo "$NOTIFICATION" | grep -Eqi "compact|context.*window|truncat" 2>/dev/n
   exit 0
 fi
 
-# ── Locate project ──────────────────────────────────────────────────────────
+# ── Locate vault ──────────────────────────────────────────────────────────
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-VAULT_DIR="$PROJECT_DIR/.agents/vault"
+PROJECT_SLUG=$(basename "$PROJECT_DIR")
+GLOBAL_VAULT="$HOME/.canuto/vault"
+LOCAL_VAULT="$PROJECT_DIR/.agents/vault"
 
-if [ ! -d "$VAULT_DIR" ]; then
+# Use global vault if it exists, fallback to local
+if [ -d "$GLOBAL_VAULT/projects/$PROJECT_SLUG" ]; then
+  VAULT_DIR="$GLOBAL_VAULT/projects/$PROJECT_SLUG"
+elif [ -d "$LOCAL_VAULT" ]; then
+  VAULT_DIR="$LOCAL_VAULT"
+else
   exit 0
 fi
 
@@ -49,7 +56,7 @@ echo "════════════════════════�
 echo "  Canuto — Pre-Compaction Snapshot"
 echo "════════════════════════════════════════"
 echo ""
-echo "Critical context saved to: .agents/vault/.snapshots/pre-compact-$TIMESTAMP"
+echo "Critical context saved to: $VAULT_DIR/.snapshots/pre-compact-$TIMESTAMP"
 echo ""
 
 # Output condensed context that survives compaction

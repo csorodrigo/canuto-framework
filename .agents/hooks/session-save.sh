@@ -13,12 +13,18 @@
 
 set -euo pipefail
 
-# ── Locate project ──────────────────────────────────────────────────────────
+# ── Locate vault ──────────────────────────────────────────────────────────
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-VAULT_DIR="$PROJECT_DIR/.agents/vault"
+PROJECT_SLUG=$(basename "$PROJECT_DIR")
+GLOBAL_VAULT="$HOME/.canuto/vault"
+LOCAL_VAULT="$PROJECT_DIR/.agents/vault"
 
-# Exit silently if not a Canuto project
-if [ ! -d "$VAULT_DIR" ]; then
+# Use global vault if it exists, fallback to local
+if [ -d "$GLOBAL_VAULT/projects/$PROJECT_SLUG" ]; then
+  VAULT_DIR="$GLOBAL_VAULT/projects/$PROJECT_SLUG"
+elif [ -d "$LOCAL_VAULT" ]; then
+  VAULT_DIR="$LOCAL_VAULT"
+else
   exit 0
 fi
 
@@ -50,7 +56,7 @@ echo ""
 echo "════════════════════════════════════════"
 echo "  Canuto — Session State Saved"
 echo "════════════════════════════════════════"
-echo "  Snapshot: .agents/vault/.snapshots/$TIMESTAMP"
+echo "  Snapshot: $VAULT_DIR/.snapshots/$TIMESTAMP"
 echo ""
 echo "  Reminder: If the Maestro did not finalize"
 echo "  the session note, pending tasks, and metrics,"

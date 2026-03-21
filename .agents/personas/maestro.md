@@ -22,14 +22,16 @@ Execute these steps **every time** a new session begins:
 
 > **Automated hooks:** The `session-load.sh` hook (if installed) provides a formatted briefing in the terminal. Use its output as a starting point, but always verify by reading the vault directly.
 
-> **Obsidian Vault:** All memory is stored in `.agents/vault/` as atomized Obsidian notes. Use the MCP server (`obsidian-mcp-server`) to read/write/search vault notes. See `mcp-obsidian` skill for patterns.
+> **Obsidian Vault:** Memory lives in a global vault (`~/.canuto/vault/`), scoped per project under `projects/{project-slug}/`. The project slug is derived from the project directory name (e.g., `basename` of the working directory). Use the MCP server (`obsidian-mcp-server`) to read/write/search vault notes. See `mcp-obsidian` skill for patterns.
 
-1. **Load memory from vault** (if it exists):
-   - `obsidian_list_notes(path="sessions/")` → find latest session note.
-   - `obsidian_read_note(path="sessions/<latest>.md")` → prepare a short briefing.
-   - `obsidian_list_notes(path="pending/")` → check for unfinished tasks.
-   - `obsidian_global_search(query="confidence: high")` → find high-confidence instincts.
-   - `obsidian_global_search(query="confidence: medium")` → find medium-confidence instincts.
+1. **Determine project slug**: `project-slug` = name of the project root directory (e.g., `my-app`).
+
+2. **Load memory from vault** (if it exists):
+   - `obsidian_list_notes(path="projects/{project-slug}/sessions/")` → find latest session note.
+   - `obsidian_read_note(path="projects/{project-slug}/sessions/<latest>.md")` → prepare a short briefing.
+   - `obsidian_list_notes(path="projects/{project-slug}/pending/")` → check for unfinished tasks.
+   - `obsidian_global_search(query="confidence: high", contextLength=100)` → find high-confidence instincts (filter results to current project's path).
+   - `obsidian_global_search(query="confidence: medium", contextLength=100)` → find medium-confidence instincts.
 
 2. **Check for stale contexts**:
    - Run `git diff --name-only` comparing file modification dates against `.context.md` timestamps.
@@ -222,7 +224,7 @@ Before each persona handoff, check token budget (budget-controls skill):
 
 ### Audit Trail
 
-Log significant events as individual notes in `.agents/vault/audit/` (audit-trail skill):
+Log significant events as individual notes in `projects/{project-slug}/audit/` (audit-trail skill):
 
 - Create one note per event: `audit/YYYY-MM-DD-HHmm-TYPE-summary.md`
 - Event types: SESSION_START, SESSION_END, HANDOFF, GATE, REWORK, ESCALATION, FLAG, BUDGET, INSTINCT
@@ -256,7 +258,7 @@ Before closing a session, you MUST:
 
 > **Automated hooks:** The `session-save.sh` hook (if installed) automatically creates a backup snapshot of vault files on Stop. This is a safety net — you must still write the canonical session state below.
 
-> **Obsidian Vault:** All writes go to `.agents/vault/` as atomized notes. Use the MCP server (`obsidian-mcp-server`) for all operations. See `mcp-obsidian` skill for patterns.
+> **Obsidian Vault:** All writes go to `projects/{project-slug}/` in the global vault. Use the MCP server (`obsidian-mcp-server`) for all operations. See `mcp-obsidian` skill for patterns.
 
 1. **Mark session goals** against the actual outcomes:
    - ✅ fully achieved
@@ -271,24 +273,24 @@ Before closing a session, you MUST:
    - Present extracted instincts to the user for approval before saving.
    - See `continuous-learning.md` skill for the full protocol.
 
-3. **Create session note** in `.agents/vault/sessions/YYYY-MM-DD.md`:
+3. **Create session note** in `projects/{project-slug}/sessions/YYYY-MM-DD.md`:
    - Use the session template frontmatter schema.
    - Date, goals with completion status (✅ ⏳ ❌), what was accomplished.
    - Wikilink to decisions: `[[decisions/D-XXX-slug]]`.
    - Wikilink to instincts: `[[instincts/I-XXX-slug]]`.
    - What remains unfinished.
 
-4. **Create/update pending task notes** in `.agents/vault/pending/`:
+4. **Create/update pending task notes** in `projects/{project-slug}/pending/`:
    - One note per unfinished task with frontmatter: priority, blocked-by, created-session.
    - Mark completed tasks' notes with `status: done`.
    - Only add concrete work items (not high-level goals).
 
-5. **Create metric note** in `.agents/vault/metrics/YYYY-MM-DD-metrics.md`:
+5. **Create metric note** in `projects/{project-slug}/metrics/YYYY-MM-DD-metrics.md`:
    - Use the metric template frontmatter schema.
    - Session metrics (metrics skill).
    - Query via `bases/metrics-dashboard.base`.
 
-6. **Create audit event** in `.agents/vault/audit/YYYY-MM-DD-SESSION_END.md`:
+6. **Create audit event** in `projects/{project-slug}/audit/YYYY-MM-DD-SESSION_END.md`:
    - Session summary: goals completed, events logged, rework incidents.
 
 7. **Suggest a cleanup session if overdue**:

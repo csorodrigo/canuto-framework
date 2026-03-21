@@ -71,7 +71,7 @@ Projects can define additional gates in `CLAUDE.md`:
 
 ### Gate Log
 
-Every gate decision is logged as an audit note in `.agents/vault/audit/`:
+Every gate decision is logged as an audit note in `~/.canuto/vault/projects/{project-slug}/audit/`:
 
 ```markdown
 ### GATE-2026-03-18-001

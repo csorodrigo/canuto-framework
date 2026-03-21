@@ -187,43 +187,38 @@ Step 2 — Add rate limiting middleware
 
 ### 5.1 Memory Structure
 
-All memory lives in an Obsidian vault at `.agents/vault/`. Each memory type is atomized — one note per item, with rich frontmatter for querying via Bases.
+All memory lives in a **global** Obsidian vault at `~/.canuto/vault/`. Each project's memory is scoped under `projects/{project-slug}/` (where project-slug = basename of the project directory). Each memory type is atomized — one note per item, with rich frontmatter for querying via Bases.
 
 ```
-.agents/vault/
-  .obsidian/               — Obsidian config (plugins, templates)
-  _index.md                — MOC (Map of Content) — vault entry point
+~/.canuto/vault/                      — Global vault (opened once in Obsidian)
+  .obsidian/                          — Obsidian config (plugins, templates)
+  _index.md                           — MOC (Map of Content) — vault entry point
 
-  sessions/                — Daily session notes (replaces last-session.md)
-    2026-03-21.md
+  projects/
+    my-app/                           — Per-project memory (project-slug)
+      _index.md                       — Project entry point
+      sessions/                       — Daily session notes
+        2026-03-21.md
+      decisions/                      — One note per decision
+        D-001-lucide-animated.md
+      instincts/                      — One note per instinct
+        I-001-slug.md
+      pending/                        — One note per pending task
+        task-slug.md
+      audit/                          — One note per event
+        2026-03-21-SESSION_START.md
+      metrics/                        — One note per session metrics
+        2026-03-21-metrics.md
+      design/                         — Design profile + component inventory
+        profile.md
+        components/
+          button.md
 
-  decisions/               — One note per decision (replaces decisions.md)
-    D-001-lucide-animated.md
-    D-002-anti-hallucination.md
-
-  instincts/               — One note per instinct (replaces instincts.md)
-    I-001-slug.md
-
-  pending/                 — One note per pending task (replaces pending.md)
-    task-slug.md
-
-  audit/                   — One note per event (replaces audit-log.md)
-    2026-03-21-SESSION_START.md
-    2026-03-21-HANDOFF-maestro-architect.md
-
-  metrics/                 — One note per session metrics (replaces metrics.md)
-    2026-03-21-metrics.md
-
-  design/                  — Design profile + component inventory
-    profile.md
-    components/
-      button.md
-
-  canvas/                  — Visual maps (JSON Canvas format)
+  canvas/                             — Visual maps (global, JSON Canvas format)
     persona-flow.canvas
     memory-map.canvas
 
-  bases/                   — Database views over vault notes
+  bases/                              — Database views (global, query across projects)
     instincts-by-confidence.base
     decisions-timeline.base
     pending-tasks.base
@@ -448,7 +443,7 @@ The template generates a default `CLAUDE.md` with these configurable sections:
 29. **Coverage Tracking** — Maestro tracks exploration depth across personas, areas, concerns, and absences for M/L tasks.
 30. **Budget Controls** — Token/cost budgets per persona and session with advisory warnings and optional hard-stop.
 31. **Governance Gates** — Approval checkpoints for high-impact actions (deploy, migration, breaking changes). Immutable audit logging.
-32. **Audit Trail** — Immutable audit event notes in `.agents/vault/audit/`.
+32. **Audit Trail** — Immutable audit event notes in `projects/{project-slug}/audit/`.
 33. **Runtime Flags** — Session-scoped behavioral overrides (FAST_MODE, STRICT_MODE, etc.) without editing config files.
 34. **Convergence Detection** — Multi-persona agreement detection with elevated confidence scoring for instinct extraction.
 35. **Session Continuation Modes** — Full/continue/targeted modes for session lifecycle flexibility.
@@ -533,7 +528,7 @@ Skill: `governance.md`
 
 ### 11.6 Audit Trail
 
-Immutable audit event notes for all significant session mutations: handoffs, gates, rework, escalations, flags, budget warnings. Stored as individual notes in `.agents/vault/audit/`. Complements `decisions/` (architectural) and `metrics/` (numbers) with a forensic timeline. Query via `bases/audit-by-type.base`.
+Immutable audit event notes for all significant session mutations: handoffs, gates, rework, escalations, flags, budget warnings. Stored as individual notes in `projects/{project-slug}/audit/`. Complements `decisions/` (architectural) and `metrics/` (numbers) with a forensic timeline. Query via `bases/audit-by-type.base`.
 
 Skill: `audit-trail.md`
 

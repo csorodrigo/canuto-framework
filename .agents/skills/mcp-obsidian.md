@@ -9,7 +9,7 @@ How the Canuto Framework interacts with the Obsidian vault via the MCP server (`
 
 ## When to Use
 
-- When any persona needs to read or write to the vault (`.agents/vault/`)
+- When any persona needs to read or write to the vault (`~/.canuto/vault/`)
 - When searching for decisions, instincts, or audit events across sessions
 - When managing frontmatter properties on vault notes
 - When creating new memory notes (sessions, decisions, instincts, etc.)
@@ -24,8 +24,8 @@ How the Canuto Framework interacts with the Obsidian vault via the MCP server (`
 ### Reading
 
 ```
-obsidian_read_note(path="decisions/D-001-lucide-animated.md")
-obsidian_read_note(path="instincts/I-001.md", format="json")
+obsidian_read_note(path="projects/{project-slug}/decisions/D-001-lucide-animated.md")
+obsidian_read_note(path="projects/{project-slug}/instincts/I-001.md", format="json")
 ```
 
 ### Creating / Updating
@@ -33,7 +33,7 @@ obsidian_read_note(path="instincts/I-001.md", format="json")
 ```
 # Create a new decision note
 obsidian_update_note(
-  path="decisions/D-003-new-auth.md",
+  path="projects/{project-slug}/decisions/D-003-new-auth.md",
   content="---\ntype: decision\nid: D-003\n...",
   createIfNotExists=true
 )
@@ -150,7 +150,7 @@ obsidian_update_note(
 
 ```
 # Don't do this — bypasses MCP and loses search/cache benefits
-Read(.agents/vault/decisions/D-003-jwt-auth.md)
+Read(~/.canuto/vault/projects/{project-slug}/decisions/D-003-jwt-auth.md)
 ```
 
 ## References

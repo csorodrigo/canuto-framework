@@ -47,21 +47,22 @@ Detect broken or missing framework components before they silently degrade sessi
 - [ ] `api-design.md` present.
 - [ ] `metrics.md` present.
 
-### Vault (Obsidian Memory)
-- [ ] `.agents/vault/` directory exists.
-- [ ] `.agents/vault/_index.md` exists.
-- [ ] `.agents/vault/.obsidian/` config exists.
+### Global Vault (Obsidian Memory)
+- [ ] `~/.canuto/vault/` directory exists.
+- [ ] `~/.canuto/vault/_index.md` exists.
+- [ ] `~/.canuto/vault/.obsidian/` config exists.
+- [ ] `~/.canuto/vault/projects/{project-slug}/` directory exists (project-slug = basename of project dir).
 
-### Vault Directories
-- [ ] `.agents/vault/sessions/` directory exists.
-- [ ] `.agents/vault/decisions/` directory exists.
-- [ ] `.agents/vault/instincts/` directory exists.
-- [ ] `.agents/vault/pending/` directory exists.
-- [ ] `.agents/vault/audit/` directory exists.
-- [ ] `.agents/vault/metrics/` directory exists.
-- [ ] `.agents/vault/design/` directory exists.
-- [ ] `.agents/vault/bases/` directory exists.
-- [ ] `.agents/vault/canvas/` directory exists.
+### Vault Project Directories
+- [ ] `projects/{project-slug}/sessions/` directory exists.
+- [ ] `projects/{project-slug}/decisions/` directory exists.
+- [ ] `projects/{project-slug}/instincts/` directory exists.
+- [ ] `projects/{project-slug}/pending/` directory exists.
+- [ ] `projects/{project-slug}/audit/` directory exists.
+- [ ] `projects/{project-slug}/metrics/` directory exists.
+- [ ] `projects/{project-slug}/design/` directory exists.
+- [ ] `~/.canuto/vault/bases/` directory exists (global).
+- [ ] `~/.canuto/vault/canvas/` directory exists (global).
 
 ### MCP
 - [ ] `.agents/mcp/server.json` exists.
@@ -119,8 +120,8 @@ Detect broken or missing framework components before they silently degrade sessi
 | CLAUDE.md missing sections | `bash install.sh` (or curl one-liner) |
 | Persona files missing | `bash install.sh --update` |
 | Skill files missing | `bash install.sh --update` |
-| Vault missing | `bash install.sh` (install mode) |
-| Vault directories missing | `bash install.sh --migrate` |
+| Global vault missing | `bash install.sh` (creates `~/.canuto/vault/`) |
+| Project vault dirs missing | `bash install.sh --update` (creates project subdirectories) |
 | MCP config missing | Copy from `.agents/mcp/server.json` template |
 | MCP not connecting | Check: Obsidian open? Local REST API plugin enabled? API key correct? See `.agents/mcp/setup.md` |
 | Old memory/ exists | `bash install.sh --migrate` |

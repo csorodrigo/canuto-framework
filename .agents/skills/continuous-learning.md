@@ -60,7 +60,7 @@ Observation → Extraction → Storage → Reinforcement → Promotion (optional
 
 1. **Observation**: Something notable happens (rework, bug pattern, review feedback)
 2. **Extraction**: Maestro identifies and formalizes the pattern at session end
-3. **Storage**: Written as individual note in `.agents/vault/instincts/I-XXX-slug.md`
+3. **Storage**: Written as individual note in `~/.canuto/vault/projects/{project-slug}/instincts/I-XXX-slug.md`
 4. **Reinforcement**: Same pattern observed again → confidence increases
 5. **Promotion** (optional): User can promote a `high` instinct to a project rule in `stack.md` or a custom skill
 
@@ -68,7 +68,7 @@ Observation → Extraction → Storage → Reinforcement → Promotion (optional
 
 ## Storage
 
-### Vault: `.agents/vault/instincts/`
+### Vault: `~/.canuto/vault/projects/{project-slug}/instincts/`
 
 Each instinct is an individual note with frontmatter:
 

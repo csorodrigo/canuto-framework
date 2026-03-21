@@ -10,7 +10,7 @@ origin: kepano/obsidian-skills (adapted for Canuto Framework)
 
 - When creating database views over Canuto vault notes (instincts, decisions, metrics, etc.)
 - When the user asks for filtered/sorted/grouped views of memory data
-- When creating `.base` files in `.agents/vault/bases/`
+- When creating `.base` files in `~/.canuto/vault/bases/`
 
 ## Workflow
 

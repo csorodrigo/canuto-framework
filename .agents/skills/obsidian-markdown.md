@@ -10,7 +10,7 @@ Create and edit valid Obsidian Flavored Markdown. Obsidian extends CommonMark an
 
 ## When to Use
 
-- When creating or editing notes in the Canuto vault (`.agents/vault/`)
+- When creating or editing notes in the Canuto vault (`~/.canuto/vault/`)
 - When linking between memory notes (decisions, instincts, sessions, etc.)
 - When the user mentions wikilinks, callouts, frontmatter, tags, or embeds
 

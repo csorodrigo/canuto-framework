@@ -52,7 +52,7 @@ defuddle parse <url> -p domain
 defuddle parse https://example.com/blog/article --md
 
 # Save to vault
-defuddle parse https://example.com/blog/article --md -o .agents/vault/research/article.md
+defuddle parse https://example.com/blog/article --md -o ~/.canuto/vault/projects/{project-slug}/research/article.md
 
 # Get title for frontmatter
 defuddle parse https://example.com/blog/article -p title

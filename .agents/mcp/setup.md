@@ -18,8 +18,10 @@
 ## Step 2: Open the Canuto Vault in Obsidian
 
 1. Open Obsidian → Open folder as vault
-2. Select the `.agents/vault/` directory from your project
+2. Select `~/.canuto/vault/` (the global vault created by `install.sh`)
 3. Trust the vault when prompted
+
+> **One vault for all projects.** Each project's memory is scoped under `projects/{project-name}/`. You only need to open this vault once — it persists across all projects.
 
 ## Step 3: Configure the MCP Server
 

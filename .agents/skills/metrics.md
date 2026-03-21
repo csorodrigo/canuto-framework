@@ -97,7 +97,7 @@ Tracked per file per session:
 
 ## Storage
 
-### Vault: `.agents/vault/metrics/`
+### Vault: `~/.canuto/vault/projects/{project-slug}/metrics/`
 
 Each session's metrics are stored as an individual note with structured frontmatter:
 
@@ -210,4 +210,4 @@ This is bad because: no structured fields, unmeasurable, cannot be compared acro
 - Metrics collection MUST NOT slow down the session. If a metric is hard to measure, skip it and note "N/A".
 - Metrics are descriptive, not prescriptive. They inform decisions but do not automatically change behavior.
 - Never fabricate metrics. If a persona was not invoked, do not record metrics for it.
-- The metrics notes are committed alongside code changes (they're part of `.agents/vault/metrics/`).
+- The metrics notes are committed alongside code changes (they're part of `~/.canuto/vault/projects/{project-slug}/metrics/`).

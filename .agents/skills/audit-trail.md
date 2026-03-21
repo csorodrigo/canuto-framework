@@ -59,7 +59,7 @@ This creates a forensic timeline of the session, enabling post-mortem analysis a
 
 ### Storage
 
-Vault: `.agents/vault/audit/`
+Vault: `~/.canuto/vault/projects/{project-slug}/audit/`
 
 Each audit event is an individual note with frontmatter:
 

@@ -8,7 +8,7 @@ origin: kepano/obsidian-skills (adapted for Canuto Framework)
 
 ## When to Use
 
-- When creating visual maps in `.agents/vault/canvas/` (persona flows, memory maps, feature maps)
+- When creating visual maps in `~/.canuto/vault/canvas/` (persona flows, memory maps, feature maps)
 - When the user asks for flowcharts, mind maps, or visual diagrams
 - When working with `.canvas` files
 
