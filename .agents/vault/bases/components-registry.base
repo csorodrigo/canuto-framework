@@ -1,0 +1,30 @@
+filters:
+  and:
+    - file.inFolder("design/components")
+    - 'file.ext == "md"'
+
+properties:
+  source:
+    displayName: "Source"
+  path:
+    displayName: "File Path"
+
+views:
+  - type: table
+    name: "All Components"
+    order:
+      - file.name
+      - source
+      - path
+      - variants
+      - used_in
+    groupBy:
+      property: source
+      direction: ASC
+
+  - type: cards
+    name: "Component Cards"
+    order:
+      - file.name
+      - source
+      - variants

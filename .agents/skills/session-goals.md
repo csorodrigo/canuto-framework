@@ -31,7 +31,7 @@ After presenting the session briefing, Maestro asks:
 
 > "What are your top goals for this session? (up to 3)"
 
-If the user provides goals, Maestro stores them in-session and includes them in `last-session.md` under `## Goals` when writing the session summary.
+If the user provides goals, Maestro stores them in-session and includes them in the session note (`vault/sessions/YYYY-MM-DD.md`) under `## Goals` when writing the session summary.
 
 If the user skips this step, Maestro infers goals from the conversation and records them at session end.
 
@@ -51,7 +51,7 @@ If the user skips this step, Maestro infers goals from the conversation and reco
 
 ### On Session End
 
-Before writing `last-session.md`, Maestro reviews each goal and marks:
+Before creating the session note, Maestro reviews each goal and marks:
 
 - `✅` if the goal was fully achieved.
 - `⏳` if partially done or deferred.
@@ -173,7 +173,7 @@ Maestro infers the mode from user signals:
 
 ### Mode Logging
 
-Session mode is recorded in `last-session.md` and `audit-log.md`:
+Session mode is recorded in the session note and audit log:
 
 ```markdown
 - Session mode: continue (resumed 2 pending tasks from 2026-03-17)

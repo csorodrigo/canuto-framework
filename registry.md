@@ -34,6 +34,12 @@ These skills ship with every install and update automatically.
 | `runtime-flags` | Session-scoped behavioral overrides (FAST_MODE, STRICT_MODE, etc.) | configuration |
 | `convergence-detection` | Detect when multiple personas independently reach the same conclusion | observability |
 | `heartbeat` | Foundation for scheduled agent activation in autonomous setups | orchestration, future |
+| `obsidian-markdown` | Obsidian Flavored Markdown: wikilinks, embeds, callouts, properties, tags | obsidian, markdown |
+| `obsidian-bases` | Obsidian Bases: database views over notes (.base files) | obsidian, queries |
+| `json-canvas` | JSON Canvas: visual maps and flowcharts (.canvas files) | obsidian, visualization |
+| `obsidian-cli` | Interact with Obsidian vault via CLI | obsidian, cli |
+| `defuddle` | Extract clean markdown from web pages (token-efficient) | web, ingestion |
+| `mcp-obsidian` | How the framework uses MCP to interact with the vault | obsidian, mcp, memory |
 
 ---
 

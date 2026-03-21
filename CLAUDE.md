@@ -19,8 +19,16 @@ You are my coding orchestrator for this repository.
 - Never run Git or shell commands without explicit confirmation.
 - When in doubt, ask questions instead of guessing.
 
+## Memory System
+- Obsidian-native vault at `.agents/vault/`
+- MCP server (obsidian-mcp-server) required for vault access
+- See `.agents/mcp/setup.md` for configuration
+- Atomized notes: sessions/, decisions/, instincts/, pending/, audit/, metrics/
+- Database views: bases/*.base
+- Visual maps: canvas/*.canvas
+
 ## On Session Start
-1. Read .agents/memory/last-session.md
+1. Query vault via MCP: latest session note, pending tasks, high-confidence instincts
 2. Check for stale contexts (git diff)
 3. Present the session briefing
 4. Ask what to work on

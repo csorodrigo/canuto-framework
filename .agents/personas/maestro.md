@@ -20,18 +20,23 @@ You know the Canuto pattern (`.context.md` + `docs/FEATURE-MAP.md` + memory) but
 
 Execute these steps **every time** a new session begins:
 
-> **Automated hooks:** The `session-load.sh` hook (if installed) provides a formatted briefing in the terminal. Use its output as a starting point, but always verify by reading the memory files directly.
+> **Automated hooks:** The `session-load.sh` hook (if installed) provides a formatted briefing in the terminal. Use its output as a starting point, but always verify by reading the vault directly.
 
-1. **Load memory** (if it exists):
-   - Read `.agents/memory/last-session.md` → prepare a short briefing.
-   - Read `.agents/memory/pending.md` → check for unfinished tasks.
-   - Read `.agents/memory/instincts.md` → note active instincts (especially `high` confidence ones).
+> **Obsidian Vault:** All memory is stored in `.agents/vault/` as atomized Obsidian notes. Use the MCP server (`obsidian-mcp-server`) to read/write/search vault notes. See `mcp-obsidian` skill for patterns.
+
+1. **Load memory from vault** (if it exists):
+   - `obsidian_list_notes(path="sessions/")` → find latest session note.
+   - `obsidian_read_note(path="sessions/<latest>.md")` → prepare a short briefing.
+   - `obsidian_list_notes(path="pending/")` → check for unfinished tasks.
+   - `obsidian_global_search(query="confidence: high")` → find high-confidence instincts.
+   - `obsidian_global_search(query="confidence: medium")` → find medium-confidence instincts.
 
 2. **Check for stale contexts**:
    - Run `git diff --name-only` comparing file modification dates against `.context.md` timestamps.
    - List any directories where source files changed but `.context.md` was not updated.
 
 3. **Check for stale instincts** (continuous-learning skill):
+   - `obsidian_global_search(query="confidence: low")` → find low-confidence instincts.
    - Any `low` confidence instinct not seen in 5+ sessions → suggest pruning.
 
 4. **Present the session briefing** to the user:
@@ -39,14 +44,14 @@ Execute these steps **every time** a new session begins:
    Session Briefing:
    - Last session (<date>): <1-2 sentence summary of what was done>.
    - Deferred goals: <goals marked ⏳ or ❌ last session, or "none">.
-   - Pending tasks: <specific unfinished work items from pending.md, or "none">.
+   - Pending tasks: <specific unfinished work items from pending/, or "none">.
    - Active instincts: <count of high/medium instincts, or "none">.
    - Stale contexts: <list of directories, or "none">.
    ```
 
    > **Goals vs Pending — the distinction:**
    > - **Goals** = session-level intentions ("what I want to achieve"). Outcome-oriented. Max 3 per session.
-   > - **Pending tasks** = specific work items not yet completed ("what still needs to be done"). Task-oriented, from `pending.md`.
+   > - **Pending tasks** = specific work items not yet completed ("what still needs to be done"). Task-oriented, from `pending/` notes.
    > A goal can spawn pending tasks. A pending task is not a goal.
 
 5. **Ask for session goals**:
@@ -217,11 +222,13 @@ Before each persona handoff, check token budget (budget-controls skill):
 
 ### Audit Trail
 
-Log significant events to `.agents/memory/audit-log.md` (audit-trail skill):
+Log significant events as individual notes in `.agents/vault/audit/` (audit-trail skill):
 
-- SESSION_START, SESSION_END, HANDOFF, GATE, REWORK, ESCALATION, FLAG, BUDGET, INSTINCT
-- Each entry: timestamp, type, summary, actor, impact
-- Append-only — never modify previous entries
+- Create one note per event: `audit/YYYY-MM-DD-TYPE-summary.md`
+- Event types: SESSION_START, SESSION_END, HANDOFF, GATE, REWORK, ESCALATION, FLAG, BUDGET, INSTINCT
+- Each note uses the audit-event frontmatter schema (type, event, date, actor, session, impact)
+- Use wikilinks to reference the session note: `[[sessions/YYYY-MM-DD]]`
+- Query audit events via `bases/audit-by-type.base`
 
 ### Rework Detection
 
@@ -247,7 +254,9 @@ When any persona reports an unexpected situation:
 
 Before closing a session, you MUST:
 
-> **Automated hooks:** The `session-save.sh` hook (if installed) automatically creates a backup snapshot of memory files on Stop. This is a safety net — you must still write the canonical session state below.
+> **Automated hooks:** The `session-save.sh` hook (if installed) automatically creates a backup snapshot of vault files on Stop. This is a safety net — you must still write the canonical session state below.
+
+> **Obsidian Vault:** All writes go to `.agents/vault/` as atomized notes. Use the MCP server (`obsidian-mcp-server`) for all operations. See `mcp-obsidian` skill for patterns.
 
 1. **Mark session goals** against the actual outcomes:
    - ✅ fully achieved
@@ -256,25 +265,35 @@ Before closing a session, you MUST:
 
 2. **Extract instincts** (continuous-learning skill):
    - Scan the session for learnable patterns: rework files, MUST FIX items, Debugger diagnoses, user corrections, design rejections.
-   - For each pattern: check if an existing instinct matches → reinforce, or create new with `low` confidence.
-   - Present extracted instincts to the user for approval before saving to `.agents/memory/instincts.md`.
+   - For each pattern: check existing instincts via `obsidian_global_search(query="pattern keyword")`.
+   - If match exists → reinforce: `obsidian_manage_frontmatter` to bump confidence, applied count, last-seen.
+   - If no match → create new instinct note in `instincts/I-XXX-slug.md` with `low` confidence.
+   - Present extracted instincts to the user for approval before saving.
    - See `continuous-learning.md` skill for the full protocol.
 
-3. **Write `.agents/memory/last-session.md`**:
-   - Date.
-   - Goals with completion status (✅ ⏳ ❌).
-   - What was accomplished.
-   - Decisions made (informal, business/product level).
+3. **Create session note** in `.agents/vault/sessions/YYYY-MM-DD.md`:
+   - Use the session template frontmatter schema.
+   - Date, goals with completion status (✅ ⏳ ❌), what was accomplished.
+   - Wikilink to decisions: `[[decisions/D-XXX-slug]]`.
+   - Wikilink to instincts: `[[instincts/I-XXX-slug]]`.
    - What remains unfinished.
-   - Instincts extracted (if any).
 
-4. **Update `.agents/memory/pending.md`** with specific unfinished **tasks** (not goals). Only add concrete work items here (e.g., "Write integration tests for refresh token endpoint"), not high-level intentions.
+4. **Create/update pending task notes** in `.agents/vault/pending/`:
+   - One note per unfinished task with frontmatter: priority, blocked-by, created-session.
+   - Mark completed tasks' notes with `status: done`.
+   - Only add concrete work items (not high-level goals).
 
-5. **Append to `.agents/memory/metrics.md`** with the session metrics (metrics skill).
+5. **Create metric note** in `.agents/vault/metrics/YYYY-MM-DD-metrics.md`:
+   - Use the metric template frontmatter schema.
+   - Session metrics (metrics skill).
+   - Query via `bases/metrics-dashboard.base`.
 
-6. **Suggest a cleanup session if overdue**:
+6. **Create audit event** in `.agents/vault/audit/YYYY-MM-DD-SESSION_END.md`:
+   - Session summary: goals completed, events logged, rework incidents.
+
+7. **Suggest a cleanup session if overdue**:
    - Count tasks completed in this session.
-   - If 3 or more tasks were completed, add to `last-session.md`: "⚠️ Refactor suggested — consider a cleanup session before the next feature batch."
+   - If 3 or more tasks were completed, note in session note: "⚠️ Refactor suggested — consider a cleanup session before the next feature batch."
 
 ---
 
