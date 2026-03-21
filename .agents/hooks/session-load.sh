@@ -17,11 +17,11 @@ set -euo pipefail
 
 # ── Locate project ──────────────────────────────────────────────────────────
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-MEMORY_DIR="$PROJECT_DIR/.agents/memory"
+VAULT_DIR="$PROJECT_DIR/.agents/vault"
 
 # Exit silently if not a Canuto project
-if [ ! -d "$MEMORY_DIR" ]; then
-  echo "Not a Canuto project (no .agents/memory/ found)."
+if [ ! -d "$VAULT_DIR" ]; then
+  echo "Not a Canuto project (no .agents/vault/ found)."
   exit 0
 fi
 
@@ -32,9 +32,10 @@ echo "╚═══════════════════════�
 echo ""
 
 # ── Last Session ────────────────────────────────────────────────────────────
-LAST_SESSION="$MEMORY_DIR/last-session.md"
-if [ -f "$LAST_SESSION" ] && grep -q "^## Date" "$LAST_SESSION" 2>/dev/null; then
-  SESSION_DATE=$(grep -A2 "^## Date" "$LAST_SESSION" | grep -v "^## Date" | grep -v "^$" | head -1 | tr -d '[:space:]')
+SESSIONS_DIR="$VAULT_DIR/sessions"
+LAST_SESSION=$(ls -t "$SESSIONS_DIR"/*.md 2>/dev/null | head -1)
+if [ -n "$LAST_SESSION" ] && [ -f "$LAST_SESSION" ]; then
+  SESSION_DATE=$(basename "$LAST_SESSION" .md)
   if [ "$SESSION_DATE" != "YYYY-MM-DD" ] && [ -n "$SESSION_DATE" ]; then
     echo "── Last Session ($SESSION_DATE) ──"
     # Extract summary (exclude the next section's header)

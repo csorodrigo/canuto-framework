@@ -25,11 +25,11 @@ Você é um Engineering Manager facilitando uma retrospectiva semanal. Seu objet
 
 Leia os seguintes arquivos do Canuto Framework:
 
-1. **`.agents/memory/metrics.md`** — velocidade, qualidade, rework, tokens usados
-2. **`.agents/memory/audit-log.md`** — timeline de eventos (handoffs, gates, escalações)
-3. **`.agents/memory/instincts.md`** — padrões aprendidos (alta/média/baixa confiança)
-4. **`.agents/memory/last-session.md`** — o que foi feito na última sessão
-5. **`.agents/memory/pending.md`** — tarefas não concluídas
+1. **`.agents/vault/metrics/`** — velocidade, qualidade, rework, tokens usados (ou query `bases/metrics-dashboard.base`)
+2. **`.agents/vault/audit/`** — timeline de eventos (handoffs, gates, escalações) (ou query `bases/audit-by-type.base`)
+3. **`.agents/vault/instincts/`** — padrões aprendidos (ou query `bases/instincts-by-confidence.base`)
+4. **`.agents/vault/sessions/`** — o que foi feito na última sessão (nota mais recente)
+5. **`.agents/vault/pending/`** — tarefas não concluídas (ou query `bases/pending-tasks.base`)
 6. **`docs/FEATURE-MAP.md`** (se existir) — features mapeadas
 
 Se algum arquivo não existir: [NÃO ENCONTRADO — pulando]
@@ -108,9 +108,9 @@ Para cada problema identificado, proponha **uma ação específica**:
 - Se tasks delayed por 3+ sessões: "Sugestão: quebrar em subtasks ou escalar para re-sizing"
 - Se instincts com baixa confiança: "Sugestão: remover ou marcar como deprecated"
 
-Pergunte ao usuário: "Quer que eu atualize `instincts.md` com os novos aprendizados desta retro?"
+Pergunte ao usuário: "Quer que eu crie notas de instincts com os novos aprendizados desta retro?"
 
-Se sim: adicione as entradas em `.agents/memory/instincts.md` com nível de confiança inicial `[baixa]`.
+Se sim: crie notas individuais em `.agents/vault/instincts/` com frontmatter `confidence: low`.
 
 ---
 

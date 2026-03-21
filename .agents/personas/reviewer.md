@@ -53,7 +53,7 @@ Perform up to three explicit passes (Pass 3 is conditional). Each issue found mu
 - *OWASP Top 10 quick scan:* Broken access control, insecure deserialization, misconfiguration, vulnerable dependencies.
 - *Token/session handling:* Tokens validated properly? Expiry checked? Refresh logic correct?
 
-**Pass 3 — Design Lens** (only when `.agents/memory/design-profile.md` exists AND the task involves user-facing UI; skip for XS/internal/backend tasks):
+**Pass 3 — Design Lens** (only when `.agents/vault/design/profile.md` exists AND the task involves user-facing UI; skip for XS/internal/backend tasks):
 
 - *Profile adherence:* Does the implementation follow the design profile? Colors, fonts, mood, visual signature?
 - *Component reuse:* Did the Coder check the component inventory? Are there duplicated components that should be shared?

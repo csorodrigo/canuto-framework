@@ -4,18 +4,18 @@ filters:
     - 'file.ext == "md"'
 
 formulas:
-  verdict_icon: 'if(quality_verdict == "APPROVE", "✅", "❌")'
+  verdict_icon: 'if(quality-verdict == "APPROVE", "✅", "❌")'
 
 properties:
   formula.verdict_icon:
     displayName: ""
-  quality_verdict:
+  quality-verdict:
     displayName: "Verdict"
-  must_fix_count:
+  must-fix-count:
     displayName: "MUST FIX"
-  tasks_completed:
+  tasks-completed:
     displayName: "Tasks"
-  rework_cycles:
+  rework-cycles:
     displayName: "Rework"
 
 views:
@@ -24,17 +24,17 @@ views:
     order:
       - date
       - formula.verdict_icon
-      - tasks_completed
-      - must_fix_count
-      - test_failures
-      - rework_cycles
-      - persona_transitions
+      - tasks-completed
+      - must-fix-count
+      - test-failures
+      - rework-cycles
+      - persona-transitions
       - escalations
-      - format_compliance
-      - scope_violations
+      - format-compliance
+      - scope-violations
     summaries:
-      tasks_completed: Sum
-      must_fix_count: Average
-      test_failures: Sum
-      rework_cycles: Average
-      format_compliance: Average
+      tasks-completed: Sum
+      must-fix-count: Average
+      test-failures: Sum
+      rework-cycles: Average
+      format-compliance: Average

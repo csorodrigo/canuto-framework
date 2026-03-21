@@ -23,22 +23,23 @@ fi
 
 # ── Locate project ──────────────────────────────────────────────────────────
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-MEMORY_DIR="$PROJECT_DIR/.agents/memory"
+VAULT_DIR="$PROJECT_DIR/.agents/vault"
 
-if [ ! -d "$MEMORY_DIR" ]; then
+if [ ! -d "$VAULT_DIR" ]; then
   exit 0
 fi
 
 # ── Save pre-compaction snapshot ────────────────────────────────────────────
-SNAPSHOT_DIR="$MEMORY_DIR/.snapshots"
+SNAPSHOT_DIR="$VAULT_DIR/.snapshots"
 TIMESTAMP=$(date +%Y-%m-%d_%H%M%S)
 COMPACT_PATH="$SNAPSHOT_DIR/pre-compact-$TIMESTAMP"
 
 mkdir -p "$COMPACT_PATH"
 
-for file in last-session.md pending.md decisions.md metrics.md instincts.md; do
-  if [ -f "$MEMORY_DIR/$file" ]; then
-    cp "$MEMORY_DIR/$file" "$COMPACT_PATH/$file" 2>/dev/null || true
+for dir in sessions decisions instincts pending metrics audit; do
+  if [ -d "$VAULT_DIR/$dir" ]; then
+    mkdir -p "$COMPACT_PATH/$dir"
+    cp "$VAULT_DIR/$dir"/*.md "$COMPACT_PATH/$dir/" 2>/dev/null || true
   fi
 done
 
@@ -48,29 +49,31 @@ echo "════════════════════════�
 echo "  Canuto — Pre-Compaction Snapshot"
 echo "════════════════════════════════════════"
 echo ""
-echo "Critical context saved to: .agents/memory/.snapshots/pre-compact-$TIMESTAMP"
+echo "Critical context saved to: .agents/vault/.snapshots/pre-compact-$TIMESTAMP"
 echo ""
 
 # Output condensed context that survives compaction
 echo "── ESSENTIAL CONTEXT (preserve after compaction) ──"
 echo ""
 
-# Current pending tasks (strip HTML comments)
-if [ -f "$MEMORY_DIR/pending.md" ]; then
-  TASKS=$(sed '/<!--/,/-->/d' "$MEMORY_DIR/pending.md" | grep '^\- \[' 2>/dev/null) || TASKS=""
+# Current pending tasks (list files in pending/)
+PENDING_DIR="$VAULT_DIR/pending"
+if [ -d "$PENDING_DIR" ]; then
+  TASKS=$(ls "$PENDING_DIR"/*.md 2>/dev/null | xargs -I{} basename {} .md) || TASKS=""
   if [ -n "$TASKS" ]; then
     echo "Pending tasks:"
-    echo "$TASKS"
+    echo "$TASKS" | while read -r task; do echo "  - $task"; done
     echo ""
   fi
 fi
 
-# Active instincts (top 3 by confidence)
-if [ -f "$MEMORY_DIR/instincts.md" ]; then
-  INSTINCTS=$(grep -A1 '^### ' "$MEMORY_DIR/instincts.md" 2>/dev/null | head -9) || INSTINCTS=""
+# Active instincts (list files in instincts/)
+INSTINCTS_DIR="$VAULT_DIR/instincts"
+if [ -d "$INSTINCTS_DIR" ]; then
+  INSTINCTS=$(ls "$INSTINCTS_DIR"/*.md 2>/dev/null | head -5 | xargs -I{} basename {} .md) || INSTINCTS=""
   if [ -n "$INSTINCTS" ]; then
     echo "Top instincts:"
-    echo "$INSTINCTS"
+    echo "$INSTINCTS" | while read -r inst; do echo "  - $inst"; done
     echo ""
   fi
 fi

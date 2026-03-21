@@ -122,7 +122,7 @@ LLMs naturally generate only the "happy path" successful state. Every interactiv
 
 ### 1. Read the Design Profile
 
-Before any visual work, read `.agents/memory/design-profile.md`.
+Before any visual work, read `.agents/vault/design/profile.md`.
 
 - If it exists: all visual decisions must align with it.
 - If it does not exist:
@@ -131,7 +131,7 @@ Before any visual work, read `.agents/memory/design-profile.md`.
 
 ### 2. Consult the Component Inventory
 
-Read `.agents/memory/component-inventory.md`.
+Read `.agents/vault/design/components/` (or query `bases/components-registry.base`).
 
 - If a component already exists that satisfies the requirement, reuse it.
 - If a variant is needed, extend the existing component with a new variant rather than creating a duplicate.

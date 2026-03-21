@@ -17,7 +17,7 @@ views:
       - source
       - path
       - variants
-      - used_in
+      - used-in
     groupBy:
       property: source
       direction: ASC

@@ -156,7 +156,7 @@ A 4-stage pipeline inspired by AI knowledge-base systems. Produces a comprehensi
 
 **Output files:**
 - `docs/REPO-INDEX.md` — human-readable domain map with entities, tags, and relationships.
-- `.agents/memory/repo-index.json` — machine-readable index for programmatic queries by personas.
+- `.agents/vault/repo-index.json` — machine-readable index for programmatic queries by personas.
 
 Together with `.context.md` (per-directory) and `FEATURE-MAP.md` (per-feature), the Repo Index answers **"what entities exist, how are they related, and where do I find them?"**.
 
@@ -276,7 +276,7 @@ Group all entities into **domains** with confidence scores:
 | Payments | Authentication, Database | — |
 ```
 
-#### .agents/memory/repo-index.json (Canuto Schema)
+#### .agents/vault/repo-index.json (Canuto Schema)
 
 ```json
 {
@@ -324,7 +324,7 @@ Group all entities into **domains** with confidence scores:
 2. **Run Stage 2** (Dependency Analysis): For each entity, resolve imports and dependents.
 3. **Run Stage 3** (Semantic Tagging): Tag each entity with 3–8 tags.
 4. **Run Stage 4** (Categorization): Group into domains, assign confidence, map cross-domain dependencies.
-5. **Generate outputs**: Write `docs/REPO-INDEX.md` and `.agents/memory/repo-index.json`.
+5. **Generate outputs**: Write `docs/REPO-INDEX.md` and `.agents/vault/repo-index.json`.
 6. **Present summary to user**:
    ```
    Evaluate Repo complete:

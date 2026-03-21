@@ -397,7 +397,7 @@ The template generates a default `CLAUDE.md` with these configurable sections:
 - [Project-specific rules go here]
 
 ## On Session Start
-1. Read .agents/memory/last-session.md
+1. Query vault via MCP: latest session note, pending tasks, high-confidence instincts
 2. Check for stale contexts
 3. Scan plugins
 4. Brief the user
@@ -448,7 +448,7 @@ The template generates a default `CLAUDE.md` with these configurable sections:
 29. **Coverage Tracking** — Maestro tracks exploration depth across personas, areas, concerns, and absences for M/L tasks.
 30. **Budget Controls** — Token/cost budgets per persona and session with advisory warnings and optional hard-stop.
 31. **Governance Gates** — Approval checkpoints for high-impact actions (deploy, migration, breaking changes). Immutable audit logging.
-32. **Audit Trail** — Append-only log of all significant session events in `.agents/memory/audit-log.md`.
+32. **Audit Trail** — Immutable audit event notes in `.agents/vault/audit/`.
 33. **Runtime Flags** — Session-scoped behavioral overrides (FAST_MODE, STRICT_MODE, etc.) without editing config files.
 34. **Convergence Detection** — Multi-persona agreement detection with elevated confidence scoring for instinct extraction.
 35. **Session Continuation Modes** — Full/continue/targeted modes for session lifecycle flexibility.
@@ -533,7 +533,7 @@ Skill: `governance.md`
 
 ### 11.6 Audit Trail
 
-Append-only log of all significant session mutations: handoffs, gates, rework, escalations, flags, budget warnings. Stored in `.agents/memory/audit-log.md`. Complements `decisions.md` (architectural) and `metrics.md` (numbers) with a forensic timeline.
+Immutable audit event notes for all significant session mutations: handoffs, gates, rework, escalations, flags, budget warnings. Stored as individual notes in `.agents/vault/audit/`. Complements `decisions/` (architectural) and `metrics/` (numbers) with a forensic timeline. Query via `bases/audit-by-type.base`.
 
 Skill: `audit-trail.md`
 

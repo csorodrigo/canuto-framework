@@ -5,7 +5,7 @@ filters:
 
 formulas:
   priority_icon: 'if(priority == "high", "🔴", if(priority == "medium", "🟡", "🟢"))'
-  is_blocked: 'if(blocked_by, "🚫 " + blocked_by, "")'
+  is_blocked: 'if(blocked-by, "🚫 " + blocked-by, "")'
 
 properties:
   formula.priority_icon:
@@ -24,7 +24,7 @@ views:
       - file.name
       - priority
       - formula.is_blocked
-      - created_session
+      - created-session
     groupBy:
       property: priority
       direction: ASC
@@ -36,4 +36,4 @@ views:
         - 'status == "done"'
     order:
       - file.name
-      - created_session
+      - created-session

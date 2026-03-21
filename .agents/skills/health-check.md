@@ -47,10 +47,17 @@ Detect broken or missing framework components before they silently degrade sessi
 - [ ] `api-design.md` present.
 - [ ] `metrics.md` present.
 
-### Memory
-- [ ] `.agents/memory/last-session.md` exists.
-- [ ] `.agents/memory/decisions.md` exists.
-- [ ] `.agents/memory/pending.md` exists.
+### Vault (Obsidian Memory)
+- [ ] `.agents/vault/` directory exists.
+- [ ] `.agents/vault/_index.md` exists.
+- [ ] `.agents/vault/.obsidian/` config exists.
+- [ ] `.agents/vault/sessions/` directory exists.
+- [ ] `.agents/vault/decisions/` directory exists.
+- [ ] `.agents/vault/instincts/` directory exists.
+
+### MCP
+- [ ] `.agents/mcp/server.json` exists.
+- [ ] `.agents/mcp/setup.md` exists.
 
 ### SPEC
 - [ ] `.agents/SPEC.md` exists.
@@ -63,14 +70,15 @@ Detect broken or missing framework components before they silently degrade sessi
 ## Framework Health Check — YYYY-MM-DD
 
 ### ✅ Passing (N items)
-- CLAUDE.md: all 4 sections present
+- CLAUDE.md: all required sections present
 - Personas: all 7 present
-- Memory: all 3 files present
+- Vault: directory structure intact, _index.md present
+- MCP: server.json and setup.md present
 - SPEC.md: present
 
 ### ⚠️ Warnings (N items)
 - `.agents/skills/metrics.md` missing (metrics tracking disabled)
-- `.agents/memory/metrics.md` missing (will be created on first session end)
+- `.agents/vault/bases/` empty (will be populated on first session end)
 
 ### ❌ Failures (N items)
 - CLAUDE.md missing `## Framework` section → run `bash install.sh` to fix
@@ -92,7 +100,8 @@ Detect broken or missing framework components before they silently degrade sessi
 | CLAUDE.md missing sections | `bash install.sh` (or curl one-liner) |
 | Persona files missing | `bash install.sh --update` |
 | Skill files missing | `bash install.sh --update` |
-| Memory files missing | `bash install.sh` (install mode) |
+| Vault missing | `bash install.sh` (install mode) |
+| MCP config missing | Copy from `.agents/mcp/server.json` template |
 | SPEC.md missing | `bash install.sh --update` |
 
 ---
@@ -107,11 +116,11 @@ Detect broken or missing framework components before they silently degrade sessi
 ### ✅ Passing (4 items)
 - CLAUDE.md: all required sections present
 - Personas: all 7 present
-- Memory: last-session.md, decisions.md, pending.md present
+- Vault: structure intact, _index.md present
 - SPEC.md: present
 
 ### ⚠️ Warnings (1 item)
-- .agents/memory/metrics.md missing (will be created on first session end)
+- .agents/vault/metrics/ empty (will be populated on first session end)
 
 ### Verdict: HEALTHY
 ```

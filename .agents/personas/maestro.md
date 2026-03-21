@@ -224,7 +224,7 @@ Before each persona handoff, check token budget (budget-controls skill):
 
 Log significant events as individual notes in `.agents/vault/audit/` (audit-trail skill):
 
-- Create one note per event: `audit/YYYY-MM-DD-TYPE-summary.md`
+- Create one note per event: `audit/YYYY-MM-DD-HHmm-TYPE-summary.md`
 - Event types: SESSION_START, SESSION_END, HANDOFF, GATE, REWORK, ESCALATION, FLAG, BUDGET, INSTINCT
 - Each note uses the audit-event frontmatter schema (type, event, date, actor, session, impact)
 - Use wikilinks to reference the session note: `[[sessions/YYYY-MM-DD]]`

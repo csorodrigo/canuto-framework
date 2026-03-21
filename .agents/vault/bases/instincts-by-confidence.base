@@ -4,7 +4,7 @@ filters:
     - 'file.ext == "md"'
 
 formulas:
-  days_since_seen: 'if(last_seen, (today() - date(last_seen)).days, "")'
+  days_since_seen: 'if(last-seen, (today() - date(last-seen)).days, "")'
   confidence_icon: 'if(confidence == "high", "🔴", if(confidence == "medium", "🟡", "🟢"))'
 
 properties:
@@ -47,4 +47,4 @@ views:
     order:
       - file.name
       - status
-      - promoted_to
+      - promoted-to

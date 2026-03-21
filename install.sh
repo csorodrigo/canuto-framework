@@ -182,13 +182,14 @@ FRAMEWORK_FILES=(
 )
 
 INSTALL_ONLY_FILES=(
-  ".agents/memory/last-session.md"
-  ".agents/memory/decisions.md"
-  ".agents/memory/pending.md"
-  ".agents/memory/metrics.md"
-  ".agents/memory/repo-index.json"
-  ".agents/memory/instincts.md"
-  ".agents/memory/audit-log.md"
+  ".agents/vault/_index.md"
+  ".agents/vault/.obsidian/app.json"
+  ".agents/vault/.obsidian/community-plugins.json"
+  ".agents/vault/.obsidian/core-plugins.json"
+  ".agents/vault/.obsidian/.gitignore"
+  ".agents/vault/repo-index.json"
+  ".agents/mcp/server.json"
+  ".agents/mcp/setup.md"
   ".agents/stack.md"
 )
 
@@ -265,7 +266,7 @@ SECTION
     cat >> "$CLAUDE_MD" << 'SECTION'
 
 ## On Session Start
-1. Read .agents/memory/last-session.md
+1. Query vault via MCP: latest session note, pending tasks, high-confidence instincts
 2. Check for stale contexts (git diff)
 3. Present the session briefing
 4. Ask what to work on

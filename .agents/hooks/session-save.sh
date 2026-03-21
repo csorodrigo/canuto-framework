@@ -15,24 +15,25 @@ set -euo pipefail
 
 # ── Locate project ──────────────────────────────────────────────────────────
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-MEMORY_DIR="$PROJECT_DIR/.agents/memory"
+VAULT_DIR="$PROJECT_DIR/.agents/vault"
 
 # Exit silently if not a Canuto project
-if [ ! -d "$MEMORY_DIR" ]; then
+if [ ! -d "$VAULT_DIR" ]; then
   exit 0
 fi
 
 # ── Create backup snapshot ──────────────────────────────────────────────────
-SNAPSHOT_DIR="$MEMORY_DIR/.snapshots"
+SNAPSHOT_DIR="$VAULT_DIR/.snapshots"
 TIMESTAMP=$(date +%Y-%m-%d_%H%M%S)
 SNAPSHOT_PATH="$SNAPSHOT_DIR/$TIMESTAMP"
 
 mkdir -p "$SNAPSHOT_PATH"
 
-# Copy current memory state (ignore errors for empty/missing files)
-for file in last-session.md pending.md decisions.md metrics.md instincts.md; do
-  if [ -f "$MEMORY_DIR/$file" ]; then
-    cp "$MEMORY_DIR/$file" "$SNAPSHOT_PATH/$file" 2>/dev/null || true
+# Copy current vault state (key directories only)
+for dir in sessions decisions instincts pending metrics audit; do
+  if [ -d "$VAULT_DIR/$dir" ]; then
+    mkdir -p "$SNAPSHOT_PATH/$dir"
+    cp "$VAULT_DIR/$dir"/*.md "$SNAPSHOT_PATH/$dir/" 2>/dev/null || true
   fi
 done
 
@@ -42,17 +43,17 @@ if [ -d "$SNAPSHOT_DIR" ]; then
 fi
 
 # ── Write session marker ────────────────────────────────────────────────────
-echo "$TIMESTAMP" > "$MEMORY_DIR/.last-save-timestamp"
+echo "$TIMESTAMP" > "$VAULT_DIR/.last-save-timestamp"
 
 # ── Output reminder (visible to user) ───────────────────────────────────────
 echo ""
 echo "════════════════════════════════════════"
 echo "  Canuto — Session State Saved"
 echo "════════════════════════════════════════"
-echo "  Snapshot: .agents/memory/.snapshots/$TIMESTAMP"
+echo "  Snapshot: .agents/vault/.snapshots/$TIMESTAMP"
 echo ""
 echo "  Reminder: If the Maestro did not finalize"
-echo "  last-session.md, pending.md, and metrics.md,"
+echo "  the session note, pending tasks, and metrics,"
 echo "  the backup above can be used to recover state."
 echo "════════════════════════════════════════"
 echo ""

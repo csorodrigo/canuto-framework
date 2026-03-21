@@ -85,13 +85,15 @@ tags:
 **Impact:** Architect interview started.
 ```
 
-Naming convention: `audit/YYYY-MM-DD-EVENT-summary.md`
+Naming convention: `audit/YYYY-MM-DD-HHmm-EVENT-summary.md`
+
+Include the time (HHmm) to avoid collisions when multiple events of the same type occur on the same day.
 
 Examples:
-- `audit/2026-03-18-SESSION_START.md`
-- `audit/2026-03-18-HANDOFF-maestro-architect.md`
-- `audit/2026-03-18-GATE-migration-approved.md`
-- `audit/2026-03-18-SESSION_END.md`
+- `audit/2026-03-18-1000-SESSION_START.md`
+- `audit/2026-03-18-1005-HANDOFF-maestro-architect.md`
+- `audit/2026-03-18-1025-GATE-migration-approved.md`
+- `audit/2026-03-18-1200-SESSION_END.md`
 
 Query audit events via `bases/audit-by-type.base` for grouped views by event type or actor.
 

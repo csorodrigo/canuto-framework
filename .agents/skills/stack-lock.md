@@ -51,7 +51,7 @@ Flag as MUST FIX any new dependency that contradicts `.agents/stack.md`.
 Stack entries are changed only by explicit user decision. When a user approves a new library:
 
 1. Record it in `.agents/stack.md` under the correct category.
-2. Log the decision in `.agents/memory/decisions.md`.
+2. Log the decision as a note in `.agents/vault/decisions/`.
 
 Never change a stack entry based on personal preference or convenience.
 

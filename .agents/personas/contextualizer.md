@@ -23,7 +23,7 @@ The Maestro delegates to you in four scenarios:
 1. **Bootstrap**: No `.context.md` or `docs/FEATURE-MAP.md` exist. Full scan needed.
 2. **Stale check**: Maestro detected files changed since last `.context.md` update. Targeted update needed.
 3. **Post-implementation**: Coder requests context update after significant changes.
-4. **Evaluate Repo**: Deep indexation pipeline requested — generate the Repo Index (`docs/REPO-INDEX.md` + `.agents/memory/repo-index.json`).
+4. **Evaluate Repo**: Deep indexation pipeline requested — generate the Repo Index (`docs/REPO-INDEX.md` + `.agents/vault/repo-index.json`).
 
 ---
 
@@ -103,7 +103,7 @@ Triggered when: user requests `evaluate-repo`, during bootstrap (after `.context
 
 2. **Generate dual output**:
    - `docs/REPO-INDEX.md` — human-readable (follows the Canuto Repo Index schema).
-   - `.agents/memory/repo-index.json` — machine-readable (follows the JSON schema).
+   - `.agents/vault/repo-index.json` — machine-readable (follows the JSON schema).
 
 3. **Present summary to user**:
    ```
