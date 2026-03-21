@@ -222,7 +222,47 @@ Depois disso, nunca mais precisa mexer. Funciona pra todos os projetos.
 
 ---
 
-## 8. Dicas
+## 8. Monorepos e Workspaces
+
+Se voce trabalha com monorepos (yarn workspaces, pnpm, npm workspaces), pode ter conflito de slugs — dois pacotes com o mesmo `basename` (ex: `packages/app` e `services/app`).
+
+### Solucao: Override de slug
+
+No `CLAUDE.md` de cada pacote, defina um slug unico:
+
+```markdown
+## Project Rules
+- project-slug: monorepo-frontend-app
+```
+
+O Maestro e os hooks usam esse slug em vez de `basename` do diretorio.
+
+### Como funciona
+
+- Cada pacote do monorepo tem seu proprio vault: `~/.canuto/vault/projects/monorepo-frontend-app/`
+- Sessions, instincts, decisions — tudo separado por pacote
+- Instincts globais (`global-instincts/`) sao compartilhados entre todos
+
+### Dica
+
+Use `bash analyze.sh` para ver todos os projetos do vault de uma vez — util para monorepos com muitos pacotes.
+
+---
+
+## 9. Troubleshooting
+
+Se algo nao funcionar, consulte `docs/TROUBLESHOOTING.md` para solucoes de problemas comuns:
+
+- Obsidian/MCP nao conecta
+- Briefing vazio ou sessao sem memoria
+- Hooks nao rodam
+- Bases vazias no Obsidian
+
+Ou rode o diagnostico: `bash test-framework.sh --verbose`
+
+---
+
+## 10. Dicas
 
 - **"Continue"** ao iniciar retoma de onde parou sem precisar re-explicar.
 - **"/office-hours"** antes de features grandes evita retrabalho.
