@@ -176,6 +176,8 @@ FRAMEWORK_FILES=(
   ".agents/skills/runtime-flags.md"
   ".agents/skills/convergence-detection.md"
   ".agents/skills/heartbeat.md"
+  ".agents/skills/product-review.md"
+  ".agents/skills/browser-qa.md"
   ".agents/SPEC.md"
 )
 
@@ -396,6 +398,71 @@ setup_search_tools() {
   fi
 }
 
+# ── setup_gstack ─────────────────────────────────────────────────────────────
+# Installs/updates gstack (Garry Tan's 21 engineering skills) globally.
+# Requires: git. Optional: bun (for /browse binary compilation).
+setup_gstack() {
+  local gstack_dir="$HOME/.claude/skills/gstack"
+
+  log "Setting up gstack..."
+
+  if ! command -v bun &> /dev/null; then
+    warn "Bun not found — /browse binary will not be compiled."
+    command -v brew &> /dev/null && warn "Install: brew install bun"
+  else
+    ok "bun $(bun --version)"
+  fi
+
+  if [ -d "$gstack_dir" ]; then
+    git -C "$gstack_dir" pull --ff-only --quiet 2>/dev/null \
+      && ok "gstack updated" \
+      || warn "Could not update gstack — check manually: cd ~/.claude/skills/gstack && git pull"
+  else
+    git clone --quiet https://github.com/garrytan/gstack.git "$gstack_dir" 2>/dev/null \
+      && ok "gstack cloned" \
+      || { warn "Could not clone gstack. Manual: git clone https://github.com/garrytan/gstack.git ~/.claude/skills/gstack"; return; }
+  fi
+
+  [ -f "$gstack_dir/setup" ] && chmod +x "$gstack_dir/setup" \
+    && (cd "$gstack_dir" && ./setup 2>/dev/null || ./setup) \
+    && ok "gstack setup complete" \
+    || warn "gstack/setup failed — verify manually."
+}
+
+# ── setup_global_skills ───────────────────────────────────────────────────────
+# Downloads Canuto-adapted global skills (slash commands) to ~/.claude/skills/.
+# Uses the existing download() helper — no duplicate curl/wget logic.
+setup_global_skills() {
+  local -a global_skills=(
+    # Canuto originals
+    "office-hours"
+    "investigate"
+    "document-release"
+    "retro"
+    # Impeccable design skills
+    "audit"
+    "animate"
+    "bolder"
+    "polish"
+    "critique"
+    "typeset"
+    "harden"
+    "colorize"
+    "overdrive"
+    "clarify"
+  )
+
+  log "Installing Canuto global skills to ~/.claude/skills/..."
+
+  for skill in "${global_skills[@]}"; do
+    local remote="global-skills/${skill}/SKILL.md"
+    local dst="$HOME/.claude/skills/${skill}/SKILL.md"
+    download "$remote" "$dst" \
+      && ok "/$skill" \
+      || warn "Could not download $remote"
+  done
+}
+
 # ── CHECK ───────────────────────────────────────────────────────────────────
 if [ "$MODE" = "check" ]; then
   echo ""
@@ -510,6 +577,8 @@ if [ "$MODE" = "install" ]; then
   merge_claude_md
   setup_hooks
   setup_search_tools
+  setup_gstack
+  setup_global_skills
 
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
@@ -519,7 +588,7 @@ if [ "$MODE" = "install" ]; then
     read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Commit now? [Y/n] ")" COMMIT_ANSWER
     COMMIT_ANSWER="${COMMIT_ANSWER:-Y}"
     if [[ "$COMMIT_ANSWER" =~ ^[Yy]$ ]]; then
-      git commit -m "chore: add Canuto Framework v1.4"
+      git commit -m "chore: add Canuto Framework v1.5"
       ok "Committed!"
     else
       warn "Files staged but not committed. Run 'git commit' when ready."
@@ -528,7 +597,7 @@ if [ "$MODE" = "install" ]; then
 
   echo ""
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
-  echo -e "${GREEN}  Done! Open the project in Claude and${RESET}"
+  echo -e "${GREEN}  Done! v1.5 installed. Open the project in Claude and${RESET}"
   echo -e "${GREEN}  the Maestro will take it from here.${RESET}"
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
   echo ""
@@ -561,6 +630,8 @@ if [ "$MODE" = "update" ]; then
   merge_claude_md
   setup_hooks
   setup_search_tools
+  setup_gstack
+  setup_global_skills
 
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
@@ -570,7 +641,7 @@ if [ "$MODE" = "update" ]; then
     read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Commit now? [Y/n] ")" COMMIT_ANSWER
     COMMIT_ANSWER="${COMMIT_ANSWER:-Y}"
     if [[ "$COMMIT_ANSWER" =~ ^[Yy]$ ]]; then
-      git commit -m "chore: update Canuto Framework to v1.4"
+      git commit -m "chore: update Canuto Framework to v1.5"
       ok "Committed!"
     else
       warn "Files staged but not committed. Run 'git commit' when ready."
@@ -579,7 +650,7 @@ if [ "$MODE" = "update" ]; then
 
   echo ""
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
-  echo -e "${GREEN}  Framework updated to v1.4 successfully.${RESET}"
+  echo -e "${GREEN}  Framework updated to v1.5 successfully.${RESET}"
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
   echo ""
 fi

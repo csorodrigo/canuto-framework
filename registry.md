@@ -45,6 +45,38 @@ Useful in specific project types. Install with `bash install.sh --skill <name>`.
 |------|-------------|----------|------|
 | `session-goals` | Track session goals explicitly in a separate skill file | Teams or highly structured workflows | productivity |
 | `adr` | Architecture Decision Records | Long-lived projects with multiple contributors | architecture |
+| `product-review` | When/how to run /office-hours + /plan-ceo-review before Architect on L/XL features | Product-heavy projects, new features with uncertain scope | product, planning |
+| `browser-qa` | When/how to use gstack's /qa + /browse for real-browser UI testing | Projects with web frontends, critical user flows | testing, quality |
+
+---
+
+## Global Skills (deployed to ~/.claude/skills/ by install.sh)
+
+These skills are slash commands invokable directly in Claude Code. Installed automatically via `bash .agents/hooks/install.sh`.
+
+### Canuto Core
+
+| Command | Description | Tags |
+|---------|-------------|------|
+| `/office-hours` | YC Office Hours — reframe product idea before coding. Asks forcing questions, generates 3 approaches, saves context for Architect. | product, planning |
+| `/investigate` | Forensic debugger — Iron Law: no fix without confirmed root cause. Read-only investigation phase first. | debugging |
+| `/document-release` | Post-ship documentation sweep — updates README, FEATURE-MAP.md, .context.md, CHANGELOG after a deploy. | documentation, workflow |
+| `/retro` | Weekly retrospective — reads metrics.md, audit-log.md, instincts.md to generate Shipped / Delayed / Learned / Next. | learning, memory |
+
+### Design Skills (via Impeccable)
+
+| Command | Description | Tags |
+|---------|-------------|------|
+| `/audit` | Systematic multi-dimensional quality scan: a11y, performance, responsiveness, anti-patterns. Severity-prioritized issue list. | design, quality |
+| `/animate` | Strategic motion pass — adds or fixes animations with purpose. Distinguishes entrance, micro-interaction, state, and delight. | design, motion |
+| `/bolder` | Amplifies safe or generic designs into memorable, distinctive experiences without falling into AI slop. | design |
+| `/polish` | Final pre-ship checklist: spacing consistency, all interaction states, keyboard nav, responsive edge cases. | design, quality |
+| `/critique` | Holistic UX/design evaluation — hierarchy, information architecture, emotional resonance, discoverability. 10-dimension assessment. | design, ux |
+| `/typeset` | Focused typography audit: font choices, size scale, weight contrast, line length, pairing strategy. | design, typography |
+| `/harden` | Production resilience: text overflow, i18n, error handling, edge cases, accessibility under stress. | quality, a11y |
+| `/colorize` | Strategic color introduction — 60/30/10 balance, OKLCH palettes, semantic color roles. | design, color |
+| `/overdrive` | Technically ambitious interfaces: View Transitions, scroll-driven animations, WebGL, virtual scrolling, Web Audio. | design, advanced |
+| `/clarify` | Microcopy and interface text improvement — every word earns its place. Error messages, empty states, button copy. | design, copy |
 
 ---
 

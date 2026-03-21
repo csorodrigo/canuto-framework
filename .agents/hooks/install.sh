@@ -1,53 +1,57 @@
 #!/usr/bin/env bash
-# install.sh — Instala o hook de segunda opinião (plan-review) no Claude Code
-# Execute a partir da raiz do projeto:
-#   bash .agents/hooks/install.sh
+# .agents/hooks/install.sh
+# Installs local hooks and MCP servers for this project.
+#
+# NOTE: For full framework install/update (including gstack and global skills),
+# use the main installer instead:
+#   curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --update
+#
+# Use this script only when working on the framework repo locally.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOKS_DIR="$HOME/.claude/hooks"
+SETTINGS_FILE="$HOME/.claude/settings.json"
 
 echo "🔍 Verificando pré-requisitos..."
 
-# Verificar se jq está disponível (usado no hook)
 if ! command -v jq &> /dev/null; then
   echo "⚠️  jq não encontrado. Instale com: brew install jq"
-  echo "Abortando — jq é necessário para o hook funcionar."
+  echo "Abortando — jq é necessário para hooks e MCP."
   exit 1
 fi
 
-echo "📁 Criando ~/.claude/hooks/..."
+# ── Hooks ───────────────────────────────────────────────────────────────────
+echo ""
+echo "📁 Instalando hooks em ~/.claude/hooks/..."
 mkdir -p "$HOOKS_DIR"
 
-echo "📋 Copiando plan-review.sh..."
-cp "$SCRIPT_DIR/plan-review.sh" "$HOOKS_DIR/plan-review.sh"
-chmod +x "$HOOKS_DIR/plan-review.sh"
-
-# ──────────────────────────────────────────────────────
-# MCP Servers — merge into ~/.claude/settings.json
-# ──────────────────────────────────────────────────────
-SETTINGS_FILE="$HOME/.claude/settings.json"
-
-echo ""
-echo "🔌 Configurando MCP servers..."
-
-if [ -f "$SETTINGS_FILE" ]; then
-  # Merge mcpServers from snippet into existing settings
-  SNIPPET="$SCRIPT_DIR/settings-snippet.json"
-  if [ -f "$SNIPPET" ] && command -v jq &> /dev/null; then
-    # Extract mcpServers from snippet and merge with existing
-    MERGED=$(jq -s '.[0] * { mcpServers: (.[0].mcpServers // {} ) * .[1].mcpServers }' "$SETTINGS_FILE" "$SNIPPET")
-    echo "$MERGED" > "$SETTINGS_FILE"
-    echo "   ✅ MCP servers adicionados ao settings.json existente:"
-  else
-    echo "   ⚠️  Não foi possível fazer merge. Adicione manualmente de settings-snippet.json."
+for hook in plan-review.sh session-save.sh session-load.sh pre-compact-save.sh; do
+  if [ -f "$SCRIPT_DIR/$hook" ]; then
+    cp "$SCRIPT_DIR/$hook" "$HOOKS_DIR/$hook"
+    chmod +x "$HOOKS_DIR/$hook"
+    echo "   ✅ $hook"
   fi
-else
-  # Create settings.json from snippet
+done
+
+# ── MCP Servers ─────────────────────────────────────────────────────────────
+echo ""
+echo "🔌 Configurando MCP servers em settings.json..."
+
+SNIPPET="$SCRIPT_DIR/settings-snippet.json"
+
+if [ -f "$SETTINGS_FILE" ] && [ -f "$SNIPPET" ]; then
+  MERGED=$(jq -s '.[0] * { mcpServers: (.[0].mcpServers // {} ) * .[1].mcpServers }' \
+    "$SETTINGS_FILE" "$SNIPPET")
+  echo "$MERGED" > "$SETTINGS_FILE"
+  echo "   ✅ MCP servers mesclados no settings.json existente"
+elif [ -f "$SNIPPET" ]; then
   mkdir -p "$HOME/.claude"
-  cp "$SCRIPT_DIR/settings-snippet.json" "$SETTINGS_FILE"
-  echo "   ✅ settings.json criado com MCP servers:"
+  cp "$SNIPPET" "$SETTINGS_FILE"
+  echo "   ✅ settings.json criado com MCP servers"
+else
+  echo "   ⚠️  settings-snippet.json não encontrado — pulando MCP setup."
 fi
 
 echo "      - ast-grep (análise AST)"
@@ -55,8 +59,6 @@ echo "      - openbrand (extração de assets de marca)"
 echo "      - context-hub (docs de API atualizadas)"
 
 echo ""
-echo "✅ Instalação concluída!"
+echo "✅ Hooks e MCP instalados."
 echo ""
-echo "ℹ️  ExitPlanMode não é um evento de hook válido no Claude Code."
-echo "   plan-review.sh foi instalado em ~/.claude/hooks/ para uso manual."
-echo "   Execute: bash ~/.claude/hooks/plan-review.sh"
+echo "ℹ️  plan-review.sh disponível em: bash ~/.claude/hooks/plan-review.sh"
