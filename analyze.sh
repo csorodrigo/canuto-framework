@@ -23,13 +23,17 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-# ── Colors ──────────────────────────────────────────────────────────────────
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
-RED='\033[0;31m'
-BOLD='\033[1m'
-RESET='\033[0m'
+# ── Colors (TTY-aware) ─────────────────────────────────────────────────────
+if [ -t 1 ]; then
+  GREEN='\033[0;32m'
+  YELLOW='\033[1;33m'
+  CYAN='\033[0;36m'
+  RED='\033[0;31m'
+  BOLD='\033[1m'
+  RESET='\033[0m'
+else
+  GREEN='' YELLOW='' CYAN='' RED='' BOLD='' RESET=''
+fi
 
 # ── Verify vault exists ────────────────────────────────────────────────────
 if [ ! -d "$VAULT/projects" ]; then
@@ -50,6 +54,12 @@ from datetime import datetime, timedelta
 from collections import defaultdict, Counter
 from pathlib import Path
 
+def _safe_int(val, default=0):
+    try:
+        return int(val or default)
+    except (ValueError, TypeError):
+        return default
+
 vault = os.path.expanduser("~/.canuto/vault")
 projects_dir = f"{vault}/projects"
 today = datetime.now()
@@ -59,10 +69,11 @@ def count_files(path, ext="*.md"):
     return len([f for f in files if '.gitkeep' not in f])
 
 def read_frontmatter(filepath):
-    """Extract YAML frontmatter as dict (simple parser)."""
+    """Extract YAML frontmatter as dict (simple parser).
+    Handles values with colons (e.g., URLs)."""
     fm = {}
     try:
-        with open(filepath) as f:
+        with open(filepath, errors='ignore') as f:
             lines = f.readlines()
         if not lines or lines[0].strip() != '---':
             return fm
@@ -71,16 +82,19 @@ def read_frontmatter(filepath):
                 break
             if ':' in line:
                 key, _, val = line.partition(':')
-                fm[key.strip()] = val.strip()
-    except:
-        pass
+                key = key.strip()
+                val = val.strip().strip('"')
+                if key and not key.startswith('#') and not key.startswith('-'):
+                    fm[key] = val
+    except (IOError, OSError) as e:
+        print(f"Warning: could not read {filepath}: {e}", file=sys.stderr)
     return fm
 
 def file_age_days(filepath):
     try:
         mtime = os.path.getmtime(filepath)
         return (today - datetime.fromtimestamp(mtime)).days
-    except:
+    except (IOError, OSError):
         return -1
 
 # ── Discover projects ─────────────────────────────────────────────────────
@@ -134,7 +148,7 @@ for proj in projects:
             'project': proj,
             'category': fm.get('category', 'unknown'),
             'confidence': fm.get('confidence', 'unknown'),
-            'applied': int(fm.get('applied', '0') or '0'),
+            'applied': _safe_int(fm.get('applied', '0')),
             'name': os.path.basename(ifile).replace('.md', ''),
             'file': ifile,
         })
@@ -155,7 +169,7 @@ for ifile in glob.glob(f"{vault}/global-instincts/*.md"):
     global_instincts.append({
         'category': fm.get('category', 'unknown'),
         'confidence': fm.get('confidence', 'unknown'),
-        'applied': int(fm.get('applied', '0') or '0'),
+        'applied': _safe_int(fm.get('applied', '0')),
         'name': os.path.basename(ifile).replace('.md', ''),
         'source_project': fm.get('source_project', 'unknown'),
     })

@@ -59,7 +59,7 @@ fi
 
 # ── Create backup snapshot ──────────────────────────────────────────────────
 SNAPSHOT_DIR="$VAULT_DIR/.snapshots"
-TIMESTAMP=$(date +%Y-%m-%d_%H%M%S)
+TIMESTAMP=$(date +%Y-%m-%d_%H%M%S)_$$
 SNAPSHOT_PATH="$SNAPSHOT_DIR/$TIMESTAMP"
 
 mkdir -p "$SNAPSHOT_PATH"
@@ -74,7 +74,7 @@ done
 
 # ── Prune old snapshots (keep last 10) ──────────────────────────────────────
 if [ -d "$SNAPSHOT_DIR" ]; then
-  ls -dt "$SNAPSHOT_DIR"/*/ 2>/dev/null | tail -n +11 | xargs rm -rf 2>/dev/null || true
+  ls -dt "$SNAPSHOT_DIR"/*/ 2>/dev/null | tail -n +11 | while IFS= read -r dir; do rm -rf "$dir"; done 2>/dev/null || true
 fi
 
 # ── Write session marker ────────────────────────────────────────────────────

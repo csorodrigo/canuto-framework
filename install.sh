@@ -608,7 +608,7 @@ if not os.path.exists(timeline_path):
                         if line.startswith('- ['):
                             summary = line.strip()[:45]
                             break
-            except:
+            except (IOError, OSError):
                 pass
             if not summary:
                 summary = f"Session {name}"
@@ -788,11 +788,38 @@ from pathlib import Path
 from datetime import datetime
 from collections import defaultdict, Counter
 
+import sys as _sys
+
 project_dir = os.environ.get("PROJECT_DIR", os.getcwd())
 project_slug = os.path.basename(project_dir)
-vault = os.path.expanduser("~/.canuto/vault")
+vault = os.environ.get("CANUTO_VAULT", os.path.expanduser("~/.canuto/vault"))
 project_vault = f"{vault}/projects/{project_slug}"
 today = datetime.now().isoformat()[:19]
+
+# Max file size for reading content (1MB)
+MAX_FILE_SIZE = 1_000_000
+# Max source files to scan for API surface / env vars
+MAX_SCAN_FILES = 500
+
+def _warn(msg):
+    print(f"\033[1;33m[canuto]\033[0m {msg}", file=_sys.stderr)
+
+def _safe_read(filepath, max_size=MAX_FILE_SIZE):
+    """Read file content with size guard. Returns None if too large or unreadable."""
+    try:
+        if os.path.getsize(filepath) > max_size:
+            return None
+        with open(filepath, errors='ignore') as f:
+            return f.read()
+    except (IOError, OSError):
+        return None
+
+def _safe_int(val, default=0):
+    """Convert to int safely."""
+    try:
+        return int(val or default)
+    except (ValueError, TypeError):
+        return default
 
 # ═══════════════════════════════════════════════════════════════════════
 # PHASE 1: Generate project-index.json (deep scan)
@@ -899,8 +926,8 @@ if os.path.exists(pkg_json):
         # Scripts
         index["scripts"] = pkg.get("scripts", {})
 
-    except Exception as e:
-        pass
+    except (json.JSONDecodeError, IOError, OSError, KeyError, TypeError) as e:
+        _warn(f"Could not parse package.json: {e}")
 
 elif os.path.exists(pyproject):
     index["stack"]["primary_language"] = "python"
@@ -929,8 +956,8 @@ elif os.path.exists(pyproject):
 
         if "pytest" in content: index["stack"]["test_framework"] = "pytest"
         elif "unittest" in content: index["stack"]["test_framework"] = "unittest"
-    except:
-        pass
+    except (IOError, OSError) as e:
+        _warn(f"Could not parse pyproject.toml: {e}")
 
 elif os.path.exists(requirements):
     index["stack"]["primary_language"] = "python"
@@ -941,8 +968,8 @@ elif os.path.exists(requirements):
             deps = [l.split("==")[0].split(">=")[0].split("<=")[0].strip()
                     for l in f if l.strip() and not l.startswith("#")]
         index["dependencies"]["production"] = {d: "*" for d in deps}
-    except:
-        pass
+    except (IOError, OSError) as e:
+        _warn(f"Could not parse requirements.txt: {e}")
 
 elif os.path.exists(go_mod):
     index["stack"]["primary_language"] = "go"
@@ -956,8 +983,8 @@ elif os.path.exists(go_mod):
         if "gin-gonic" in content: index["stack"]["framework"] = "gin"
         elif "gofiber" in content: index["stack"]["framework"] = "fiber"
         elif "echo" in content: index["stack"]["framework"] = "echo"
-    except:
-        pass
+    except (IOError, OSError) as e:
+        _warn(f"Could not parse go.mod: {e}")
 
 elif os.path.exists(cargo_toml):
     index["stack"]["primary_language"] = "rust"
@@ -971,8 +998,8 @@ elif os.path.exists(cargo_toml):
         if "actix" in content: index["stack"]["framework"] = "actix"
         elif "axum" in content: index["stack"]["framework"] = "axum"
         elif "rocket" in content: index["stack"]["framework"] = "rocket"
-    except:
-        pass
+    except (IOError, OSError) as e:
+        _warn(f"Could not parse Cargo.toml: {e}")
 
 # ── Analyze structure ────────────────────────────────────────────────
 IGNORE = {'.git', 'node_modules', '.next', 'dist', 'build', '__pycache__',
@@ -1001,8 +1028,12 @@ for root, dirs, files in os.walk(project_dir):
 
         if ext in SOURCE_EXTS:
             try:
-                lc = sum(1 for _ in open(fpath, errors='ignore'))
-            except:
+                fsize = os.path.getsize(fpath)
+                if fsize > MAX_FILE_SIZE:
+                    lc = 0  # Skip large files
+                else:
+                    lc = sum(1 for _ in open(fpath, errors='ignore'))
+            except (IOError, OSError):
                 lc = 0
 
             is_test = any(p in rel_path.lower() for p in TEST_PATTERNS)
@@ -1115,9 +1146,9 @@ if gh_workflows:
     # Detect steps
     all_wf_content = ""
     for wf in gh_workflows:
-        try:
-            with open(wf) as f: all_wf_content += f.read().lower()
-        except: pass
+        wf_content = _safe_read(wf)
+        if wf_content:
+            all_wf_content += wf_content.lower()
     ci["has_lint"] = "lint" in all_wf_content or "eslint" in all_wf_content
     ci["has_tests"] = "test" in all_wf_content
     ci["has_deploy"] = "deploy" in all_wf_content or "release" in all_wf_content
@@ -1138,35 +1169,31 @@ for env_file in ['.env.example', '.env.sample', '.env.template', '.env.local.exa
                     line = line.strip()
                     if line and not line.startswith('#') and '=' in line:
                         env_vars.add(line.split('=')[0].strip())
-        except:
-            pass
+        except (IOError, OSError) as e:
+            _warn(f"Could not read {env_file}: {e}")
 
-# Also scan source for process.env / os.environ
-for sf in source_files[:100]:
-    try:
-        with open(f"{project_dir}/{sf}", errors='ignore') as f:
-            content = f.read()
-        env_vars.update(re.findall(r'process\.env\.([A-Z_][A-Z0-9_]*)', content))
-        env_vars.update(re.findall(r'os\.environ\.get\(["\']([A-Z_][A-Z0-9_]*)', content))
-        env_vars.update(re.findall(r'os\.getenv\(["\']([A-Z_][A-Z0-9_]*)', content))
-    except:
-        pass
+# Also scan source for process.env / os.environ (with size guard)
+for sf in source_files[:MAX_SCAN_FILES]:
+    content = _safe_read(f"{project_dir}/{sf}")
+    if content is None:
+        continue
+    env_vars.update(re.findall(r'process\.env\.([A-Z_][A-Z0-9_]*)', content))
+    env_vars.update(re.findall(r'os\.environ\.get\(["\']([A-Z_][A-Z0-9_]*)', content))
+    env_vars.update(re.findall(r'os\.getenv\(["\']([A-Z_][A-Z0-9_]*)', content))
 index["env_vars"] = sorted(list(env_vars))
 
 # ── API surface ──────────────────────────────────────────────────────
 routes_count = 0
 middleware_count = 0
 models_count = 0
-for sf in source_files:
-    try:
-        with open(f"{project_dir}/{sf}", errors='ignore') as f:
-            content = f.read()
-        routes_count += len(re.findall(r'\.(get|post|put|patch|delete|all)\s*\(', content, re.I))
-        routes_count += len(re.findall(r'@(Get|Post|Put|Patch|Delete|Route)\s*\(', content))
-        middleware_count += len(re.findall(r'\.use\s*\(', content))
-        models_count += len(re.findall(r'model\s+\w+\s*\{', content))
-    except:
-        pass
+for sf in source_files[:MAX_SCAN_FILES]:
+    content = _safe_read(f"{project_dir}/{sf}")
+    if content is None:
+        continue
+    routes_count += len(re.findall(r'\.(get|post|put|patch|delete|all)\s*\(', content, re.I))
+    routes_count += len(re.findall(r'@(Get|Post|Put|Patch|Delete|Route)\s*\(', content))
+    middleware_count += len(re.findall(r'\.use\s*\(', content))
+    models_count += len(re.findall(r'model\s+\w+\s*\{', content))
 index["api_surface"] = {
     "routes_count": routes_count,
     "middleware_count": middleware_count,
@@ -1196,8 +1223,8 @@ if os.path.exists(projects_dir):
             try:
                 with open(p_index) as f:
                     other_projects.append(json.load(f))
-            except:
-                pass
+            except (json.JSONDecodeError, IOError, OSError) as e:
+                _warn(f"Could not read project-index.json for {p}: {e}")
 
 if not other_projects:
     print(f"\033[1;33m[canuto]\033[0m No other indexed projects in vault. Onboarding report skipped.")
@@ -1236,30 +1263,36 @@ matches.sort(key=lambda m: m["overall"], reverse=True)
 
 # ── Collect instincts from similar projects ──────────────────────────
 def read_frontmatter(filepath):
+    """Extract YAML frontmatter and first heading from a markdown note."""
     fm = {}
     try:
-        with open(filepath) as f:
+        with open(filepath, errors='ignore') as f:
             lines = f.readlines()
         if not lines or lines[0].strip() != '---':
             return fm
+        # Parse frontmatter (handle values with colons like URLs)
         for line in lines[1:]:
             if line.strip() == '---':
                 break
             if ':' in line:
                 key, _, val = line.partition(':')
-                fm[key.strip()] = val.strip().strip('"')
-        # Also grab first heading after frontmatter as title
-        in_body = False
-        for line in lines:
-            if in_body and line.startswith('# '):
+                key = key.strip()
+                val = val.strip().strip('"')
+                # Skip YAML arrays/objects and comments
+                if key and not key.startswith('#') and not key.startswith('-'):
+                    fm[key] = val
+        # Grab first heading after frontmatter as title
+        found_end = 0
+        for line in lines[1:]:
+            if line.strip() == '---':
+                found_end += 1
+                if found_end >= 1:
+                    continue
+            if found_end >= 1 and line.startswith('# '):
                 fm['_title'] = line.lstrip('# ').strip()
                 break
-            if line.strip() == '---':
-                if in_body:
-                    break
-                in_body = True
-    except:
-        pass
+    except (IOError, OSError) as e:
+        _warn(f"Could not read {filepath}: {e}")
     return fm
 
 recommended_instincts = []
@@ -1285,7 +1318,7 @@ for match in matches[:5]:  # Top 5 similar projects
                 "title": fm.get('_title', fm.get('id', 'unknown')),
                 "category": fm.get('category', 'unknown'),
                 "confidence": conf,
-                "applied": int(fm.get('applied', '0') or '0'),
+                "applied": _safe_int(fm.get('applied', '0')),
                 "match": match["overall"],
             })
 
@@ -1307,21 +1340,20 @@ for match in matches[:5]:  # Top 5 similar projects
     for sfile in glob.glob(f"{p_dir}/sessions/*.md"):
         if '.gitkeep' in sfile:
             continue
-        try:
-            with open(sfile) as f:
-                content = f.read().lower()
-            if 'rework' in content:
-                common_issues['rework detected'] += 1
-            if 'error' in content and 'swallow' in content:
-                common_issues['silent error swallowing'] += 1
-            if 'flak' in content or 'intermittent' in content:
-                common_issues['test flakiness'] += 1
-            if 'timeout' in content:
-                common_issues['timeout issues'] += 1
-            if 'memory' in content and ('leak' in content or 'oom' in content):
-                common_issues['memory issues'] += 1
-        except:
-            pass
+        content = _safe_read(sfile)
+        if content is None:
+            continue
+        content = content.lower()
+        if 'rework' in content:
+            common_issues['rework detected'] += 1
+        if 'error' in content and 'swallow' in content:
+            common_issues['silent error swallowing'] += 1
+        if 'flak' in content or 'intermittent' in content:
+            common_issues['test flakiness'] += 1
+        if 'timeout' in content:
+            common_issues['timeout issues'] += 1
+        if 'memory' in content and ('leak' in content or 'oom' in content):
+            common_issues['memory issues'] += 1
 
 # Also check global instincts
 for ifile in glob.glob(f"{vault}/global-instincts/*.md"):
@@ -1334,7 +1366,7 @@ for ifile in glob.glob(f"{vault}/global-instincts/*.md"):
         "title": fm.get('_title', fm.get('id', 'unknown')),
         "category": fm.get('category', 'unknown'),
         "confidence": fm.get('confidence', 'high'),
-        "applied": int(fm.get('applied', '0') or '0'),
+        "applied": _safe_int(fm.get('applied', '0')),
         "match": 100,
     })
 
@@ -1384,7 +1416,8 @@ if matches and matches[0]["overall"] >= 20:
         deps_preview = ", ".join(m["shared_deps"][:5])
         if len(m["shared_deps"]) > 5:
             deps_preview += f" +{len(m['shared_deps'])-5} more"
-        report.append(f"| [[projects/{m['slug']}\\|{m['slug']}]] | {m['overall']}% | {m['dep_match']}% | {m['domain_match']}% | {deps_preview} |")
+        safe_slug = m['slug'].replace('|', '-')
+        report.append(f"| [[projects/{safe_slug}\\|{safe_slug}]] | {m['overall']}% | {m['dep_match']}% | {m['domain_match']}% | {deps_preview} |")
     report.append("")
 else:
     report.append("No similar projects found (all matches < 20%).")
@@ -1395,7 +1428,7 @@ report.append("## Recommended Instincts")
 report.append("")
 if recommended_instincts:
     for inst in recommended_instincts[:10]:
-        icon = {"high": "\U0001f7e2", "medium": "\U0001f7e1"}.get(inst["confidence"], "\u26aa")
+        icon = {'high': '🟢', 'medium': '🟡'}.get(inst["confidence"], '⚪')
         src = f"[{inst['project']}]" if inst["project"] != "GLOBAL" else "[GLOBAL]"
         report.append(f"- {icon} {src} **{inst['title']}** ({inst['category']}) — confidence: {inst['confidence']}, applied: {inst['applied']}x")
     report.append("")

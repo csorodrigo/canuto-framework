@@ -95,7 +95,7 @@ fi
 # ── Pending Tasks ───────────────────────────────────────────────────────────
 PENDING_DIR="$VAULT_DIR/pending"
 if [ -d "$PENDING_DIR" ]; then
-  TASK_COUNT=$(ls "$PENDING_DIR"/*.md 2>/dev/null | grep -cv '.gitkeep' 2>/dev/null) || TASK_COUNT=0
+  TASK_COUNT=$(find "$PENDING_DIR" -maxdepth 1 -name "*.md" -not -name ".gitkeep" -type f 2>/dev/null | wc -l) || TASK_COUNT=0
   if [ "$TASK_COUNT" -gt 0 ]; then
     echo "── Pending Tasks ($TASK_COUNT) ──"
     for f in "$PENDING_DIR"/*.md; do

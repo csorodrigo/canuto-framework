@@ -36,48 +36,52 @@ if ! command -v python3 &> /dev/null; then
 fi
 
 # ── Run ─────────────────────────────────────────────────────────────────────
-REPORT=$(FOCUS="$FOCUS_PROJECT" python3 << 'PYEOF'
-import os, json, glob, re, sys
-from pathlib import Path
+REPORT=$(FOCUS="$FOCUS_PROJECT" CANUTO_VAULT="$VAULT" python3 << 'PYEOF'
+import os, json, glob, sys
 from datetime import datetime
 from collections import defaultdict, Counter
 
-vault = os.path.expanduser("~/.canuto/vault")
+vault = os.environ.get("CANUTO_VAULT", os.path.expanduser("~/.canuto/vault"))
 projects_dir = f"{vault}/projects"
 focus = os.environ.get("FOCUS", "")
 today = datetime.now()
 
+def _safe_int(val, default=0):
+    try:
+        return int(val or default)
+    except (ValueError, TypeError):
+        return default
+
 def read_frontmatter(filepath):
+    """Extract YAML frontmatter and first heading from a markdown note.
+    Handles values with colons (e.g., URLs)."""
     fm = {}
     try:
-        with open(filepath) as f:
+        with open(filepath, errors='ignore') as f:
             lines = f.readlines()
         if not lines or lines[0].strip() != '---':
             return fm
-        in_fm = False
-        for line in lines:
+        # Parse frontmatter
+        for line in lines[1:]:
             if line.strip() == '---':
-                if in_fm: break
-                in_fm = True
-                continue
-            if in_fm and ':' in line:
+                break
+            if ':' in line:
                 key, _, val = line.partition(':')
-                fm[key.strip()] = val.strip().strip('"')
-            if not in_fm and line.startswith('# '):
-                fm['_title'] = line.lstrip('# ').strip()
-                break
-        # Get title from body
-        in_body = False
-        for line in lines:
+                key = key.strip()
+                val = val.strip().strip('"')
+                if key and not key.startswith('#') and not key.startswith('-'):
+                    fm[key] = val
+        # Grab first heading after frontmatter as title
+        found_end = 0
+        for line in lines[1:]:
             if line.strip() == '---':
-                if in_body: pass
-                in_body = not in_body
+                found_end += 1
                 continue
-            if in_body and line.startswith('# '):
+            if found_end >= 1 and line.startswith('# '):
                 fm['_title'] = line.lstrip('# ').strip()
                 break
-    except:
-        pass
+    except (IOError, OSError) as e:
+        print(f"Warning: could not read {filepath}: {e}", file=sys.stderr)
     return fm
 
 # ── Load all project indexes ─────────────────────────────────────────
@@ -87,18 +91,20 @@ for p in sorted(os.listdir(projects_dir)):
     if not os.path.isdir(pdir) or p == '.obsidian':
         continue
     idx_path = f"{pdir}/project-index.json"
-    idx = {}
-    if os.path.exists(idx_path):
-        try:
-            with open(idx_path) as f:
-                idx = json.load(f)
-        except:
-            pass
+    # Skip projects without index (per spec: unindexed projects are excluded)
+    if not os.path.exists(idx_path):
+        continue
+    try:
+        with open(idx_path) as f:
+            idx = json.load(f)
+    except (json.JSONDecodeError, IOError, OSError) as e:
+        print(f"Warning: skipping {p} (bad project-index.json): {e}", file=sys.stderr)
+        continue
     projects[p] = {
         "index": idx,
         "instincts": [],
         "decisions": [],
-        "sessions_count": len(glob.glob(f"{pdir}/sessions/*.md")) - len(glob.glob(f"{pdir}/sessions/.gitkeep")),
+        "sessions_count": len([f for f in glob.glob(f"{pdir}/sessions/*.md") if '.gitkeep' not in f]),
     }
 
     # Load instincts
@@ -110,7 +116,7 @@ for p in sorted(os.listdir(projects_dir)):
             "title": fm.get('_title', fm.get('id', 'unknown')),
             "category": fm.get('category', 'unknown'),
             "confidence": fm.get('confidence', 'unknown'),
-            "applied": int(fm.get('applied', '0') or '0'),
+            "applied": _safe_int(fm.get('applied', '0')),
         })
 
     # Load decisions
@@ -189,7 +195,7 @@ if cross_patterns:
         report.append(f"### {cat}")
         report.append(f"Projects: {', '.join(project_list)}\n")
         for inst in sorted(insts, key=lambda x: x["applied"], reverse=True):
-            icon = {"high": "\U0001f7e2", "medium": "\U0001f7e1", "low": "\U0001f534"}.get(inst["confidence"], "\u26aa")
+            icon = {'high': '🟢', 'medium': '🟡', 'low': '🔴'}.get(inst["confidence"], '⚪')
             report.append(f"- {icon} [{inst['project']}] **{inst['title']}** — {inst['confidence']}, applied {inst['applied']}x")
         report.append("")
 else:
@@ -315,11 +321,22 @@ PYEOF
 )
 
 # ── Terminal output ─────────────────────────────────────────────────────────
+# Detect TTY for color support
+if [ -t 1 ]; then
+  CYAN='\033[0;36m'
+  GREEN='\033[0;32m'
+  RESET='\033[0m'
+else
+  CYAN=''
+  GREEN=''
+  RESET=''
+fi
+
 if [ "$OUTPUT_MODE" != "vault" ]; then
   echo ""
-  echo -e "\033[0;36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
-  echo -e "\033[0;36m  Canuto — Cross-Reference Engine\033[0m"
-  echo -e "\033[0;36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo -e "${CYAN}  Canuto — Cross-Reference Engine${RESET}"
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
   echo ""
   echo "$REPORT"
   echo ""
@@ -343,5 +360,5 @@ type: cross-reference
 
 FMEOF
   echo "$REPORT" >> "$REPORT_FILE"
-  echo -e "\033[0;32m[canuto]\033[0m Report saved: $REPORT_FILE"
+  echo -e "${GREEN}[canuto]${RESET} Report saved: $REPORT_FILE"
 fi

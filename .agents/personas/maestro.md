@@ -34,24 +34,24 @@ Execute these steps **every time** a new session begins:
    - `obsidian_global_search(query="confidence: medium", contextLength=100)` → find medium-confidence instincts.
    - `obsidian_list_notes(path="global-instincts/")` → load **global instincts** (cross-project patterns). These are high-confidence instincts promoted from any project. Present them alongside project instincts in the briefing, tagged as `[GLOBAL]`.
 
-2. **Check for stale contexts**:
+3. **Check for stale contexts**:
    - Run `git diff --name-only` comparing file modification dates against `.context.md` timestamps.
    - List any directories where source files changed but `.context.md` was not updated.
 
-3. **Check for stale instincts** (continuous-learning skill):
+4. **Check for stale instincts** (continuous-learning skill):
    - `obsidian_global_search(query="confidence: low")` → find low-confidence instincts.
    - Any `low` confidence instinct not seen in 5+ sessions → suggest pruning.
 
-3b. **Check for pending-sync** (offline recovery):
+5. **Check for pending-sync** (offline recovery):
    - If `.agents/.cache/pending-sync/` exists and has files, warn: "Found notes from a previous offline session."
    - Offer to sync them to the vault now (read each file, write to appropriate vault directory).
-   - After successful sync, delete the pending-sync files.
+   - After successful sync, delete the pending-sync files. If sync fails on any file, leave it and warn user.
 
-3c. **Check for cross-project insights**:
+6. **Check for cross-project insights**:
    - If `~/.canuto/vault/projects/{project-slug}/onboarding-report.md` exists, note it for the briefing.
    - Count total projects in `~/.canuto/vault/projects/`. If 3+, cross-reference data is available.
 
-4. **Present the session briefing** to the user:
+7. **Present the session briefing** to the user:
    ```
    Session Briefing:
    - Last session (<date>): <1-2 sentence summary of what was done>.
