@@ -509,6 +509,129 @@ Project memory for \`$project_slug\`.
 PEOF
     ok "Created project index: projects/$project_slug/_index.md"
   fi
+
+  # Copy global canvas templates if not present
+  for canvas_file in persona-flow.canvas memory-map.canvas; do
+    if [ ! -f "$vault/canvas/$canvas_file" ] && [ -f ".agents/vault/canvas/$canvas_file" ]; then
+      cp ".agents/vault/canvas/$canvas_file" "$vault/canvas/$canvas_file"
+      ok "Canvas: $canvas_file"
+    fi
+  done
+
+  # Copy global bases templates if not present
+  for base_file in .agents/vault/bases/*.base; do
+    [ -f "$base_file" ] || continue
+    local base_name
+    base_name=$(basename "$base_file")
+    if [ ! -f "$vault/bases/$base_name" ]; then
+      cp "$base_file" "$vault/bases/$base_name"
+      ok "Base: $base_name"
+    fi
+  done
+
+  # Generate project-specific canvas (requires python3)
+  if command -v python3 &> /dev/null; then
+    generate_project_canvas "$project_slug" "$project_dir"
+  else
+    warn "python3 not found — skipping canvas generation"
+  fi
+}
+
+# ── generate_project_canvas ───────────────────────────────────────────────────
+# Creates visual canvas files for a project: overview map and session timeline.
+# Requires python3 for reliable JSON generation.
+generate_project_canvas() {
+  local slug="$1"
+  local project_dir="$2"
+  local vault="$HOME/.canuto/vault"
+
+  python3 << 'PYEOF' "$slug" "$project_dir" "$vault"
+import json, os, sys, glob
+from datetime import date
+
+slug = sys.argv[1]
+project_dir = sys.argv[2]
+vault = sys.argv[3]
+
+def count_md(subdir):
+    return len([f for f in glob.glob(f"{project_dir}/{subdir}/*.md") if '.gitkeep' not in f])
+
+# ── Project Overview Canvas ─────────────────────────────────────────────
+overview_path = f"{vault}/canvas/{slug}-overview.canvas"
+if not os.path.exists(overview_path):
+    n = {d: count_md(d) for d in ['sessions','decisions','instincts','pending','metrics','audit']}
+    canvas = {
+        "nodes": [
+            {"id":"po_grp","type":"group","x":-50,"y":-100,"width":1300,"height":600,"label":slug,"color":"6"},
+            {"id":"po_title","type":"text","x":0,"y":-40,"width":300,"height":80,"text":f"# {slug}\n\nProject Overview","color":"6"},
+            {"id":"po_sessions","type":"text","x":400,"y":-40,"width":180,"height":100,"text":f"# Sessions\n\n{n['sessions']} notes\n`sessions/`","color":"5"},
+            {"id":"po_decisions","type":"text","x":640,"y":-40,"width":180,"height":100,"text":f"# Decisions\n\n{n['decisions']} notes\n`decisions/`","color":"4"},
+            {"id":"po_instincts","type":"text","x":880,"y":-40,"width":180,"height":100,"text":f"# Instincts\n\n{n['instincts']} notes\n`instincts/`","color":"3"},
+            {"id":"po_pending","type":"text","x":400,"y":140,"width":180,"height":100,"text":f"# Pending\n\n{n['pending']} tasks\n`pending/`","color":"2"},
+            {"id":"po_metrics","type":"text","x":640,"y":140,"width":180,"height":100,"text":f"# Metrics\n\n{n['metrics']} notes\n`metrics/`","color":"2"},
+            {"id":"po_audit","type":"text","x":880,"y":140,"width":180,"height":100,"text":f"# Audit\n\n{n['audit']} events\n`audit/`","color":"1"},
+            {"id":"po_design","type":"text","x":0,"y":140,"width":300,"height":100,"text":"# Design\n\nProfile + Components\n`design/`","color":"3"},
+            {"id":"po_date","type":"text","x":0,"y":340,"width":300,"height":60,"text":f"Created: {date.today()}\nVault: ~/.canuto/vault/"},
+        ],
+        "edges": [
+            {"id":"po_e1","fromNode":"po_title","fromSide":"right","toNode":"po_sessions","toSide":"left","toEnd":"arrow"},
+            {"id":"po_e2","fromNode":"po_sessions","fromSide":"right","toNode":"po_decisions","toSide":"left","toEnd":"arrow","label":"records"},
+            {"id":"po_e3","fromNode":"po_sessions","fromSide":"right","toNode":"po_instincts","toSide":"left","toEnd":"arrow","label":"extracts"},
+            {"id":"po_e4","fromNode":"po_sessions","fromSide":"bottom","toNode":"po_pending","toSide":"top","toEnd":"arrow","label":"defers"},
+            {"id":"po_e5","fromNode":"po_sessions","fromSide":"bottom","toNode":"po_metrics","toSide":"top","toEnd":"arrow","label":"tracks"},
+            {"id":"po_e6","fromNode":"po_sessions","fromSide":"bottom","toNode":"po_audit","toSide":"top","toEnd":"arrow","label":"logs"},
+        ]
+    }
+    with open(overview_path, 'w') as f:
+        json.dump(canvas, f, indent=2)
+    print(f"\033[0;32m[canuto]\033[0m \u2713 Canvas: {slug}-overview.canvas")
+
+# ── Session Timeline Canvas ─────────────────────────────────────────────
+timeline_path = f"{vault}/canvas/{slug}-timeline.canvas"
+if not os.path.exists(timeline_path):
+    session_files = sorted(glob.glob(f"{project_dir}/sessions/*.md"))
+    session_files = [f for f in session_files if '.gitkeep' not in f]
+    nodes = []
+    edges = []
+
+    if not session_files:
+        nodes.append({"id":"tl_empty","type":"text","x":0,"y":0,"width":300,"height":100,
+            "text":"# Timeline\n\nNo sessions yet.\nThe Maestro will populate this.","color":"5"})
+    else:
+        for i, sf in enumerate(session_files):
+            name = os.path.basename(sf).replace('.md','')
+            # Try to extract first goal
+            summary = ""
+            try:
+                with open(sf) as fh:
+                    for line in fh:
+                        if line.startswith('- ['):
+                            summary = line.strip()[:45]
+                            break
+            except:
+                pass
+            if not summary:
+                summary = f"Session {name}"
+
+            y = 0 if i % 2 == 0 else 160
+            color = str((i % 6) + 1)
+            node_id = f"tl_{i:04d}"
+            nodes.append({"id":node_id,"type":"text","x":i*300,"y":y,"width":220,"height":80,
+                "text":f"## {name}\n{summary}","color":color})
+            if i > 0:
+                edges.append({"id":f"tl_e_{i:04d}","fromNode":f"tl_{i-1:04d}","fromSide":"right",
+                    "toNode":node_id,"toSide":"left","toEnd":"arrow"})
+
+        # Add group around all nodes
+        nodes.insert(0, {"id":"tl_grp","type":"group","x":-50,"y":-80,
+            "width":len(session_files)*300+50,"height":400,
+            "label":f"{slug} — Session Timeline","color":"5"})
+
+    canvas = {"nodes": nodes, "edges": edges}
+    with open(timeline_path, 'w') as f:
+        json.dump(canvas, f, indent=2)
+    print(f"\033[0;32m[canuto]\033[0m \u2713 Canvas: {slug}-timeline.canvas")
+PYEOF
 }
 
 # ── setup_obsidian_mcp ────────────────────────────────────────────────────────
