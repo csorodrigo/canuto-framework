@@ -431,6 +431,63 @@ setup_search_tools() {
   fi
 }
 
+# ── setup_obsidian_mcp ────────────────────────────────────────────────────────
+# Registers the obsidian-mcp-server in ~/.claude/settings.json.
+# Prompts for API key if not already configured.
+setup_obsidian_mcp() {
+  local settings="$HOME/.claude/settings.json"
+
+  if ! command -v jq &> /dev/null; then
+    warn "jq not found — skipping Obsidian MCP setup."
+    return
+  fi
+
+  log "Setting up Obsidian MCP server..."
+
+  if [ ! -f "$settings" ]; then
+    echo '{}' > "$settings"
+  fi
+
+  # Check if already configured
+  if jq -e '.mcpServers["obsidian-mcp-server"]' "$settings" &>/dev/null; then
+    ok "obsidian-mcp-server already in settings.json"
+    return
+  fi
+
+  echo ""
+  echo -e "${CYAN}  Obsidian MCP requires the Local REST API plugin.${RESET}"
+  echo -e "${CYAN}  In Obsidian: Settings → Community Plugins → Browse → \"Local REST API\" → Install → Enable${RESET}"
+  echo -e "${CYAN}  Then copy the API Key from the plugin settings.${RESET}"
+  echo ""
+  read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Paste your Obsidian Local REST API key (or press Enter to skip): ")" API_KEY
+
+  if [ -z "$API_KEY" ]; then
+    warn "Skipped Obsidian MCP setup. Configure manually later (see .agents/mcp/setup.md)."
+    return
+  fi
+
+  local updated
+  updated=$(jq --arg key "$API_KEY" '
+    .mcpServers["obsidian-mcp-server"] = {
+      "command": "npx",
+      "args": ["obsidian-mcp-server"],
+      "env": {
+        "OBSIDIAN_API_KEY": $key,
+        "OBSIDIAN_BASE_URL": "http://127.0.0.1:27123",
+        "MCP_TRANSPORT_TYPE": "stdio",
+        "OBSIDIAN_VERIFY_SSL": "false"
+      }
+    }
+  ' "$settings")
+
+  if [[ -n "$updated" ]]; then
+    echo "$updated" > "$settings"
+    ok "obsidian-mcp-server added to $settings"
+  else
+    warn "jq failed — Obsidian MCP server not added."
+  fi
+}
+
 # ── setup_gstack ─────────────────────────────────────────────────────────────
 # Installs/updates gstack (Garry Tan's 21 engineering skills) globally.
 # Requires: git. Optional: bun (for /browse binary compilation).
@@ -664,6 +721,7 @@ if [ "$MODE" = "migrate" ]; then
   merge_claude_md
   setup_hooks
   setup_search_tools
+  setup_obsidian_mcp
 
   # ── Step 6: Clean up old memory dir ──────────────────────────────────────
   if [ -d ".agents/memory" ] && [ "$MIGRATED" -gt 0 ]; then
@@ -735,6 +793,7 @@ if [ "$MODE" = "install" ]; then
   merge_claude_md
   setup_hooks
   setup_search_tools
+  setup_obsidian_mcp
   setup_gstack
   setup_global_skills
 
@@ -788,6 +847,7 @@ if [ "$MODE" = "update" ]; then
   merge_claude_md
   setup_hooks
   setup_search_tools
+  setup_obsidian_mcp
   setup_gstack
   setup_global_skills
 
