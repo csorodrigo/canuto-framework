@@ -741,6 +741,8 @@ setup_global_skills() {
     "investigate"
     "document-release"
     "retro"
+    "auto-analysis"
+    "vault-maintenance"
     # Impeccable design skills
     "audit"
     "animate"

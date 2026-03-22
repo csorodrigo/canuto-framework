@@ -68,6 +68,8 @@ These skills are slash commands invokable directly in Claude Code. Installed aut
 | `/investigate` | Forensic debugger — Iron Law: no fix without confirmed root cause. Read-only investigation phase first. | debugging |
 | `/document-release` | Post-ship documentation sweep — updates README, FEATURE-MAP.md, .context.md, CHANGELOG after a deploy. | documentation, workflow |
 | `/retro` | Weekly retrospective — reads metrics.md, audit-log.md, instincts.md to generate Shipped / Delayed / Learned / Next. | learning, memory |
+| `/auto-analysis` | Deep project scan + cross-reference with other vault projects. Generates project-index.json and onboarding-report.md. | analytics, onboarding |
+| `/vault-maintenance` | Periodic vault cleanup — archives old sessions, aggregates metrics/audits, cleans snapshots. | maintenance, vault |
 
 ### Design Skills (via Impeccable)
 
