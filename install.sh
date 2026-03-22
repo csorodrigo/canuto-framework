@@ -545,7 +545,7 @@ generate_project_canvas() {
   local project_dir="$2"
   local vault="$HOME/.canuto/vault"
 
-  python3 << 'PYEOF' "$slug" "$project_dir" "$vault"
+  python3 - "$slug" "$project_dir" "$vault" << 'PYEOF'
 import json, os, sys, glob
 from datetime import date
 
