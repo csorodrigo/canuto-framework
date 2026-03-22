@@ -26,7 +26,6 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-# Auto-detect vault
 if [ -z "$VAULT_DIR" ]; then
   if [ -d "$GLOBAL_VAULT" ]; then
     VAULT_DIR="$GLOBAL_VAULT"
@@ -51,55 +50,66 @@ echo "  Vault: $VAULT_DIR"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# ── Build reference graph ────────────────────────────────────────────────
+# ── Single find pass — collect all vault notes once ──────────────────────
 echo "── Scanning vault ──"
 
-declare -A REFERENCED_NOTES
-declare -A ALL_NOTES
+mapfile -t ALL_NOTE_FILES < <(find "$VAULT_DIR" -name "*.md" -type f -not -path "*/.obsidian/*" 2>/dev/null)
+TOTAL_NOTES=${#ALL_NOTE_FILES[@]}
 
-# Index all notes
-while IFS= read -r note; do
+declare -A NOTE_EXISTS    # basename (no ext) -> 1
+declare -A NOTE_BY_PATH   # rel_path -> 1
+declare -A REFERENCED_NOTES
+declare -A WIKILINKS_BY_NOTE  # note_path -> space-separated targets (for reuse in Check 2)
+
+# Index all notes by name and path
+for note in "${ALL_NOTE_FILES[@]}"; do
   rel_path="${note#"$VAULT_DIR"/}"
   basename_no_ext=$(basename "$note" .md)
-  ALL_NOTES["$rel_path"]=1
-  TOTAL_NOTES=$((TOTAL_NOTES + 1))
-done < <(find "$VAULT_DIR" -name "*.md" -type f -not -path "*/.obsidian/*" 2>/dev/null)
+  NOTE_EXISTS["$basename_no_ext"]=1
+  NOTE_BY_PATH["$rel_path"]=1
+  NOTE_BY_PATH["${rel_path%.md}"]=1
+done
 
-# Find all wikilink targets
-while IFS= read -r note; do
-  while IFS= read -r target; do
-    target=$(echo "$target" | sed 's/\[\[//;s/\]\]//;s/|.*//' | xargs)
+# Extract wikilinks once — populate both REFERENCED_NOTES and WIKILINKS_BY_NOTE
+for note in "${ALL_NOTE_FILES[@]}"; do
+  targets=""
+  while IFS= read -r raw; do
+    target="${raw//\[\[}"
+    target="${target//\]\]}"
+    target="${target%%|*}"
+    target="${target## }"
+    target="${target%% }"
     [ -z "$target" ] && continue
     [[ "$target" == http* ]] && continue
     [[ "$target" == \#* ]] && continue
     target_base="${target%%#*}"
     [ -z "$target_base" ] && continue
     REFERENCED_NOTES["$target_base"]=1
+    targets+="$target_base"$'\n'
   done < <(grep -oP '\[\[[^\]]+\]\]' "$note" 2>/dev/null || true)
-done < <(find "$VAULT_DIR" -name "*.md" -type f -not -path "*/.obsidian/*" 2>/dev/null)
+  [ -n "$targets" ] && WIKILINKS_BY_NOTE["$note"]="$targets"
+done
 
 # ── Check 1: Orphan notes (no incoming references) ──────────────────────
 echo ""
 echo "── Orphan Notes (no incoming references) ──"
 
-while IFS= read -r note; do
+for note in "${ALL_NOTE_FILES[@]}"; do
   rel_path="${note#"$VAULT_DIR"/}"
   basename_no_ext=$(basename "$note" .md)
 
-  # Skip index files, templates, and root-level docs
   [[ "$basename_no_ext" == "_index" ]] && continue
   [[ "$rel_path" == .obsidian/* ]] && continue
   [[ "$basename_no_ext" == "README" ]] && continue
   [[ "$basename_no_ext" == "SPEC" ]] && continue
 
-  # Check if referenced by name or path
   if [ -z "${REFERENCED_NOTES[$basename_no_ext]:-}" ] && \
      [ -z "${REFERENCED_NOTES[$rel_path]:-}" ] && \
      [ -z "${REFERENCED_NOTES[${rel_path%.md}]:-}" ]; then
     echo "  ORPHAN: $rel_path"
     ORPHAN_COUNT=$((ORPHAN_COUNT + 1))
   fi
-done < <(find "$VAULT_DIR" -name "*.md" -type f -not -path "*/.obsidian/*" 2>/dev/null)
+done
 
 [ $ORPHAN_COUNT -eq 0 ] && echo "  ✓ No orphan notes found"
 
@@ -107,31 +117,22 @@ done < <(find "$VAULT_DIR" -name "*.md" -type f -not -path "*/.obsidian/*" 2>/de
 echo ""
 echo "── Broken Wikilinks ──"
 
-while IFS= read -r note; do
-  while IFS= read -r match; do
-    target=$(echo "$match" | sed 's/\[\[//;s/\]\]//;s/|.*//' | xargs)
-    [ -z "$target" ] && continue
-    [[ "$target" == http* ]] && continue
-    [[ "$target" == \#* ]] && continue
-    target_base="${target%%#*}"
+for note in "${ALL_NOTE_FILES[@]}"; do
+  targets="${WIKILINKS_BY_NOTE[$note]:-}"
+  [ -z "$targets" ] && continue
+
+  while IFS= read -r target_base; do
     [ -z "$target_base" ] && continue
-
-    # Try to find the target
-    found=false
-    while IFS= read -r candidate; do
-      found=true
-      break
-    done < <(find "$VAULT_DIR" -name "$target_base.md" -type f 2>/dev/null)
-
-    if ! $found; then
-      # Also try exact path
-      if [ ! -f "$VAULT_DIR/$target_base" ] && [ ! -f "$VAULT_DIR/$target_base.md" ]; then
-        echo "  BROKEN: [[$target]] in $(basename "$note")"
-        BROKEN_COUNT=$((BROKEN_COUNT + 1))
-      fi
+    # Resolve via pre-built indexes — no find calls needed
+    if [ -z "${NOTE_EXISTS[$target_base]:-}" ] && \
+       [ -z "${NOTE_BY_PATH[$target_base]:-}" ] && \
+       [ ! -f "$VAULT_DIR/$target_base" ] && \
+       [ ! -f "$VAULT_DIR/$target_base.md" ]; then
+      echo "  BROKEN: [[$target_base]] in $(basename "$note")"
+      BROKEN_COUNT=$((BROKEN_COUNT + 1))
     fi
-  done < <(grep -oP '\[\[[^\]]+\]\]' "$note" 2>/dev/null || true)
-done < <(find "$VAULT_DIR" -name "*.md" -type f -not -path "*/.obsidian/*" 2>/dev/null)
+  done <<< "$targets"
+done
 
 [ $BROKEN_COUNT -eq 0 ] && echo "  ✓ No broken wikilinks found"
 
@@ -139,23 +140,22 @@ done < <(find "$VAULT_DIR" -name "*.md" -type f -not -path "*/.obsidian/*" 2>/de
 echo ""
 echo "── Empty Required Frontmatter ──"
 
-# Check instincts for missing confidence
-while IFS= read -r note; do
-  if grep -q "^confidence:$" "$note" 2>/dev/null || \
-     grep -q "^confidence: *$" "$note" 2>/dev/null; then
-    echo "  EMPTY confidence: $(basename "$note")"
-    EMPTY_FM_COUNT=$((EMPTY_FM_COUNT + 1))
-  fi
-done < <(find "$VAULT_DIR" -path "*/instincts/*.md" -type f 2>/dev/null)
-
-# Check pending tasks for missing priority
-while IFS= read -r note; do
-  if grep -q "^priority:$" "$note" 2>/dev/null || \
-     grep -q "^priority: *$" "$note" 2>/dev/null; then
-    echo "  EMPTY priority: $(basename "$note")"
-    EMPTY_FM_COUNT=$((EMPTY_FM_COUNT + 1))
-  fi
-done < <(find "$VAULT_DIR" -path "*/pending/*.md" -type f 2>/dev/null)
+for note in "${ALL_NOTE_FILES[@]}"; do
+  case "$note" in
+    */instincts/*.md)
+      if grep -qE "^confidence: *$" "$note" 2>/dev/null; then
+        echo "  EMPTY confidence: $(basename "$note")"
+        EMPTY_FM_COUNT=$((EMPTY_FM_COUNT + 1))
+      fi
+      ;;
+    */pending/*.md)
+      if grep -qE "^priority: *$" "$note" 2>/dev/null; then
+        echo "  EMPTY priority: $(basename "$note")"
+        EMPTY_FM_COUNT=$((EMPTY_FM_COUNT + 1))
+      fi
+      ;;
+  esac
+done
 
 [ $EMPTY_FM_COUNT -eq 0 ] && echo "  ✓ All required frontmatter present"
 
@@ -163,16 +163,19 @@ done < <(find "$VAULT_DIR" -path "*/pending/*.md" -type f 2>/dev/null)
 echo ""
 echo "── Sessions Without Metrics ──"
 
-while IFS= read -r session; do
-  session_date=$(basename "$session" .md)
-  # Look for corresponding metrics file
-  project_dir=$(dirname "$(dirname "$session")")
-  metrics_file="$project_dir/metrics/${session_date}-metrics.md"
-  if [ ! -f "$metrics_file" ]; then
-    echo "  MISSING metrics for session: $session_date"
-    MISSING_METRICS_COUNT=$((MISSING_METRICS_COUNT + 1))
-  fi
-done < <(find "$VAULT_DIR" -path "*/sessions/*.md" -type f 2>/dev/null)
+for note in "${ALL_NOTE_FILES[@]}"; do
+  case "$note" in
+    */sessions/*.md)
+      session_date=$(basename "$note" .md)
+      project_dir=$(dirname "$(dirname "$note")")
+      metrics_file="$project_dir/metrics/${session_date}-metrics.md"
+      if [ ! -f "$metrics_file" ]; then
+        echo "  MISSING metrics for session: $session_date"
+        MISSING_METRICS_COUNT=$((MISSING_METRICS_COUNT + 1))
+      fi
+      ;;
+  esac
+done
 
 [ $MISSING_METRICS_COUNT -eq 0 ] && echo "  ✓ All sessions have metrics"
 

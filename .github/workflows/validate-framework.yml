@@ -62,13 +62,9 @@ jobs:
         run: bash install.sh --check
 
       - name: Check vault references
-        run: |
-          if [ -f .agents/hooks/check-references.sh ]; then
-            bash .agents/hooks/check-references.sh || echo "Reference issues found (non-blocking in CI)"
-          fi
+        continue-on-error: true
+        run: bash .agents/hooks/check-references.sh
 
       - name: Check vault orphans
-        run: |
-          if [ -f .agents/hooks/check-orphans.sh ]; then
-            bash .agents/hooks/check-orphans.sh || echo "Orphan issues found (non-blocking in CI)"
-          fi
+        continue-on-error: true
+        run: bash .agents/hooks/check-orphans.sh
