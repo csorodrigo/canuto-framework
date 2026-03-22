@@ -109,6 +109,7 @@ Disponiveis em **qualquer projeto**. Instalados em `~/.claude/skills/`.
 | `/investigate` | Debugging forense. Iron Law: sem fix sem causa raiz confirmada. |
 | `/document-release` | Atualiza toda a documentacao apos ship (README, FEATURE-MAP, CHANGELOG). |
 | `/retro` | Retrospectiva semanal com metricas do framework. |
+| `/research` | Analise estruturada: explora codebase + vault → analisa riscos → gera plano → salva decisao. |
 
 ### Design skills (Impeccable)
 
@@ -191,24 +192,25 @@ Resultado: **HEALTHY** | **DEGRADED** | **BROKEN**
 ## 7. Instalacao e Migracao — Referencia Rapida
 
 ```bash
-# Fresh install (projeto novo)
+# ── Fresh install (projeto novo) ──
 curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash
 
-# Com API key (via curl pipe)
-curl -fsSL .../install.sh | bash -s -- --api-key SUA_KEY
+# ── Atualizar framework (ja instalado, nao toca vault/plugins) ──
+curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --update
 
-# Migrar de v1.5 (flat-file) para v1.6 (Obsidian vault)
-curl -fsSL .../install.sh | bash -s -- --migrate --api-key SUA_KEY
+# ── Migrar de v1.5 para v1.6 (UMA VEZ so, converte flat-file → Obsidian) ──
+curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --migrate --api-key SUA_KEY
 
-# Atualizar framework (nao toca vault/plugins)
-curl -fsSL .../install.sh | bash -s -- --update
-
-# Instalar skill opcional
+# ── Instalar skill opcional ──
 bash install.sh --skill adr --skill session-goals
 
-# Checar versoes
+# ── Checar versoes e integridade ──
 bash install.sh --check
 ```
+
+> **update vs migrate:** Use `--update` para atualizar personas, skills e hooks para a versao mais recente.
+> Use `--migrate` apenas uma vez, quando estiver saindo da v1.5 (flat-file) para a v1.6 (Obsidian vault).
+> Se ja esta na v1.6, `--migrate` nao e necessario — use `--update`.
 
 ### Setup unico do Obsidian
 
@@ -249,7 +251,64 @@ Use `bash analyze.sh` para ver todos os projetos do vault de uma vez — util pa
 
 ---
 
-## 9. Troubleshooting
+## 9. Validacao e CI
+
+### Hooks de validacao do vault
+
+Dois hooks verificam a saude do vault automaticamente:
+
+```bash
+# Detectar wikilinks e links quebrados
+bash .agents/hooks/check-references.sh
+
+# So arquivos modificados (mais rapido)
+bash .agents/hooks/check-references.sh --changed-only
+
+# Detectar notas orfas, frontmatter vazio, metricas faltando
+bash .agents/hooks/check-orphans.sh
+
+# Verificar vault especifico
+bash .agents/hooks/check-orphans.sh --vault ~/.canuto/vault
+```
+
+**Quando rodar:**
+- Apos migrations (`install.sh --migrate`)
+- Apos mudancas estruturais no vault
+- O Maestro sugere automaticamente no briefing se arquivos do vault mudaram
+
+### CI com GitHub Actions
+
+O framework inclui `.github/workflows/validate-framework.yml` que roda em PRs para `main`:
+
+1. Syntax check em todos os `.sh`
+2. Validacao de frontmatter das skills
+3. `test-framework.sh --verbose` (estrutura completa)
+4. `install.sh --check` (integridade)
+5. `check-references.sh` e `check-orphans.sh` (vault, non-blocking)
+
+### Headless Mode (scripts em CI)
+
+Scripts do framework precisam funcionar sem terminal interativo. A regra:
+
+```bash
+if [[ -t 0 ]]; then
+  # Terminal interativo — pode perguntar ao usuario
+  read -p "API key: " key
+else
+  # CI / pipe — usar flag ou env var
+  key="${OBSIDIAN_API_KEY:-}"
+fi
+```
+
+**Dica:** Teste seus scripts localmente com `< /dev/null` antes de confiar no CI:
+```bash
+bash install.sh --check < /dev/null
+bash test-framework.sh < /dev/null
+```
+
+---
+
+## 10. Troubleshooting
 
 Se algo nao funcionar, consulte `docs/TROUBLESHOOTING.md` para solucoes de problemas comuns:
 
@@ -262,15 +321,31 @@ Ou rode o diagnostico: `bash test-framework.sh --verbose`
 
 ---
 
-## 10. Dicas
+## 11. Dicas
 
 - **"Continue"** ao iniciar retoma de onde parou sem precisar re-explicar.
 - **"/office-hours"** antes de features grandes evita retrabalho.
+- **"/research"** para investigar antes de planejar — consulta vault + codebase e gera plano estruturado.
 - **"set FAST_MODE"** para quick fixes que nao precisam de Tester.
 - **Graph view** no Obsidian mostra como decisions, instincts e sessions se conectam.
 - **"health check"** se algo parecer estranho — diagnostica tudo.
 - O Maestro **nunca** roda Git ou shell sem pedir confirmacao.
 - Instincts com alta confianca influenciam decisoes futuras automaticamente.
+- Apos migrations, rode `check-orphans.sh` para garantir integridade do vault.
+- Nunca pushe direto ao main — use feature branch + PR. O CI valida tudo automaticamente.
+
+### Workflow recomendado para features grandes
+
+```
+1. /office-hours        → Entender o problema antes de codar
+2. /research            → Investigar codebase + vault + riscos
+3. Architect planeja    → Maestro delega automaticamente
+4. Coder implementa    → Com testes
+5. Tester valida       → Edge cases + regressoes
+6. Reviewer aprova     → Checklist de qualidade
+7. /document-release   → Atualiza docs
+8. Maestro encerra     → Salva tudo no vault
+```
 
 ---
 
