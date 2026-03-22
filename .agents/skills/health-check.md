@@ -79,6 +79,20 @@ Detect broken or missing framework components before they silently degrade sessi
 - [ ] `.agents/memory/` directory does NOT exist. If it does, warn: "Old flat-file memory detected. Run `bash install.sh --migrate` to upgrade."
 - [ ] `.agents/skills/obsidian-markdown/SKILL.md` does NOT exist. If it does, warn: "Old skill directory structure detected. Update framework files."
 
+### Hooks
+- [ ] `~/.claude/hooks/session-save.sh` exists and is executable.
+- [ ] `~/.claude/hooks/session-load.sh` exists and is executable.
+- [ ] `~/.claude/hooks/pre-compact-save.sh` exists and is executable.
+
+### Tools
+- [ ] `python3` is available (required for canvas generation and analyze.sh).
+- [ ] `jq` is available (required for hooks and MCP setup).
+
+### Global Vault Extras
+- [ ] `~/.canuto/vault/global-instincts/` directory exists.
+- [ ] `~/.canuto/vault/reports/` directory exists.
+- [ ] At least 4 global bases exist in `~/.canuto/vault/bases/` (all-instincts, all-metrics, cross-project-patterns, global-instincts).
+
 ### SPEC
 - [ ] `.agents/SPEC.md` exists.
 
@@ -127,6 +141,11 @@ Detect broken or missing framework components before they silently degrade sessi
 | Old memory/ exists | `bash install.sh --migrate` |
 | Old skill SKILL.md in subdir | `bash install.sh --update` |
 | SPEC.md missing | `bash install.sh --update` |
+| Hooks missing | `bash install.sh --update` (reinstalls hooks) |
+| python3 missing | Install: `brew install python3` or `apt install python3` |
+| jq missing | Install: `brew install jq` or `apt install jq` |
+| global-instincts/ missing | `bash install.sh --update` (creates directory) |
+| Global bases missing | `bash install.sh --update` (copies base templates) |
 
 ---
 

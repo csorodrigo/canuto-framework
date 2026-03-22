@@ -1,0 +1,33 @@
+filters:
+  and:
+    - file.inFolder("global-instincts")
+    - 'file.ext == "md"'
+
+formulas:
+  days_since_seen: 'if(last_seen, (today() - date(last_seen)).days, "")'
+  source_display: 'if(source_project, source_project, "unknown")'
+
+properties:
+  formula.days_since_seen:
+    displayName: "Days Since Seen"
+  formula.source_display:
+    displayName: "Source Project"
+
+views:
+  - type: table
+    name: "Global Instincts"
+    filters:
+      and:
+        - 'status != "pruned"'
+    order:
+      - file.name
+      - confidence
+      - category
+      - applied
+      - formula.source_display
+      - formula.days_since_seen
+    groupBy:
+      property: confidence
+      direction: DESC
+    summaries:
+      applied: Sum

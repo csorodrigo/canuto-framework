@@ -22,9 +22,9 @@ Execute these steps **every time** a new session begins:
 
 > **Automated hooks:** The `session-load.sh` hook (if installed) provides a formatted briefing in the terminal. Use its output as a starting point, but always verify by reading the vault directly.
 
-> **Obsidian Vault:** Memory lives in a global vault (`~/.canuto/vault/`), scoped per project under `projects/{project-slug}/`. The project slug is derived from the project directory name (e.g., `basename` of the working directory). Use the MCP server (`obsidian-mcp-server`) to read/write/search vault notes. See `mcp-obsidian` skill for patterns.
+> **Obsidian Vault:** Memory lives in a global vault (`~/.canuto/vault/`), scoped per project under `projects/{project-slug}/`. The project slug is derived from the project directory name (e.g., `basename` of the working directory), or overridden via `project-slug: custom-name` in CLAUDE.md. Use the MCP server (`obsidian-mcp-server`) to read/write/search vault notes. See `mcp-obsidian` skill for patterns.
 
-1. **Determine project slug**: `project-slug` = name of the project root directory (e.g., `my-app`).
+1. **Determine project slug**: Check CLAUDE.md for `project-slug:` override. If not found, use `basename` of project root directory (e.g., `my-app`). This is important for monorepos where multiple packages share the same directory name.
 
 2. **Load memory from vault** (if it exists):
    - `obsidian_list_notes(path="projects/{project-slug}/sessions/")` → find latest session note.
@@ -32,23 +32,36 @@ Execute these steps **every time** a new session begins:
    - `obsidian_list_notes(path="projects/{project-slug}/pending/")` → check for unfinished tasks.
    - `obsidian_global_search(query="confidence: high", contextLength=100)` → find high-confidence instincts (filter results to current project's path).
    - `obsidian_global_search(query="confidence: medium", contextLength=100)` → find medium-confidence instincts.
+   - `obsidian_list_notes(path="global-instincts/")` → load **global instincts** (cross-project patterns). These are high-confidence instincts promoted from any project. Present them alongside project instincts in the briefing, tagged as `[GLOBAL]`.
 
-2. **Check for stale contexts**:
+3. **Check for stale contexts**:
    - Run `git diff --name-only` comparing file modification dates against `.context.md` timestamps.
    - List any directories where source files changed but `.context.md` was not updated.
+   - If vault files were modified since last session, suggest running `check-references.sh` to detect broken wikilinks.
 
-3. **Check for stale instincts** (continuous-learning skill):
+4. **Check for stale instincts** (continuous-learning skill):
    - `obsidian_global_search(query="confidence: low")` → find low-confidence instincts.
    - Any `low` confidence instinct not seen in 5+ sessions → suggest pruning.
 
-4. **Present the session briefing** to the user:
+5. **Check for pending-sync** (offline recovery):
+   - If `.agents/.cache/pending-sync/` exists and has files, warn: "Found notes from a previous offline session."
+   - Offer to sync them to the vault now (read each file, write to appropriate vault directory).
+   - After successful sync, delete the pending-sync files. If sync fails on any file, leave it and warn user.
+
+6. **Check for cross-project insights**:
+   - If `~/.canuto/vault/projects/{project-slug}/onboarding-report.md` exists, note it for the briefing.
+   - Count total projects in `~/.canuto/vault/projects/`. If 3+, cross-reference data is available.
+
+7. **Present the session briefing** to the user:
    ```
    Session Briefing:
    - Last session (<date>): <1-2 sentence summary of what was done>.
    - Deferred goals: <goals marked ⏳ or ❌ last session, or "none">.
    - Pending tasks: <specific unfinished work items from pending/, or "none">.
    - Active instincts: <count of high/medium instincts, or "none">.
+   - Global instincts: <count of global instincts, or "none"> [GLOBAL].
    - Stale contexts: <list of directories, or "none">.
+   - Cross-project: <"Onboarding report available" if exists, or "Run /auto-analysis for cross-project insights" if 3+ projects>.
    ```
 
    > **Goals vs Pending — the distinction:**
@@ -136,6 +149,12 @@ For **health check** (user says "health check", "diagnose", "is the framework ok
 
 ```
 Maestro → [run health-check skill inline]
+```
+
+For **research / investigation** (user says "research", "investigate", "analyze", "migration plan"):
+
+```
+Maestro → [run research skill] → Architect (if plan approved) → Coder
 ```
 
 ### Delegating Work

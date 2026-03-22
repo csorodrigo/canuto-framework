@@ -62,7 +62,9 @@ Observation → Extraction → Storage → Reinforcement → Promotion (optional
 2. **Extraction**: Maestro identifies and formalizes the pattern at session end
 3. **Storage**: Written as individual note in `~/.canuto/vault/projects/{project-slug}/instincts/I-XXX-slug.md`
 4. **Reinforcement**: Same pattern observed again → confidence increases
-5. **Promotion** (optional): User can promote a `high` instinct to a project rule in `stack.md` or a custom skill
+5. **Promotion** (optional): Two promotion paths:
+   - **To project rule**: Promote to `stack.md` or a custom skill (project-scoped).
+   - **To global instinct**: Copy to `~/.canuto/vault/global-instincts/` so it appears in ALL projects. Add `source_project` frontmatter field. Use when the pattern is universal (not project-specific)
 
 ---
 
@@ -166,12 +168,21 @@ When an instinct reaches `high` confidence and has been applied 5+ times:
    Promote to:
    (a) Project rule in stack.md
    (b) Custom skill in .agents/skills/
-   (c) Keep as instinct
+   (c) Global instinct (visible in ALL projects)
+   (d) Keep as instinct
    ```
 
-2. On promotion:
+2. On promotion to project rule/skill:
    - Add the rule/skill
    - Mark the instinct as `[PROMOTED → stack.md]` (keep for history, stop enforcing as instinct)
+
+3. On promotion to **global instinct**:
+   - Copy the instinct note to `~/.canuto/vault/global-instincts/I-XXX-slug.md`
+   - Add `source_project: {project-slug}` to the frontmatter
+   - Add `promoted_from: "[[projects/{project-slug}/instincts/I-XXX-slug]]"` to link back
+   - Mark the original as `promoted-to: "[[global-instincts/I-XXX-slug]]"`
+   - Global instincts appear in **all projects** during session start, tagged as `[GLOBAL]`
+   - Use for patterns that are **universal** (not project-specific), e.g.: "always validate env vars at startup", "never swallow errors silently"
 
 ### Pruning Instincts
 

@@ -17,9 +17,18 @@ set -euo pipefail
 
 # ── Locate vault ──────────────────────────────────────────────────────────
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-PROJECT_SLUG=$(basename "$PROJECT_DIR")
 GLOBAL_VAULT="$HOME/.canuto/vault"
 LOCAL_VAULT="$PROJECT_DIR/.agents/vault"
+CACHE_DIR="$PROJECT_DIR/.agents/.cache"
+
+# Support project-slug override in CLAUDE.md
+SLUG_OVERRIDE=""
+if [ -f "$PROJECT_DIR/CLAUDE.md" ]; then
+  SLUG_OVERRIDE=$(grep -oP 'project-slug:\s*\K\S+' "$PROJECT_DIR/CLAUDE.md" 2>/dev/null || true)
+fi
+PROJECT_SLUG="${SLUG_OVERRIDE:-$(basename "$PROJECT_DIR")}"
+
+VAULT_AVAILABLE=true
 
 # Use global vault if it exists, fallback to local
 if [ -d "$GLOBAL_VAULT/projects/$PROJECT_SLUG" ]; then
@@ -27,8 +36,35 @@ if [ -d "$GLOBAL_VAULT/projects/$PROJECT_SLUG" ]; then
 elif [ -d "$LOCAL_VAULT" ]; then
   VAULT_DIR="$LOCAL_VAULT"
 else
-  echo "Not a Canuto project (no vault found)."
-  exit 0
+  VAULT_AVAILABLE=false
+fi
+
+# ── Fallback: load from cache if vault unavailable ────────────────────────
+if [ "$VAULT_AVAILABLE" = false ]; then
+  if [ -f "$CACHE_DIR/last-briefing.txt" ]; then
+    echo ""
+    echo "╔══════════════════════════════════════════╗"
+    echo "║   Canuto — OFFLINE MODE                  ║"
+    echo "║   Vault unavailable, using cached data   ║"
+    echo "╚══════════════════════════════════════════╝"
+    echo ""
+    cat "$CACHE_DIR/last-briefing.txt"
+    echo ""
+    # Check for pending-sync items
+    if [ -d "$CACHE_DIR/pending-sync" ]; then
+      SYNC_COUNT=$(ls "$CACHE_DIR/pending-sync"/*.md 2>/dev/null | wc -l) || SYNC_COUNT=0
+      if [ "$SYNC_COUNT" -gt 0 ]; then
+        echo "── ⚠ Pending Sync: $SYNC_COUNT notes waiting to be written to vault ──"
+        echo ""
+      fi
+    fi
+    echo "Ready. Ask the Maestro what to work on. (vault offline)"
+    echo ""
+    exit 0
+  else
+    echo "Not a Canuto project (no vault found, no cache available)."
+    exit 0
+  fi
 fi
 
 echo ""
@@ -59,7 +95,7 @@ fi
 # ── Pending Tasks ───────────────────────────────────────────────────────────
 PENDING_DIR="$VAULT_DIR/pending"
 if [ -d "$PENDING_DIR" ]; then
-  TASK_COUNT=$(ls "$PENDING_DIR"/*.md 2>/dev/null | grep -cv '.gitkeep' 2>/dev/null) || TASK_COUNT=0
+  TASK_COUNT=$(find "$PENDING_DIR" -maxdepth 1 -name "*.md" -not -name ".gitkeep" -type f 2>/dev/null | wc -l) || TASK_COUNT=0
   if [ "$TASK_COUNT" -gt 0 ]; then
     echo "── Pending Tasks ($TASK_COUNT) ──"
     for f in "$PENDING_DIR"/*.md; do
@@ -125,6 +161,34 @@ LAST_SAVE="$VAULT_DIR/.last-save-timestamp"
 if [ -f "$LAST_SAVE" ]; then
   echo "── Last auto-save: $(cat "$LAST_SAVE") ──"
   echo ""
+fi
+
+# ── Cache briefing for offline fallback ────────────────────────────────────
+mkdir -p "$CACHE_DIR"
+{
+  echo "Cached briefing from $(date +%Y-%m-%d\ %H:%M)"
+  echo "Project: $PROJECT_SLUG"
+  echo ""
+  # Re-extract key info for cache
+  if [ -n "${LAST_SESSION:-}" ] && [ -f "$LAST_SESSION" ]; then
+    echo "Last session: $(basename "$LAST_SESSION" .md)"
+  fi
+  if [ "${TASK_COUNT:-0}" -gt 0 ]; then
+    echo "Pending tasks: $TASK_COUNT"
+  fi
+  if [ "${INSTINCT_COUNT:-0}" -gt 0 ]; then
+    echo "Active instincts: $INSTINCT_COUNT"
+  fi
+} > "$CACHE_DIR/last-briefing.txt" 2>/dev/null || true
+
+# ── Check for pending-sync from previous offline session ──────────────────
+if [ -d "$CACHE_DIR/pending-sync" ]; then
+  SYNC_COUNT=$(ls "$CACHE_DIR/pending-sync"/*.md 2>/dev/null | wc -l) || SYNC_COUNT=0
+  if [ "$SYNC_COUNT" -gt 0 ]; then
+    echo "── ⚠ Pending Sync: $SYNC_COUNT notes from offline session ──"
+    echo "  Ask Maestro to run /vault-sync to push these to the vault."
+    echo ""
+  fi
 fi
 
 echo "Ready. Ask the Maestro what to work on."

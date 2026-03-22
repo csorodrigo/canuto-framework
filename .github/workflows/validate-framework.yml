@@ -1,0 +1,70 @@
+name: Validate Framework
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq jq
+
+      - name: Syntax check all shell scripts
+        run: |
+          echo "── Checking shell script syntax ──"
+          ERRORS=0
+          while IFS= read -r script; do
+            if bash -n "$script" 2>/dev/null; then
+              echo "  ✓ $script"
+            else
+              echo "  ✗ $script"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done < <(find . -name "*.sh" -type f)
+          if [ $ERRORS -gt 0 ]; then
+            echo "Found $ERRORS script(s) with syntax errors"
+            exit 1
+          fi
+          echo "All scripts pass syntax check"
+
+      - name: Validate skill frontmatter
+        run: |
+          echo "── Checking skill frontmatter ──"
+          ERRORS=0
+          for skill in .agents/skills/*.md; do
+            [ -f "$skill" ] || continue
+            name=$(basename "$skill")
+            if ! head -1 "$skill" | grep -q "^shortDescription:"; then
+              echo "  ✗ $name missing shortDescription"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "  ✓ $name"
+            fi
+          done
+          if [ $ERRORS -gt 0 ]; then
+            echo "Found $ERRORS skill(s) with missing frontmatter"
+            exit 1
+          fi
+          echo "All skills have valid frontmatter"
+
+      - name: Run test framework
+        run: bash test-framework.sh --verbose
+
+      - name: Install check
+        run: bash install.sh --check
+
+      - name: Check vault references
+        continue-on-error: true
+        run: bash .agents/hooks/check-references.sh
+
+      - name: Check vault orphans
+        continue-on-error: true
+        run: bash .agents/hooks/check-orphans.sh
