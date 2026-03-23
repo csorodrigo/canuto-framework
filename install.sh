@@ -882,6 +882,39 @@ def _safe_int(val, default=0):
     except (ValueError, TypeError):
         return default
 
+def _stack_info(idx):
+    stack = idx.get("stack", {})
+    return stack if isinstance(stack, dict) else {}
+
+def _dependency_map(idx, kind):
+    deps = idx.get("dependencies", {})
+    if not isinstance(deps, dict):
+        return {}
+    dep_map = deps.get(kind, {})
+    return dep_map if isinstance(dep_map, dict) else {}
+
+def _dependency_keys(idx):
+    return set(_dependency_map(idx, "production").keys()) | set(_dependency_map(idx, "development").keys())
+
+def _domain_names(idx):
+    names = []
+    for domain in idx.get("domains", []):
+        if isinstance(domain, dict):
+            name = domain.get("name")
+        elif isinstance(domain, str):
+            name = domain
+        else:
+            name = None
+        if isinstance(name, str) and name:
+            names.append(name)
+    return names
+
+def _pattern_names(idx):
+    patterns = idx.get("patterns_detected", idx.get("patterns", []))
+    if not isinstance(patterns, list):
+        return []
+    return [pattern for pattern in patterns if isinstance(pattern, str) and pattern]
+
 # ═══════════════════════════════════════════════════════════════════════
 # PHASE 1: Generate project-index.json (deep scan)
 # ═══════════════════════════════════════════════════════════════════════
@@ -1293,16 +1326,15 @@ if not other_projects:
     sys.exit(0)
 
 # ── Calculate stack match ────────────────────────────────────────────
-my_deps = set(index["dependencies"]["production"].keys()) | set(index["dependencies"]["development"].keys())
-my_domains = set(d["name"] for d in index["domains"])
-my_patterns = set(index["patterns_detected"])
+my_deps = _dependency_keys(index)
+my_domains = set(_domain_names(index))
+my_patterns = set(_pattern_names(index))
 
 matches = []
 for other in other_projects:
-    other_deps = set(other.get("dependencies", {}).get("production", {}).keys()) | \
-                 set(other.get("dependencies", {}).get("development", {}).keys())
-    other_domains = set(d["name"] for d in other.get("domains", []))
-    other_patterns = set(other.get("patterns_detected", []))
+    other_deps = _dependency_keys(other)
+    other_domains = set(_domain_names(other))
+    other_patterns = set(_pattern_names(other))
 
     shared_deps = my_deps & other_deps
     dep_match = len(shared_deps) / max(len(my_deps | other_deps), 1)
@@ -1317,7 +1349,7 @@ for other in other_projects:
         "overall": round(overall * 100),
         "shared_deps": sorted(list(shared_deps))[:15],
         "shared_domains": sorted(list(my_domains & other_domains)),
-        "stack": other.get("stack", {}),
+        "stack": _stack_info(other),
     })
 
 matches.sort(key=lambda m: m["overall"], reverse=True)
@@ -1461,8 +1493,8 @@ if st.get("orm"): report.append(f"- **ORM**: {st['orm']}")
 if st.get("test_framework"): report.append(f"- **Tests**: {st['test_framework']}")
 if st.get("ui_framework"): report.append(f"- **UI**: {st['ui_framework']}")
 report.append(f"- **LOC**: {total_loc:,}")
-report.append(f"- **Domains**: {', '.join(d['name'] for d in index['domains'])}")
-report.append(f"- **Patterns**: {', '.join(index['patterns_detected']) or 'none detected'}")
+report.append(f"- **Domains**: {', '.join(_domain_names(index)) or 'none detected'}")
+report.append(f"- **Patterns**: {', '.join(_pattern_names(index)) or 'none detected'}")
 report.append("")
 
 # Similar projects
