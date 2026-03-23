@@ -111,43 +111,48 @@ Exemplos de uso:
 
 ### Chrome DevTools MCP
 
-For scraping data from **authenticated** pages (dashboards, admin panels, CRM, analytics tools), use Chrome DevTools MCP. This lets the agent use a browser session you're already logged into — skipping CAPTCHA, 2FA, and re-login flows.
+Chrome shipped a feature that lets AI agents use a browser you're already logged into. No re-login, no API, no CAPTCHA workaround. The agent reuses the session you already have open — Gmail, X, Notion, Stripe, internal tools, everything.
 
 **Use cases:**
 - Extract data from analytics dashboards (Google Analytics, Mixpanel, etc.)
 - Scrape CRM data (HubSpot, Salesforce admin)
 - Pull reports from SaaS tools behind login walls
 - Extract data from internal admin panels
+- Sync new Notion tasks to Slack
+- Pull traffic source data from Google Analytics
+- Extract low-engagement posts from X
+- Flag unprocessed refunds in Stripe
 
 **Prerequisites:**
-1. Chrome/Chromium running with remote debugging enabled:
-   ```bash
-   # macOS
-   /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+1. Update Chrome to the latest version
+2. Open `chrome://inspect/#remote-debugging` in Chrome
+3. Check the "Allow remote debugging for this browser instance" checkbox
+4. Server will be active at `127.0.0.1:9222`
 
-   # Linux
-   google-chrome --remote-debugging-port=9222
-   ```
-2. Chrome DevTools MCP configured
-
-**MCP Configuration:**
+**MCP Configuration (Option 1 — Chrome DevTools MCP):**
 ```json
 {
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "@anthropic/mcp-chrome-devtools"],
-      "env": {
-        "CHROME_DEBUG_PORT": "9222"
-      }
+      "args": ["chrome-devtools-mcp@latest", "--channel", "stable", "--autoConnect"]
     }
   }
 }
 ```
 
+The `--autoConnect` flag connects automatically to the Chrome instance you already have running and reuses your current logged-in session. No environment variables needed.
+
+**Alternative (Option 2 — browser-use CLI 2.0):**
+```bash
+browser-use --connect
+```
+
+The `--connect` flag reuses the session you already have open instead of launching a new browser. Direct CDP underneath.
+
 **How it works:**
-1. User opens Chrome normally and logs into the target site
-2. Agent connects to the existing browser session via DevTools Protocol
+1. User opens Chrome normally, enables remote debugging, and logs into the target site
+2. `--autoConnect` connects the agent to the existing browser session automatically
 3. Agent navigates, extracts data, takes screenshots — all using the user's auth
 4. Extracted data can be fed into `knowledge-ingest` skill for structured vault notes
 
@@ -155,9 +160,9 @@ For scraping data from **authenticated** pages (dashboards, admin panels, CRM, a
 - Always inform the user before navigating to any page — the agent is using THEIR session
 - Never submit forms or click "delete"/"confirm" buttons without explicit user approval
 - Use for READ operations only (data extraction, not actions)
-- Close the debugging port when done: the agent should remind the user
+- When done: uncheck "Allow remote debugging" in `chrome://inspect/#remote-debugging`
 
-> [!warning] Chrome DevTools MCP gives the agent access to your authenticated browser session. Only enable it when actively extracting data, and disable remote debugging when done.
+> [!warning] Chrome DevTools MCP gives the agent full access to your authenticated browser session (saved data, cookies, site data, ability to navigate to any URL). Only enable remote debugging when actively extracting data, and disable it when done.
 
 ---
 
