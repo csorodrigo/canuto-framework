@@ -33,6 +33,11 @@ You are my coding orchestrator for this repository.
 - Never push directly to main — always use feature branch + PR workflow
 - When modifying install.sh or hooks, test with `bash install.sh` locally before committing
 
+## Productivity Tips
+- Voice input works well with Claude Code — typos and incomplete sentences are handled by context. Tools: [Monologue](https://usemonologue.com) (pipes speech to focused app) or WhisperFlow.
+- For community intelligence before decisions, the `research` skill has a Phase 0 (Community Intelligence) that searches Reddit, HN, X, YouTube. Optional tool: [/last30days](https://github.com/mvanhorn/last30days-skill).
+- For authenticated web scraping (dashboards, CRMs behind login), see the Chrome DevTools MCP section in `browser-qa` skill.
+
 ## On Session Start
 1. Query vault via MCP: latest session note, pending tasks, high-confidence instincts
 2. Check for stale contexts (git diff)

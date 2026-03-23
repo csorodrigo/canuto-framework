@@ -42,6 +42,12 @@ These skills ship with every install and update automatically.
 | `mcp-obsidian` | How the framework uses MCP to interact with the vault (+ semantic search, multi-MCP connectors) | obsidian, mcp, memory |
 | `knowledge-ingest` | Ingest external sources (videos, articles, PDFs, meeting transcripts) into structured vault notes | ingestion, knowledge, memory |
 | `experiment-loop` | Systematic experiment loops — change, test, measure, keep/discard, repeat | optimization, experimentation |
+| `research` | Structured investigation workflow with community intelligence (Reddit, HN, X), codebase scan, and vault lookup | research, planning |
+| `frontend-design` | Visual design consistency with tunable design knobs (variance, motion, density) | design, frontend |
+| `api-docs-fetch` | Fetch current API/SDK docs via Context Hub (chub) before coding — prevents hallucination | documentation, api |
+| `brand-bootstrap` | Extract brand identity from existing websites | design, branding |
+| `plan-second-opinion` | Automatic Codex CLI review of Architect plans for M/L tasks | planning, review |
+| `stack-lock` | Prevent library drift via approved stack | governance, dependencies |
 
 ---
 
@@ -54,7 +60,7 @@ Useful in specific project types. Install with `bash install.sh --skill <name>`.
 | `session-goals` | Track session goals explicitly in a separate skill file | Teams or highly structured workflows | productivity |
 | `adr` | Architecture Decision Records | Long-lived projects with multiple contributors | architecture |
 | `product-review` | When/how to run /office-hours + /plan-ceo-review before Architect on L/XL features | Product-heavy projects, new features with uncertain scope | product, planning |
-| `browser-qa` | When/how to use gstack's /qa + /browse for real-browser UI testing | Projects with web frontends, critical user flows | testing, quality |
+| `browser-qa` | Real-browser QA via gstack + authenticated data extraction via Chrome DevTools MCP | Projects with web frontends, critical user flows | testing, quality, scraping |
 
 ---
 

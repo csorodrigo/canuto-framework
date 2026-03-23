@@ -107,9 +107,65 @@ Exemplos de uso:
 
 ---
 
+## Authenticated Data Extraction (Optional)
+
+### Chrome DevTools MCP
+
+For scraping data from **authenticated** pages (dashboards, admin panels, CRM, analytics tools), use Chrome DevTools MCP. This lets the agent use a browser session you're already logged into — skipping CAPTCHA, 2FA, and re-login flows.
+
+**Use cases:**
+- Extract data from analytics dashboards (Google Analytics, Mixpanel, etc.)
+- Scrape CRM data (HubSpot, Salesforce admin)
+- Pull reports from SaaS tools behind login walls
+- Extract data from internal admin panels
+
+**Prerequisites:**
+1. Chrome/Chromium running with remote debugging enabled:
+   ```bash
+   # macOS
+   /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+
+   # Linux
+   google-chrome --remote-debugging-port=9222
+   ```
+2. Chrome DevTools MCP configured
+
+**MCP Configuration:**
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-chrome-devtools"],
+      "env": {
+        "CHROME_DEBUG_PORT": "9222"
+      }
+    }
+  }
+}
+```
+
+**How it works:**
+1. User opens Chrome normally and logs into the target site
+2. Agent connects to the existing browser session via DevTools Protocol
+3. Agent navigates, extracts data, takes screenshots — all using the user's auth
+4. Extracted data can be fed into `knowledge-ingest` skill for structured vault notes
+
+**Guardrails:**
+- Always inform the user before navigating to any page — the agent is using THEIR session
+- Never submit forms or click "delete"/"confirm" buttons without explicit user approval
+- Use for READ operations only (data extraction, not actions)
+- Close the debugging port when done: the agent should remind the user
+
+> [!warning] Chrome DevTools MCP gives the agent access to your authenticated browser session. Only enable it when actively extracting data, and disable remote debugging when done.
+
+---
+
 ## Relacionamentos com Outros Skills
 
 - **Tester persona** → roda primeiro; /qa é complementar, não substituto
 - **coverage-tracking.md** → registre cobertura de browser QA
 - **audit-log.md** → bugs críticos de browser QA devem ser logados
 - **gstack /careful** → ative antes do /qa em ambientes de staging (proteção contra deleção acidental)
+- **knowledge-ingest** → dados extraídos via Chrome DevTools MCP podem ser ingeridos como vault notes
+- **defuddle** → para páginas públicas, prefira `defuddle` (mais simples, sem browser necessário)
