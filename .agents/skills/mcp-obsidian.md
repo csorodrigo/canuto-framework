@@ -153,7 +153,119 @@ obsidian_update_note(
 Read(~/.canuto/vault/projects/{project-slug}/decisions/D-003-jwt-auth.md)
 ```
 
+## Semantic Search (Optional)
+
+The default `obsidian_global_search` performs text-based search — it finds exact keyword matches. For cases where you need to find conceptually related notes even when they don't share exact words, add the **Smart Connections** MCP server.
+
+### When to Use Semantic vs Text Search
+
+| Use | Search Type | Tool |
+|-----|-------------|------|
+| Find a specific note by name/content | Text search | `obsidian_global_search(query="JWT auth")` |
+| Find notes related to a concept | Semantic search | `smart_search(query="authentication patterns")` |
+| Find notes with specific frontmatter | Text search | `obsidian_global_search(query="/confidence:\\s*high/")` |
+| Find notes that discuss similar ideas | Semantic search | `smart_search(query="how to handle API errors")` |
+| Find all notes mentioning a file | Text search | `obsidian_global_search(query="token-service.ts")` |
+
+### Setup
+
+Install the Smart Connections MCP server:
+
+```bash
+pip install smart-connections-mcp
+```
+
+Add to your MCP config (`.claude/settings.json` or project-level):
+
+```json
+{
+  "mcpServers": {
+    "smart-connections": {
+      "command": "python",
+      "args": ["-m", "smart_connections_mcp.server"],
+      "env": {
+        "OBSIDIAN_VAULT_PATH": "~/.canuto/vault"
+      }
+    }
+  }
+}
+```
+
+### Usage
+
+```
+# Find notes conceptually related to a topic
+smart_search(query="optimizing build performance")
+
+# Results come ranked by semantic similarity
+# Titles alone often indicate relevance (especially with prose-as-title naming)
+```
+
+> [!note] Smart Connections is OPTIONAL. The framework works fully with text search alone. Semantic search is an enhancement for larger vaults where keyword search misses conceptually related notes.
+
+---
+
+## Additional MCP Connectors (Optional)
+
+The Obsidian MCP is the primary connector for the Canuto vault. For broader context, you can optionally add connectors for other tools your team uses. These are supplementary — the vault remains the source of truth.
+
+### Google Drive (Meeting Transcripts)
+
+Useful when meeting transcripts are auto-saved to Drive (via Fathom, Otter, Fireflies, etc.). Combine with the `knowledge-ingest` skill to process transcripts into structured vault notes.
+
+```json
+{
+  "mcpServers": {
+    "google-drive": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-google-drive"],
+      "env": {
+        "GOOGLE_DRIVE_FOLDER_ID": "<your-transcripts-folder-id>"
+      }
+    }
+  }
+}
+```
+
+### Slack (Team Context)
+
+Useful for pulling team discussions, decisions made in channels, and status updates.
+
+```json
+{
+  "mcpServers": {
+    "slack": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-slack"],
+      "env": {
+        "SLACK_BOT_TOKEN": "<your-bot-token>"
+      }
+    }
+  }
+}
+```
+
+### Google Calendar (Schedule Context)
+
+Useful for understanding upcoming meetings, deadlines, and time blocks.
+
+```json
+{
+  "mcpServers": {
+    "google-calendar": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-google-calendar"]
+    }
+  }
+}
+```
+
+> [!warning] Additional MCP connectors require separate authentication setup. Refer to each connector's documentation for auth configuration. Never store API keys or tokens in vault notes — use environment variables.
+
+---
+
 ## References
 
 - [obsidian-mcp-server](https://github.com/cyanheads/obsidian-mcp-server)
+- [smart-connections-mcp](https://github.com/brianpetro/smart-connections)
 - [Setup guide](.agents/mcp/setup.md)

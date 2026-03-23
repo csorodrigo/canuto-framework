@@ -39,7 +39,9 @@ These skills ship with every install and update automatically.
 | `json-canvas` | JSON Canvas: visual maps and flowcharts (.canvas files) | obsidian, visualization |
 | `obsidian-cli` | Interact with Obsidian vault via CLI | obsidian, cli |
 | `defuddle` | Extract clean markdown from web pages (token-efficient) | web, ingestion |
-| `mcp-obsidian` | How the framework uses MCP to interact with the vault | obsidian, mcp, memory |
+| `mcp-obsidian` | How the framework uses MCP to interact with the vault (+ semantic search, multi-MCP connectors) | obsidian, mcp, memory |
+| `knowledge-ingest` | Ingest external sources (videos, articles, PDFs, meeting transcripts) into structured vault notes | ingestion, knowledge, memory |
+| `experiment-loop` | Systematic experiment loops — change, test, measure, keep/discard, repeat | optimization, experimentation |
 
 ---
 

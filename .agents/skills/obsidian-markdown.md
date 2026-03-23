@@ -159,6 +159,46 @@ Text with a footnote[^1].
 Inline footnote.^[This is inline.]
 ```
 
+## Naming Conventions
+
+### Structured Notes (ID-based)
+
+Notes that are queried programmatically or tracked in Bases use ID-based naming. This ensures consistent sorting and machine-readable references:
+
+```
+decisions/D-001-jwt-auth.md
+instincts/I-003-form-validation.md
+metrics/2026-03-21-metrics.md
+sessions/2026-03-21.md
+experiments/SER-001-build-time.md
+```
+
+### Knowledge Notes (Prose-as-Title)
+
+Notes in `knowledge/`, `research/`, and `ingested/` folders benefit from **prose-as-title** naming — the filename is a claim or assertion, not a category:
+
+```markdown
+# ✅ Good — title tells you if the note is relevant before reading it
+knowledge/semantic-search-outperforms-keyword-for-large-vaults.md
+knowledge/experiment-loops-work-for-any-measurable-process.md
+knowledge/whisper-transcription-stays-local-no-data-leaves.md
+
+# ❌ Bad — generic category names, must read to know if relevant
+knowledge/search-methods.md
+knowledge/optimization.md
+knowledge/transcription.md
+```
+
+**Why:** When searching the vault (especially with semantic search), note titles are often the first thing returned. A descriptive title lets the agent (or you) judge relevance without opening the note.
+
+**Rules for prose-as-title:**
+- State as an assertion or claim, not a question
+- Use kebab-case
+- Keep under 60 characters when possible
+- Prefix with date when the note is time-sensitive: `2026-03-23-<claim>.md`
+
+---
+
 ## Examples
 
 ### Good — Canuto vault note with proper linking
