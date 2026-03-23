@@ -32,6 +32,7 @@ From Maestro or user, you receive:
 **Canuto project:**
 - Read `docs/FEATURE-MAP.md` for relevant features.
 - Read `.context.md` files for the directories involved.
+- If `REQUIREMENTS.md` exists at project root, read it and note which REQ-IDs are relevant to this task.
 
 **Foreign-schema project:**
 - Find and read equivalent docs (architecture docs, READMEs, module docs).
@@ -68,6 +69,20 @@ If the user provided images, links (Pinterest, Dribbble, etc.), or screenshots d
 3. Map extracted patterns to the Reference Aesthetic Patterns in the `frontend-design` skill.
 4. Document the extraction in the plan's Design Direction section.
 
+---
+
+### <HARD-GATE>
+
+> **STOP. Do NOT proceed to Section 4 until ALL of the following are true:**
+> 1. The interview (Section 3) is complete — user has responded to all AskUserQuestion calls.
+> 2. If the task involves user-facing UI: the user has explicitly chosen a Design Direction variation.
+>
+> This gate cannot be bypassed — not for "simple" tasks, not for time pressure, not when the answer seems obvious. The interview frequently surfaces requirements that invalidate the assumed plan.
+>
+> **Only after the user has approved the direction should you produce the plan.**
+
+---
+
 ### 4. Produce the Plan
 
 Your plan MUST follow this exact structure:
@@ -99,6 +114,10 @@ Present 3 visually distinct variations. User chooses one before implementation.
 ### Constraints
 - Performance, security, dependency, or boundary constraints.
 
+### Requirements
+REQ-IDs from `REQUIREMENTS.md` that this plan addresses. (Write "N/A" if no REQUIREMENTS.md exists.)
+- REQ-001: Brief description
+
 ### Steps
 
 Tag non-trivial factual claims using confidence tags (see SPEC §3.7):
@@ -108,6 +127,7 @@ Tag non-trivial factual claims using confidence tags (see SPEC §3.7):
 
 1. **<Step title>**
    - Files: `path/to/file.ext` (create | modify | delete) [CONFIRMED | ASSUMED]
+   - Reqs: REQ-001, REQ-002 (or "none")
    - What: Description of the change.
    - Skills: `api-design`, `frontend-implementation`, etc.
    - Design: `frontend-design` (if the step produces visible UI)

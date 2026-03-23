@@ -181,6 +181,52 @@ Step 2 — Add rate limiting middleware
 - Core always wins on name conflicts; plugins use namespaced names.
 - Maestro discovers plugins on session start and announces them.
 
+### 4.4 Progressive Disclosure
+
+Skills follow a 3-level loading system to optimize token consumption per session.
+
+| Level | Content | In Context? | Target Size |
+|---|---|---|---|
+| **1 — Frontmatter** | `skill`, `shortDescription`, `trigger`, `persona` | Always | ~100 words |
+| **2 — Skill body** | Instructions, procedures, decision trees | When skill activates | ≤200 lines |
+| **3 — References** | Extended docs, code patterns, large examples | On demand | Unlimited |
+
+**Structure rules:**
+- Skills ≤200 lines: single `.md` file (no subdirectory needed)
+- Skills >200 lines: split into a subdirectory:
+  ```
+  skills/skill-name/
+  ├── SKILL.md        — body (≤200 lines, always loaded)
+  └── references/
+      ├── topic-a.md  — loaded explicitly by skill body when needed
+      └── topic-b.md
+  ```
+- The skill body must say *which* reference files to read and *when*
+
+**Skill frontmatter fields:**
+
+```
+skill: skill-name           # kebab-case identifier
+trigger: /skill-name        # slash command trigger (or phrase for auto-trigger)
+persona: maestro            # primary persona that owns this skill
+version: 1.0.0
+lastUpdated: YYYY-MM-DD
+shortDescription: >         # used for routing — must be trigger-accurate
+  One-line description. Include when to use AND what it does.
+usedBy: [persona1, persona2]
+evals:                      # optional — required for critical/frequently-triggered skills
+  - prompt: "..."           # realistic user phrase: casual speech, typos, context
+    should_trigger: true
+  - prompt: "..."           # near-miss: same domain but different intent
+    should_trigger: false
+```
+
+**`evals` guidelines:**
+- Min 4 evals per skill: 2 `should_trigger: true` (obvious + edge case), 2 `should_trigger: false` (near-misses)
+- Near-misses are more valuable than obviously irrelevant prompts — they test the real boundary
+- Prompts must be realistic and specific. Bad: `"run health check"`. Good: `"somethings off, can u check if the framework is configured correctly?"`
+- Skills in the Critical Skills list (section 10) must have `evals` defined
+
 ---
 
 ## 5. Memory & Session Persistence (Obsidian-Native)
@@ -491,6 +537,20 @@ The template generates a default `CLAUDE.md` with these configurable sections:
 | `runtime-flags` | Session-scoped behavioral overrides |
 | `convergence-detection` | Multi-persona agreement detection |
 | `heartbeat` | Foundation for autonomous agent activation |
+| `audit` | Multi-dimensional UI/design quality scan (a11y, performance, responsiveness) |
+
+### Design Skills
+| Skill | Purpose |
+|-------|--------|
+| `colorize` | BM25 search over 161 curated palettes; returns WCAG-compliant semantic token sets |
+| `typeset` | Search 57 font pairings by mood/product type; returns heading+body with Tailwind config |
+| `design-consultation` | Generate a full design system from requirements; outputs to `design-system/MASTER.md` |
+
+### Meta Skills
+| Skill | Purpose |
+|-------|--------|
+| `skill-creator` | 7-phase workflow for creating new skills (Intent→Research→Structure→Write→Evals→Review→Integrate) |
+| `skill-check-protocol` | 1% Rule: all personas check applicable skills before any non-trivial action |
 
 ---
 
