@@ -437,6 +437,30 @@ setup_search_tools() {
   fi
 }
 
+# ── detect_project_slug ───────────────────────────────────────────────────────
+# Detects the project slug from the current directory.
+# Handles Conductor workspaces where structure is:
+#   /conductor/workspaces/{project-name}/{branch-name}/
+# In that case, basename is the branch — we want the parent (project name).
+# For normal repos, basename of pwd is the project name.
+detect_project_slug() {
+  local dir="${1:-$(pwd)}"
+  local slug
+  slug=$(basename "$dir")
+  local parent
+  parent=$(basename "$(dirname "$dir")")
+  local grandparent
+  grandparent=$(basename "$(dirname "$(dirname "$dir")")")
+
+  # Conductor pattern: workspaces/{project-name}/{branch-name}/
+  # Only match if grandparent is "workspaces" AND current dir has .git (is a repo root)
+  if [[ "$grandparent" == "workspaces" && -d "$dir/.git" ]]; then
+    slug="$parent"
+  fi
+
+  echo "$slug"
+}
+
 # ── setup_global_vault ────────────────────────────────────────────────────────
 # Creates a global Obsidian vault at ~/.canuto/vault/ (one vault for all projects).
 # Each project gets its own subdirectory under projects/{project-slug}/.
@@ -444,7 +468,7 @@ setup_search_tools() {
 setup_global_vault() {
   local vault="$HOME/.canuto/vault"
   local project_slug
-  project_slug=$(basename "$(pwd)")
+  project_slug=$(detect_project_slug)
 
   log "Setting up global vault at $vault..."
 
@@ -773,7 +797,7 @@ setup_global_skills() {
 post_install_analysis() {
   local project_dir="${1:-.}"
   local project_slug
-  project_slug=$(basename "$project_dir")
+  project_slug=$(detect_project_slug "$project_dir")
   local vault="$HOME/.canuto/vault"
   local project_vault="$vault/projects/$project_slug"
 
@@ -784,6 +808,7 @@ post_install_analysis() {
 
   log "Running deep project analysis..."
 
+  PROJECT_DIR="$project_dir" PROJECT_SLUG="$project_slug" CANUTO_VAULT="$vault" \
   python3 << 'PYEOF'
 import os, sys, json, glob, re
 from pathlib import Path
@@ -792,9 +817,9 @@ from collections import defaultdict, Counter
 
 import sys as _sys
 
-project_dir = os.environ.get("PROJECT_DIR", os.getcwd())
-project_slug = os.path.basename(project_dir)
-vault = os.environ.get("CANUTO_VAULT", os.path.expanduser("~/.canuto/vault"))
+project_dir = os.environ["PROJECT_DIR"]
+project_slug = os.environ["PROJECT_SLUG"]
+vault = os.environ["CANUTO_VAULT"]
 project_vault = f"{vault}/projects/{project_slug}"
 today = datetime.now().isoformat()[:19]
 
@@ -1624,7 +1649,7 @@ if [ "$MODE" = "migrate" ]; then
     fi
   }
 
-  PROJECT_SLUG=$(basename "$(pwd)")
+  PROJECT_SLUG=$(detect_project_slug)
   PROJECT_VAULT="$HOME/.canuto/vault/projects/$PROJECT_SLUG"
 
   migrate_flat_file ".agents/memory/decisions.md"           "$PROJECT_VAULT/decisions"  "migrated-decisions.md"

@@ -4,8 +4,8 @@
 
 Abra o Claude no diretorio do seu projeto. O Maestro automaticamente:
 
-1. Determina o projeto pelo nome da pasta (ex: `prague`)
-2. Carrega a memoria do vault (`~/.canuto/vault/projects/prague/`)
+1. Determina o projeto pelo nome da pasta (ou pelo nome do projeto no Conductor: `workspaces/{projeto}/{branch}`)
+2. Carrega a memoria do vault (`~/.canuto/vault/projects/{projeto}/`)
 3. Verifica contextos desatualizados via git diff
 4. Apresenta o briefing:
 
@@ -109,7 +109,9 @@ Disponiveis em **qualquer projeto**. Instalados em `~/.claude/skills/`.
 | `/investigate` | Debugging forense. Iron Law: sem fix sem causa raiz confirmada. |
 | `/document-release` | Atualiza toda a documentacao apos ship (README, FEATURE-MAP, CHANGELOG). |
 | `/retro` | Retrospectiva semanal com metricas do framework. |
-| `/research` | Analise estruturada: explora codebase + vault → analisa riscos → gera plano → salva decisao. |
+| `/research` | Analise estruturada: community intelligence + codebase + vault → analisa riscos → gera plano. |
+| `/auto-analysis` | Scan profundo do projeto + cross-reference com outros projetos no vault. |
+| `/vault-maintenance` | Limpeza periodica: arquiva sessoes antigas, agrega metricas/audits, limpa snapshots. |
 
 ### Design skills (Impeccable)
 
@@ -181,11 +183,15 @@ Resultado: **HEALTHY** | **DEGRADED** | **BROKEN**
 | Base | O que mostra |
 |------|-------------|
 | `instincts-by-confidence.base` | Instincts agrupados por confianca |
+| `all-instincts.base` | Todos os instincts de todos os projetos |
+| `global-instincts.base` | Instincts globais (compartilhados entre projetos) |
 | `decisions-timeline.base` | Timeline de decisoes |
 | `pending-tasks.base` | Tasks pendentes |
 | `audit-by-type.base` | Eventos de audit por tipo |
 | `metrics-dashboard.base` | Dashboard de metricas |
+| `all-metrics.base` | Metricas de todos os projetos |
 | `components-registry.base` | Registro de componentes UI |
+| `cross-project-patterns.base` | Padroes compartilhados entre projetos |
 
 ---
 
@@ -321,11 +327,65 @@ Ou rode o diagnostico: `bash test-framework.sh --verbose`
 
 ---
 
-## 11. Dicas
+## 11. Novas Capabilities
+
+### Knowledge Ingestion
+
+Ingira fontes externas no vault como notas estruturadas:
+
+```
+"Ingest this YouTube video: https://youtube.com/watch?v=abc123"
+"Process this meeting transcript: /path/to/standup.txt"
+"Clip this article: https://example.com/article"
+```
+
+O skill `knowledge-ingest` aceita: YouTube, artigos web, PDFs, audio/video, e meeting transcripts. Extrai claims, frameworks, action items e salva em `vault/knowledge/ingested/`.
+
+### Community Research
+
+O skill `research` agora tem Phase 0 (Community Intelligence). Antes de investigar o codebase, busca em paralelo no Reddit, HN, X, YouTube e Stack Overflow:
+
+```
+"Research Playwright vs Cypress"
+→ Busca community threads, consolida consenso, pitfalls, e controversias
+→ Depois investiga codebase + vault como antes
+```
+
+Ferramenta opcional para research mais profunda: [/last30days](https://github.com/mvanhorn/last30days-skill) (instalar separadamente).
+
+### Experiment Loop
+
+Otimizacao automatica com o padrao Karpathy — change, test, measure, keep/discard, repeat:
+
+```
+"Optimize Vite build time"
+→ Define metrica (build time) + variavel (vite config) + teste (time npx vite build)
+→ Roda N variacoes, mantem a melhor, apresenta relatorio
+```
+
+### Chrome DevTools MCP (Scraping Autenticado)
+
+Extraia dados de sites onde voce ja esta logado (dashboards, CRM, admin panels):
+
+1. Abra `chrome://inspect/#remote-debugging` e marque "Allow remote debugging"
+2. Configure o MCP: `chrome-devtools-mcp@latest --autoConnect`
+3. O agente usa sua sessao autenticada — sem re-login, sem CAPTCHA
+
+Veja detalhes no skill `browser-qa.md`.
+
+### Voice Input
+
+Voice-to-text funciona bem com Claude Code — typos e frases incompletas sao interpretados pelo contexto. Ferramentas: [Monologue](https://usemonologue.com) ou WhisperFlow.
+
+---
+
+## 12. Dicas
 
 - **"Continue"** ao iniciar retoma de onde parou sem precisar re-explicar.
 - **"/office-hours"** antes de features grandes evita retrabalho.
-- **"/research"** para investigar antes de planejar — consulta vault + codebase e gera plano estruturado.
+- **"/research"** para investigar antes de planejar — consulta comunidade + vault + codebase e gera plano estruturado.
+- **"/auto-analysis"** ao onboardar um projeto — gera index e cross-referencia com outros projetos.
+- **"/vault-maintenance"** periodicamente para arquivar sessoes velhas e agregar metricas.
 - **"set FAST_MODE"** para quick fixes que nao precisam de Tester.
 - **Graph view** no Obsidian mostra como decisions, instincts e sessions se conectam.
 - **"health check"** se algo parecer estranho — diagnostica tudo.
@@ -333,12 +393,13 @@ Ou rode o diagnostico: `bash test-framework.sh --verbose`
 - Instincts com alta confianca influenciam decisoes futuras automaticamente.
 - Apos migrations, rode `check-orphans.sh` para garantir integridade do vault.
 - Nunca pushe direto ao main — use feature branch + PR. O CI valida tudo automaticamente.
+- Use `bash migrate-slug.sh <old> <new>` se precisar renomear um projeto no vault.
 
 ### Workflow recomendado para features grandes
 
 ```
 1. /office-hours        → Entender o problema antes de codar
-2. /research            → Investigar codebase + vault + riscos
+2. /research            → Community intelligence + codebase + vault + riscos
 3. Architect planeja    → Maestro delega automaticamente
 4. Coder implementa    → Com testes
 5. Tester valida       → Edge cases + regressoes
@@ -349,4 +410,4 @@ Ou rode o diagnostico: `bash test-framework.sh --verbose`
 
 ---
 
-*Canuto Framework v1.6 — Rodrigo Canuto (c) 2026*
+*Canuto Framework v1.7 — Rodrigo Canuto (c) 2026*

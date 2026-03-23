@@ -12,36 +12,42 @@ These skills ship with every install and update automatically.
 
 | Name | Description | Tags |
 |------|-------------|------|
-| `context-maintenance` | How to maintain `.context.md`, `FEATURE-MAP.md`, and Repo Index (evaluate-repo pipeline) | documentation, indexation |
-| `api-design` | How to design and evolve HTTP/JSON APIs | backend |
-| `frontend-implementation` | How to implement frontend features | frontend |
-| `cli-usage` | How to safely use CLI commands and scripts | devops |
-| `security-practices` | Rules for secrets, env vars, and security hygiene | security |
-| `git-workflow` | Branching, commits, and PR conventions | workflow |
-| `plugin-system` | How to create and manage opt-in plugins | extensibility |
-| `multi-provider` | How Maestro delegates to Claude, Codex, GLM | orchestration |
-| `metrics` | Quality, velocity, compliance, and rework tracking | analytics |
-| `squads` | Parallel domain-based workstreams | orchestration |
-| `pr-description` | Auto-generate PR descriptions after review | workflow |
-| `health-check` | Diagnose framework setup integrity | diagnostics |
-| `continuous-learning` | Extract, store, and evolve reusable patterns (instincts) from session experience | learning, memory |
 | `absence-reporting` | Personas report what they searched and did NOT find, eliminating silence ambiguity | observability |
-| `cross-persona-flags` | Outbound flags between personas for lateral discovery via Maestro | orchestration |
-| `coverage-tracking` | Track exploration depth across personas, areas, and concerns for M/L tasks | observability |
-| `budget-controls` | Token/cost budgets per persona and session with advisory warnings | cost-management |
-| `governance` | Approval gates for high-impact actions (deploy, migration, breaking changes) | governance |
+| `api-design` | How to design and evolve HTTP/JSON APIs | backend |
+| `api-docs-fetch` | Fetch current API/SDK docs via Context Hub (chub) before coding — prevents hallucination | documentation, api |
 | `audit-trail` | Immutable append-only log of all significant session events | observability |
-| `runtime-flags` | Session-scoped behavioral overrides (FAST_MODE, STRICT_MODE, etc.) | configuration |
+| `brand-bootstrap` | Extract brand identity from existing websites | design, branding |
+| `budget-controls` | Token/cost budgets per persona and session with advisory warnings | cost-management |
+| `cli-usage` | How to safely use CLI commands and scripts | devops |
+| `context-maintenance` | How to maintain `.context.md`, `FEATURE-MAP.md`, and Repo Index (evaluate-repo pipeline) | documentation, indexation |
+| `continuous-learning` | Extract, store, and evolve reusable patterns (instincts) from session experience | learning, memory |
 | `convergence-detection` | Detect when multiple personas independently reach the same conclusion | observability |
-| `heartbeat` | Foundation for scheduled agent activation in autonomous setups | orchestration, future |
-| `obsidian-markdown` | Obsidian Flavored Markdown: wikilinks, embeds, callouts, properties, tags | obsidian, markdown |
-| `obsidian-bases` | Obsidian Bases: database views over notes (.base files) | obsidian, queries |
-| `json-canvas` | JSON Canvas: visual maps and flowcharts (.canvas files) | obsidian, visualization |
-| `obsidian-cli` | Interact with Obsidian vault via CLI | obsidian, cli |
+| `coverage-tracking` | Track exploration depth across personas, areas, and concerns for M/L tasks | observability |
+| `cross-persona-flags` | Outbound flags between personas for lateral discovery via Maestro | orchestration |
 | `defuddle` | Extract clean markdown from web pages (token-efficient) | web, ingestion |
-| `mcp-obsidian` | How the framework uses MCP to interact with the vault (+ semantic search, multi-MCP connectors) | obsidian, mcp, memory |
-| `knowledge-ingest` | Ingest external sources (videos, articles, PDFs, meeting transcripts) into structured vault notes | ingestion, knowledge, memory |
 | `experiment-loop` | Systematic experiment loops — change, test, measure, keep/discard, repeat | optimization, experimentation |
+| `frontend-design` | Visual design consistency with tunable design knobs (variance, motion, density) | design, frontend |
+| `frontend-implementation` | How to implement frontend features | frontend |
+| `git-workflow` | Branching, commits, and PR conventions | workflow |
+| `governance` | Approval gates for high-impact actions (deploy, migration, breaking changes) | governance |
+| `health-check` | Diagnose framework setup integrity | diagnostics |
+| `heartbeat` | Foundation for scheduled agent activation in autonomous setups | orchestration, future |
+| `json-canvas` | JSON Canvas: visual maps and flowcharts (.canvas files) | obsidian, visualization |
+| `knowledge-ingest` | Ingest external sources (videos, articles, PDFs, meeting transcripts) into structured vault notes | ingestion, knowledge, memory |
+| `mcp-obsidian` | How the framework uses MCP to interact with the vault (+ semantic search, multi-MCP connectors) | obsidian, mcp, memory |
+| `metrics` | Quality, velocity, compliance, and rework tracking | analytics |
+| `multi-provider` | How Maestro delegates to Claude, Codex, GLM | orchestration |
+| `obsidian-bases` | Obsidian Bases: database views over notes (.base files) | obsidian, queries |
+| `obsidian-cli` | Interact with Obsidian vault via CLI | obsidian, cli |
+| `obsidian-markdown` | Obsidian Flavored Markdown: wikilinks, embeds, callouts, properties, tags | obsidian, markdown |
+| `plan-second-opinion` | Automatic Codex CLI review of Architect plans for M/L tasks | planning, review |
+| `plugin-system` | How to create and manage opt-in plugins | extensibility |
+| `pr-description` | Auto-generate PR descriptions after review | workflow |
+| `research` | Structured investigation workflow with community intelligence (Reddit, HN, X), codebase scan, and vault lookup | research, planning |
+| `runtime-flags` | Session-scoped behavioral overrides (FAST_MODE, STRICT_MODE, etc.) | configuration |
+| `security-practices` | Rules for secrets, env vars, and security hygiene | security |
+| `squads` | Parallel domain-based workstreams | orchestration |
+| `stack-lock` | Prevent library drift via approved stack | governance, dependencies |
 
 ---
 
@@ -54,7 +60,7 @@ Useful in specific project types. Install with `bash install.sh --skill <name>`.
 | `session-goals` | Track session goals explicitly in a separate skill file | Teams or highly structured workflows | productivity |
 | `adr` | Architecture Decision Records | Long-lived projects with multiple contributors | architecture |
 | `product-review` | When/how to run /office-hours + /plan-ceo-review before Architect on L/XL features | Product-heavy projects, new features with uncertain scope | product, planning |
-| `browser-qa` | When/how to use gstack's /qa + /browse for real-browser UI testing | Projects with web frontends, critical user flows | testing, quality |
+| `browser-qa` | Real-browser QA via gstack + authenticated data extraction via Chrome DevTools MCP | Projects with web frontends, critical user flows | testing, quality, scraping |
 
 ---
 

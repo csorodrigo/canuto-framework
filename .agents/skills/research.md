@@ -25,6 +25,36 @@ Provide a structured, repeatable workflow for investigating topics, features, or
 
 ## Procedure
 
+### Phase 0: Community Intelligence (when applicable)
+
+Before diving into the codebase, check what the broader community knows about the topic. This phase is **optional** — use it when the topic involves library/tool choices, migration paths, best practices, or any decision where real-world experience from others is valuable.
+
+**When to run this phase:**
+- Choosing between libraries or tools (e.g., "Playwright vs Cypress")
+- Evaluating a new technology or approach
+- Investigating production issues that others may have encountered
+- Any decision where "what are people actually saying about this?" would help
+
+**How:**
+1. **Parallel web searches** across community sources. Run multiple WebSearch queries simultaneously:
+   - `site:reddit.com <topic>` — community discussions, real experience reports
+   - `site:news.ycombinator.com <topic>` — technical deep dives, contrarian takes
+   - `site:stackoverflow.com <topic>` — specific problems and solutions
+   - `<topic> 2026` — general web results with recency bias
+   - `<topic> comparison OR vs OR alternative` — head-to-head evaluations
+
+2. **Consolidate findings:**
+   - **Community consensus**: What does the majority recommend? (note sample size)
+   - **Common pitfalls**: What problems do people report?
+   - **Controversial points**: Where does the community disagree?
+   - **Key threads**: Top 3-5 most upvoted/engaged discussions with brief summaries
+
+3. **Feed into Phase 1**: The community intelligence becomes "External context" for the Explore phase below.
+
+> **Optional tool:** [/last30days](https://github.com/mvanhorn/last30days-skill) is a Claude Code skill that automates parallel search across Reddit, X, YouTube, HN, Polymarket, and the web. Install for deeper community research: `claude skill install mvanhorn/last30days-skill`
+
+---
+
 ### Phase 1: Explore
 
 1. **Codebase scan**: Search the project for files, patterns, and dependencies related to the topic.
@@ -33,6 +63,7 @@ Provide a structured, repeatable workflow for investigating topics, features, or
    - `obsidian_list_notes(path="projects/{project-slug}/decisions/")` — check for related ADRs.
    - `obsidian_list_notes(path="projects/{project-slug}/pending/")` — check for related pending tasks.
 3. **External context** (if needed): Check documentation, changelogs, or API references relevant to the topic.
+4. **Community context** (from Phase 0): Integrate community findings — consensus, pitfalls, recommendations.
 
 ### Phase 2: Analyze
 
@@ -64,6 +95,11 @@ Provide a structured, repeatable workflow for investigating topics, features, or
 - <key finding 1>
 - <key finding 2>
 - ...
+
+### Community Intelligence (if Phase 0 was run)
+- **Consensus:** <what the community recommends>
+- **Pitfalls:** <common problems reported>
+- **Key threads:** <top 3 discussions with brief summaries>
 
 ### Prior Work (vault)
 - <related session/decision/instinct with wikilinks, or "None found">
