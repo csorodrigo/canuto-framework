@@ -20,6 +20,15 @@ set -euo pipefail
 
 VAULT="$HOME/.canuto/vault"
 
+# ── sed -i portability (macOS vs Linux) ──
+sedi() {
+  if sed --version 2>/dev/null | grep -q GNU; then
+    sed -i "$@"
+  else
+    sed -i '' "$@"
+  fi
+}
+
 # ── Colors ──
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -128,7 +137,7 @@ for canvas in "$VAULT/canvas/${NEW_SLUG}-"*.canvas "$VAULT/canvas/${OLD_SLUG}-"*
   if grep -q "$OLD_SLUG" "$canvas" 2>/dev/null; then
     echo "  $(basename "$canvas"): replacing '$OLD_SLUG' → '$NEW_SLUG'"
     if ! $DRY_RUN; then
-      sed -i "s|$OLD_SLUG|$NEW_SLUG|g" "$canvas"
+      sedi "s|$OLD_SLUG|$NEW_SLUG|g" "$canvas"
     fi
     CHANGES=$((CHANGES + 1))
   fi
@@ -145,7 +154,7 @@ if [[ -f "$INDEX_FILE" ]]; then
   if grep -q "$OLD_SLUG" "$INDEX_FILE" 2>/dev/null; then
     echo "  project-index.json: replacing '$OLD_SLUG' → '$NEW_SLUG'"
     if ! $DRY_RUN; then
-      sed -i "s|$OLD_SLUG|$NEW_SLUG|g" "$INDEX_FILE"
+      sedi "s|$OLD_SLUG|$NEW_SLUG|g" "$INDEX_FILE"
     fi
     CHANGES=$((CHANGES + 1))
   fi
@@ -164,7 +173,7 @@ while IFS= read -r -d '' mdfile; do
   if grep -q "$OLD_SLUG" "$mdfile" 2>/dev/null; then
     echo "  $(echo "$mdfile" | sed "s|$VAULT/||")"
     if ! $DRY_RUN; then
-      sed -i "s|$OLD_SLUG|$NEW_SLUG|g" "$mdfile"
+      sedi "s|$OLD_SLUG|$NEW_SLUG|g" "$mdfile"
     fi
     MD_COUNT=$((MD_COUNT + 1))
   fi
@@ -183,7 +192,7 @@ for report in "$VAULT/reports/"*.md; do
   if grep -q "$OLD_SLUG" "$report" 2>/dev/null; then
     echo "  $(basename "$report")"
     if ! $DRY_RUN; then
-      sed -i "s|$OLD_SLUG|$NEW_SLUG|g" "$report"
+      sedi "s|$OLD_SLUG|$NEW_SLUG|g" "$report"
     fi
     CHANGES=$((CHANGES + 1))
   fi
