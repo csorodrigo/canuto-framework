@@ -146,6 +146,33 @@ fetch_content() {
   fi
 }
 
+skill_remote_files() {
+  local skill_name="$1"
+  case "$skill_name" in
+    context-maintenance)
+      printf '%s\n' \
+        ".agents/skills/context-maintenance/SKILL.md" \
+        ".agents/skills/context-maintenance/references/evaluate-repo-pipeline.md" \
+        ".agents/skills/context-maintenance/references/examples.md"
+      ;;
+    continuous-learning)
+      printf '%s\n' \
+        ".agents/skills/continuous-learning/SKILL.md" \
+        ".agents/skills/continuous-learning/references/instinct-promotion.md" \
+        ".agents/skills/continuous-learning/references/examples.md"
+      ;;
+    frontend-design)
+      printf '%s\n' \
+        ".agents/skills/frontend-design/SKILL.md" \
+        ".agents/skills/frontend-design/references/design-patterns.md" \
+        ".agents/skills/frontend-design/references/aesthetic-patterns.md"
+      ;;
+    *)
+      printf '%s\n' ".agents/skills/${skill_name}.md"
+      ;;
+  esac
+}
+
 # ── File lists ──────────────────────────────────────────────────────────────
 
 FRAMEWORK_FILES=(
@@ -156,7 +183,9 @@ FRAMEWORK_FILES=(
   ".agents/personas/debugger.md"
   ".agents/personas/reviewer.md"
   ".agents/personas/contextualizer.md"
-  ".agents/skills/context-maintenance.md"
+  ".agents/skills/context-maintenance/SKILL.md"
+  ".agents/skills/context-maintenance/references/evaluate-repo-pipeline.md"
+  ".agents/skills/context-maintenance/references/examples.md"
   ".agents/skills/api-design.md"
   ".agents/skills/frontend-implementation.md"
   ".agents/skills/cli-usage.md"
@@ -174,7 +203,9 @@ FRAMEWORK_FILES=(
   ".agents/hooks/session-save.sh"
   ".agents/hooks/session-load.sh"
   ".agents/hooks/pre-compact-save.sh"
-  ".agents/skills/continuous-learning.md"
+  ".agents/skills/continuous-learning/SKILL.md"
+  ".agents/skills/continuous-learning/references/instinct-promotion.md"
+  ".agents/skills/continuous-learning/references/examples.md"
   ".agents/skills/absence-reporting.md"
   ".agents/skills/cross-persona-flags.md"
   ".agents/skills/coverage-tracking.md"
@@ -189,7 +220,9 @@ FRAMEWORK_FILES=(
   ".agents/skills/session-goals.md"
   ".agents/skills/adr.md"
   ".agents/skills/brand-bootstrap.md"
-  ".agents/skills/frontend-design.md"
+  ".agents/skills/frontend-design/SKILL.md"
+  ".agents/skills/frontend-design/references/design-patterns.md"
+  ".agents/skills/frontend-design/references/aesthetic-patterns.md"
   ".agents/skills/api-docs-fetch.md"
   ".agents/skills/defuddle.md"
   ".agents/skills/obsidian-markdown.md"
@@ -1552,11 +1585,18 @@ if [ "$MODE" = "skill" ]; then
 
   INSTALLED=()
   for skill_name in "${SKILLS_TO_INSTALL[@]}"; do
-    skill_file=".agents/skills/${skill_name}.md"
-    remote_path=".agents/skills/${skill_name}.md"
     log "Installing skill: $skill_name..."
-    if download "$remote_path" "$skill_file"; then
-      ok "Installed: $skill_file"
+    mapfile -t skill_files < <(skill_remote_files "$skill_name")
+    installed_skill=true
+    for skill_file in "${skill_files[@]}"; do
+      if ! download "$skill_file" "$skill_file"; then
+        installed_skill=false
+        break
+      fi
+    done
+
+    if [ "$installed_skill" = true ]; then
+      ok "Installed: $skill_name"
       INSTALLED+=("$skill_name")
     else
       warn "Skill '$skill_name' not found. Check registry.md for available skills."
