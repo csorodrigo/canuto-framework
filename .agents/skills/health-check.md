@@ -1,8 +1,17 @@
 shortDescription: Diagnose framework setup integrity and detect misconfigurations before they cause session failures.
 usedBy: [maestro]
-version: 1.1.0
-lastUpdated: 2026-03-21
+version: 1.2.0
+lastUpdated: 2026-03-23
 copyright: Rodrigo Canuto © 2026.
+evals:
+  - prompt: "somethings off with the framework, can u check if everythings configured ok? just started a new session"
+    should_trigger: true
+  - prompt: "personas arent responding properly, maybe something broke in the setup"
+    should_trigger: true
+  - prompt: "the coder persona made a mistake, can you review its output?"
+    should_trigger: false
+  - prompt: "is my obsidian vault syncing correctly?"
+    should_trigger: false
 
 ## When to Use
 
@@ -77,7 +86,12 @@ Detect broken or missing framework components before they silently degrade sessi
 
 ### Legacy Check
 - [ ] `.agents/memory/` directory does NOT exist. If it does, warn: "Old flat-file memory detected. Run `bash install.sh --migrate` to upgrade."
-- [ ] `.agents/skills/obsidian-markdown/SKILL.md` does NOT exist. If it does, warn: "Old skill directory structure detected. Update framework files."
+- [ ] `.agents/skills/obsidian-markdown/SKILL.md` does NOT exist. If it does, warn: "Legacy obsidian-markdown skill structure detected (predates v1.6). Run `bash install.sh --update`."
+
+### Skills Quality
+- [ ] Critical skills have `evals` field in frontmatter: `health-check.md`, `auto-analysis.md`, `context-maintenance.md`, `continuous-learning.md`, `experiment-loop.md`, `browser-qa.md`, `knowledge-ingest.md`. Missing `evals` on a critical skill = WARNING.
+- [ ] Skills >200 lines use subdirectory structure (`skill-name/SKILL.md` + `references/`). Oversized flat skills without progressive disclosure = WARNING.
+- [ ] `frontend-design/` directory exists with `SKILL.md` and `references/` subdirectory (progressive disclosure pilot).
 
 ### Hooks
 - [ ] `~/.claude/hooks/session-save.sh` exists and is executable.

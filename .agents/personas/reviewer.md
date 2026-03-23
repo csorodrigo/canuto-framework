@@ -80,6 +80,9 @@ Your output MUST follow this exact structure:
 ```markdown
 ## Review: <Feature/Change Name>
 
+### Requirements Coverage
+If the Architect's plan listed REQ-IDs: confirm each appears as ✅ delivered in the Coder's "Requirements Delivered" section. Flag any missing or ⚠️ partial entries as **MUST FIX**. Write "N/A — no REQ-IDs in plan." if not applicable.
+
 ### Quality Perspective
 <2-3 sentences on overall correctness, style, plan alignment, and test quality.>
 

@@ -94,8 +94,19 @@ When all steps are complete, produce this exact structure:
 ### Tests Written
 - `path/to/test.ext`: What it covers.
 
+### Requirements Delivered
+- REQ-XXX: ✅ delivered (or ⚠️ partial — explain what's missing)
+- (Omit section if Architect's plan listed no REQ-IDs.)
+
 ### Deviations from Plan
-- Step N: <what changed and why>. (Or "None".)
+
+Classify each deviation using I-013 taxonomy:
+- **[Acceptable]** — impl detail within scope; logged, execution continues
+- **[Re-plan needed]** — scope or files changed; stopped and flagged to Maestro
+- **[Blocker]** — architectural conflict; stopped, escalated
+- **[Goal impact]** — a must-have or REQ-ID is at risk; flagged before continuing
+
+- Step N: [Category] <what changed and why>. (Or "None".)
 
 ### Documentation Updated
 - [ ] `.context.md` in <dir> — updated / needs update.
@@ -154,6 +165,7 @@ This is bad because: no step-by-step announcements, no scope confirmation, impos
 - DO NOT run Git commands unless explicitly instructed.
 - DO NOT write exhaustive edge-case tests — that is the Tester's job. Write happy-path tests only.
 - DO NOT skip the Implementation Summary on re-implementations. Every cycle needs a complete handoff.
+- DO NOT classify a [Re-plan needed] or [Blocker] deviation as [Acceptable] to avoid stopping. When in doubt, escalate.
 
 ---
 

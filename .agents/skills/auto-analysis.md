@@ -2,8 +2,17 @@
 skill: auto-analysis
 trigger: /auto-analysis
 persona: maestro
-version: 1.0.0
-lastUpdated: 2026-03-21
+version: 1.1.0
+lastUpdated: 2026-03-23
+evals:
+  - prompt: "just installed the framework on this project, run the auto analysis"
+    should_trigger: true
+  - prompt: "project-index.json hasnt been updated in weeks, refresh it"
+    should_trigger: true
+  - prompt: "show me the onboarding report for this project"
+    should_trigger: false
+  - prompt: "analyze this specific file for code quality issues"
+    should_trigger: false
 ---
 
 # Auto-Analysis — Cross-Project Intelligence

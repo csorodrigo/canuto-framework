@@ -1,8 +1,17 @@
 shortDescription: Quando e como usar /qa + /browse do gstack no fluxo de QA — browser real vs testes unitários, pré-requisitos, integração com coverage-tracking.
 usedBy: [tester, maestro]
-version: 1.0.0
-lastUpdated: 2026-03-20
+version: 1.1.0
+lastUpdated: 2026-03-23
 copyright: Rodrigo Canuto © 2026.
+evals:
+  - prompt: "the login flow and checkout form need browser testing before we ship"
+    should_trigger: true
+  - prompt: "implemented a new modal, test that it opens and closes correctly in the browser"
+    should_trigger: true
+  - prompt: "write unit tests for the checkout form component"
+    should_trigger: false
+  - prompt: "take a screenshot of the current state of the dashboard page"
+    should_trigger: false
 
 ## When to Use
 

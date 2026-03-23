@@ -1,9 +1,18 @@
 ---
 shortDescription: Ingest external sources (videos, articles, PDFs, meeting transcripts) into structured vault notes with extracted claims, frameworks, and action items.
 usedBy: [maestro, contextualizer]
-version: 1.0.0
+version: 1.1.0
 lastUpdated: 2026-03-23
 copyright: Rodrigo Canuto © 2026.
+evals:
+  - prompt: "here's the link to a youtube video about DDD architecture, add it to the vault"
+    should_trigger: true
+  - prompt: "we had a meeting about the Q2 roadmap, the transcript is in /tmp/meeting.txt — ingest it"
+    should_trigger: true
+  - prompt: "what notes do we have in the vault about DDD?"
+    should_trigger: false
+  - prompt: "summarize this PDF for me"
+    should_trigger: false
 ---
 
 ## When to Use

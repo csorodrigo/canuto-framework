@@ -84,6 +84,53 @@ Execute these steps **every time** a new session begins:
 
 ## Playbook
 
+### Skill Check (Step 0 — before any routing)
+
+Before classifying task size or routing to any persona, apply the **1% Rule**:
+
+> If there is even a 1% chance that a skill in `.agents/skills/` applies to this task, that skill MUST be checked before proceeding.
+
+```
+Is there a skill that covers this task or a sub-step of it?
+  → YES or UNSURE: read the skill before routing.
+  → CLEARLY NO: proceed to Task Sizing.
+```
+
+See `skill-check-protocol` skill for the full protocol and red flags.
+
+**Common rationalizations to ignore:**
+- "This is too simple for a skill" — skills exist precisely for simple, repeated actions.
+- "I already know how to do this" — the skill may constrain *how*, not just *whether*.
+- "The skill name doesn't match exactly" — check adjacent skills before skipping.
+
+---
+
+### Instinct Lookup (Step 0.5 — passive, before every routing)
+
+After the skill check, before sizing the task, query the vault for relevant instincts.
+This is automatic — the user does not trigger it.
+
+1. **Extract 2-3 keywords** from the task description (e.g., "add auth endpoint" → `auth api endpoint`).
+2. **Query project instincts**:
+   `obsidian_global_search(query="{keywords}", path="projects/{slug}/instincts/", contextLength=150)`
+3. **Query global instincts**:
+   `obsidian_list_notes(path="global-instincts/")` → read any that match the domain.
+4. **Filter**: include only `confidence: high` or `confidence: medium`. Skip low-confidence and off-topic matches.
+5. **If matches found**, surface them before the delegation announcement:
+   ```
+   [Maestro] Relevant instincts for this task:
+   - I-011 (rework-count-escalate-maestro, high) — "File modified 3+ times → pause and re-plan"
+   - I-007 (cross-persona-flags-blockers, high) — "Reviewer MUST FIX → escalate immediately"
+   Applied to handoff constraints.
+   ```
+6. **Inject into handoff** — add matched instincts as items in the Constraints section sent to the target persona.
+7. **If no matches**: proceed silently (no announcement needed).
+
+> **Why passive?** Users should not need to say "check instincts" before each task.
+> The vault's accumulated knowledge shapes routing automatically.
+
+---
+
 ### Task Sizing
 
 Before routing any task, classify its complexity:
@@ -165,6 +212,11 @@ When you hand off to a persona, you MUST provide:
 2. **Project style**: Canuto | foreign-schema | new.
 3. **Relevant paths**: which `.context.md`, feature map sections, or docs to read.
 4. **Constraints**: anything the persona must not do.
+5. **Context isolation**: each persona starts fresh. Pass only what is needed for this specific task.
+   - ✅ Include: goal, plan step, relevant file paths, constraints, expected output format.
+   - ❌ Exclude: conversation history, prior persona outputs, resolved errors, exploration context, decisions already incorporated into the plan.
+
+> **Why this matters:** Personas receiving unnecessary context accumulate "context pollution" — token bloat and interference from prior session state. A fresh persona with minimal, precise context produces better output than one inheriting a full conversation history.
 
 ### Announcing Transitions
 
@@ -353,6 +405,7 @@ You do NOT produce code, diffs, plans, reviews, or test results.
 - DO NOT continue when the user's goal is unclear — ask up to 2 clarification questions, then yield.
 - DO NOT ignore rework signals. Three modifications to the same file means something is wrong with the plan.
 - DO NOT mix goals with pending tasks. Goals go in `last-session.md`. Specific unfinished work goes in `pending.md`.
+- DO NOT skip the instinct lookup. Even for XS tasks, a matching high-confidence instinct may change what Coder must avoid.
 
 ---
 

@@ -1673,7 +1673,12 @@ if [ "$MODE" = "migrate" ]; then
   if [ -d ".agents/memory" ] && [ "$MIGRATED" -gt 0 ]; then
     echo ""
     warn "Old .agents/memory/ still exists (backup at $BACKUP_DIR)."
-    read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Delete old .agents/memory/? [y/N] ")" DELETE_OLD
+    if [ -t 0 ]; then
+      read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Delete old .agents/memory/? [y/N] ")" DELETE_OLD
+    else
+      DELETE_OLD="N"
+      log "Non-interactive mode: keeping .agents/memory/ (delete manually when ready)."
+    fi
     if [[ "$DELETE_OLD" =~ ^[Yy]$ ]]; then
       rm -rf ".agents/memory"
       ok "Deleted .agents/memory/"
@@ -1686,7 +1691,11 @@ if [ "$MODE" = "migrate" ]; then
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
     git add "$AGENTS_DIR/" "$CLAUDE_MD" 2>/dev/null || true
-    read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Commit migration? [Y/n] ")" COMMIT_ANSWER
+    if [ -t 0 ]; then
+      read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Commit migration? [Y/n] ")" COMMIT_ANSWER
+    else
+      COMMIT_ANSWER="Y"
+    fi
     COMMIT_ANSWER="${COMMIT_ANSWER:-Y}"
     if [[ "$COMMIT_ANSWER" =~ ^[Yy]$ ]]; then
       git commit -m "chore: migrate Canuto Framework to v1.5 (Obsidian vault)"
@@ -1698,7 +1707,11 @@ if [ "$MODE" = "migrate" ]; then
   echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
   # ── Post-migrate analysis ────────────────────────────────────────────────
   echo ""
-  read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Run cross-project auto-analysis? [Y/n] ")" ANALYSIS_ANSWER
+  if [ -t 0 ]; then
+    read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Run cross-project auto-analysis? [Y/n] ")" ANALYSIS_ANSWER
+  else
+    ANALYSIS_ANSWER="Y"
+  fi
   ANALYSIS_ANSWER="${ANALYSIS_ANSWER:-Y}"
   if [[ "$ANALYSIS_ANSWER" =~ ^[Yy]$ ]]; then
     PROJECT_DIR="$(pwd)" post_install_analysis "$(pwd)"
@@ -1771,7 +1784,11 @@ if [ "$MODE" = "install" ]; then
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
   # ── Post-install analysis ─────────────────────────────────────────────────
   echo ""
-  read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Run cross-project auto-analysis? [Y/n] ")" ANALYSIS_ANSWER
+  if [ -t 0 ]; then
+    read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Run cross-project auto-analysis? [Y/n] ")" ANALYSIS_ANSWER
+  else
+    ANALYSIS_ANSWER="Y"
+  fi
   ANALYSIS_ANSWER="${ANALYSIS_ANSWER:-Y}"
   if [[ "$ANALYSIS_ANSWER" =~ ^[Yy]$ ]]; then
     PROJECT_DIR="$(pwd)" post_install_analysis "$(pwd)"
