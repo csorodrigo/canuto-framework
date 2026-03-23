@@ -15,7 +15,8 @@ Personal multi-agent framework for AI-assisted development. Claude-first, provid
     reviewer.md         — Quality gate. Reviews code + generates PR descriptions.
     contextualizer.md   — Knowledge engine. Scans code and maintains context files.
   skills/
-    context-maintenance.md    — How to maintain .context.md and FEATURE-MAP.md.
+    context-maintenance/
+      SKILL.md                — How to maintain .context.md and FEATURE-MAP.md.
     api-design.md             — How to design and evolve HTTP/JSON APIs.
     frontend-implementation.md — How to implement frontend features.
     cli-usage.md              — How to safely use CLI commands and scripts.
@@ -27,7 +28,10 @@ Personal multi-agent framework for AI-assisted development. Claude-first, provid
     squads.md                 — Parallel workstreams for larger projects.
     pr-description.md         — Auto-generate PR descriptions after review.
     health-check.md           — Diagnose framework setup integrity on demand.
-    frontend-design.md        — Visual design principles, knobs, and LLM bias correction.
+    continuous-learning/
+      SKILL.md                — Extract reusable instincts from session experience.
+    frontend-design/
+      SKILL.md                — Visual design principles, knobs, and LLM bias correction.
     api-docs-fetch.md         — Fetch current API docs via Context Hub before coding.
     brand-bootstrap.md        — Extract brand assets from URLs via OpenBrand.
     obsidian-markdown.md      — Wikilinks, embeds, callouts, properties, tags.

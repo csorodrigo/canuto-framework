@@ -52,7 +52,7 @@ Detect broken or missing framework components before they silently degrade sessi
 
 ### Core Skills
 - [ ] `.agents/skills/` directory is non-empty.
-- [ ] `context-maintenance.md` present.
+- [ ] `context-maintenance.md` present, or `.agents/skills/context-maintenance/SKILL.md` present.
 - [ ] `api-design.md` present.
 - [ ] `metrics.md` present.
 
@@ -89,7 +89,7 @@ Detect broken or missing framework components before they silently degrade sessi
 - [ ] `.agents/skills/obsidian-markdown/SKILL.md` does NOT exist. If it does, warn: "Legacy obsidian-markdown skill structure detected (predates v1.6). Run `bash install.sh --update`."
 
 ### Skills Quality
-- [ ] Critical skills have `evals` field in frontmatter: `health-check.md`, `auto-analysis.md`, `context-maintenance.md`, `continuous-learning.md`, `experiment-loop.md`, `browser-qa.md`, `knowledge-ingest.md`. Missing `evals` on a critical skill = WARNING.
+- [ ] Critical skills have `evals` field in frontmatter: `health-check.md`, `auto-analysis.md`, `context-maintenance/SKILL.md`, `continuous-learning/SKILL.md`, `experiment-loop.md`, `browser-qa.md`, `knowledge-ingest.md`. Missing `evals` on a critical skill = WARNING.
 - [ ] Skills >200 lines use subdirectory structure (`skill-name/SKILL.md` + `references/`). Oversized flat skills without progressive disclosure = WARNING.
 - [ ] `frontend-design/` directory exists with `SKILL.md` and `references/` subdirectory (progressive disclosure pilot).
 

@@ -25,7 +25,9 @@ WARNINGS=()
 
 pass() {
   PASS=$((PASS + 1))
-  $VERBOSE && echo "  ✅ $1"
+  if [ "$VERBOSE" = true ]; then
+    echo "  ✅ $1"
+  fi
 }
 
 fail() {
@@ -100,11 +102,14 @@ CORE_SKILLS=(
 )
 
 for skill in "${CORE_SKILLS[@]}"; do
-  SFILE="$AGENTS_DIR/skills/$skill.md"
-  if [ -f "$SFILE" ]; then
+  FLAT_FILE="$AGENTS_DIR/skills/$skill.md"
+  DIRECTORY_FILE="$AGENTS_DIR/skills/$skill/SKILL.md"
+  if [ -f "$FLAT_FILE" ]; then
     pass "Skill exists: $skill.md"
+  elif [ -f "$DIRECTORY_FILE" ]; then
+    pass "Skill exists: $skill/SKILL.md"
   else
-    fail "Core skill missing: $skill.md"
+    fail "Core skill missing: $skill (.md or /SKILL.md)"
   fi
 done
 echo ""
