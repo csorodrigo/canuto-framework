@@ -52,6 +52,43 @@ def _safe_int(val, default=0):
     except (ValueError, TypeError):
         return default
 
+def _stack_info(idx):
+    stack = idx.get("stack", {})
+    return stack if isinstance(stack, dict) else {}
+
+def _primary_language(idx):
+    stack = _stack_info(idx)
+    language = stack.get("primary_language") or idx.get("language", "unknown")
+    return language if isinstance(language, str) and language else "unknown"
+
+def _framework_name(idx):
+    stack = _stack_info(idx)
+    framework = stack.get("framework") or idx.get("framework", "none")
+    return framework if isinstance(framework, str) and framework else "none"
+
+def _dependency_map(idx, kind):
+    deps = idx.get("dependencies", {})
+    if not isinstance(deps, dict):
+        return {}
+    dep_map = deps.get(kind, {})
+    return dep_map if isinstance(dep_map, dict) else {}
+
+def _production_dependencies(idx):
+    return set(_dependency_map(idx, "production").keys())
+
+def _domain_names(idx):
+    names = []
+    for domain in idx.get("domains", []):
+        if isinstance(domain, dict):
+            name = domain.get("name")
+        elif isinstance(domain, str):
+            name = domain
+        else:
+            name = None
+        if isinstance(name, str) and name:
+            names.append(name)
+    return names
+
 def read_frontmatter(filepath):
     """Extract YAML frontmatter and first heading from a markdown note.
     Handles values with colons (e.g., URLs)."""
@@ -141,9 +178,8 @@ report.append("\n## Stack Clusters\n")
 clusters = defaultdict(list)
 for slug, data in projects.items():
     idx = data["index"]
-    stack = idx.get("stack", {})
-    lang = stack.get("primary_language", "unknown")
-    fw = stack.get("framework", "none")
+    lang = _primary_language(idx)
+    fw = _framework_name(idx)
     cluster_key = f"{lang}/{fw}" if fw != "none" else lang
     clusters[cluster_key].append(slug)
 
@@ -162,7 +198,7 @@ report.append("## Shared Dependencies\n")
 dep_projects = defaultdict(list)
 for slug, data in projects.items():
     idx = data["index"]
-    all_deps = set(idx.get("dependencies", {}).get("production", {}).keys())
+    all_deps = _production_dependencies(idx)
     for dep in all_deps:
         dep_projects[dep].append(slug)
 
