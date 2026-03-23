@@ -453,8 +453,9 @@ detect_project_slug() {
   grandparent=$(basename "$(dirname "$(dirname "$dir")")")
 
   # Conductor pattern: workspaces/{project-name}/{branch-name}/
-  # Only match if grandparent is "workspaces" AND current dir has .git (is a repo root)
-  if [[ "$grandparent" == "workspaces" && -d "$dir/.git" ]]; then
+  # Only match if grandparent is "workspaces" AND current dir has .git
+  # Note: use -e (exists) not -d (is directory) because git worktrees use a .git file, not a directory
+  if [[ "$grandparent" == "workspaces" && -e "$dir/.git" ]]; then
     slug="$parent"
   fi
 
