@@ -1,8 +1,10 @@
+---
 shortDescription: Ingest external sources (videos, articles, PDFs, meeting transcripts) into structured vault notes with extracted claims, frameworks, and action items.
 usedBy: [maestro, contextualizer]
 version: 1.0.0
 lastUpdated: 2026-03-23
 copyright: Rodrigo Canuto © 2026.
+---
 
 ## When to Use
 

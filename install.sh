@@ -452,8 +452,9 @@ detect_project_slug() {
   local grandparent
   grandparent=$(basename "$(dirname "$(dirname "$dir")")")
 
-  # Conductor pattern: grandparent is "workspaces"
-  if [[ "$grandparent" == "workspaces" ]]; then
+  # Conductor pattern: workspaces/{project-name}/{branch-name}/
+  # Only match if grandparent is "workspaces" AND current dir has .git (is a repo root)
+  if [[ "$grandparent" == "workspaces" && -d "$dir/.git" ]]; then
     slug="$parent"
   fi
 
@@ -807,6 +808,7 @@ post_install_analysis() {
 
   log "Running deep project analysis..."
 
+  PROJECT_DIR="$project_dir" PROJECT_SLUG="$project_slug" CANUTO_VAULT="$vault" \
   python3 << 'PYEOF'
 import os, sys, json, glob, re
 from pathlib import Path
@@ -815,14 +817,9 @@ from collections import defaultdict, Counter
 
 import sys as _sys
 
-project_dir = os.environ.get("PROJECT_DIR", os.getcwd())
-# Detect Conductor workspace: workspaces/{project}/{branch}/
-_slug = os.path.basename(project_dir)
-_grandparent = os.path.basename(os.path.dirname(os.path.dirname(project_dir)))
-if _grandparent == "workspaces":
-    _slug = os.path.basename(os.path.dirname(project_dir))
-project_slug = os.environ.get("PROJECT_SLUG", _slug)
-vault = os.environ.get("CANUTO_VAULT", os.path.expanduser("~/.canuto/vault"))
+project_dir = os.environ["PROJECT_DIR"]
+project_slug = os.environ["PROJECT_SLUG"]
+vault = os.environ["CANUTO_VAULT"]
 project_vault = f"{vault}/projects/{project_slug}"
 today = datetime.now().isoformat()[:19]
 

@@ -1,8 +1,10 @@
+---
 shortDescription: Run systematic experiment loops — change a variable, test, measure, keep or discard, repeat. Automated optimization for any process with a measurable metric.
 usedBy: [maestro, architect]
 version: 1.0.0
 lastUpdated: 2026-03-23
 copyright: Rodrigo Canuto © 2026.
+---
 
 ## When to Use
 
