@@ -572,22 +572,17 @@ PYEOF
     log "Renaming stale vault entry: $dir_name → $correct_slug"
 
     if [ -d "$target" ]; then
-      # Target already exists — merge without overwriting
-      for subdir in sessions decisions instincts pending audit metrics design; do
-        [ -d "$project_dir/$subdir" ] || continue
-        mkdir -p "$target/$subdir"
-        for f in "$project_dir/$subdir"/*.md; do
-          [ -f "$f" ] || continue
-          local dest="$target/$subdir/$(basename "$f")"
-          [ -e "$dest" ] || mv "$f" "$dest"
-        done
-      done
-      # Move top-level files that don't already exist at target
-      for f in "$project_dir"/*; do
-        [ -f "$f" ] || continue
-        local dest="$target/$(basename "$f")"
-        [ -e "$dest" ] || mv "$f" "$dest"
-      done
+      # Target already exists — recursively merge all files without overwriting
+      while IFS= read -r -d '' src; do
+        local rel="${src#${project_dir}/}"
+        local dest="$target/$rel"
+        if [ -d "$src" ]; then
+          mkdir -p "$dest"
+        elif [ ! -e "$dest" ]; then
+          mkdir -p "$(dirname "$dest")"
+          mv "$src" "$dest"
+        fi
+      done < <(find "$project_dir" -mindepth 1 -print0)
       rm -rf "$project_dir"
     else
       mv "$project_dir" "$target"
@@ -596,14 +591,18 @@ PYEOF
     # Update slug field inside project-index.json to match the new name
     if [ -f "$target/project-index.json" ]; then
       python3 - "$target/project-index.json" "$correct_slug" << 'PYEOF'
-import json, sys
+import json, os, sys
 path, slug = sys.argv[1], sys.argv[2]
 try:
-    d = json.load(open(path))
+    with open(path) as f:
+        d = json.load(f)
     d['slug'] = slug
-    json.dump(d, open(path, 'w'), indent=2)
-except Exception:
-    pass
+    tmp = path + '.tmp'
+    with open(tmp, 'w') as f:
+        json.dump(d, f, indent=2)
+    os.replace(tmp, path)
+except Exception as e:
+    print(f'[canuto] warn: could not update slug in {path}: {e}', file=sys.stderr)
 PYEOF
     fi
 
