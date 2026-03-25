@@ -2,12 +2,12 @@ filters:
   and:
     - 'file.ext == "md"'
     - or:
-        - file.inFolder("instincts")
-        - file.inFolder("global-instincts")
+        - 'file.folder.split("/").slice(-1)[0] == "instincts"'
+        - 'file.folder.split("/").slice(-1)[0] == "global-instincts"'
 
 formulas:
   days_since_seen: 'if(last_seen, (today() - date(last_seen)).days, "")'
-  project: 'file.folder'
+  project: 'file.folder.split("/").slice(-2)[0]'
 
 properties:
   formula.days_since_seen:

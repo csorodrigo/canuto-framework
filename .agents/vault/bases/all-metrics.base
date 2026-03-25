@@ -1,10 +1,10 @@
 filters:
   and:
-    - file.inFolder("metrics")
+    - 'file.folder.split("/").slice(-1)[0] == "metrics"'
     - 'file.ext == "md"'
 
 formulas:
-  project: 'file.folder'
+  project: 'file.folder.split("/").slice(-2)[0]'
   session_date: 'file.ctime.format("YYYY-MM-DD")'
 
 properties:

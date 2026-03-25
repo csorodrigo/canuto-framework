@@ -1,6 +1,6 @@
 filters:
   and:
-    - file.inFolder("design/components")
+    - 'file.folder.split("/").slice(-2).join("/") == "design/components"'
     - 'file.ext == "md"'
 
 properties:
