@@ -97,47 +97,101 @@ O hook `session-save.sh` dispara automaticamente no Stop e cria um backup snapsh
 
 ---
 
-## 4. Slash Commands (Global Skills)
+## 4. Slash Commands — Referencia Completa
 
 Disponiveis em **qualquer projeto**. Instalados em `~/.claude/skills/`.
 
-### Canuto originals
+### A. Canuto Core (globais)
 
-| Comando | O que faz |
-|---------|-----------|
-| `/office-hours` | Reframe de produto estilo YC antes de codar. Forca as perguntas certas, gera 3 abordagens. |
-| `/investigate` | Debugging forense. Iron Law: sem fix sem causa raiz confirmada. |
-| `/document-release` | Atualiza toda a documentacao apos ship (README, FEATURE-MAP, CHANGELOG). |
-| `/retro` | Retrospectiva semanal com metricas do framework. |
-| `/research` | Analise estruturada: community intelligence + codebase + vault → analisa riscos → gera plano. |
-| `/auto-analysis` | Scan profundo do projeto + cross-reference com outros projetos no vault. |
-| `/vault-maintenance` | Limpeza periodica: arquiva sessoes antigas, agrega metricas/audits, limpa snapshots. |
+| Comando | O que faz | O que esperar |
+|---------|-----------|---------------|
+| `/briefing` | Carrega contexto completo do projeto | Briefing em 5 linhas: ultima sessao, pendentes, alertas, instincts ativos |
+| `/commit` | Commit semantico com validacoes | Analisa diff, gera mensagem convencional, pede confirmacao |
+| `/fix` | Debug com causa raiz confirmada | Read-only primeiro, diagnostico, propoe fix minimo |
+| `/test` | Roda testes do projeto | Detecta framework automaticamente, roda, reporta cobertura e falhas |
+| `/review` | Revisao pre-commit | Checa console.logs, tipos TS, imports nao usados, padroes do projeto |
+| `/deploy` | Deploy com validacoes completas | Branch → build → testes → health check → smoke test |
+| `/deploy-gate` | Checklist pre-deploy | Veredicto binario claro: **PRONTO** ou **BLOQUEADO** |
+| `/supabase-migration` | Migration + RLS | Gera SQL → verifica RLS → atualiza tipos TS → documenta |
+| `/canuto-init` | Onboarding de projeto novo | Gera `.agents/`, detecta stack, cria CLAUDE.md, inicializa memoria |
+| `/termdock-ast` | Busca AST (simbolos, dependencias) | Onde esta X, quem chama X, o que depende de X, impacto de refactor |
+| `/xcodebuildmcp-cli` | Build/test iOS/macOS | Build, run, test, debug, logs, UI automation via XcodeBuildMCP |
+| `/ios-device-deploy` | Deploy iOS em device fisico | Requer cabo USB, Release config e provisioning profile valido |
 
-### Design skills (Impeccable)
+### B. Design Impeccable (gstack)
 
-| Comando | O que faz |
-|---------|-----------|
-| `/audit` | Scan de qualidade: acessibilidade, performance, responsividade, anti-patterns. |
-| `/animate` | Adiciona animacoes e micro-interacoes com proposito. |
-| `/bolder` | Transforma designs genericos em experiencias memoraveis. |
-| `/clarify` | Melhora microcopy e textos de interface. |
-| `/colorize` | Introducao estrategica de cor (60/30/10, OKLCH). |
-| `/critique` | Avaliacao holistica de UX/design. |
-| `/harden` | Resiliencia para producao: edge cases, overflow, i18n, erros. |
-| `/overdrive` | Interfaces tecnicamente ambiciosas (View Transitions, WebGL, scroll-driven). |
-| `/polish` | Passe final de qualidade antes do ship. |
-| `/typeset` | Auditoria e melhoria de tipografia. |
+| Comando | O que faz | O que esperar |
+|---------|-----------|---------------|
+| `/audit` | Scan multi-dimensional de qualidade | Relatorio com score: a11y, performance, responsividade, AI slop patterns |
+| `/animate` | Adiciona animacoes e micro-interacoes com proposito | Motion apenas onde agrega — sem decoracao gratuita |
+| `/bolder` | Transforma designs genericos em memoraveis | Variantes ousadas com justificativa de cada escolha |
+| `/clarify` | Melhora microcopy e textos de interface | Labels, tooltips, mensagens de erro — cada palavra justificada |
+| `/colorize` | Introducao estrategica de cor | Paleta 60/30/10 em OKLCH com significado semantico |
+| `/critique` | Avaliacao holistica de UX/design | Hierarquia, arquitetura de informacao, emocao, acessibilidade |
+| `/harden` | Resiliencia para producao | Edge cases de texto, overflow, i18n, estados vazios, erros |
+| `/overdrive` | Interfaces tecnicamente ambiciosas | View Transitions, WebGL, scroll-driven animations, animacoes CSS avanc. |
+| `/polish` | Passe final de qualidade | Espacamento, estados hover/focus/disabled, alinhamento, detalhes finais |
+| `/typeset` | Auditoria e melhoria de tipografia | Escala, hierarquia, legibilidade, line-height, letra e espacamento |
 
-### gstack (Garry Tan)
+### C. gstack — Workflow Completo
 
-| Comando | O que faz |
-|---------|-----------|
-| `/plan-ceo-review` | Revisao de escopo nivel CEO. |
-| `/plan-eng-review` | Revisao de arquitetura. |
-| `/qa` | QA com browser Chromium real. |
-| `/careful` | Guardrails contra operacoes destrutivas. |
-| `/browse` | Pesquisa in-browser (requer bun). |
-| `+16 mais` | Ver `~/.claude/skills/gstack/` |
+| Comando | O que faz | O que esperar |
+|---------|-----------|---------------|
+| `/office-hours` | Reframe de produto estilo YC | 3 abordagens com trade-offs, questiona premissas, salva contexto para Architect |
+| `/plan-ceo-review` | Revisao estrategica de plano | Expansao de escopo, foco no problema certo, perspectiva de fundador |
+| `/plan-eng-review` | Revisao de arquitetura de plano | Data flow, diagramas, edge cases, cobertura de testes, performance |
+| `/plan-design-review` | Revisao de design de plano | Score 0-10 por dimensao, o que precisa para chegar a 10, fix do plano |
+| `/autoplan` | Todos os reviews de uma vez | CEO + eng + design reviews automaticos com auto-decisoes, gate final |
+| `/codex` | Second opinion adversarial | "200 IQ adversarial dev" testa suas suposicoes e tenta quebrar seu codigo |
+| `/design-consultation` | Cria sistema de design completo | Estetica, tipografia, cor, layout, motion → `DESIGN.md` como fonte da verdade |
+| `/design-review` | Audit visual com screenshots | Inconsistencias, espacamento, hierarquia, AI slop → fix atomico com evidencia |
+| `/qa` | QA completo + fix de bugs | Testa com Chromium real, fix atomico por bug, score saude antes/depois |
+| `/qa-only` | QA so relatorio, sem fix | Report estruturado com health score, screenshots, repro steps |
+| `/browse` | Headless browser rapido | Screenshot, clicar, preencher, verificar estado — ~100ms por acao |
+| `/ship` | Cria PR com bump de versao | Merge base, testes, review diff, bump VERSION, CHANGELOG, push, PR |
+| `/land-and-deploy` | Merge + verificar producao | Merge PR → espera CI → verifica saude via canary checks |
+| `/canary` | Monitoramento pos-deploy | Assiste console errors, performance, falhas — alerta em anomalias |
+| `/benchmark` | Deteccao de regressao de performance | Baseline de load time, Core Web Vitals, bundle size — compara antes/depois |
+| `/investigate` | Debugging forense | Iron Law: sem fix sem causa raiz confirmada — fase read-only obrigatoria |
+| `/retro` | Retrospectiva semanal | Le metrics.md, audit-log.md, instincts.md → Shipped / Delayed / Learned / Next |
+| `/document-release` | Atualiza docs apos ship | README, FEATURE-MAP.md, .context.md, CHANGELOG — zero docs desatualizados |
+| `/review` | Code review do diff | Revisao independente com pass/fail gate |
+| `/careful` | Guardrails contra operacoes destrutivas | Avisa antes de rm -rf, DROP TABLE, force-push, reset --hard |
+| `/guard` | Safety mode maximo | `/careful` + `/freeze` — edit restrictions + warnings destrutivos |
+| `/freeze` | Restringe edits a um diretorio | Bloqueia Edit/Write fora do path definido para a sessao |
+| `/unfreeze` | Remove restricao de edits | Libera escopo de edicoes para todos os diretorios |
+| `/setup-deploy` | Configura deploy automatico | Detecta plataforma (Fly, Vercel, Render...), grava config no CLAUDE.md |
+| `/setup-browser-cookies` | Importa cookies do browser real | Picker de dominios, importa sessao autenticada para headless |
+| `/loop` | Repete skill em intervalo | Ex: `/loop 5m /qa` — util para monitoramento continuo |
+| `/claude-api` | Constroi com Anthropic SDK | Scaffolding, exemplos, patterns do Claude API e Agent SDK |
+| `/simplify` | Revisao de qualidade de codigo | Detecta over-engineering, duplicacao, ineficiencias — fix direto |
+| `/gstack-upgrade` | Atualiza gstack | Detecta global vs vendored, roda upgrade, mostra o que mudou |
+
+### D. Skills do Projeto (.agents/skills/)
+
+Invocadas automaticamente pelo Maestro, mas voce pode chamar diretamente:
+
+| Skill | O que faz | O que esperar |
+|-------|-----------|---------------|
+| `health-check` | Saude geral do framework | HEALTHY / DEGRADED / BROKEN + lista itemizada de 112 checks |
+| `auto-analysis` | Scan profundo + cross-reference | Gera `project-index.json` e `onboarding-report.md`, cruza com outros projetos no vault |
+| `research` | Busca community intelligence | Phase 0 (Reddit/HN/X/YouTube) → codebase → vault → riscos → plano estruturado |
+| `browser-qa` | QA com Chrome DevTools | Usa sessao autenticada do browser real — sem re-login, sem CAPTCHA |
+| `vault-maintenance` | Manutencao do vault Obsidian | Arquiva sessoes antigas, agrega metricas/audits, limpa snapshots orfaos |
+| `skill-creator` | Cria novos skills | Workflow 7-fases para construir e registrar novos playbooks no framework |
+| `context-maintenance` | Mantem .context.md atualizado | Detecta mudancas via git diff, regenera contextos desatualizados |
+| `continuous-learning` | Extrai e evolui instincts | Captura padroes da sessao, propoe instincts, promove por confianca |
+| `experiment-loop` | Loop de experimentos A/B | Define metrica + variavel + teste → N variacoes → mantem melhor → relatorio |
+| `knowledge-ingest` | Ingere fontes externas no vault | YouTube, artigos, PDFs, transcripts → claims + frameworks + action items |
+| `frontend-design` | Design frontend coerente | Tailwind + shadcn/ui com principios opinionados — resultado visualmente distintivo |
+| `adr` | Architecture Decision Records | Cria ADR numerado com contexto, decisao, consequencias |
+| `api-design` | Design de APIs | REST/GraphQL best practices, contratos, versionamento |
+| `security-practices` | Checklist de segurança | OWASP top 10, RLS, env vars, validacao de inputs, secrets |
+| `session-goals` | Define metas da sessao | Coleta ate 3 goals, rastreia status ao longo da sessao |
+| `research` | Pesquisa community + vault + code | Contexto completo antes de qualquer decisao arquitetural |
+| `squads` | Orquestra multiplos agentes | Divide trabalho entre subagentes paralelos para tarefas grandes |
+| `product-review` | Review de produto | Avalia feature sob perspectiva de usuario, negocio e tecnica |
+| `plan-second-opinion` | Segunda opiniao em planos | Avalia plano de angulo diferente, aponta riscos e alternativas |
 
 ---
 
@@ -410,4 +464,72 @@ Voice-to-text funciona bem com Claude Code — typos e frases incompletas sao in
 
 ---
 
-*Canuto Framework v1.7 — Rodrigo Canuto (c) 2026*
+## 13. Workflows por Cenario
+
+### Fluxo: Seguranca
+
+Use quando suspeitar de vulnerabilidade, implementar autenticacao, lidar com dados sensiveis, ou antes de expor qualquer endpoint publico.
+
+```
+1. /research          → Busca community intelligence (CVEs, pitfalls, solucoes conhecidas)
+2. /investigate       → Diagnostico forense — Iron Law: sem fix sem causa raiz confirmada
+3. /careful           → Ativa guardrails contra operacoes destrutivas
+4. Architect planeja  → Com skill security-practices como constraint obrigatorio
+5. Coder implementa   → Minimal footprint: nada alem do necessario
+6. /review            → Code review focado em OWASP top 10, injection, auth, secrets
+7. /qa                → Testa edge cases com browser real (auth bypass, XSS, inputs maliciosos)
+8. /deploy-gate       → Verifica env vars, RLS, secrets antes de subir
+9. /canary            → Monitora pos-deploy por comportamentos anomalos
+```
+
+**Quando pular passos:** Para fixes de segurança urgentes em prod, va direto para `/investigate` → `/careful` → Coder → `/deploy-gate`. Documente depois.
+
+---
+
+### Fluxo: Melhorar Frontend
+
+Use quando o frontend estiver funcionando mas parecer generico, inconsistente, ou "feito por IA". Tambem util antes de demos ou launches.
+
+```
+1. /browse            → Screenshots baseline — documenta o estado atual (antes)
+2. /audit             → Scan: a11y, performance, responsividade, AI slop patterns — score inicial
+3. /critique          → Avaliacao holistica: hierarquia visual, arquitetura de informacao, emocao
+4. /design-review     → Designer's eye: inconsistencias, espacamento errado, alinhamento quebrado
+5. /colorize          → Paletas estrategicas 60/30/10 OKLCH com significado semantico
+6. /typeset           → Tipografia: escala, hierarquia, legibilidade, line-height
+7. /clarify           → Microcopy: labels, tooltips, mensagens de erro — cada palavra justificada
+8. /harden            → Edge cases: overflow de texto, i18n, estados vazios, erros de rede
+9. /animate           → Micro-interacoes com proposito — transicoes, feedback, loading states
+10. /polish           → Passe final: espacamento, estados hover/focus/disabled, detalhes finais
+11. /browse           → Screenshots depois — compare com baseline do passo 1
+```
+
+**Dica:** Voce nao precisa rodar todos. `/audit` → `/design-review` → `/polish` ja resolve 80% dos casos. Use os outros para launches importantes.
+
+---
+
+### Fluxo: Problema Muito Complexo
+
+Use quando o problema for ambiguo, envolver multiplos sistemas, ter muitos stakeholders, ou quando a abordagem certa nao for obvia.
+
+```
+1. /office-hours      → YC-style: reframe o problema, 3 abordagens, questiona premissas — antes de qualquer codigo
+2. /research          → Community intelligence: como outros resolveram isso + vault + codebase + riscos
+3. /plan-ceo-review   → Revisao estrategica: e o escopo certo? e o problema certo a resolver?
+4. /plan-eng-review   → Revisao de arquitetura: data flow, edge cases, diagramas, performance
+5. /autoplan          → Roda CEO + eng + design review de uma vez com auto-decisoes — gate final para voce aprovar
+6. /codex             → Second opinion adversarial: tenta quebrar suas suposicoes antes de implementar
+7. /careful           → Safety mode se tocar producao, banco de dados ou dados de usuario
+8. Architect planeja  → Com todos os reviews e constraints como input — plano solido
+9. Coder implementa   → Incrementalmente, uma camada por vez — feature flags se necessario
+10. /qa               → QA exaustivo com browser real: happy path + edge cases + regressoes
+11. /canary           → Monitoramento pos-deploy: console errors, performance, anomalias
+12. /document-release → Atualiza README, FEATURE-MAP.md, .context.md, CHANGELOG
+13. /retro            → Retrospectiva para capturar aprendizados como instincts no vault
+```
+
+**Quando pular passos:** Para problemas complexos mas bem definidos, pule `/office-hours` e va direto para `/research` → `/plan-eng-review` → Architect. Use `/autoplan` quando quiser as tres perspectivas (CEO, eng, design) sem ter que responder 30 perguntas manualmente.
+
+---
+
+*Canuto Framework v1.8 — Rodrigo Canuto (c) 2026*

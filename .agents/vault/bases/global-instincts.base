@@ -1,6 +1,6 @@
 filters:
   and:
-    - file.inFolder("global-instincts")
+    - 'file.folder.split("/").slice(-1)[0] == "global-instincts"'
     - 'file.ext == "md"'
 
 formulas:

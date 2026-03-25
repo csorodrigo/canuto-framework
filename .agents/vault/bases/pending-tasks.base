@@ -1,6 +1,6 @@
 filters:
   and:
-    - file.inFolder("pending")
+    - 'file.folder.split("/").slice(-1)[0] == "pending"'
     - 'file.ext == "md"'
 
 formulas:

@@ -1,6 +1,6 @@
 filters:
   and:
-    - file.inFolder("decisions")
+    - 'file.folder.split("/").slice(-1)[0] == "decisions"'
     - 'file.ext == "md"'
 
 formulas:

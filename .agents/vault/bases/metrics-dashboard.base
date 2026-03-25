@@ -1,6 +1,6 @@
 filters:
   and:
-    - file.inFolder("metrics")
+    - 'file.folder.split("/").slice(-1)[0] == "metrics"'
     - 'file.ext == "md"'
 
 formulas:

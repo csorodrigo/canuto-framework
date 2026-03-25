@@ -470,14 +470,30 @@ setup_search_tools() {
   fi
 }
 
-# ── detect_project_slug ───────────────────────────────────────────────────────
-# Detects the project slug from the current directory.
-# Handles Conductor workspaces where structure is:
-#   /conductor/workspaces/{project-name}/{branch-name}/
-# In that case, basename is the branch — we want the parent (project name).
-# For normal repos, basename of pwd is the project name.
-detect_project_slug() {
+# ── resolve_project_dir / detect_project_slug ────────────────────────────────
+# Resolve the canonical project directory before deriving the slug.
+# This handles:
+# - normal repos executed from subdirectories
+# - git worktrees where .git is a file
+# - Conductor layouts that may include a branch-named child directory
+resolve_project_dir() {
   local dir="${1:-$(pwd)}"
+  local root=""
+
+  if command -v git &> /dev/null; then
+    root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null || true)
+  fi
+
+  if [[ -n "$root" ]]; then
+    echo "$root"
+  else
+    echo "$dir"
+  fi
+}
+
+detect_project_slug() {
+  local dir
+  dir=$(resolve_project_dir "${1:-$(pwd)}")
   local slug
   slug=$(basename "$dir")
   local parent
@@ -495,6 +511,164 @@ detect_project_slug() {
   echo "$slug"
 }
 
+# ── slug_from_conductor_path ──────────────────────────────────────────────────
+# Derives the project slug from a stored path string without requiring the
+# directory to exist on disk. Used for vault cleanup of stale entries.
+# Handles both:
+#   /conductor/workspaces/{project}/{branch}/  → returns {project}
+#   /any/other/path/                           → returns basename of path
+slug_from_conductor_path() {
+  local path="$1"
+  # Strip trailing slash
+  path="${path%/}"
+  local grandparent
+  grandparent=$(basename "$(dirname "$(dirname "$path")")")
+  if [[ "$grandparent" == "workspaces" ]]; then
+    basename "$(dirname "$path")"
+  else
+    basename "$path"
+  fi
+}
+
+# ── cleanup_stale_vault_slugs ─────────────────────────────────────────────────
+# Scans vault/projects/ for entries whose folder name differs from the correct
+# project slug (i.e., they were created with a branch/city name instead of
+# the project name). Uses project-index.json.path to derive the correct slug.
+# Renames or merges stale entries automatically.
+cleanup_stale_vault_slugs() {
+  local vault="$1"
+  local projects_dir="$vault/projects"
+
+  [ -d "$projects_dir" ] || return 0
+
+  for project_dir in "$projects_dir"/*/; do
+    [ -d "$project_dir" ] || continue
+    local dir_name
+    dir_name=$(basename "$project_dir")
+    local index="$project_dir/project-index.json"
+
+    [ -f "$index" ] || continue
+
+    # Extract 'path' field from project-index.json
+    local stored_path
+    stored_path=$(python3 - "$index" << 'PYEOF'
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    print(d.get('path', '').strip())
+except Exception:
+    print('')
+PYEOF
+)
+    [ -z "$stored_path" ] && continue
+
+    # Derive correct slug from stored path (no filesystem access needed)
+    local correct_slug
+    correct_slug=$(slug_from_conductor_path "$stored_path")
+
+    [ "$correct_slug" = "$dir_name" ] && continue  # already correct, skip
+
+    local target="$projects_dir/$correct_slug"
+    log "Renaming stale vault entry: $dir_name → $correct_slug"
+
+    if [ -d "$target" ]; then
+      # Target already exists — recursively merge all files without overwriting
+      while IFS= read -r -d '' src; do
+        local rel="${src#${project_dir}/}"
+        local dest="$target/$rel"
+        if [ -d "$src" ]; then
+          mkdir -p "$dest"
+        elif [ ! -e "$dest" ]; then
+          mkdir -p "$(dirname "$dest")"
+          mv "$src" "$dest"
+        fi
+      done < <(find "$project_dir" -mindepth 1 -print0)
+      rm -rf "$project_dir"
+    else
+      mv "$project_dir" "$target"
+    fi
+
+    # Update slug field inside project-index.json to match the new name
+    if [ -f "$target/project-index.json" ]; then
+      python3 - "$target/project-index.json" "$correct_slug" << 'PYEOF'
+import json, os, sys
+path, slug = sys.argv[1], sys.argv[2]
+try:
+    with open(path) as f:
+        d = json.load(f)
+    d['slug'] = slug
+    tmp = path + '.tmp'
+    with open(tmp, 'w') as f:
+        json.dump(d, f, indent=2)
+    os.replace(tmp, path)
+except Exception as e:
+    print(f'[canuto] warn: could not update slug in {path}: {e}', file=sys.stderr)
+PYEOF
+    fi
+
+    ok "Vault: renamed $dir_name → $correct_slug"
+  done
+}
+
+# ── promote_global_instincts ──────────────────────────────────────────────────
+# Copies high-confidence instinct notes into vault/global-instincts/ so the
+# global-instincts.base shows cross-project data.
+# Scans two sources:
+#   1. Global vault: ~/.canuto/vault/projects/*/instincts/ (migrated projects)
+#   2. Local project vault: .agents/vault/instincts/ (current project, atomized notes)
+# Uses {project}-{filename} naming to avoid collisions.
+# Safe to re-run (skips already-promoted files).
+promote_global_instincts() {
+  local vault="$1"
+  local current_project_slug="$2"        # optional: slug for the local vault
+  local local_instincts_dir="${3:-.agents/vault/instincts}"  # local vault path
+  local global_dir="$vault/global-instincts"
+  mkdir -p "$global_dir"
+
+  local promoted=0
+
+  # Source 1: global vault project directories (migrated projects)
+  for project_dir in "$vault/projects"/*/; do
+    [ -d "$project_dir" ] || continue
+    local slug
+    slug=$(basename "$project_dir")
+    local instincts_dir="$project_dir/instincts"
+    [ -d "$instincts_dir" ] || continue
+
+    for f in "$instincts_dir"/*.md; do
+      [ -f "$f" ] || continue
+      if grep -q 'confidence: high' "$f" 2>/dev/null; then
+        local fname
+        fname=$(basename "$f")
+        local dest="$global_dir/${slug}-${fname}"
+        if [ ! -f "$dest" ]; then
+          cp "$f" "$dest"
+          promoted=$((promoted + 1))
+        fi
+      fi
+    done
+  done
+
+  # Source 2: current project's local vault (atomized instinct notes)
+  if [[ -n "$current_project_slug" && -d "$local_instincts_dir" ]]; then
+    for f in "$local_instincts_dir"/*.md; do
+      [ -f "$f" ] || continue
+      if grep -q 'confidence: high' "$f" 2>/dev/null; then
+        local fname
+        fname=$(basename "$f")
+        local dest="$global_dir/${current_project_slug}-${fname}"
+        if [ ! -f "$dest" ]; then
+          cp "$f" "$dest"
+          promoted=$((promoted + 1))
+        fi
+      fi
+    done
+  fi
+
+  [ "$promoted" -gt 0 ] && ok "Promoted $promoted high-confidence instincts to global-instincts/"
+  return 0
+}
+
 # ── setup_global_vault ────────────────────────────────────────────────────────
 # Creates a global Obsidian vault at ~/.canuto/vault/ (one vault for all projects).
 # Each project gets its own subdirectory under projects/{project-slug}/.
@@ -509,6 +683,9 @@ setup_global_vault() {
   # Create vault root with Obsidian config
   mkdir -p "$vault/.obsidian"
   mkdir -p "$vault/projects"
+
+  # Rename any stale project entries that were created with a branch name
+  cleanup_stale_vault_slugs "$vault"
 
   # Copy Obsidian config if not already present
   if [ ! -f "$vault/.obsidian/app.json" ]; then
@@ -576,15 +753,13 @@ PEOF
     fi
   done
 
-  # Copy global bases templates if not present
+  # Deploy global bases (always overwrite to propagate filter fixes)
   for base_file in .agents/vault/bases/*.base; do
     [ -f "$base_file" ] || continue
     local base_name
     base_name=$(basename "$base_file")
-    if [ ! -f "$vault/bases/$base_name" ]; then
-      cp "$base_file" "$vault/bases/$base_name"
-      ok "Base: $base_name"
-    fi
+    cp "$base_file" "$vault/bases/$base_name"
+    ok "Base: $base_name"
   done
 
   # Generate project-specific canvas (requires python3)
@@ -593,6 +768,10 @@ PEOF
   else
     warn "python3 not found — skipping canvas generation"
   fi
+
+  # Promote high-confidence instincts from all projects to global-instincts/
+  # Also includes the current project's local vault (atomized instinct notes)
+  promote_global_instincts "$vault" "$project_slug" ".agents/vault/instincts"
 }
 
 # ── generate_project_canvas ───────────────────────────────────────────────────
@@ -830,6 +1009,7 @@ setup_global_skills() {
 # by cross-referencing with other indexed projects in the vault.
 post_install_analysis() {
   local project_dir="${1:-.}"
+  project_dir=$(resolve_project_dir "$project_dir")
   local project_slug
   project_slug=$(detect_project_slug "$project_dir")
   local vault="$HOME/.canuto/vault"
@@ -915,6 +1095,17 @@ def _pattern_names(idx):
         return []
     return [pattern for pattern in patterns if isinstance(pattern, str) and pattern]
 
+def _looks_like_nested_project(dirpath):
+    if not os.path.isdir(dirpath):
+        return False
+    markers = [
+        os.path.join(dirpath, ".agents"),
+        os.path.join(dirpath, "CLAUDE.md"),
+        os.path.join(dirpath, "install.sh"),
+        os.path.join(dirpath, "registry.md"),
+    ]
+    return os.path.isdir(markers[0]) and any(os.path.exists(marker) for marker in markers[1:])
+
 # ═══════════════════════════════════════════════════════════════════════
 # PHASE 1: Generate project-index.json (deep scan)
 # ═══════════════════════════════════════════════════════════════════════
@@ -940,6 +1131,10 @@ pyproject = f"{project_dir}/pyproject.toml"
 requirements = f"{project_dir}/requirements.txt"
 go_mod = f"{project_dir}/go.mod"
 cargo_toml = f"{project_dir}/Cargo.toml"
+pubspec_files = [
+    path for path in glob.glob(f"{project_dir}/**/pubspec.yaml", recursive=True)
+    if "/Pods/" not in path and "/.dart_tool/" not in path
+]
 
 if os.path.exists(pkg_json):
     try:
@@ -1095,10 +1290,17 @@ elif os.path.exists(cargo_toml):
     except (IOError, OSError) as e:
         _warn(f"Could not parse Cargo.toml: {e}")
 
+elif pubspec_files:
+    index["stack"]["primary_language"] = "dart"
+    index["stack"]["languages"] = ["dart"]
+    index["stack"]["runtime"] = "flutter"
+    index["stack"]["framework"] = "flutter"
+
 # ── Analyze structure ────────────────────────────────────────────────
 IGNORE = {'.git', 'node_modules', '.next', 'dist', 'build', '__pycache__',
-          '.venv', 'venv', 'target', '.agents', '.obsidian', 'vendor', 'coverage'}
-SOURCE_EXTS = {'.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.java', '.kt', '.rb', '.php', '.swift'}
+          '.venv', 'venv', 'target', '.agents', '.obsidian', 'vendor', 'coverage',
+          'Pods', '.dart_tool'}
+SOURCE_EXTS = {'.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.java', '.kt', '.rb', '.php', '.swift', '.dart'}
 TEST_PATTERNS = {'test', 'spec', '__tests__', 'tests', '_test'}
 CONFIG_EXTS = {'.json', '.yaml', '.yml', '.toml', '.ini', '.env', '.config.js', '.config.ts'}
 
@@ -1112,7 +1314,10 @@ source_loc = 0
 test_loc = 0
 
 for root, dirs, files in os.walk(project_dir):
-    dirs[:] = [d for d in dirs if d not in IGNORE]
+    dirs[:] = [
+        d for d in dirs
+        if d not in IGNORE and not _looks_like_nested_project(os.path.join(root, d))
+    ]
     rel_root = os.path.relpath(root, project_dir)
 
     for fname in files:
@@ -1148,6 +1353,7 @@ for root, dirs, files in os.walk(project_dir):
 entry_candidates = ['src/index.ts', 'src/index.js', 'src/main.ts', 'src/main.py',
                     'src/app.ts', 'src/app.py', 'main.go', 'src/main.rs',
                     'src/server.ts', 'src/server.js', 'app.py', 'manage.py',
+                    'apps/resumeai/lib/main.dart', 'lib/main.dart',
                     'index.ts', 'index.js']
 entry_points = [e for e in entry_candidates if os.path.exists(f"{project_dir}/{e}")]
 
@@ -1722,7 +1928,8 @@ if [ "$MODE" = "migrate" ]; then
     fi
   }
 
-  PROJECT_SLUG=$(detect_project_slug)
+  PROJECT_DIR=$(resolve_project_dir)
+  PROJECT_SLUG=$(detect_project_slug "$PROJECT_DIR")
   PROJECT_VAULT="$HOME/.canuto/vault/projects/$PROJECT_SLUG"
 
   migrate_flat_file ".agents/memory/decisions.md"           "$PROJECT_VAULT/decisions"  "migrated-decisions.md"
@@ -1771,8 +1978,12 @@ if [ "$MODE" = "migrate" ]; then
     fi
     COMMIT_ANSWER="${COMMIT_ANSWER:-Y}"
     if [[ "$COMMIT_ANSWER" =~ ^[Yy]$ ]]; then
-      git commit -m "chore: migrate Canuto Framework to v1.5 (Obsidian vault)"
-      ok "Committed!"
+      if git diff --cached --quiet; then
+        log "Nothing to commit — framework already up to date."
+      else
+        git commit -m "chore: migrate Canuto Framework to v1.5 (Obsidian vault)"
+        ok "Committed!"
+      fi
     fi
   fi
 
@@ -1787,7 +1998,7 @@ if [ "$MODE" = "migrate" ]; then
   fi
   ANALYSIS_ANSWER="${ANALYSIS_ANSWER:-Y}"
   if [[ "$ANALYSIS_ANSWER" =~ ^[Yy]$ ]]; then
-    PROJECT_DIR="$(pwd)" post_install_analysis "$(pwd)"
+    PROJECT_DIR="$(resolve_project_dir "$(pwd)")" post_install_analysis "$(pwd)"
   fi
 
   echo -e "${GREEN}  Migration complete! $MIGRATED files migrated.${RESET}"
@@ -1864,7 +2075,7 @@ if [ "$MODE" = "install" ]; then
   fi
   ANALYSIS_ANSWER="${ANALYSIS_ANSWER:-Y}"
   if [[ "$ANALYSIS_ANSWER" =~ ^[Yy]$ ]]; then
-    PROJECT_DIR="$(pwd)" post_install_analysis "$(pwd)"
+    PROJECT_DIR="$(resolve_project_dir "$(pwd)")" post_install_analysis "$(pwd)"
   fi
 
   echo -e "${GREEN}  Done! v1.5 installed. Open the project in Claude and${RESET}"
