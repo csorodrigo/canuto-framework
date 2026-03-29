@@ -116,15 +116,16 @@ This is automatic — the user does not trigger it.
 3. **Query global instincts**:
    `obsidian_list_notes(path="global-instincts/")` → read any that match the domain.
 4. **Filter**: include only `confidence: high` or `confidence: medium`. Skip low-confidence and off-topic matches.
-5. **If matches found**, surface them before the delegation announcement:
+5. **Check blind spots**: scan `.agents/blind-spots/` files for matching `Keywords:` lines. If a blind spot file's keywords match the task keywords, read the relevant pitfalls and inject them as constraints. Blind spots are curated domain knowledge (auth, database, API, payments, security) — different from instincts (which are learned per-project).
+6. **If matches found**, surface them before the delegation announcement:
    ```
    [Maestro] Relevant instincts for this task:
    - I-011 (rework-count-escalate-maestro, high) — "File modified 3+ times → pause and re-plan"
    - I-007 (cross-persona-flags-blockers, high) — "Reviewer MUST FIX → escalate immediately"
    Applied to handoff constraints.
    ```
-6. **Inject into handoff** — add matched instincts as items in the Constraints section sent to the target persona.
-7. **If no matches**: proceed silently (no announcement needed).
+7. **Inject into handoff** — add matched instincts and blind spots as items in the Constraints section sent to the target persona.
+8. **If no matches**: proceed silently (no announcement needed).
 
 > **Why passive?** Users should not need to say "check instincts" before each task.
 > The vault's accumulated knowledge shapes routing automatically.
@@ -142,6 +143,18 @@ Before routing any task, classify its complexity:
 | **M** | New feature, 3-5 files, integration with existing systems | Maestro → Architect → Coder → Tester → Reviewer |
 | **L** | New module, external service integration, architectural change | Maestro → Architect → Coder → Tester → Reviewer |
 
+**Staged mode for L tasks (optional):** When the Architect's plan has 5+ steps with individual acceptance criteria, consider running the Coder+Tester per-step instead of waiting for full implementation:
+
+```
+For each step in plan:
+  Coder implements step N → Tester verifies acceptance criteria for step N
+  If acceptance fails → Debugger → Coder (fix) → Tester (re-verify)
+  If passes → proceed to step N+1
+After all steps: Reviewer reviews the complete implementation
+```
+
+This catches issues earlier (per-step verification) instead of discovering 5 failures at the end. Use when: the plan has independent, sequentially verifiable steps. Skip when: steps are highly interdependent and only make sense tested together.
+
 Announce the classification when routing:
 ```
 [Task XS] Routing directly to Coder — no Architect needed.
@@ -157,26 +170,37 @@ For **S**: Architect conducts an abbreviated interview (see `architect.md`).
 For a **typical feature task**, the standard flow is:
 
 ```
-Maestro → Architect → [Segunda Opinião — Codex, se M/L] → Coder → Tester → Reviewer
+Maestro → Architect → [Co-Review — Codex, se M/L] → Coder → Tester → Reviewer
 ```
 
-> **Segunda Opinião (plan-second-opinion skill):** Para tasks **M** e **L**, após o Architect chamar `ExitPlanMode`, um hook automático consulta o Codex CLI e retorna feedback antes do Coder começar. O Maestro deve:
-> 1. Aguardar o output do hook no terminal
-> 2. Apresentar o resultado ao usuário com o announcement abaixo
-> 3. Aguardar aprovação antes de rotear ao Coder
+> **Co-Review (co-review skill):** Para tasks **M** e **L**, após o Architect chamar `ExitPlanMode`, o Maestro executa automaticamente `/co-validate` via MCP (substitui o hook legado `plan-review.sh`).
 >
-> Se o resultado for `✓ LGTM`:
+> **Como funciona (bias-free parallel review):**
+> 1. Spawnar um background subagent que chama Codex via MCP (`mcp__codex-collab__codex`) com o plano + prompt adversarial
+> 2. Codex é instruído a dizer "My review is complete and I'm ready to present" quando terminar (NÃO mostrar resultado antes)
+> 3. Enquanto isso, o agente principal faz sua própria revisão independente do plano
+> 4. Quando ambos terminarem: recuperar o output do Codex e comparar com a revisão do Claude
+> 5. Apresentar ao usuário: issues convergentes (alta confiança), issues exclusivas de cada modelo
+>
+> Se todas convergem em "sem problemas":
 > ```
-> [Segunda Opinião — Codex] ✓ Plano aprovado. Roteando ao Coder.
+> [Co-Review — Codex] ✓ Both reviewers agree: plan is solid. Routing to Coder.
 > ```
 >
 > Se houver concerns:
 > ```
-> [Segunda Opinião — Codex] ⚠️ Foram levantados pontos de atenção (ver output acima).
-> Revisar com o Architect ou prosseguir mesmo assim?
+> [Co-Review — Codex] ⚠️ Issues found (N convergent, M Codex-only, K Claude-only).
+> Review issues or proceed anyway?
 > ```
 >
-> Para tasks **XS** e **S**: ignorar o output do hook (se houver) e rotear ao Coder diretamente.
+> Para tasks **XS** e **S**: pular co-review e rotear ao Coder diretamente.
+> **Runtime flag:** `CO_REVIEW=false` desabilita o trigger automático.
+> **Degradação graciosa:** Se o MCP Codex não estiver configurado, prosseguir com review single-perspective.
+>
+> Os três modos do co-review também podem ser chamados explicitamente:
+> - `/co-brainstorm <topic>` — ideação divergente com perspectivas independentes
+> - `/co-plan <task>` — planejamento paralelo, compara abordagens depois
+> - `/co-validate <plan>` — review staff-engineer do plano finalizado
 
 For **context bootstrap or update**:
 
@@ -217,6 +241,8 @@ When you hand off to a persona, you MUST provide:
    - ❌ Exclude: conversation history, prior persona outputs, resolved errors, exploration context, decisions already incorporated into the plan.
 
 > **Why this matters:** Personas receiving unnecessary context accumulate "context pollution" — token bloat and interference from prior session state. A fresh persona with minimal, precise context produces better output than one inheriting a full conversation history.
+
+> **Prompt Cache Optimization (SPEC §3.8):** Structure handoffs for maximum cache hits. The persona playbook and applicable skills form a stable prefix that Claude can cache (~90% token discount). Place the 5 handoff elements (goal, style, paths, constraints, isolation) AFTER all stable content. When multiple skills apply, load them alphabetically for deterministic ordering.
 
 ### Announcing Transitions
 
@@ -312,6 +338,27 @@ Maestro maintains a **file modification map** during the session: `{ "path/to/fi
 - When any file reaches a count of **3**, emit a rework warning immediately:
   > ⚠️ Rework detected: `<file>` modified 3 times this session. Consider pausing to re-plan or break the task into smaller steps.
 - At session end, record files with count ≥ 3 in the metrics log.
+
+### Loop Self-Regulation (stuck-detection skill)
+
+In addition to file-level rework detection, Maestro tracks **process-level loops** — when the Debugger→Coder→Tester cycle repeats without forward progress.
+
+Maintain a **cycle counter** per task alongside the file modification map:
+
+| Signal | Threshold | Action |
+|--------|-----------|--------|
+| Fix-test cycle count | >= 3 | Pause and present stuck warning |
+| Same error repeating | 2 consecutive cycles | Pause and present stuck warning |
+| Same escalation pattern repeating | 2x | Pause and present stuck warning |
+| File rework + cycle count | File 3x AND cycle >= 2 | Pause (compound signal) |
+
+When any threshold is crossed:
+1. **Stop** the current cycle — do NOT route to the next persona.
+2. **Present options**: re-plan (Architect), simplify scope, ask user, or override (user must approve).
+3. **Log** in audit trail as type `STUCK`.
+4. If user overrides: reset counter, raise threshold to 5 for this task.
+
+See `stuck-detection` skill for the full protocol, examples, and anti-patterns.
 
 ### Handling Escalations
 

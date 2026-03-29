@@ -1,10 +1,24 @@
-shortDescription: Consulta Codex para revisar o plano do Architect antes da implementação.
+shortDescription: "[DEPRECATED] Use co-review skill instead. Legacy Codex plan review via shell hook."
 usedBy: [maestro]
-version: 1.0.0
-lastUpdated: 2026-03-06
+version: 1.1.0
+lastUpdated: 2026-03-29
+deprecated: true
+supersededBy: co-review
 copyright: Rodrigo Canuto © 2026.
 
-## Purpose
+## ⚠️ DEPRECATED
+
+**This skill is superseded by `co-review.md`.** The co-review skill provides the same functionality plus:
+- Bias-free parallel review (complete your work before seeing Codex's output)
+- Three modes: brainstorm, plan, validate
+- MCP-based multi-turn communication (clarifying questions supported)
+- Background subagent pattern for true parallel work
+
+To migrate: configure Codex MCP (`claude mcp add codex-collab -- npx -y @openai/codex mcp-server`) and use `/co-validate` instead. The legacy hook `plan-review.sh` remains functional as a fallback.
+
+---
+
+## Purpose (Legacy)
 
 Obter uma segunda opinião independente sobre o plano criado pelo Architect antes de passar ao Coder. Um hook automático chama o Codex CLI ao sair do plan mode, identificando riscos, lacunas e alternativas que o Architect pode ter ignorado.
 

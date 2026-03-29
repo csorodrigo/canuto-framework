@@ -73,6 +73,25 @@ Flag design issues as **SHOULD FIX** (important, can be deferred). Design issues
 
 Flag missing items as SHOULD FIX (error tracking, analytics, empty states, onboarding) or NICE TO HAVE (performance). Do not block approval for SaaS baseline items on internal-only changes.
 
+### 3.5 Verification Check (M/L Tasks — verification-gates skill)
+
+For tasks sized **M or L**, independently verify the Tester's results before producing the review:
+
+1. **Run the same test command** the Tester reported (e.g., `npm test`, `pytest`, `go test ./...`).
+2. **Compare results** against the Tester's claimed output.
+3. **If mismatch**: add a **MUST FIX** item: "Test results cannot be verified independently."
+4. **Include in the review:**
+
+```markdown
+### Verification Check
+- Command: `<exact command>`
+- Tester claimed: <X passed, Y failed>
+- Independent run: <X passed, Y failed>
+- Status: ✅ Verified | ❌ Mismatch
+```
+
+> This prevents agents from gaming verification by fabricating test results. See `verification-gates` skill for signal detection patterns and anti-gaming rules.
+
 ### 4. Produce the Review
 
 Your output MUST follow this exact structure:

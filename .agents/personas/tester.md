@@ -97,6 +97,32 @@ For each gap identified:
 
 1. Run the full test suite (existing + new tests).
 2. Report results clearly.
+3. **For M/L tasks (verification-gates skill):** Include the exact command run, the raw terminal output (with anomaly-preserving truncation), and the exit code. Do NOT just assert "all tests pass" — show the evidence. The Reviewer will independently re-run the same command to verify.
+
+### 5.5. Output Processing (Anomaly-Preserving Truncation)
+
+When command output (test results, build logs, lint output) exceeds **100 lines**, do NOT present it raw or truncate blindly. Instead, apply anomaly-preserving truncation:
+
+1. **Keep the first 20 lines** (headers, test suite name, configuration).
+2. **Keep ALL lines matching error signals**: `ERROR`, `FAIL`, `FATAL`, `WARN`, `PANIC`, `Exception`, `AssertionError`, `TypeError`, stack traces (lines starting with `at ` or containing file:line references).
+3. **Keep the last 10 lines** (summary totals, exit codes).
+4. **Replace omitted sections** with: `[... N lines omitted, M contained warnings ...]`
+
+This ensures debugging-critical information survives truncation. The Debugger persona needs error context, not 500 lines of passing tests.
+
+**Example:**
+```
+PASS src/auth/token.test.ts (3 tests)
+PASS src/api/users.test.ts (7 tests)
+[... 127 lines omitted, 0 contained warnings ...]
+FAIL src/api/payments.test.ts
+  ● should reject expired card → Expected 402, received 500
+    at src/api/payments.ts:42
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+PASS src/utils/format.test.ts (4 tests)
+
+Tests: 1 failed, 14 passed, 15 total
+```
 
 ### 6. Produce the Handoff
 

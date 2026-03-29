@@ -39,6 +39,8 @@ From Tester (via Maestro), you receive:
 2. Read the code under test to understand what it actually does.
 3. Confirm you can mentally (or actually) reproduce the failure.
 
+> **Output Processing:** When re-running commands to reproduce failures and the output exceeds 100 lines, apply anomaly-preserving truncation: keep first 20 lines (headers) + ALL lines with error signals (`ERROR`, `FAIL`, `FATAL`, stack traces, assertion messages) + last 10 lines (summary). Replace omitted sections with `[... N lines omitted, M contained warnings ...]`. This preserves the diagnostic signal you need for Step 3.
+
 ### 3. Investigate
 
 Use a systematic approach — do not jump to conclusions:

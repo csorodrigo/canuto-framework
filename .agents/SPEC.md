@@ -147,6 +147,26 @@ Step 2 — Add rate limiting middleware
 - Limit: 100 req/min per IP [CONFIRMED — per user interview]
 ```
 
+### 3.8 Prompt Cache Optimization
+
+Claude offers ~90% discount on cached tokens when stable content appears at the beginning of the prompt. All handoffs and skill loading MUST follow this ordering to maximize cache hits:
+
+```
+1. Persona playbook (stable — rarely changes between sessions)
+2. Applicable skills (stable — loaded when skill activates)
+3. Project context files (.context.md, stack.md) (semi-stable — changes with codebase)
+4. Task-specific handoff (variable — unique per task: goal, constraints, paths)
+```
+
+**Rules:**
+- Persona definitions are always loaded first in any interaction. They form the cache-friendly prefix.
+- When multiple skills apply, load them in alphabetical order (deterministic = cache-friendly).
+- Project context files are loaded after skills but before the task handoff.
+- Task-specific content (goals, constraints, dynamic paths) goes last — this is the only part that varies per handoff.
+- Maestro's handoff template places its 5 required elements (goal, style, paths, constraints, context isolation) at the END of the prompt, after all stable content.
+
+**Source:** Adapted from Claude Octopus's cache-aligned prompt construction pattern.
+
 ---
 
 ## 4. Skills
@@ -545,6 +565,12 @@ The template generates a default `CLAUDE.md` with these configurable sections:
 | `colorize` | BM25 search over 161 curated palettes; returns WCAG-compliant semantic token sets |
 | `typeset` | Search 57 font pairings by mood/product type; returns heading+body with Tailwind config |
 | `design-consultation` | Generate a full design system from requirements; outputs to `design-system/MASTER.md` |
+
+### Defensive Skills
+| Skill | Purpose |
+|-------|--------|
+| `stuck-detection` | Detects Debugger→Coder→Tester loops without progress; escalates before wasting tokens |
+| `verification-gates` | Prevents test result fabrication; requires raw output and dual verification for M/L tasks |
 
 ### Meta Skills
 | Skill | Purpose |

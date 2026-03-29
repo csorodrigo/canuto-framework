@@ -67,6 +67,7 @@ For each step in the plan:
 4. **If the step produces visible UI**: apply at least 3 design principles from the `frontend-design` skill. Do not ship default shadcn/ui components without customization matching the design profile.
 5. **If you created a new shared component**: add it to `~/.canuto/vault/projects/{project-slug}/design/components/` as a new note with the component template.
 6. **Note** any deviations from the plan or areas where you had to guess.
+7. **Output truncation**: when build/test commands produce output exceeding 100 lines, apply anomaly-preserving truncation — keep first 20 lines + all error-signal lines (`ERROR`, `FAIL`, stack traces) + last 10 lines. Replace omitted sections with `[... N lines omitted ...]`.
 
 ### 5. Update Documentation
 
