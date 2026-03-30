@@ -1,4 +1,111 @@
-# Canuto Framework — Tutorial Completo
+# Canuto Framework — Tutorial Operacional
+
+Tutorial visual local:
+
+```bash
+open docs/TUTORIAL-VISUAL.html
+```
+
+## Quickstart: instalar, atualizar e validar
+
+### Projeto novo
+
+```bash
+cd /caminho/do/projeto
+curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash
+```
+
+### Projeto que ja usa o framework
+
+```bash
+cd /caminho/do/projeto
+bash install.sh --update
+```
+
+Esse e o caminho padrao de update. O `install.sh` local se autoatualiza a partir de `main` antes de aplicar a atualizacao, entao ele continua valido mesmo quando o arquivo local esta antigo.
+
+### Como testar se a instalacao ou o update deram certo
+
+```bash
+# Check rapido: versoes, arquivos esperados, integridade basica
+bash install.sh --check
+
+# Smoke test recomendado para projetos que usam o framework
+bash install.sh --test
+
+# Repara hooks, MCPs, profiles e arquivos bootstrap sem reinstalar tudo
+bash install.sh --repair
+
+# Repara e valida em uma chamada
+bash install.sh --doctor
+
+# Suite do proprio framework (use isto quando estiver mexendo no framework, nao no projeto consumidor)
+bash test-framework.sh
+```
+
+### O que esperar do resultado
+
+| Comando | Quando usar | Resultado esperado |
+|---------|-------------|-------------------|
+| `bash install.sh --check` | Check rapido depois de instalar/update | Versoes, arquivos e integridade basica |
+| `bash install.sh --test` | Validacao real da integracao | `HEALTHY`, `DEGRADED`, ou `BROKEN` |
+| `bash install.sh --repair` | Hooks/MCP/config fora de sincronia | Reidrata runtime local sem baixar tudo de novo |
+| `bash install.sh --doctor` | Quero consertar e validar em uma vez | Roda repair + smoke test do projeto + health check Codex |
+| `bash test-framework.sh` | Manutencao do framework em si | Suite estrutural do repo do framework |
+
+## O que funciona passivamente
+
+Depois de instalar e abrir o projeto no Claude/Codex com o framework carregado, estas partes podem rodar sem voce pedir comando especifico:
+
+| Funciona passivamente | Gatilho |
+|-----------------------|---------|
+| Briefing inicial de sessao do Maestro | Abrir a sessao e comecar o trabalho |
+| Fluxo `Maestro -> Architect -> Coder -> Tester -> Reviewer` | Pedir uma task normal |
+| `session-save.sh` | Evento `Stop` |
+| `pre-compact-save.sh` | Antes de compactacao |
+| `plan-review.sh` | Saida do modo de plano (`ExitPlanMode`) |
+| `codex-pretool-guard.sh` | Uso de `git commit` pelo Bash hookado e delegacoes Codex |
+| Coleta de goals/pending/instincts/metrics | Encerramento formal da sessao |
+| MCPs e profiles Codex disponiveis | Apos `install.sh` / `--update` bem-sucedido |
+
+## O que voce precisa pedir explicitamente
+
+| Voce precisa dizer/rodar explicitamente | Exemplo |
+|-----------------------------------------|---------|
+| Instalar o framework | `bash install.sh` ou `curl ... | bash` |
+| Atualizar um projeto que ja usa o framework | `bash install.sh --update` |
+| Validar o setup | `bash install.sh --test` |
+| Rodar diagnostico de framework | `"health check"` |
+| Trocar modo de sessao | `"continue"`, `"retoma"`, `"quick fix"` |
+| Ativar flags de runtime | `"set FAST_MODE"`, `"set STRICT_MODE"` |
+| Chamar slash commands | `/office-hours`, `/qa`, `/review` |
+| Chamar uma skill especifica | `"use a skill health-check"`, `"use a skill research"` |
+| Instalar skills opcionais | `bash install.sh --skill adr --skill session-goals` |
+| Recarregar contexto manualmente | `bash ~/.claude/hooks/session-load.sh` |
+
+## Frases que o Maestro entende
+
+| O que voce diz | O que o framework faz |
+|----------------|-----------------------|
+| `"continue"` ou `"retoma"` | Entra em modo `continue` e puxa pending tasks como foco da sessao |
+| `"quick fix"` ou `"so isso"` | Entra em modo `targeted` |
+| `"health check"` | Roda diagnostico do framework |
+| `"set FAST_MODE"` | Reduz rigor em tarefas pequenas |
+| `"set STRICT_MODE"` | Ativa validacoes maximas |
+| `"skip tests"` | Pede fluxo sem Tester |
+| `"use a skill research"` | Forca uso explicito da skill `research` |
+| `/office-hours` | Abre o slash command global correspondente |
+| `/qa` | Executa o fluxo global de QA |
+
+## Hooks ativos
+
+| Hook | Evento | O que faz |
+|------|--------|-----------|
+| `codex-pretool-guard.sh` | `PreToolUse` | Faz gate de `git commit`, review de diff e bloqueios de delegacao Codex sem contexto |
+| `plan-review.sh` | `PostToolUse: ExitPlanMode` | Faz review estruturado de planos antes de codar |
+| `session-save.sh` | `Stop` | Salva snapshot de sessao |
+| `pre-compact-save.sh` | `Notification` | Salva contexto antes da compactacao |
+| `session-load.sh` | manual | Recarrega contexto da sessao quando voce chamar explicitamente |
 
 ## 1. Iniciando uma Sessao
 
@@ -169,29 +276,31 @@ Disponiveis em **qualquer projeto**. Instalados em `~/.claude/skills/`.
 
 ### D. Skills do Projeto (.agents/skills/)
 
-Invocadas automaticamente pelo Maestro, mas voce pode chamar diretamente:
+Estas skills podem ser usadas automaticamente pelo Maestro quando o problema pede, ou explicitamente se voce disser o nome da skill.
 
-| Skill | O que faz | O que esperar |
-|-------|-----------|---------------|
-| `health-check` | Saude geral do framework | HEALTHY / DEGRADED / BROKEN + lista itemizada de 112 checks |
-| `auto-analysis` | Scan profundo + cross-reference | Gera `project-index.json` e `onboarding-report.md`, cruza com outros projetos no vault |
-| `research` | Busca community intelligence | Phase 0 (Reddit/HN/X/YouTube) → codebase → vault → riscos → plano estruturado |
-| `browser-qa` | QA com Chrome DevTools | Usa sessao autenticada do browser real — sem re-login, sem CAPTCHA |
-| `vault-maintenance` | Manutencao do vault Obsidian | Arquiva sessoes antigas, agrega metricas/audits, limpa snapshots orfaos |
-| `skill-creator` | Cria novos skills | Workflow 7-fases para construir e registrar novos playbooks no framework |
-| `context-maintenance` | Mantem .context.md atualizado | Detecta mudancas via git diff, regenera contextos desatualizados |
-| `continuous-learning` | Extrai e evolui instincts | Captura padroes da sessao, propoe instincts, promove por confianca |
-| `experiment-loop` | Loop de experimentos A/B | Define metrica + variavel + teste → N variacoes → mantem melhor → relatorio |
-| `knowledge-ingest` | Ingere fontes externas no vault | YouTube, artigos, PDFs, transcripts → claims + frameworks + action items |
-| `frontend-design` | Design frontend coerente | Tailwind + shadcn/ui com principios opinionados — resultado visualmente distintivo |
-| `adr` | Architecture Decision Records | Cria ADR numerado com contexto, decisao, consequencias |
-| `api-design` | Design de APIs | REST/GraphQL best practices, contratos, versionamento |
-| `security-practices` | Checklist de segurança | OWASP top 10, RLS, env vars, validacao de inputs, secrets |
-| `session-goals` | Define metas da sessao | Coleta ate 3 goals, rastreia status ao longo da sessao |
-| `research` | Pesquisa community + vault + code | Contexto completo antes de qualquer decisao arquitetural |
-| `squads` | Orquestra multiplos agentes | Divide trabalho entre subagentes paralelos para tarefas grandes |
-| `product-review` | Review de produto | Avalia feature sob perspectiva de usuario, negocio e tecnica |
-| `plan-second-opinion` | Segunda opiniao em planos | Avalia plano de angulo diferente, aponta riscos e alternativas |
+#### 1. Workflow, planejamento e pesquisa
+
+`adr`, `api-design`, `api-docs-fetch`, `auto-analysis`, `cli-usage`, `defuddle`, `git-workflow`, `parallel-impl`, `plan-second-opinion`, `pr-description`, `product-review`, `research`, `session-goals`, `skill-creator`, `squads`
+
+#### 2. Qualidade, seguranca e governanca
+
+`absence-reporting`, `audit`, `audit-trail`, `budget-controls`, `competition`, `convergence-detection`, `cost-routing`, `coverage-tracking`, `cross-persona-flags`, `governance`, `headless-validation`, `health-check`, `heartbeat`, `lazy-opus-review`, `security-practices`, `skill-check-protocol`, `smart-token-metering`, `stack-lock`, `stuck-detection`, `verification-gates`
+
+#### 3. Contexto, memoria e Obsidian
+
+`context-digest`, `context-preload`, `json-canvas`, `knowledge-ingest`, `mcp-obsidian`, `metrics`, `multi-provider`, `obsidian-bases`, `obsidian-cli`, `obsidian-markdown`, `plugin-system`, `runtime-flags`, `vault-maintenance`
+
+#### 4. Frontend, design e UX
+
+`brand-bootstrap`, `browser-qa`, `colorize`, `design-consultation`, `frontend-implementation`, `typeset`
+
+#### 5. Skills focadas em Codex
+
+`codex-browser-qa`, `codex-context-loader`, `codex-github-ops`, `codex-multi-vault`, `codex-onboarding`, `codex-pr-writer`, `codex-refactor-prep`, `codex-security-gate`, `codex-session-writer`, `codex-smoke-test`, `codex-test-fix`
+
+#### 6. Skills em subdiretorio
+
+`co-review`, `context-maintenance`, `continuous-learning`, `experiment-loop`, `frontend-design`
 
 ---
 
@@ -255,8 +364,18 @@ Resultado: **HEALTHY** | **DEGRADED** | **BROKEN**
 # ── Fresh install (projeto novo) ──
 curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash
 
-# ── Atualizar framework (ja instalado, nao toca vault/plugins) ──
-curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --update
+# ── Atualizar framework (ja instalado) ──
+# O install.sh local se autoatualiza antes de aplicar o update
+bash install.sh --update
+
+# ── Smoke test do projeto (recomendado depois de instalar/update) ──
+bash install.sh --test
+
+# ── Repair local (hooks, MCPs, profiles, docs bootstrap) ──
+bash install.sh --repair
+
+# ── Repair + validate ──
+bash install.sh --doctor
 
 # ── Migrar de v1.5 para v1.6 (UMA VEZ so, converte flat-file → Obsidian) ──
 curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --migrate --api-key SUA_KEY
@@ -266,11 +385,22 @@ bash install.sh --skill adr --skill session-goals
 
 # ── Checar versoes e integridade ──
 bash install.sh --check
+
+# ── Suite do proprio framework (maintainers) ──
+bash test-framework.sh
 ```
 
 > **update vs migrate:** Use `--update` para atualizar personas, skills e hooks para a versao mais recente.
 > Use `--migrate` apenas uma vez, quando estiver saindo da v1.5 (flat-file) para a v1.6 (Obsidian vault).
 > Se ja esta na v1.6, `--migrate` nao e necessario — use `--update`.
+
+### O que muda no update
+
+- Atualiza personas, skills, hooks, tools e docs de suporte do framework.
+- Reaplica hooks em `~/.claude/hooks/` e mergeia `~/.claude/settings.json`.
+- Reidrata profiles e trust no `~/.codex/config.toml`.
+- Recria `.context.md`, `docs/FEATURE-MAP.md` e digest bootstrap se estiverem faltando.
+- Nao sobrescreve `CLAUDE.md`, `vault/` ou `plugins/`.
 
 ### Setup unico do Obsidian
 
@@ -532,4 +662,4 @@ Use quando o problema for ambiguo, envolver multiplos sistemas, ter muitos stake
 
 ---
 
-*Canuto Framework v1.8 — Rodrigo Canuto (c) 2026*
+*Canuto Framework — Rodrigo Canuto (c) 2026*

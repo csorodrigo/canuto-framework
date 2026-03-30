@@ -119,7 +119,7 @@ echo ""
 # ═══════════════════════════════════════════════════════════════════════════
 echo "── Test 3: Hook Scripts ──"
 
-HOOKS=(session-load session-save pre-compact-save check-references check-orphans)
+HOOKS=(session-load session-save pre-compact-save check-references check-orphans plan-review codex-pretool-guard)
 for hook in "${HOOKS[@]}"; do
   HFILE="$AGENTS_DIR/hooks/$hook.sh"
   if [ ! -f "$HFILE" ]; then
@@ -141,6 +141,109 @@ for hook in "${HOOKS[@]}"; do
     warn "$hook.sh not executable (chmod +x needed)"
   fi
 done
+echo ""
+
+echo "── Test 3b: Tooling ──"
+
+CODEX_TOOLS=(codex-common codex-diff-context codex-context-package codex-health-check canuto-consumer-smoke)
+for tool in "${CODEX_TOOLS[@]}"; do
+  TFILE="$AGENTS_DIR/tools/$tool.sh"
+  if [ ! -f "$TFILE" ]; then
+    fail "Codex tool missing: $tool.sh"
+    continue
+  fi
+
+  if bash -n "$TFILE" 2>/dev/null; then
+    pass "$tool.sh syntax valid"
+  else
+    fail "$tool.sh has syntax errors"
+  fi
+
+  if [ -x "$TFILE" ]; then
+    pass "$tool.sh is executable"
+  else
+    warn "$tool.sh not executable (chmod +x needed)"
+  fi
+done
+
+mkdir -p "$AGENTS_DIR/tmp"
+CONTEXT_SMOKE="$AGENTS_DIR/tmp/context-package-smoke.md"
+if bash "$AGENTS_DIR/tools/codex-context-package.sh" --task "Smoke Test" --output "$CONTEXT_SMOKE" --file "CLAUDE.md" >/dev/null 2>&1; then
+  if grep -q "Context Package" "$CONTEXT_SMOKE" 2>/dev/null; then
+    pass "codex-context-package.sh happy path"
+  else
+    fail "codex-context-package.sh did not write expected content"
+  fi
+else
+  fail "codex-context-package.sh happy path failed"
+fi
+rm -f "$CONTEXT_SMOKE"
+
+if bash "$AGENTS_DIR/tools/codex-diff-context.sh" --staged >/dev/null 2>&1; then
+  pass "codex-diff-context.sh happy path"
+else
+  fail "codex-diff-context.sh happy path failed"
+fi
+
+if bash "$AGENTS_DIR/tools/codex-health-check.sh" --json >/tmp/codex-health-json.$$ 2>/dev/null; then
+  if command -v jq >/dev/null 2>&1 && jq -e '.tool == "codex-health-check" and .verdict' /tmp/codex-health-json.$$ >/dev/null 2>&1; then
+    pass "codex-health-check.sh JSON output"
+  else
+    fail "codex-health-check.sh JSON output invalid"
+  fi
+else
+  fail "codex-health-check.sh --json failed"
+fi
+rm -f /tmp/codex-health-json.$$
+
+if bash "$AGENTS_DIR/tools/canuto-consumer-smoke.sh" --json >/tmp/canuto-consumer-smoke.$$ 2>/dev/null; then
+  if command -v jq >/dev/null 2>&1 && jq -e '.tool == "canuto-consumer-smoke" and .verdict' /tmp/canuto-consumer-smoke.$$ >/dev/null 2>&1; then
+    pass "canuto-consumer-smoke.sh JSON output"
+  else
+    fail "canuto-consumer-smoke.sh JSON output invalid"
+  fi
+else
+  fail "canuto-consumer-smoke.sh --json failed"
+fi
+rm -f /tmp/canuto-consumer-smoke.$$
+
+HOOKS_HOME="$(mktemp -d)"
+mkdir -p "$HOOKS_HOME/.claude"
+cat > "$HOOKS_HOME/.claude/settings.json" <<'EOF'
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "cwd": "/tmp/preserve-me",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/codex-pretool-guard.sh",
+            "timeout": 240,
+            "env": {
+              "KEEP_ME": "1"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
+EOF
+if HOME="$HOOKS_HOME" bash "$AGENTS_DIR/hooks/install.sh" >/dev/null 2>&1; then
+  PRESERVED_CWD=$(jq -r '.hooks.PreToolUse[] | select(.hooks[]?.command == "~/.claude/hooks/codex-pretool-guard.sh") | .cwd // empty' "$HOOKS_HOME/.claude/settings.json" | head -1)
+  PRESERVED_ENV=$(jq -r '.hooks.PreToolUse[] | select(.hooks[]?.command == "~/.claude/hooks/codex-pretool-guard.sh") | .hooks[] | select(.command == "~/.claude/hooks/codex-pretool-guard.sh") | .env.KEEP_ME // empty' "$HOOKS_HOME/.claude/settings.json" | head -1)
+  HOOK_COUNT=$(jq '[.hooks.PreToolUse[] | .hooks[] | select(.command == "~/.claude/hooks/codex-pretool-guard.sh")] | length' "$HOOKS_HOME/.claude/settings.json")
+  if [ "$PRESERVED_CWD" = "/tmp/preserve-me" ] && [ "$PRESERVED_ENV" = "1" ] && [ "$HOOK_COUNT" -eq 1 ]; then
+    pass "hook installer preserves existing hook metadata while deduping"
+  else
+    fail "hook installer lost hook metadata or duplicated entries"
+  fi
+else
+  fail ".agents/hooks/install.sh merge regression test failed"
+fi
+rm -rf "$HOOKS_HOME"
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -235,6 +338,18 @@ if [ -f "$FRAMEWORK_DIR/CLAUDE.md" ]; then
 else
   fail "CLAUDE.md missing"
 fi
+
+if [ -f "$FRAMEWORK_DIR/.context.md" ]; then
+  pass ".context.md exists"
+else
+  fail ".context.md missing"
+fi
+
+if [ -f "$FRAMEWORK_DIR/docs/FEATURE-MAP.md" ]; then
+  pass "docs/FEATURE-MAP.md exists"
+else
+  fail "docs/FEATURE-MAP.md missing"
+fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -319,7 +434,7 @@ echo ""
 # ═══════════════════════════════════════════════════════════════════════════
 echo "── Test 9: Documentation ──"
 
-DOCS=(TUTORIAL.md TROUBLESHOOTING.md PLUGIN-REGISTRY.md)
+DOCS=(TUTORIAL.md TROUBLESHOOTING.md PLUGIN-REGISTRY.md CLAUDE-EXAMPLES.md FEATURE-MAP.md)
 for doc in "${DOCS[@]}"; do
   if [ -f "$FRAMEWORK_DIR/docs/$doc" ]; then
     pass "docs/$doc exists"

@@ -88,6 +88,15 @@ Your output MUST follow this exact structure:
 
 ---
 
+## Workflow
+
+1. Reproduce the failing behavior from the reported test and code under test.
+2. Trace the data flow until the actual behavior diverges from the expected contract.
+3. Confirm the exact root-cause location and classify the failure layer.
+4. Hand back a precise fix description with impact notes, then stop for Coder to implement it.
+
+---
+
 ## Examples
 
 ### Good Diagnosis

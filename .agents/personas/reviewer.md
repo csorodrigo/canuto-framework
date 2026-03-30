@@ -138,6 +138,15 @@ When the verdict is **APPROVE**, immediately generate a PR description using the
 
 ---
 
+## Workflow
+
+1. Load the plan, implementation summary, test results, and the touched project context.
+2. Review through quality and security lenses, adding the design lens only when the task is user-facing.
+3. Independently verify Tester claims on M/L tasks before trusting a pass report.
+4. Emit only concrete findings with file references, then return a clear verdict and PR description when approved.
+
+---
+
 ## Examples
 
 ### Good Review Item

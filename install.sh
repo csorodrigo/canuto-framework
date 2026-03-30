@@ -7,10 +7,14 @@
 #   Update only:      bash install.sh --update
 #   Update via curl:  curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --update
 #   Check versions:   bash install.sh --check
+#   Smoke test:       bash install.sh --test
+#   Repair runtime:   bash install.sh --repair
+#   Doctor mode:      bash install.sh --doctor
 #   Migrate from v1:  bash install.sh --migrate
 #   With API key:     bash install.sh --migrate --api-key YOUR_OBSIDIAN_API_KEY
 #   Via curl + key:   curl ... | bash -s -- --migrate --api-key YOUR_KEY
 #   Install a skill:  bash install.sh --skill pr-description --skill health-check
+#   JSON health:      bash install.sh --test --json
 # =============================================================================
 
 set -euo pipefail
@@ -19,8 +23,12 @@ REPO_URL="https://raw.githubusercontent.com/csorodrigo/canuto-framework/main"
 AGENTS_DIR=".agents"
 CLAUDE_MD="CLAUDE.md"
 TMP_DIR=$(mktemp -d)
-MODE="auto" # auto | install | update | check | skill | migrate
+MODE="auto" # auto | install | update | check | skill | migrate | repair | doctor | test
+ORIGINAL_ARGS=("$@")
+SCRIPT_SOURCE="${BASH_SOURCE[0]:-$0}"
 SKILLS_TO_INSTALL=()
+JSON_OUTPUT=false
+AUTO_YES=false
 
 # ── Colors ─────────────────────────────────────────────────────────────────
 GREEN='\033[0;32m'
@@ -39,7 +47,12 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     --update) MODE="update" ;;
     --check)   MODE="check"   ;;
+    --test)    MODE="test"    ;;
     --migrate) MODE="migrate" ;;
+    --repair)  MODE="repair"  ;;
+    --doctor|--health) MODE="doctor" ;;
+    --json) JSON_OUTPUT=true ;;
+    --yes) AUTO_YES=true ;;
     --skill)
       shift
       SKILLS_TO_INSTALL+=("$1")
@@ -63,10 +76,33 @@ if [ "$MODE" = "auto" ]; then
   fi
 fi
 
-# ── Confirm not running in the framework repo itself ────────────────────────
+is_interactive() {
+  [[ -t 0 ]]
+}
+
+confirm_yes() {
+  local prompt="$1"
+  local default_answer="${2:-Y}"
+  local answer=""
+
+  if [ "$AUTO_YES" = true ] || ! is_interactive; then
+    answer="$default_answer"
+  else
+    read -r -p "$(echo -e "${CYAN}[canuto]${RESET} $prompt")" answer
+    answer="${answer:-$default_answer}"
+  fi
+
+  [[ "$answer" =~ ^[Yy]$ ]]
+}
+
+# ── Confirm not running install/update flows in the framework repo itself ───
 if git remote -v 2>/dev/null | grep -q "canuto-framework"; then
-  warn "This looks like the canuto-framework repo itself. Aborting."
-  exit 0
+  case "$MODE" in
+    install|update|migrate|skill)
+      warn "This looks like the canuto-framework repo itself. Aborting."
+      exit 0
+      ;;
+  esac
 fi
 
 # ── setup_deps ──────────────────────────────────────────────────────────────
@@ -110,6 +146,18 @@ setup_deps() {
   else
     ok "node $(node --version) already installed"
   fi
+
+  # uv / uvx — required for codex-as-mcp
+  if ! command -v uvx &> /dev/null; then
+    if $has_brew; then
+      log "Installing uv via Homebrew..."
+      brew install uv 2>/dev/null && ok "uv/uvx installed" || warn "Failed to install uv — install manually: brew install uv"
+    else
+      warn "uvx not found and brew unavailable. Install manually: brew install uv"
+    fi
+  else
+    ok "uvx available"
+  fi
 }
 
 # ── Check git availability ──────────────────────────────────────────────────
@@ -145,6 +193,53 @@ fetch_content() {
     wget -q "$REPO_URL/$remote_path" -O - 2>/dev/null
   fi
 }
+
+should_refresh_installer() {
+  case "$MODE" in
+    install|update|check|skill|migrate|repair|doctor)
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  [ "${CANUTO_BOOTSTRAPPED:-0}" = "1" ] && return 1
+
+  if git remote -v 2>/dev/null | grep -q "canuto-framework"; then
+    return 1
+  fi
+
+  case "$SCRIPT_SOURCE" in
+    /dev/fd/*|/proc/*|stdin|-)
+      return 1
+      ;;
+  esac
+
+  [ -f "$SCRIPT_SOURCE" ]
+}
+
+refresh_from_remote_installer_if_needed() {
+  if ! should_refresh_installer; then
+    return
+  fi
+
+  if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
+    warn "Could not refresh installer from main (curl/wget missing). Continuing with local copy."
+    return
+  fi
+
+  log "Refreshing installer from main before proceeding..."
+  local remote_installer="$TMP_DIR/install.remote.sh"
+  if download "install.sh" "$remote_installer"; then
+    chmod +x "$remote_installer"
+    CANUTO_BOOTSTRAPPED=1 bash "$remote_installer" "${ORIGINAL_ARGS[@]}"
+    exit $?
+  fi
+
+  warn "Failed to refresh installer from main. Continuing with local copy."
+}
+
+refresh_from_remote_installer_if_needed
 
 skill_remote_files() {
   local skill_name="$1"
@@ -200,6 +295,7 @@ FRAMEWORK_FILES=(
   ".agents/skills/stack-lock.md"
   ".agents/skills/plan-second-opinion.md"
   ".agents/hooks/plan-review.sh"
+  ".agents/hooks/codex-pretool-guard.sh"
   ".agents/hooks/session-save.sh"
   ".agents/hooks/session-load.sh"
   ".agents/hooks/pre-compact-save.sh"
@@ -236,6 +332,34 @@ FRAMEWORK_FILES=(
   ".agents/skills/obsidian-bases/references/FUNCTIONS_REFERENCE.md"
   ".agents/skills/json-canvas/references/EXAMPLES.md"
   ".agents/SPEC.md"
+  # Codex integration skills (Fase 2+3)
+  ".agents/skills/co-review/SKILL.md"
+  ".agents/skills/parallel-impl.md"
+  ".agents/skills/codex-test-fix.md"
+  ".agents/skills/competition.md"
+  ".agents/skills/codex-security-gate.md"
+  ".agents/skills/cost-routing.md"
+  ".agents/skills/context-digest.md"
+  ".agents/skills/context-preload.md"
+  ".agents/skills/codex-browser-qa.md"
+  ".agents/mcp/codex-collab.md"
+  ".agents/tools/vault-bridge.sh"
+  ".agents/tools/codex-common.sh"
+  ".agents/tools/codex-diff-context.sh"
+  ".agents/tools/codex-context-package.sh"
+  ".agents/tools/codex-health-check.sh"
+  ".agents/tools/canuto-consumer-smoke.sh"
+  # Codex economy + integration skills (Fase 3)
+  ".agents/skills/codex-context-loader.md"
+  ".agents/skills/codex-session-writer.md"
+  ".agents/skills/codex-pr-writer.md"
+  ".agents/skills/smart-token-metering.md"
+  ".agents/skills/codex-github-ops.md"
+  ".agents/skills/codex-refactor-prep.md"
+  ".agents/skills/lazy-opus-review.md"
+  ".agents/skills/codex-onboarding.md"
+  ".agents/skills/codex-multi-vault.md"
+  ".agents/skills/codex-smoke-test.md"
 )
 
 INSTALL_ONLY_FILES=(
@@ -248,6 +372,7 @@ INSTALL_ONLY_FILES=(
   ".agents/mcp/server.json"
   ".agents/mcp/setup.md"
   ".agents/stack.md"
+  "docs/CLAUDE-EXAMPLES.md"
 )
 
 # Vault directories to create (no files to download, just mkdir)
@@ -262,6 +387,7 @@ VAULT_DIRS=(
   ".agents/vault/design/components"
   ".agents/vault/bases"
   ".agents/vault/canvas"
+  ".agents/vault/digests"
 )
 
 # ── merge_claude_md ─────────────────────────────────────────────────────────
@@ -364,6 +490,11 @@ setup_hooks() {
     return
   fi
 
+  if [ -x ".agents/hooks/install.sh" ]; then
+    bash ".agents/hooks/install.sh"
+    return
+  fi
+
   log "Setting up hooks..."
   mkdir -p "$HOME/.claude/hooks"
 
@@ -375,8 +506,9 @@ setup_hooks() {
   # ── Helper: install a single hook ──────────────────────────────────────
   install_hook() {
     local src="$1"       # e.g. ".agents/hooks/plan-review.sh"
-    local event="$2"     # e.g. "ExitPlanMode"
+    local event="$2"     # e.g. "PostToolUse"
     local timeout="$3"   # e.g. 120
+    local matcher="${4:-}"
     local filename
     filename=$(basename "$src")
     local dst="$HOME/.claude/hooks/$filename"
@@ -393,7 +525,12 @@ setup_hooks() {
     if grep -q "$filename" "$settings" 2>/dev/null; then
       ok "Hook $event ($filename) already in settings.json — skipping."
     else
-      local new_hook="{\"hooks\":[{\"type\":\"command\",\"command\":\"~/.claude/hooks/$filename\",\"timeout\":$timeout}]}"
+      local new_hook
+      new_hook=$(jq -n \
+        --arg matcher "${matcher:-}" \
+        --arg cmd "~/.claude/hooks/$filename" \
+        --argjson timeout "$timeout" \
+        '{matcher: $matcher, hooks: [{type: "command", command: $cmd, timeout: $timeout}]}')
       local updated
       updated=$(jq --argjson hook "$new_hook" --arg event "$event" '
         if .hooks[$event] then
@@ -412,13 +549,8 @@ setup_hooks() {
   }
 
   # ── Install all hooks ──────────────────────────────────────────────────
-  # Note: ExitPlanMode is not a valid Claude Code hook event.
-  # plan-review.sh is installed to ~/.claude/hooks/ for manual use only.
-  if [ -f ".agents/hooks/plan-review.sh" ]; then
-    cp ".agents/hooks/plan-review.sh" "$HOME/.claude/hooks/plan-review.sh"
-    chmod +x "$HOME/.claude/hooks/plan-review.sh"
-    ok "Installed: $HOME/.claude/hooks/plan-review.sh (run manually: bash ~/.claude/hooks/plan-review.sh)"
-  fi
+  install_hook ".agents/hooks/plan-review.sh"       "PostToolUse"   180 "ExitPlanMode"
+  install_hook ".agents/hooks/codex-pretool-guard.sh" "PreToolUse"  240
   install_hook ".agents/hooks/session-save.sh"      "Stop"          30
   install_hook ".agents/hooks/pre-compact-save.sh"  "Notification"  15
   # session-load.sh is a utility script, not a hook — it's called manually or via CLAUDE.md
@@ -427,6 +559,11 @@ setup_hooks() {
     chmod +x "$HOME/.claude/hooks/session-load.sh"
     ok "Installed: $HOME/.claude/hooks/session-load.sh (utility — run manually with: bash ~/.claude/hooks/session-load.sh)"
   fi
+}
+
+setup_local_script_permissions() {
+  find ".agents/hooks" -maxdepth 1 -type f -name "*.sh" -exec chmod +x {} + 2>/dev/null || true
+  find ".agents/tools" -maxdepth 1 -type f -name "*.sh" -exec chmod +x {} + 2>/dev/null || true
 }
 
 # ── setup_search_tools ───────────────────────────────────────────────────────
@@ -895,11 +1032,11 @@ setup_obsidian_mcp() {
   fi
 
   # Use --api-key arg if provided
-  local API_KEY="${OBSIDIAN_API_KEY_ARG:-}"
+  local API_KEY="${OBSIDIAN_API_KEY_ARG:-${OBSIDIAN_API_KEY:-}}"
 
   if [ -z "$API_KEY" ]; then
     # Try interactive prompt (won't work when piped via curl)
-    if [ -t 0 ]; then
+    if [[ -t 0 ]]; then
       echo ""
       echo -e "${CYAN}  Obsidian MCP requires the Local REST API plugin.${RESET}"
       echo -e "${CYAN}  In Obsidian: Settings → Community Plugins → Browse → \"Local REST API\" → Install → Enable${RESET}"
@@ -934,6 +1071,513 @@ setup_obsidian_mcp() {
     ok "obsidian-mcp-server added to $settings"
   else
     warn "jq failed — Obsidian MCP server not added."
+  fi
+}
+
+# ── setup_codex ──────────────────────────────────────────────────────────────
+# Detects/installs Codex CLI, configures profiles in config.toml, registers
+# project trust (Conductor-aware), and adds codex-coder + codex-reviewer MCPs
+# to ~/.claude/settings.json. Idempotent — safe to run on every update.
+setup_codex() {
+  local settings="$HOME/.claude/settings.json"
+  local config_toml="$HOME/.codex/config.toml"
+
+  log "Setting up Codex CLI integration..."
+
+  # ── Check/install Codex CLI ──────────────────────────────────────────────
+  if ! command -v codex &> /dev/null; then
+    if command -v npm &> /dev/null; then
+      if [[ -t 0 ]]; then
+        read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Codex CLI not found. Install via npm? [Y/n] ")" INSTALL_CODEX
+        INSTALL_CODEX="${INSTALL_CODEX:-Y}"
+      else
+        INSTALL_CODEX="Y"
+      fi
+      if [[ "$INSTALL_CODEX" =~ ^[Yy]$ ]]; then
+        log "Installing Codex CLI..."
+        npm i -g @openai/codex 2>/dev/null \
+          && ok "Codex CLI installed" \
+          || { warn "Failed to install Codex CLI. Install manually: npm i -g @openai/codex"; return; }
+      else
+        warn "Codex CLI not installed — Codex integration will be skipped."
+        return
+      fi
+    else
+      warn "Codex CLI not found and npm unavailable. Install manually: npm i -g @openai/codex"
+      return
+    fi
+  else
+    ok "Codex CLI $(codex --version 2>/dev/null || echo 'installed')"
+  fi
+
+  # ── Configure config.toml with profiles ──────────────────────────────────
+  mkdir -p "$HOME/.codex"
+  if [ ! -f "$config_toml" ]; then
+    cat > "$config_toml" << 'TOMLEOF'
+personality = "pragmatic"
+model = "gpt-5-codex"
+model_reasoning_effort = "high"
+
+[profiles.coder]
+model = "gpt-5-codex"
+model_reasoning_effort = "medium"
+
+[profiles.reviewer]
+model = "o1-pro"
+model_reasoning_effort = "high"
+
+[profiles.architect]
+model = "o3"
+model_reasoning_effort = "high"
+
+[profiles.fast]
+model = "gpt-5-codex"
+model_reasoning_effort = "low"
+TOMLEOF
+    ok "Created $config_toml with profiles (coder, reviewer, architect, fast)"
+  else
+    # Patch-merge: add missing profiles without overwriting
+    local patched=false
+    for profile in coder reviewer architect fast; do
+      if ! grep -q "\[profiles\.$profile\]" "$config_toml" 2>/dev/null; then
+        case $profile in
+          coder)     echo -e "\n[profiles.coder]\nmodel = \"gpt-5-codex\"\nmodel_reasoning_effort = \"medium\"" >> "$config_toml" ;;
+          reviewer)  echo -e "\n[profiles.reviewer]\nmodel = \"o1-pro\"\nmodel_reasoning_effort = \"high\"" >> "$config_toml" ;;
+          architect) echo -e "\n[profiles.architect]\nmodel = \"o3\"\nmodel_reasoning_effort = \"high\"" >> "$config_toml" ;;
+          fast)      echo -e "\n[profiles.fast]\nmodel = \"gpt-5-codex\"\nmodel_reasoning_effort = \"low\"" >> "$config_toml" ;;
+        esac
+        patched=true
+      fi
+    done
+    if $patched; then
+      ok "Patched $config_toml with missing profiles"
+    else
+      ok "config.toml profiles already configured"
+    fi
+  fi
+
+  # ── Add project trust (Conductor-aware) ──────────────────────────────────
+  local project_dir
+  project_dir=$(resolve_project_dir "$(pwd)")
+  local escaped_dir
+  escaped_dir=$(printf '%s' "$project_dir" | sed 's/[\/&]/\\&/g')
+
+  if ! grep -q "projects.\"$project_dir\"" "$config_toml" 2>/dev/null; then
+    cat >> "$config_toml" << TRUSTEOF
+
+[projects."$project_dir"]
+trust_level = "trusted"
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+TRUSTEOF
+    ok "Project trusted in config.toml: $project_dir"
+  else
+    ok "Project already trusted in config.toml"
+  fi
+
+  # For Conductor: also trust the workspace parent so new worktrees auto-trust
+  local grandparent
+  grandparent=$(basename "$(dirname "$(dirname "$project_dir")")")
+  if [[ "$grandparent" == "workspaces" ]]; then
+    local workspace_parent
+    workspace_parent=$(dirname "$project_dir")
+    if ! grep -q "projects.\"$workspace_parent\"" "$config_toml" 2>/dev/null; then
+      cat >> "$config_toml" << TRUSTEOF2
+
+[projects."$workspace_parent"]
+trust_level = "trusted"
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+TRUSTEOF2
+      ok "Conductor workspace parent trusted: $workspace_parent"
+    fi
+  fi
+
+  # ── Register codex-coder MCP in settings.json ───────────────────────────
+  if ! command -v jq &> /dev/null; then
+    warn "jq not found — skipping Codex MCP registration."
+    return
+  fi
+
+  if [ ! -f "$settings" ]; then
+    echo '{}' > "$settings"
+  fi
+
+  if ! jq -e '.mcpServers["codex-coder"]' "$settings" &>/dev/null; then
+    local updated
+    updated=$(jq '.mcpServers["codex-coder"] = {"command":"uvx","args":["codex-as-mcp@latest"],"type":"stdio"}' "$settings")
+    if [[ -n "$updated" ]]; then
+      echo "$updated" > "$settings"
+      ok "codex-coder MCP added to settings.json (gpt-5-codex)"
+    fi
+  else
+    ok "codex-coder MCP already in settings.json"
+  fi
+
+  # ── Register codex-reviewer MCP in settings.json ────────────────────────
+  if ! jq -e '.mcpServers["codex-reviewer"]' "$settings" &>/dev/null; then
+    local updated
+    updated=$(jq '.mcpServers["codex-reviewer"] = {"command":"codex","args":["mcp","serve","-c","model=o1-pro"],"type":"stdio"}' "$settings")
+    if [[ -n "$updated" ]]; then
+      echo "$updated" > "$settings"
+      ok "codex-reviewer MCP added to settings.json (o1-pro)"
+    fi
+  else
+    ok "codex-reviewer MCP already in settings.json"
+  fi
+}
+
+# ── setup_codex_mcps ─────────────────────────────────────────────────────────
+# Registers MCP servers natively in Codex CLI so that agents spawned via
+# codex exec have access to Obsidian vault, ast-grep, and Playwright.
+# Experimental (codex mcp is v0.40+). Degrades gracefully if unavailable.
+setup_codex_mcps() {
+  if ! command -v codex &> /dev/null; then
+    return
+  fi
+
+  # Check if codex mcp subcommand exists
+  if ! codex mcp list &>/dev/null; then
+    warn "codex mcp not available (requires v0.40+). Codex agents will use vault-bridge.sh fallback."
+    return
+  fi
+
+  log "Registering MCP servers in Codex CLI..."
+  local existing
+  existing=$(codex mcp list 2>/dev/null || echo "")
+
+  ensure_codex_mcp_stdio() {
+    local name="$1"
+    shift
+    if echo "$existing" | grep -q "^$name" 2>/dev/null || echo "$existing" | grep -q "$name" 2>/dev/null; then
+      codex mcp remove "$name" >/dev/null 2>&1 || true
+    fi
+    codex mcp add "$name" "$@"
+  }
+
+  # Obsidian vault
+  local settings="$HOME/.claude/settings.json"
+  local api_key=""
+  if [ -f "$settings" ] && command -v jq &>/dev/null; then
+    api_key=$(jq -r '.mcpServers["obsidian-mcp-server"].env.OBSIDIAN_API_KEY // empty' "$settings" 2>/dev/null)
+  fi
+  api_key="${api_key:-${OBSIDIAN_API_KEY_ARG:-${OBSIDIAN_API_KEY:-}}}"
+  if [ -n "$api_key" ]; then
+    ensure_codex_mcp_stdio obsidian-vault \
+      --env "OBSIDIAN_API_KEY=$api_key" \
+      --env "OBSIDIAN_BASE_URL=https://127.0.0.1:27124" \
+      --env "MCP_TRANSPORT_TYPE=stdio" \
+      --env "OBSIDIAN_VERIFY_SSL=false" \
+      -- npx obsidian-mcp-server >/dev/null 2>&1 \
+      && ok "Codex MCP: obsidian-vault" \
+      || warn "Failed to add obsidian-vault to Codex"
+  else
+    warn "Obsidian API key not found — skipping obsidian-vault MCP for Codex"
+  fi
+
+  # ast-grep
+  ensure_codex_mcp_stdio ast-grep -- npx -y @ast-grep/mcp >/dev/null 2>&1 \
+    && ok "Codex MCP: ast-grep" \
+    || warn "Failed to add ast-grep to Codex"
+
+  # Playwright
+  ensure_codex_mcp_stdio playwright -- npx -y @anthropic-ai/mcp-server-playwright >/dev/null 2>&1 \
+    && ok "Codex MCP: playwright" \
+    || warn "Failed to add playwright to Codex"
+
+  # GitHub (requires GITHUB_PERSONAL_ACCESS_TOKEN)
+  if [ -n "${GITHUB_PERSONAL_ACCESS_TOKEN:-}" ]; then
+    ensure_codex_mcp_stdio github -- npx -y @anthropic-ai/mcp-server-github >/dev/null 2>&1 \
+      && ok "Codex MCP: github" \
+      || warn "Failed to add github to Codex"
+  fi
+}
+
+# ── merge_agents_md ──────────────────────────────────────────────────────────
+# Creates AGENTS.md (Codex's equivalent of CLAUDE.md) in project root.
+# Gives Codex agents project-specific context, rules, and MCP tools list.
+# Idempotent — section-level merge, never overwrites custom sections.
+merge_agents_md() {
+  local agents_md="AGENTS.md"
+
+  if [ ! -f "$agents_md" ]; then
+    cat > "$agents_md" << 'AGENTSEOF'
+# Project Rules (Codex)
+
+## Context
+- Framework: Canuto v1.x at .agents/
+- Read .context.md files in each directory for local context
+- Read docs/FEATURE-MAP.md for feature status and flows
+- Read .agents/tmp/context-package.md if it exists (pre-loaded context from Architect)
+
+## Coding Rules
+- Follow existing patterns in nearby files — match style, naming, structure
+- Do NOT add new dependencies without explicit instruction in the prompt
+- Include basic happy-path tests for new functions
+- Use TypeScript strict mode if tsconfig.json has strict: true
+- Prefer editing existing files over creating new ones
+- Do NOT add comments, docstrings, or type annotations to code you didn't change
+
+## MCP Tools Available
+- **obsidian-vault**: Read/write vault notes at ~/.canuto/vault/ for project memory
+- **ast-grep**: Structural code search — use for finding patterns, symbols, callers
+- **playwright**: Browser automation — navigate, click, fill, screenshot, assert
+
+## Vault Access (Fallback)
+If MCP tools are not available, use the vault-bridge shell script:
+```bash
+bash .agents/tools/vault-bridge.sh read <note-path>
+bash .agents/tools/vault-bridge.sh search <query>
+```
+
+## File Conventions
+- New files follow the naming pattern of existing files in the same directory
+- Imports use the project's alias paths (check tsconfig.json or package.json)
+- Test files go next to source files or in the nearest tests/ directory
+
+## Codex Profiles
+
+Available profiles in \`~/.codex/config.toml\` — use when spawned with \`--profile\`:
+
+| Profile | Model | Reasoning | Use For |
+|---------|-------|-----------|---------|
+| \`coder\` | gpt-5-codex | medium | Standard code generation |
+| \`reviewer\` | o1-pro | high | Deep code review, security audit |
+| \`architect\` | o3 | high | Architecture, complex reasoning |
+| \`fast\` | gpt-5-codex | low | Quick edits, formatting, docs |
+
+## Anti-Patterns
+- Do NOT create README.md, documentation files, or CHANGELOG entries
+- Do NOT refactor unrelated code
+- Do NOT install packages or modify lock files
+- Do NOT modify .env files or configuration
+AGENTSEOF
+    ok "AGENTS.md created (Codex project instructions)"
+  else
+    # Patch missing sections
+    local patched=false
+    if ! grep -q "## MCP Tools Available" "$agents_md" 2>/dev/null; then
+      cat >> "$agents_md" << 'MCPPATCH'
+
+## MCP Tools Available
+- **obsidian-vault**: Read/write vault notes at ~/.canuto/vault/ for project memory
+- **ast-grep**: Structural code search — use for finding patterns, symbols, callers
+- **playwright**: Browser automation — navigate, click, fill, screenshot, assert
+MCPPATCH
+      patched=true
+    fi
+    if ! grep -q "## Codex Profiles" "$agents_md" 2>/dev/null; then
+      cat >> "$agents_md" << 'PROFILEPATCH'
+
+## Codex Profiles
+
+Available profiles in `~/.codex/config.toml` — use when spawned with `--profile`:
+
+| Profile | Model | Reasoning | Use For |
+|---------|-------|-----------|---------|
+| `coder` | gpt-5-codex | medium | Standard code generation |
+| `reviewer` | o1-pro | high | Deep code review, security audit |
+| `architect` | o3 | high | Architecture, complex reasoning |
+| `fast` | gpt-5-codex | low | Quick edits, formatting, docs |
+PROFILEPATCH
+      patched=true
+    fi
+    if ! grep -q "## Vault Access" "$agents_md" 2>/dev/null; then
+      cat >> "$agents_md" << 'VAULTPATCH'
+
+## Vault Access (Fallback)
+If MCP tools are not available, use the vault-bridge shell script:
+```bash
+bash .agents/tools/vault-bridge.sh read <note-path>
+bash .agents/tools/vault-bridge.sh search <query>
+```
+VAULTPATCH
+      patched=true
+    fi
+    if $patched; then
+      ok "AGENTS.md patched with missing sections"
+    else
+      ok "AGENTS.md already up to date"
+    fi
+  fi
+}
+
+ensure_project_bootstrap_files() {
+  local project_dir
+  project_dir=$(resolve_project_dir "$(pwd)")
+  local project_slug
+  project_slug=$(detect_project_slug "$project_dir")
+
+  mkdir -p "$project_dir/docs" "$project_dir/.agents/vault/digests"
+
+  if [ ! -f "$project_dir/.context.md" ]; then
+    cat > "$project_dir/.context.md" <<EOF
+# Project Context
+
+## Snapshot
+- project: $project_slug
+- repo_root: $(basename "$project_dir")
+- framework: Canuto v1.x
+
+## Working Agreements
+- Read this file and \`docs/FEATURE-MAP.md\` before structural changes.
+- Update both files when architecture, entry points, or key workflows change.
+
+## Architecture
+- Fill in primary stack, key directories, and critical entry points.
+
+## Runtime
+- dev:
+- test:
+- build:
+
+## Notes
+- This file was created by Canuto during bootstrap. Replace placeholders with repo-specific facts.
+EOF
+    ok "Created .context.md"
+  else
+    ok ".context.md already exists"
+  fi
+
+  if [ ! -f "$project_dir/docs/FEATURE-MAP.md" ]; then
+    cat > "$project_dir/docs/FEATURE-MAP.md" <<'EOF'
+# Feature Map
+
+## Status Legend
+- `implemented`
+- `partial`
+- `planned`
+- `unknown`
+
+| Area | Status | Entry Points | Notes |
+|------|--------|--------------|-------|
+| Bootstrap | implemented | `.agents/`, `install.sh`, `CLAUDE.md` | Created by Canuto |
+| Core product areas | unknown | TBD | Replace with repo-specific feature inventory |
+EOF
+    ok "Created docs/FEATURE-MAP.md"
+  else
+    ok "docs/FEATURE-MAP.md already exists"
+  fi
+
+  if [ ! -f "$project_dir/.agents/vault/digests/00-bootstrap-digest.md" ]; then
+    cat > "$project_dir/.agents/vault/digests/00-bootstrap-digest.md" <<EOF
+---
+title: Bootstrap Digest
+type: digest
+generated_by: canuto-install
+project: $project_slug
+---
+
+# Bootstrap Digest
+
+- Starter context files were created or verified.
+- Starter feature map was created or verified.
+- Validate this project with \`bash install.sh --test\`.
+- Repair runtime state with \`bash install.sh --doctor\`.
+EOF
+    ok "Created bootstrap digest"
+  else
+    ok "Bootstrap digest already exists"
+  fi
+}
+
+run_consumer_smoke() {
+  local project_dir
+  project_dir=$(resolve_project_dir "$(pwd)")
+  local script="$project_dir/.agents/tools/canuto-consumer-smoke.sh"
+  if [ "$JSON_OUTPUT" = true ]; then
+    bash "$script" --json
+  else
+    bash "$script"
+  fi
+}
+
+run_codex_health() {
+  local project_dir
+  project_dir=$(resolve_project_dir "$(pwd)")
+  local script="$project_dir/.agents/tools/codex-health-check.sh"
+  if [ "$JSON_OUTPUT" = true ]; then
+    bash "$script" --json
+  else
+    bash "$script"
+  fi
+}
+
+run_install_validation() {
+  local consumer_json=""
+  local codex_json=""
+  local consumer_rc=0
+  local codex_rc=0
+
+  if [ "$JSON_OUTPUT" = true ]; then
+    consumer_json=$(run_consumer_smoke) || consumer_rc=$?
+    codex_json=$(run_codex_health) || codex_rc=$?
+    python3 - "$consumer_json" "$codex_json" "$consumer_rc" "$codex_rc" <<'PYEOF'
+import json
+import sys
+
+consumer_json, codex_json, consumer_rc, codex_rc = sys.argv[1:]
+consumer = json.loads(consumer_json)
+codex = json.loads(codex_json)
+
+verdict_order = {"HEALTHY": 0, "DEGRADED": 1, "BROKEN": 2}
+overall = max(consumer["verdict"], codex["verdict"], key=lambda v: verdict_order[v])
+
+print(json.dumps({
+    "tool": "canuto-install-validation",
+    "verdict": overall,
+    "counts": {
+        "consumer": consumer["counts"],
+        "codex": codex["counts"],
+    },
+    "consumer_smoke": consumer,
+    "codex_health": codex,
+}, ensure_ascii=True))
+PYEOF
+    if [ "$consumer_rc" -ne 0 ] || [ "$codex_rc" -ne 0 ]; then
+      return 1
+    fi
+    return 0
+  fi
+
+  run_consumer_smoke || consumer_rc=$?
+  run_codex_health || codex_rc=$?
+
+  if [ "$consumer_rc" -ne 0 ] || [ "$codex_rc" -ne 0 ]; then
+    return 1
+  fi
+  return 0
+}
+
+repair_runtime() {
+  setup_deps
+  setup_local_script_permissions
+  merge_claude_md
+  merge_agents_md
+  ensure_project_bootstrap_files
+  setup_hooks
+  setup_search_tools
+  setup_global_vault
+  setup_obsidian_mcp
+  setup_codex
+  setup_codex_mcps
+  setup_gstack
+  setup_global_skills
+
+  mkdir -p ".agents/tmp"
+  if [ ! -f ".agents/tmp/.gitkeep" ]; then
+    echo "# Temporary files — gitignored" > ".agents/tmp/.gitkeep"
+  fi
+  if [ -x ".agents/tools/codex-context-package.sh" ]; then
+    bash ".agents/tools/codex-context-package.sh" \
+      --task "Bootstrap Context" \
+      --output ".agents/tmp/context-package.md" \
+      --file "CLAUDE.md" \
+      --file ".context.md" \
+      --file "docs/FEATURE-MAP.md" >/dev/null 2>&1 || true
+  fi
+  if [ -f ".gitignore" ] && ! grep -q ".agents/tmp/" ".gitignore" 2>/dev/null; then
+    echo ".agents/tmp/" >> ".gitignore"
   fi
 }
 
@@ -1860,6 +2504,37 @@ if [ "$MODE" = "skill" ]; then
   exit 0
 fi
 
+# ── REPAIR ──────────────────────────────────────────────────────────────────
+if [ "$MODE" = "repair" ]; then
+  echo ""
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo -e "${CYAN}  Canuto Framework — Repair${RESET}"
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo ""
+
+  repair_runtime
+
+  if [ "$JSON_OUTPUT" = false ]; then
+    echo ""
+    ok "Runtime repaired. Validate with: bash install.sh --test"
+    echo ""
+  fi
+
+  rm -rf "$TMP_DIR"
+  exit 0
+fi
+
+# ── DOCTOR ──────────────────────────────────────────────────────────────────
+if [ "$MODE" = "doctor" ]; then
+  repair_runtime
+  if run_install_validation; then
+    rm -rf "$TMP_DIR"
+    exit 0
+  fi
+  rm -rf "$TMP_DIR"
+  exit 1
+fi
+
 # ── MIGRATE ─────────────────────────────────────────────────────────────────
 # Upgrades from old flat-file memory (.agents/memory/) to Obsidian vault.
 # Safe to run multiple times. Backs up old memory/ before touching anything.
@@ -1942,24 +2617,13 @@ if [ "$MODE" = "migrate" ]; then
   migrate_flat_file ".agents/memory/component-inventory.md" "$PROJECT_VAULT/design/components" "migrated-inventory.md"
 
   # ── Step 5: Setup deps, hooks, tools ─────────────────────────────────────
-  setup_deps
-  merge_claude_md
-  setup_hooks
-  setup_search_tools
-  setup_global_vault
-  setup_obsidian_mcp
+  repair_runtime
 
   # ── Step 6: Clean up old memory dir ──────────────────────────────────────
   if [ -d ".agents/memory" ] && [ "$MIGRATED" -gt 0 ]; then
     echo ""
     warn "Old .agents/memory/ still exists (backup at $BACKUP_DIR)."
-    if [ -t 0 ]; then
-      read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Delete old .agents/memory/? [y/N] ")" DELETE_OLD
-    else
-      DELETE_OLD="N"
-      log "Non-interactive mode: keeping .agents/memory/ (delete manually when ready)."
-    fi
-    if [[ "$DELETE_OLD" =~ ^[Yy]$ ]]; then
+    if confirm_yes "Delete old .agents/memory/? [y/N] " "N"; then
       rm -rf ".agents/memory"
       ok "Deleted .agents/memory/"
     else
@@ -1970,14 +2634,8 @@ if [ "$MODE" = "migrate" ]; then
   # ── Step 7: Commit ──────────────────────────────────────────────────────
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
-    git add "$AGENTS_DIR/" "$CLAUDE_MD" 2>/dev/null || true
-    if [ -t 0 ]; then
-      read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Commit migration? [Y/n] ")" COMMIT_ANSWER
-    else
-      COMMIT_ANSWER="Y"
-    fi
-    COMMIT_ANSWER="${COMMIT_ANSWER:-Y}"
-    if [[ "$COMMIT_ANSWER" =~ ^[Yy]$ ]]; then
+    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" 2>/dev/null || true
+    if confirm_yes "Commit migration? [Y/n] " "Y"; then
       if git diff --cached --quiet; then
         log "Nothing to commit — framework already up to date."
       else
@@ -1991,13 +2649,7 @@ if [ "$MODE" = "migrate" ]; then
   echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
   # ── Post-migrate analysis ────────────────────────────────────────────────
   echo ""
-  if [ -t 0 ]; then
-    read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Run cross-project auto-analysis? [Y/n] ")" ANALYSIS_ANSWER
-  else
-    ANALYSIS_ANSWER="Y"
-  fi
-  ANALYSIS_ANSWER="${ANALYSIS_ANSWER:-Y}"
-  if [[ "$ANALYSIS_ANSWER" =~ ^[Yy]$ ]]; then
+  if confirm_yes "Run cross-project auto-analysis? [Y/n] " "Y"; then
     PROJECT_DIR="$(resolve_project_dir "$(pwd)")" post_install_analysis "$(pwd)"
   fi
 
@@ -2040,24 +2692,15 @@ if [ "$MODE" = "install" ]; then
   done
   ok "Vault directories created"
 
-  setup_deps
-  merge_claude_md
-  setup_hooks
-  setup_search_tools
-  setup_global_vault
-  setup_obsidian_mcp
-  setup_gstack
-  setup_global_skills
+  repair_runtime
 
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
     log "Staging files for git..."
-    git add "$AGENTS_DIR/" "$CLAUDE_MD" 2>/dev/null || true
+    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" 2>/dev/null || true
     echo ""
-    read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Commit now? [Y/n] ")" COMMIT_ANSWER
-    COMMIT_ANSWER="${COMMIT_ANSWER:-Y}"
-    if [[ "$COMMIT_ANSWER" =~ ^[Yy]$ ]]; then
-      git commit -m "chore: add Canuto Framework v1.5"
+    if confirm_yes "Commit now? [Y/n] " "Y"; then
+      git commit -m "chore: add Canuto Framework v1.6"
       ok "Committed!"
     else
       warn "Files staged but not committed. Run 'git commit' when ready."
@@ -2068,17 +2711,15 @@ if [ "$MODE" = "install" ]; then
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
   # ── Post-install analysis ─────────────────────────────────────────────────
   echo ""
-  if [ -t 0 ]; then
-    read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Run cross-project auto-analysis? [Y/n] ")" ANALYSIS_ANSWER
-  else
-    ANALYSIS_ANSWER="Y"
-  fi
-  ANALYSIS_ANSWER="${ANALYSIS_ANSWER:-Y}"
-  if [[ "$ANALYSIS_ANSWER" =~ ^[Yy]$ ]]; then
+  if confirm_yes "Run cross-project auto-analysis? [Y/n] " "Y"; then
     PROJECT_DIR="$(resolve_project_dir "$(pwd)")" post_install_analysis "$(pwd)"
   fi
 
-  echo -e "${GREEN}  Done! v1.5 installed. Open the project in Claude and${RESET}"
+  if ! run_install_validation; then
+    warn "Post-install validation reported issues. Re-run: bash install.sh --doctor"
+  fi
+
+  echo -e "${GREEN}  Done! v1.6 installed. Open the project in Claude and${RESET}"
   echo -e "${GREEN}  the Maestro will take it from here.${RESET}"
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
   echo ""
@@ -2094,9 +2735,7 @@ if [ "$MODE" = "update" ]; then
   warn "This will update personas, skills, hooks, and SPEC.md."
   warn "vault/ and plugins/ will NOT be touched."
   echo ""
-  read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Proceed? [Y/n] ")" PROCEED
-  PROCEED="${PROCEED:-Y}"
-  if [[ ! "$PROCEED" =~ ^[Yy]$ ]]; then
+  if ! confirm_yes "Proceed? [Y/n] " "Y"; then
     log "Aborted."
     exit 0
   fi
@@ -2106,36 +2745,47 @@ if [ "$MODE" = "update" ]; then
     download "$file" "$file"
     ok "updated: $file"
   done
+  for file in "${INSTALL_ONLY_FILES[@]}"; do
+    if [ ! -f "$file" ]; then
+      download "$file" "$file"
+      ok "created missing support file: $file"
+    fi
+  done
 
-  setup_deps
-  merge_claude_md
-  setup_hooks
-  setup_search_tools
-  setup_global_vault
-  setup_obsidian_mcp
-  setup_gstack
-  setup_global_skills
+  repair_runtime
 
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
     log "Staging updated files..."
-    git add "$AGENTS_DIR/personas/" "$AGENTS_DIR/skills/" "$AGENTS_DIR/hooks/" "$AGENTS_DIR/SPEC.md" "$CLAUDE_MD" 2>/dev/null || true
+    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" 2>/dev/null || true
     echo ""
-    read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Commit now? [Y/n] ")" COMMIT_ANSWER
-    COMMIT_ANSWER="${COMMIT_ANSWER:-Y}"
-    if [[ "$COMMIT_ANSWER" =~ ^[Yy]$ ]]; then
-      git commit -m "chore: update Canuto Framework to v1.5"
+    if confirm_yes "Commit now? [Y/n] " "Y"; then
+      git commit -m "chore: update Canuto Framework to v1.6"
       ok "Committed!"
     else
       warn "Files staged but not committed. Run 'git commit' when ready."
     fi
   fi
 
+  if ! run_install_validation; then
+    warn "Post-update validation reported issues. Re-run: bash install.sh --doctor"
+  fi
+
   echo ""
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
-  echo -e "${GREEN}  Framework updated to v1.5 successfully.${RESET}"
+  echo -e "${GREEN}  Framework updated to v1.6 successfully.${RESET}"
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
   echo ""
+fi
+
+# ── TEST ────────────────────────────────────────────────────────────────────
+if [ "$MODE" = "test" ]; then
+  if run_install_validation; then
+    rm -rf "$TMP_DIR"
+    exit 0
+  fi
+  rm -rf "$TMP_DIR"
+  exit 1
 fi
 
 # ── Cleanup ──────────────────────────────────────────────────────────────────

@@ -14,7 +14,7 @@ copyright: Rodrigo Canuto © 2026.
 - MCP-based multi-turn communication (clarifying questions supported)
 - Background subagent pattern for true parallel work
 
-To migrate: configure Codex MCP (`claude mcp add codex-collab -- npx -y @openai/codex mcp-server`) and use `/co-validate` instead. The legacy hook `plan-review.sh` remains functional as a fallback.
+To migrate: configure Codex MCP (`codex-coder` + `codex-reviewer`) and use `/co-validate` instead. The legacy hook `plan-review.sh` now runs on `PostToolUse: ExitPlanMode` with the reviewer profile as a fallback.
 
 ---
 

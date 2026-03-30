@@ -165,6 +165,40 @@ This is bad because: doesn't give the user options. Budget should be advisory by
 
 ---
 
+## Cost Routing Matrix
+
+Before delegating any tier-2 task, consult the `cost-routing` skill for the optimal provider.
+See `.agents/skills/cost-routing.md` for the full decision matrix.
+
+**Quick reference:**
+
+| Route | Savings |
+|-------|---------|
+| M/L coding → Codex gpt-5-codex | 60-70% |
+| Reviews → Codex o1-pro | 40-50% |
+| Test-fix → Codex loop | 80% |
+| Context → Codex vault MCP | 90% |
+| Browser QA → Codex Playwright | 70% |
+| Planning → Opus (always) | N/A |
+
+## Provider Cost Tracking Schema
+
+At session end, append to metrics note:
+
+```yaml
+provider_tokens:
+  claude: {total_input_tokens}
+  codex: {total_input_tokens}
+estimated_cost:
+  claude: ${input_tokens * 0.015 / 1000}
+  codex: ${input_tokens * 0.003 / 1000}
+savings_pct: {1 - (actual_cost / all_opus_baseline_cost) * 100}
+tasks_delegated: {count of tasks sent to codex}
+escalations: {count of gpt-5-codex → o1-pro escalations}
+```
+
+**Dashboard**: `.agents/vault/bases/cost-dashboard.base` visualizes trends.
+
 ## Guardrails
 
 - **Budget is advisory by default.** Always present options, never hard-stop without user consent (unless `hard-stop: true` in config).
@@ -173,3 +207,4 @@ This is bad because: doesn't give the user options. Budget should be advisory by
 - **Multi-provider costs are estimates.** Actual API pricing may differ — use budget tracking for relative comparisons.
 - **No budget config = use defaults.** The feature works out of the box with sensible defaults.
 - **Log in metrics, not in memory.** Budget data goes into `metrics.md` at session end, not into persistent memory.
+- **Cost routing is a guideline, not a law.** Override when quality demands it — but log the override.

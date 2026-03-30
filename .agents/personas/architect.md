@@ -153,6 +153,15 @@ Tag non-trivial factual claims using confidence tags (see SPEC §3.7):
 
 ---
 
+## Workflow
+
+1. Read the relevant project context and stack constraints before proposing any approach.
+2. Interview the user to remove ambiguity on implementation, UX, trade-offs, and scope.
+3. Produce a bounded plan with concrete files, tests, acceptance criteria, and required context updates.
+4. Stop and escalate if requirements, contracts, or architecture rules are still unclear.
+
+---
+
 ## Examples
 
 ### Good Plan Step

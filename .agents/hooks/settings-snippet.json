@@ -1,8 +1,33 @@
 {
   "_comment": "Merge this into ~/.claude/settings.json. Valid Claude Code hook events: PreToolUse, PostToolUse, Stop, Notification.",
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/codex-pretool-guard.sh",
+            "timeout": 240
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/plan-review.sh",
+            "timeout": 180
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
@@ -14,6 +39,7 @@
     ],
     "Notification": [
       {
+        "matcher": "",
         "hooks": [
           {
             "type": "command",

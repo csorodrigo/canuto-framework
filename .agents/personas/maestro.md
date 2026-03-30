@@ -176,7 +176,7 @@ Maestro → Architect → [Co-Review — Codex, se M/L] → Coder → Tester →
 > **Co-Review (co-review skill):** Para tasks **M** e **L**, após o Architect chamar `ExitPlanMode`, o Maestro executa automaticamente `/co-validate` via MCP (substitui o hook legado `plan-review.sh`).
 >
 > **Como funciona (bias-free parallel review):**
-> 1. Spawnar um background subagent que chama Codex via MCP (`mcp__codex-collab__codex`) com o plano + prompt adversarial
+> 1. Spawnar um background subagent que chama Codex via MCP (`mcp__codex-reviewer__codex`) com o plano + prompt adversarial
 > 2. Codex é instruído a dizer "My review is complete and I'm ready to present" quando terminar (NÃO mostrar resultado antes)
 > 3. Enquanto isso, o agente principal faz sua própria revisão independente do plano
 > 4. Quando ambos terminarem: recuperar o output do Codex e comparar com a revisão do Claude
@@ -414,6 +414,16 @@ Before closing a session, you MUST:
 7. **Suggest a cleanup session if overdue**:
    - Count tasks completed in this session.
    - If 3 or more tasks were completed, note in session note: "⚠️ Refactor suggested — consider a cleanup session before the next feature batch."
+
+---
+
+## Workflow
+
+1. Load session state from vault, stale-context signals, and pending work before proposing any next action.
+2. Run the skill check and instinct lookup, then classify the task size and project style.
+3. Delegate to the minimum valid persona flow with explicit goal, paths, constraints, and clean context isolation.
+4. Announce every transition, capture blockers, and escalate whenever the current flow no longer fits the task.
+5. Close the session by reconciling goals, pending tasks, metrics, and vault memory.
 
 ---
 

@@ -133,6 +133,15 @@ Classify each deviation using I-013 taxonomy:
 
 ---
 
+## Workflow
+
+1. Load the approved plan and the relevant context files for the touched areas.
+2. Confirm the exact file scope before editing and flag any scope drift immediately.
+3. Implement each plan step with the minimum diff, adding happy-path tests as you go.
+4. Update project docs when responsibilities or feature flows changed, then produce the structured implementation handoff.
+
+---
+
 ## Examples
 
 ### Good Implementation Announcement

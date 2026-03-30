@@ -166,6 +166,15 @@ Your output MUST follow this exact structure:
 
 ---
 
+## Workflow
+
+1. Start with lint, type-check, and build so broken baselines fail fast.
+2. Compare the Architect plan against the Coder handoff to find missing edge, error, race, and security coverage.
+3. Add only the tests that increase confidence beyond the existing happy path.
+4. Run the full suite, preserve diagnostic output, and hand the exact evidence to Reviewer or Debugger.
+
+---
+
 ## Examples
 
 ### Good Test Identification

@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Canuto Framework - Tutorial Visual</title>
+  <style>
+    :root {
+      --bg: #f6efe2;
+      --bg-strong: #f0e3cd;
+      --ink: #1f2a2c;
+      --muted: #56656a;
+      --card: rgba(255, 251, 245, 0.82);
+      --card-strong: #fff7ea;
+      --line: rgba(31, 42, 44, 0.12);
+      --accent: #0f766e;
+      --accent-2: #c65d3a;
+      --accent-3: #244e7a;
+      --shadow: 0 20px 60px rgba(55, 39, 24, 0.14);
+      --radius: 22px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(198, 93, 58, 0.16), transparent 28%),
+        radial-gradient(circle at top right, rgba(15, 118, 110, 0.16), transparent 24%),
+        linear-gradient(180deg, #fbf7ef 0%, var(--bg) 55%, #efe2c9 100%);
+      font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.55;
+    }
+
+    a {
+      color: var(--accent-3);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .shell {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 24px 0 72px;
+    }
+
+    .nav {
+      position: sticky;
+      top: 14px;
+      z-index: 10;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 12px 14px;
+      margin-bottom: 24px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 250, 242, 0.86);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 14px 34px rgba(45, 32, 20, 0.08);
+    }
+
+    .nav a {
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .nav a:hover {
+      background: rgba(36, 78, 122, 0.08);
+      color: var(--accent-3);
+      text-decoration: none;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 1.2fr 0.95fr;
+      gap: 26px;
+      padding: 34px;
+      border: 1px solid rgba(31, 42, 44, 0.08);
+      border-radius: 30px;
+      background:
+        linear-gradient(135deg, rgba(255, 248, 238, 0.95), rgba(245, 236, 222, 0.92)),
+        var(--card);
+      box-shadow: var(--shadow);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -100px -140px auto;
+      width: 260px;
+      height: 260px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(15, 118, 110, 0.18), transparent 66%);
+      pointer-events: none;
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0 0 12px;
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+    }
+
+    h1 {
+      font-size: clamp(2.7rem, 5vw, 4.4rem);
+    }
+
+    h2 {
+      font-size: clamp(1.8rem, 3vw, 2.4rem);
+      margin-bottom: 16px;
+    }
+
+    h3 {
+      font-size: 1.24rem;
+    }
+
+    p {
+      margin: 0 0 14px;
+      color: var(--muted);
+    }
+
+    .eyebrow,
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .eyebrow {
+      margin-bottom: 16px;
+      color: var(--accent);
+      background: rgba(15, 118, 110, 0.1);
+      border: 1px solid rgba(15, 118, 110, 0.12);
+    }
+
+    .pill {
+      background: rgba(198, 93, 58, 0.1);
+      color: var(--accent-2);
+      border: 1px solid rgba(198, 93, 58, 0.12);
+    }
+
+    .hero-copy {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 14px;
+    }
+
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .cta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 16px;
+      border-radius: 14px;
+      font-weight: 800;
+      border: 1px solid transparent;
+      transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
+    }
+
+    .cta:hover {
+      transform: translateY(-2px);
+      text-decoration: none;
+    }
+
+    .cta-primary {
+      color: #fff8f1;
+      background: linear-gradient(135deg, #145d57, #0f766e);
+      box-shadow: 0 12px 26px rgba(15, 118, 110, 0.22);
+    }
+
+    .cta-secondary {
+      color: var(--accent-3);
+      background: rgba(36, 78, 122, 0.08);
+      border-color: rgba(36, 78, 122, 0.14);
+    }
+
+    .hero-side {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .mini-card,
+    .card,
+    .stat,
+    .step {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--card);
+      box-shadow: 0 12px 32px rgba(45, 32, 20, 0.06);
+    }
+
+    .mini-card {
+      padding: 16px 18px;
+    }
+
+    .mini-card strong {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--ink);
+    }
+
+    .grid {
+      display: grid;
+      gap: 18px;
+      margin-top: 24px;
+    }
+
+    .grid-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .grid-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    section {
+      margin-top: 34px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-end;
+      margin-bottom: 18px;
+    }
+
+    .card {
+      padding: 22px;
+    }
+
+    .card strong {
+      color: var(--ink);
+    }
+
+    .code {
+      margin: 14px 0 0;
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: #1d2a2b;
+      color: #f8efe4;
+      overflow-x: auto;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    }
+
+    .code code,
+    .code pre {
+      margin: 0;
+      font: 14px/1.5 "SFMono-Regular", Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+    }
+
+    .kicker {
+      margin-bottom: 10px;
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent-2);
+    }
+
+    .step {
+      position: relative;
+      padding: 22px;
+      background: linear-gradient(180deg, rgba(255, 251, 245, 0.98), rgba(246, 238, 223, 0.9));
+    }
+
+    .step-number {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      font-size: 13px;
+      font-weight: 900;
+      background: rgba(36, 78, 122, 0.1);
+      color: var(--accent-3);
+    }
+
+    ul.clean {
+      padding-left: 20px;
+      margin: 10px 0 0;
+      color: var(--muted);
+    }
+
+    ul.clean li {
+      margin-bottom: 8px;
+    }
+
+    .flow,
+    .timeline {
+      padding: 22px;
+    }
+
+    .matrix {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .matrix .card {
+      min-height: 100%;
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .badge {
+      padding: 8px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      background: rgba(15, 118, 110, 0.08);
+      color: var(--accent);
+      border: 1px solid rgba(15, 118, 110, 0.12);
+    }
+
+    .warning {
+      background: rgba(198, 93, 58, 0.1);
+      color: var(--accent-2);
+      border-color: rgba(198, 93, 58, 0.12);
+    }
+
+    .muted-box {
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: rgba(36, 78, 122, 0.06);
+      border: 1px solid rgba(36, 78, 122, 0.1);
+    }
+
+    .persona-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .persona {
+      padding: 18px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255, 248, 240, 0.98), rgba(250, 238, 220, 0.9));
+    }
+
+    .persona small {
+      display: block;
+      margin-top: 8px;
+      color: var(--muted);
+    }
+
+    .commands {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .footer {
+      margin-top: 34px;
+      padding: 20px 24px;
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      background: rgba(255, 252, 247, 0.82);
+      color: var(--muted);
+    }
+
+    svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    @media (max-width: 1024px) {
+      .hero,
+      .grid-3,
+      .persona-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .commands {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .shell {
+        width: min(100vw - 18px, 100%);
+        padding-top: 14px;
+      }
+
+      .nav {
+        position: static;
+        border-radius: 24px;
+      }
+
+      .hero,
+      .grid-2,
+      .grid-3,
+      .matrix,
+      .persona-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero {
+        padding: 24px;
+      }
+
+      h1 {
+        font-size: 2.5rem;
+      }
+
+      .section-header {
+        display: block;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <nav class="nav">
+      <a href="#instalar">Instalar</a>
+      <a href="#fluxo">Fluxo</a>
+      <a href="#passivo">Passivo vs explicito</a>
+      <a href="#comandos">Comandos</a>
+      <a href="#skills">Skills</a>
+      <a href="#hooks">Hooks</a>
+      <a href="#visual">Mapa visual</a>
+    </nav>
+
+    <header class="hero" id="topo">
+      <div class="hero-copy">
+        <span class="eyebrow">Canuto Framework • tutorial visual</span>
+        <h1>Instalacao, update e fluxo do framework em uma tela so.</h1>
+        <p>Este guia mostra o ciclo completo: instalar, atualizar, validar, entender o que roda sozinho e o que precisa ser pedido explicitamente. Tudo abre localmente, sem build e sem asset externo.</p>
+        <div class="cta-row">
+          <a class="cta cta-primary" href="#instalar">Ver fluxo de instalacao</a>
+          <a class="cta cta-secondary" href="./TUTORIAL.md">Abrir tutorial operacional</a>
+          <a class="cta cta-secondary" href="../README.md">Abrir quickstart</a>
+        </div>
+      </div>
+
+      <div class="hero-side">
+        <div class="mini-card">
+          <span class="pill">1 comando para validar</span>
+          <strong><code>curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --doctor</code></strong>
+          <p>Repara hooks, MCPs, profiles, arquivos bootstrap e depois roda os checks reais. Sempre puxa a versao mais recente do GitHub.</p>
+        </div>
+        <div class="mini-card">
+          <span class="pill">update facil</span>
+          <strong><code>curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --update</code></strong>
+          <p>Puxa o <code>install.sh</code> mais recente do GitHub e aplica o update no projeto.</p>
+        </div>
+        <div class="mini-card">
+          <span class="pill">o que esperar</span>
+          <strong><code>HEALTHY</code>, <code>DEGRADED</code> ou <code>BROKEN</code></strong>
+          <p><code>--test</code> e <code>--doctor</code> mostram o estado real da integracao do projeto consumidor.</p>
+        </div>
+      </div>
+    </header>
+
+    <section id="instalar">
+      <div class="section-header">
+        <div>
+          <span class="eyebrow">Setup rapido</span>
+          <h2>1. Instalar ou atualizar</h2>
+        </div>
+        <p>O fluxo foi desenhado para nao exigir configuracao manual depois que o projeto recebe o framework.</p>
+      </div>
+
+      <div class="grid grid-3">
+        <article class="step">
+          <span class="step-number">01</span>
+          <div class="kicker">Projeto novo</div>
+          <h3>Bootstrap inicial</h3>
+          <p>Use o instalador remoto quando o projeto ainda nao tem o Canuto versionado localmente.</p>
+          <div class="code"><pre><code>cd /caminho/do/projeto
+curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash</code></pre></div>
+        </article>
+
+        <article class="step">
+          <span class="step-number">02</span>
+          <div class="kicker">Projeto que ja usa Canuto</div>
+          <h3>Update padrao</h3>
+          <p>Sempre via curl — puxa o instalador mais recente do GitHub e aplica o update. Nao use o <code>install.sh</code> local para update, ele pode estar desatualizado.</p>
+          <div class="code"><pre><code>cd /caminho/do/projeto
+curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --update</code></pre></div>
+        </article>
+
+        <article class="step">
+          <span class="step-number">03</span>
+          <div class="kicker">Se algo saiu do eixo</div>
+          <h3>Repair e doctor</h3>
+          <p><code>--repair</code> reidrata o runtime. <code>--doctor</code> repara e valida tudo em uma so passada. Ambos sempre via curl.</p>
+          <div class="code"><pre><code>curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --repair
+
+curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --doctor</code></pre></div>
+        </article>
+      </div>
+
+      <div class="card flow" style="margin-top: 18px;">
+        <h3>Pipeline de instalacao e validacao</h3>
+        <svg viewBox="0 0 1140 260" role="img" aria-label="Diagrama do pipeline de install, update, repair, test e doctor do Canuto Framework">
+          <defs>
+            <linearGradient id="installA" x1="0" x2="1">
+              <stop offset="0%" stop-color="#0f766e"/>
+              <stop offset="100%" stop-color="#145d57"/>
+            </linearGradient>
+            <linearGradient id="installB" x1="0" x2="1">
+              <stop offset="0%" stop-color="#c65d3a"/>
+              <stop offset="100%" stop-color="#a84b2d"/>
+            </linearGradient>
+          </defs>
+          <rect x="12" y="22" width="220" height="92" rx="20" fill="url(#installA)" opacity="0.96"/>
+          <text x="36" y="58" fill="#fff7ef" font-size="20" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Fresh install</text>
+          <text x="36" y="84" fill="#e6fbf8" font-size="16" font-family="Avenir Next, Segoe UI, sans-serif">curl ... | bash</text>
+
+          <rect x="272" y="22" width="220" height="92" rx="20" fill="#fff8ef" stroke="#d8c8ad"/>
+          <text x="296" y="58" fill="#1f2a2c" font-size="20" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Update</text>
+          <text x="296" y="84" fill="#6d5b52" font-size="14" font-family="Avenir Next, Segoe UI, sans-serif">curl ... | bash -s -- --update</text>
+
+          <rect x="532" y="22" width="220" height="92" rx="20" fill="#fff8ef" stroke="#d8c8ad"/>
+          <text x="556" y="58" fill="#1f2a2c" font-size="20" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Repair runtime</text>
+          <text x="556" y="84" fill="#6d5b52" font-size="14" font-family="Avenir Next, Segoe UI, sans-serif">curl ... | bash -s -- --repair</text>
+
+          <rect x="792" y="22" width="336" height="92" rx="20" fill="url(#installB)" opacity="0.96"/>
+          <text x="816" y="58" fill="#fff7ef" font-size="20" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Doctor = repair + validate</text>
+          <text x="816" y="84" fill="#fff0e7" font-size="14" font-family="Avenir Next, Segoe UI, sans-serif">curl ... | bash -s -- --doctor</text>
+
+          <rect x="160" y="162" width="250" height="74" rx="18" fill="#fffdf9" stroke="#d8c8ad"/>
+          <text x="184" y="194" fill="#1f2a2c" font-size="18" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Check rapido</text>
+          <text x="184" y="218" fill="#6d5b52" font-size="15" font-family="Avenir Next, Segoe UI, sans-serif">curl ... | bash -s -- --check</text>
+
+          <rect x="446" y="162" width="250" height="74" rx="18" fill="#fffdf9" stroke="#d8c8ad"/>
+          <text x="470" y="194" fill="#1f2a2c" font-size="18" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Smoke do consumidor</text>
+          <text x="470" y="218" fill="#6d5b52" font-size="15" font-family="Avenir Next, Segoe UI, sans-serif">curl ... | bash -s -- --test</text>
+
+          <rect x="732" y="162" width="250" height="74" rx="18" fill="#fffdf9" stroke="#d8c8ad"/>
+          <text x="756" y="194" fill="#1f2a2c" font-size="18" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Suite do framework</text>
+          <text x="756" y="218" fill="#6d5b52" font-size="15" font-family="Avenir Next, Segoe UI, sans-serif">bash test-framework.sh</text>
+
+          <path d="M232 68 L272 68" stroke="#7d8c8f" stroke-width="4" stroke-linecap="round"/>
+          <path d="M492 68 L532 68" stroke="#7d8c8f" stroke-width="4" stroke-linecap="round"/>
+          <path d="M752 68 L792 68" stroke="#7d8c8f" stroke-width="4" stroke-linecap="round"/>
+          <path d="M642 114 L642 150" stroke="#7d8c8f" stroke-width="4" stroke-linecap="round"/>
+          <path d="M644 150 L285 150" stroke="#7d8c8f" stroke-width="4" stroke-linecap="round"/>
+          <path d="M285 150 L285 162" stroke="#7d8c8f" stroke-width="4" stroke-linecap="round"/>
+          <path d="M644 150 L571 150" stroke="#7d8c8f" stroke-width="4" stroke-linecap="round"/>
+          <path d="M571 150 L571 162" stroke="#7d8c8f" stroke-width="4" stroke-linecap="round"/>
+          <path d="M644 150 L857 150" stroke="#7d8c8f" stroke-width="4" stroke-linecap="round"/>
+          <path d="M857 150 L857 162" stroke="#7d8c8f" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </section>
+
+    <section id="fluxo">
+      <div class="section-header">
+        <div>
+          <span class="eyebrow">Fluxo do framework</span>
+          <h2>2. O que acontece depois que esta instalado</h2>
+        </div>
+        <p>O objetivo e deixar a maior parte do orquestrador operando sozinho, mas com pontos claros de intervencao manual.</p>
+      </div>
+
+      <div class="card timeline">
+        <h3>Fluxo padrao de entrega</h3>
+        <svg viewBox="0 0 1120 270" role="img" aria-label="Diagrama do fluxo Maestro para Architect para Coder para Tester para Reviewer com loop para Debugger quando os testes falham">
+          <rect x="30" y="44" width="170" height="86" rx="22" fill="#fff8ee" stroke="#d6c6aa"/>
+          <rect x="238" y="44" width="170" height="86" rx="22" fill="#eef8f7" stroke="#9fc9c4"/>
+          <rect x="446" y="44" width="170" height="86" rx="22" fill="#fff8ee" stroke="#d6c6aa"/>
+          <rect x="654" y="44" width="170" height="86" rx="22" fill="#eef3fb" stroke="#b5c8db"/>
+          <rect x="862" y="44" width="220" height="86" rx="22" fill="#fff1eb" stroke="#e0b6a7"/>
+
+          <text x="62" y="82" fill="#1f2a2c" font-size="22" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Maestro</text>
+          <text x="62" y="106" fill="#6d5b52" font-size="15" font-family="Avenir Next, Segoe UI, sans-serif">briefing, sizing, routing</text>
+
+          <text x="268" y="82" fill="#145d57" font-size="22" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Architect</text>
+          <text x="268" y="106" fill="#567474" font-size="15" font-family="Avenir Next, Segoe UI, sans-serif">interview + plan</text>
+
+          <text x="486" y="82" fill="#1f2a2c" font-size="22" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Coder</text>
+          <text x="486" y="106" fill="#6d5b52" font-size="15" font-family="Avenir Next, Segoe UI, sans-serif">implementa + testa happy path</text>
+
+          <text x="694" y="82" fill="#244e7a" font-size="22" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Tester</text>
+          <text x="694" y="106" fill="#5c6f84" font-size="15" font-family="Avenir Next, Segoe UI, sans-serif">stress, edge, security</text>
+
+          <text x="892" y="82" fill="#a84b2d" font-size="22" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Reviewer</text>
+          <text x="892" y="106" fill="#7d5a4e" font-size="15" font-family="Avenir Next, Segoe UI, sans-serif">quality gate + verdict</text>
+
+          <path d="M200 86 L238 86" stroke="#7d8c8f" stroke-width="4" stroke-linecap="round"/>
+          <path d="M408 86 L446 86" stroke="#7d8c8f" stroke-width="4" stroke-linecap="round"/>
+          <path d="M616 86 L654 86" stroke="#7d8c8f" stroke-width="4" stroke-linecap="round"/>
+          <path d="M824 86 L862 86" stroke="#7d8c8f" stroke-width="4" stroke-linecap="round"/>
+
+          <rect x="470" y="182" width="180" height="64" rx="18" fill="#fffaf4" stroke="#d9c8af"/>
+          <text x="506" y="221" fill="#1f2a2c" font-size="20" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Debugger</text>
+          <text x="688" y="186" fill="#a84b2d" font-size="16" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">se o teste falha</text>
+          <path d="M740 130 C740 172 685 182 650 182" stroke="#c65d3a" stroke-width="4" fill="none" stroke-linecap="round"/>
+          <path d="M470 214 C395 214 364 172 364 130" stroke="#c65d3a" stroke-width="4" fill="none" stroke-linecap="round"/>
+          <path d="M364 130 L362 130" stroke="#c65d3a" stroke-width="4" fill="none" stroke-linecap="round"/>
+        </svg>
+        <div class="badge-row">
+          <span class="badge">XS: Maestro -> Coder -> Reviewer</span>
+          <span class="badge">S: Maestro -> Architect -> Coder -> Reviewer</span>
+          <span class="badge">M/L: Maestro -> Architect -> Coder -> Tester -> Reviewer</span>
+          <span class="badge warning">Investigation: Maestro -> Debugger -> Coder -> Tester -> Reviewer</span>
+        </div>
+      </div>
+
+      <!-- Handoff Claude <-> Codex -->
+      <div class="card" style="margin-top: 18px; padding: 26px;">
+        <div class="kicker">Handoff Claude ↔ Codex</div>
+        <h3>Quando Claude executa e quando passa para o Codex</h3>
+        <p>O Codex nao e um assistente separado — e um executor especializado que Claude aciona em momentos especificos. O trigger e automatico baseado em tamanho de task e evento.</p>
+
+        <div class="matrix" style="margin-top: 18px;">
+          <div class="card" style="background: linear-gradient(135deg, #eef8f7, #d8f0ec);">
+            <div class="kicker" style="color: #145d57; background: rgba(15,118,110,0.1); border-color: rgba(15,118,110,0.15);">Claude executa diretamente</div>
+            <ul class="clean">
+              <li><strong>Tasks XS e S</strong> — Claude implementa sem spawn. Overhead de MCP nao justificado.</li>
+              <li><strong>Maestro, Architect, Tester, Debugger, Reviewer</strong> — sempre rodando em Claude.</li>
+              <li><strong>Plano e briefing</strong> — entrevista, sizing, routing, contexto.</li>
+              <li><strong>Quick fixes e docs</strong> — Claude edita diretamente.</li>
+            </ul>
+          </div>
+
+          <div class="card" style="background: linear-gradient(135deg, #fff1eb, #f5ddd3);">
+            <div class="kicker" style="color: #a84b2d; background: rgba(198,93,58,0.1); border-color: rgba(198,93,58,0.15);">Codex entra via spawn</div>
+            <ul class="clean">
+              <li><strong>Tasks M e L</strong> — Architect gera <code>context-package.md</code>, chama <code>mcp__codex-coder__spawn_agent</code>.</li>
+              <li><strong>Tasks paralelas</strong> — <code>spawn_agents_parallel</code> com context package por agente.</li>
+              <li><strong>Pre-commit gate</strong> — <code>codex-pretool-guard.sh</code> dispara <em>Codex reviewer (o1-pro)</em> em todo <code>git commit</code> automaticamente.</li>
+              <li><strong>Plan review</strong> — ao sair do modo de plano, <code>plan-review.sh</code> chama o <em>Codex reviewer</em> automaticamente.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card flow" style="margin-top: 18px; background: #fffdf9;">
+          <h3 style="font-size: 1rem; margin-bottom: 14px;">Fluxo M/L em detalhe</h3>
+          <svg viewBox="0 0 1100 130" role="img" aria-label="Fluxo de handoff: Claude Architect gera context package, passa para Codex Coder via spawn_agent, Codex escreve codigo, Claude Reviewer le o diff e da veredicto">
+            <rect x="10" y="20" width="190" height="86" rx="18" fill="#eef8f7" stroke="#9fc9c4"/>
+            <text x="34" y="52" fill="#145d57" font-size="17" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Claude</text>
+            <text x="34" y="74" fill="#145d57" font-size="14" font-family="Avenir Next, Segoe UI, sans-serif">Architect</text>
+            <text x="34" y="95" fill="#567474" font-size="12" font-family="Avenir Next, Segoe UI, sans-serif">gera context-package.md</text>
+
+            <path d="M200 63 L248 63" stroke="#7d8c8f" stroke-width="3" stroke-linecap="round"/>
+            <text x="208" y="56" fill="#7d8c8f" font-size="11" font-family="Avenir Next, Segoe UI, sans-serif">spawn_agent</text>
+
+            <rect x="248" y="20" width="190" height="86" rx="18" fill="#fff1eb" stroke="#ddb6a9"/>
+            <text x="272" y="52" fill="#a84b2d" font-size="17" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Codex</text>
+            <text x="272" y="74" fill="#a84b2d" font-size="14" font-family="Avenir Next, Segoe UI, sans-serif">Coder (gpt-5-codex)</text>
+            <text x="272" y="95" fill="#7f5b50" font-size="12" font-family="Avenir Next, Segoe UI, sans-serif">escreve codigo no filesystem</text>
+
+            <path d="M438 63 L486 63" stroke="#7d8c8f" stroke-width="3" stroke-linecap="round"/>
+            <text x="444" y="56" fill="#7d8c8f" font-size="11" font-family="Avenir Next, Segoe UI, sans-serif">git diff</text>
+
+            <rect x="486" y="20" width="190" height="86" rx="18" fill="#eef8f7" stroke="#9fc9c4"/>
+            <text x="510" y="52" fill="#145d57" font-size="17" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Claude</text>
+            <text x="510" y="74" fill="#145d57" font-size="14" font-family="Avenir Next, Segoe UI, sans-serif">Reviewer</text>
+            <text x="510" y="95" fill="#567474" font-size="12" font-family="Avenir Next, Segoe UI, sans-serif">le diff, aprova ou pede fix</text>
+
+            <path d="M676 63 L724 63" stroke="#c65d3a" stroke-width="3" stroke-linecap="round" stroke-dasharray="6 4"/>
+            <text x="680" y="56" fill="#c65d3a" font-size="11" font-family="Avenir Next, Segoe UI, sans-serif">auto-gate</text>
+
+            <rect x="724" y="20" width="190" height="86" rx="18" fill="#fff8ee" stroke="#d6c6aa"/>
+            <text x="748" y="52" fill="#1f2a2c" font-size="17" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Codex Reviewer</text>
+            <text x="748" y="74" fill="#6d5b52" font-size="14" font-family="Avenir Next, Segoe UI, sans-serif">o1-pro (pre-commit gate)</text>
+            <text x="748" y="95" fill="#6d5b52" font-size="12" font-family="Avenir Next, Segoe UI, sans-serif">COMMIT ou HOLD — grava telemetria</text>
+
+            <rect x="914" y="36" width="170" height="56" rx="14" fill="#e8f2f3" stroke="#a8c4c8"/>
+            <text x="934" y="60" fill="#145d57" font-size="13" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Plan review tambem</text>
+            <text x="934" y="80" fill="#517170" font-size="12" font-family="Avenir Next, Segoe UI, sans-serif">ao sair do ExitPlanMode</text>
+            <path d="M914 63 L914 63" stroke="#7d8c8f" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+
+        <div class="badge-row" style="margin-top: 14px;">
+          <span class="badge" style="background:rgba(15,118,110,0.1); color:#145d57; border-color:rgba(15,118,110,0.15);">🟢 Claude = Maestro, Architect, Tester, Debugger, Reviewer</span>
+          <span class="badge" style="background:rgba(198,93,58,0.1); color:#a84b2d; border-color:rgba(198,93,58,0.15);">🟠 Codex = Coder (M/L), Reviewer (pre-commit + plan review)</span>
+          <span class="badge">context-package.md obrigatorio para spawn M/L</span>
+          <span class="badge">codex-pretool-guard intercepta todo git commit automaticamente</span>
+        </div>
+      </div>
+
+      <div class="grid grid-2">
+        <article class="card">
+          <h3>Personas em uma frase</h3>
+          <div class="persona-grid" style="margin-top: 14px;">
+            <div class="persona"><strong>Maestro</strong><small>orquestra sessao, briefing, sizing e handoffs</small></div>
+            <div class="persona"><strong>Architect</strong><small>entrevista e gera plano executavel</small></div>
+            <div class="persona"><strong>Coder</strong><small>implementa e cobre o happy path</small></div>
+            <div class="persona"><strong>Tester</strong><small>bate nos cantos e prova o comportamento</small></div>
+            <div class="persona"><strong>Reviewer</strong><small>aprova ou pede mudancas</small></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <h3>Quando o Contextualizer entra</h3>
+          <p>O Contextualizer nao fica no happy path de toda task. Ele entra quando falta contexto, quando os arquivos de contexto ficaram stale ou quando o usuario pede indexacao profunda do repo.</p>
+          <div class="muted-box">
+            <strong>Fluxo:</strong> Maestro -> Contextualizer -> aprovacao do usuario -> salvar contexto
+          </div>
+          <ul class="clean">
+            <li>Bootstrap de projeto sem <code>.context.md</code> nem <code>docs/FEATURE-MAP.md</code>.</li>
+            <li>Atualizacao de contexto depois de mudancas relevantes de estrutura ou fluxo.</li>
+            <li>Pipeline Evaluate Repo para gerar indice mais profundo do codigo.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="passivo">
+      <div class="section-header">
+        <div>
+          <span class="eyebrow">Automacao vs comando manual</span>
+          <h2>3. O que funciona passivamente e o que voce precisa pedir</h2>
+        </div>
+        <p>Esse e o ponto principal para usar o framework sem atrito.</p>
+      </div>
+
+      <div class="matrix">
+        <article class="card">
+          <div class="kicker">Funciona passivamente</div>
+          <h3>Roda sozinho depois da instalacao</h3>
+          <ul class="clean">
+            <li>Briefing inicial do Maestro ao abrir a sessao.</li>
+            <li>Classificacao de task e escolha do fluxo entre personas.</li>
+            <li>Carregamento de memoria, pending tasks e instincts no inicio.</li>
+            <li><code>plan-review.sh</code> ao sair do modo de plano.</li>
+            <li><code>codex-pretool-guard.sh</code> em <code>git commit</code> e delegacoes Codex.</li>
+            <li><code>session-save.sh</code> no evento <code>Stop</code>.</li>
+            <li><code>pre-compact-save.sh</code> antes de compactacao.</li>
+            <li>Disponibilizacao de profiles e MCPs depois de <code>install.sh</code>.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <div class="kicker">Precisa ser explicito</div>
+          <h3>Voce precisa dizer ou rodar</h3>
+          <ul class="clean">
+            <li><code>curl ... | bash -s -- --update</code> para atualizar projetos existentes (sempre via curl, nunca local).</li>
+            <li><code>curl ... | bash -s -- --repair</code> ou <code>--doctor</code> para consertar e validar.</li>
+            <li><code>curl ... | bash -s -- --test</code> para validar a integracao do projeto consumidor.</li>
+            <li><code>health check</code> para pedir diagnostico pelo Maestro.</li>
+            <li>Flags como <code>set FAST_MODE</code>, <code>set STRICT_MODE</code>, <code>skip tests</code>.</li>
+            <li>Slash commands como <code>/qa</code>, <code>/office-hours</code>, <code>/review</code>.</li>
+            <li>Pedidos explicitos de skill, por exemplo <code>use a skill research</code>.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="comandos">
+      <div class="section-header">
+        <div>
+          <span class="eyebrow">Referencia completa</span>
+          <h2>4. Todos os comandos e frases do framework</h2>
+        </div>
+        <p>Tudo que voce pode dizer ou rodar. Nenhum setup adicional necessario apos o install.</p>
+      </div>
+
+      <!-- Terminal -->
+      <article class="card" style="margin-bottom: 18px;">
+        <h3>Terminal — Setup e manutencao</h3>
+        <p style="margin-bottom: 0; font-size: 13px; color: var(--muted);">Todos os comandos de install/update/repair sempre via curl. Nunca use <code>bash install.sh</code> local para atualizar.</p>
+        <div class="code"><pre><code>CANUTO="https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh"
+
+# Instalar em projeto novo (nao tem o framework ainda)
+curl -fsSL $CANUTO | bash
+
+# Atualizar projeto que ja usa Canuto
+curl -fsSL $CANUTO | bash -s -- --update
+
+# Check rapido de integridade de arquivos e versoes
+curl -fsSL $CANUTO | bash -s -- --check
+
+# Smoke test do projeto consumidor (HEALTHY / DEGRADED / BROKEN)
+curl -fsSL $CANUTO | bash -s -- --test
+
+# Reidratar runtime: hooks, MCPs, profiles Codex, context bootstrap
+curl -fsSL $CANUTO | bash -s -- --repair
+
+# Repair + validacao completa em uma so passada
+curl -fsSL $CANUTO | bash -s -- --doctor
+
+# Migracao de projeto existente para versao nova do framework
+curl -fsSL $CANUTO | bash -s -- --migrate
+
+# Health check do Codex (MCPs, profiles, telemetria)
+bash .agents/tools/codex-health-check.sh
+
+# Smoke test especifico do projeto consumidor
+bash .agents/tools/canuto-consumer-smoke.sh
+
+# Suite interna do framework (apenas para dev do canuto em si)
+bash test-framework.sh
+
+# Instalar hooks e mesclar settings.json localmente
+bash .agents/hooks/install.sh
+
+# Abrir este tutorial
+open docs/TUTORIAL-VISUAL.html</code></pre></div>
+      </article>
+
+      <!-- Co-Review e Colaboracao paralela -->
+      <article class="card" style="margin-bottom: 18px;">
+        <h3>Colaboracao paralela Claude + Codex</h3>
+        <p style="margin-bottom: 0; font-size: 13px; color: var(--muted);">Esses comandos eliminam viés de ancoragem: Claude e Codex trabalham independentemente e os resultados sao comparados depois.</p>
+        <div class="code"><pre><code># Brainstorm paralelo — Claude e Codex geram ideias independentes, depois compara
+/co-brainstorm como estruturar o sistema de billing
+
+# Plano paralelo — ambos planejam a task, Maestro reconcilia as abordagens
+/co-plan refatorar o modulo de autenticacao
+
+# Validacao de plano — Codex faz review de staff-engineer no plano finalizado
+/co-validate PLAN.md
+
+# Implementacao paralela — Architect fatia em subtasks, Codex implementa em paralelo
+/parallel-impl
+
+# Competicao — Claude e Codex implementam a mesma feature independentemente
+/compete
+
+# Desabilitar co-review automatico para M/L tasks (flag de sessao)
+set CO_REVIEW=false</code></pre></div>
+      </article>
+
+      <!-- Slash commands por categoria -->
+      <div class="grid grid-3" style="margin-bottom: 18px;">
+        <article class="card">
+          <div class="kicker">Qualidade e revisao</div>
+          <div class="code" style="margin-top: 10px;"><pre><code>/review
+/co-validate &lt;plan&gt;
+/security-gate
+/codex-test
+/audit
+/qa
+/test-fix</code></pre></div>
+        </article>
+
+        <article class="card">
+          <div class="kicker">Contexto e planejamento</div>
+          <div class="code" style="margin-top: 10px;"><pre><code>/auto-analysis
+/co-plan &lt;task&gt;
+/co-brainstorm &lt;topico&gt;
+/parallel-impl
+/briefing
+/office-hours
+/codex-onboard</code></pre></div>
+        </article>
+
+        <article class="card">
+          <div class="kicker">Codex delegacoes</div>
+          <div class="code" style="margin-top: 10px;"><pre><code>/codex-qa
+/codex-gh
+/pr-write
+/codex-smoke-test
+/codex-refactor-prep
+/cross-project-insights
+/test-fix</code></pre></div>
+        </article>
+
+        <article class="card">
+          <div class="kicker">Sessao e vault</div>
+          <div class="code" style="margin-top: 10px;"><pre><code>/briefing
+/commit
+/vault-maintenance
+/save-session
+/skill-creator
+continue / retoma</code></pre></div>
+        </article>
+
+        <article class="card">
+          <div class="kicker">Design e frontend</div>
+          <div class="code" style="margin-top: 10px;"><pre><code>/colorize
+/typeset
+/design-consultation
+/brand-bootstrap
+/audit</code></pre></div>
+        </article>
+
+        <article class="card">
+          <div class="kicker">Flags de sessao</div>
+          <div class="code" style="margin-top: 10px;"><pre><code>set FAST_MODE
+set STRICT_MODE
+skip tests
+quick fix / so isso
+health check
+set CO_REVIEW=false
+set BUDGET_LIMIT=&lt;n&gt;</code></pre></div>
+        </article>
+      </div>
+
+      <div class="grid grid-2">
+        <article class="card">
+          <h3>Frases naturais que o Maestro entende</h3>
+          <ul class="clean">
+            <li><strong>continue / retoma</strong> — retoma pending tasks como foco.</li>
+            <li><strong>quick fix / so isso</strong> — fluxo estreito, sem Architect.</li>
+            <li><strong>health check</strong> — diagnostico completo do framework.</li>
+            <li><strong>set FAST_MODE</strong> — reduz rigor, pula Tester em XS.</li>
+            <li><strong>set STRICT_MODE</strong> — validacoes maximas, co-review forcado.</li>
+            <li><strong>skip tests</strong> — pula o Tester para essa task.</li>
+            <li><strong>use a skill X</strong> — ativa skill especifica pelo nome.</li>
+            <li><strong>brainstorm X com codex</strong> — dispara /co-brainstorm.</li>
+            <li><strong>segunda opiniao no plano</strong> — dispara /co-validate.</li>
+            <li><strong>implementa em paralelo</strong> — dispara /parallel-impl.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h3>Interpretacao do resultado</h3>
+          <ul class="clean">
+            <li><strong>HEALTHY</strong> — instalacao e runtime coerentes.</li>
+            <li><strong>DEGRADED</strong> — framework roda, setup incompleto ou warning.</li>
+            <li><strong>BROKEN</strong> — falha real no runtime que precisa de reparo.</li>
+            <li><strong>COMMIT</strong> — pre-commit gate aprovou o diff.</li>
+            <li><strong>HOLD</strong> — pre-commit gate bloqueou; ler <code>.agents/tmp/codex/latest-pre-commit-review.md</code>.</li>
+            <li><strong>LGTM</strong> — plan review aprovado pelo Codex reviewer.</li>
+            <li><strong>CONCERNS</strong> — plan review com ressalvas; resolver antes de codar.</li>
+          </ul>
+          <div class="badge-row">
+            <span class="badge">check = integridade basica</span>
+            <span class="badge">test = smoke do consumidor</span>
+            <span class="badge">doctor = repair + validacao</span>
+            <span class="badge">--json = saida estruturada para CI</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="skills">
+      <div class="section-header">
+        <div>
+          <span class="eyebrow">Catalogo de skills</span>
+          <h2>5. Todos os skills disponiveis</h2>
+        </div>
+        <p>Skills sao playbooks que o Maestro aciona por trigger de frase ou slash command. Cada um define quando entra, o que faz e quem executa.</p>
+      </div>
+
+      <div class="grid grid-3">
+        <article class="card">
+          <div class="kicker" style="color:#a84b2d; background:rgba(198,93,58,0.08); border-color:rgba(198,93,58,0.12);">Codex — delegacao e execucao</div>
+          <ul class="clean" style="margin-top: 10px;">
+            <li><strong>/codex-onboard</strong> — analise automatica de projeto novo pelo Codex</li>
+            <li><strong>/codex-qa</strong> — browser QA completo delegado ao Codex + Playwright</li>
+            <li><strong>/codex-gh</strong> — operacoes GitHub (issues, PRs) via Codex + MCP</li>
+            <li><strong>/pr-write</strong> — PR description + changelog gerado pelo Codex</li>
+            <li><strong>/test-fix</strong> — loop autonomo de correcao de testes via Codex</li>
+            <li><strong>/codex-smoke-test</strong> — verifica MCPs codex-coder e codex-reviewer</li>
+            <li><strong>/codex-refactor-prep</strong> — Codex prepara base antes de feature grande</li>
+            <li><strong>/cross-project-insights</strong> — Codex le vault de multiplos projetos</li>
+            <li><strong>/save-session</strong> — Codex escreve nota de sessao no vault</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <div class="kicker" style="color:#145d57; background:rgba(15,118,110,0.08); border-color:rgba(15,118,110,0.12);">Colaboracao e revisao</div>
+          <ul class="clean" style="margin-top: 10px;">
+            <li><strong>/co-brainstorm</strong> — ideacao paralela independente (anti-ancoragem)</li>
+            <li><strong>/co-plan</strong> — planejamento paralelo, reconciliacao posterior</li>
+            <li><strong>/co-validate</strong> — review de staff-engineer no plano pelo o1-pro</li>
+            <li><strong>/parallel-impl</strong> — implementacao paralela de subtasks via spawn_agents_parallel</li>
+            <li><strong>/compete</strong> — Claude e Codex implementam a mesma feature independentemente</li>
+            <li><strong>/lazy-opus-review</strong> — review condicional por nivel de confianca do Codex</li>
+            <li><strong>/security-gate</strong> — scan OWASP/injection pre-merge via o1-pro</li>
+            <li><strong>/review</strong> — revisao pre-commit dual (Claude + Codex)</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <div class="kicker" style="color:#244e7a; background:rgba(36,78,122,0.08); border-color:rgba(36,78,122,0.12);">Contexto e planejamento</div>
+          <ul class="clean" style="margin-top: 10px;">
+            <li><strong>/auto-analysis</strong> — scan profundo do projeto + cross-reference vault</li>
+            <li><strong>/briefing</strong> — carrega contexto completo da sessao automaticamente</li>
+            <li><strong>/office-hours</strong> — modo YC: reframe de produto antes do codigo</li>
+            <li><strong>context-preload</strong> — gera context-package.md antes de spawn M/L</li>
+            <li><strong>context-digest</strong> — digests compactos (~50 linhas) de diretorios</li>
+            <li><strong>/codex-context-loader</strong> — Codex le o codebase em vez de Opus</li>
+            <li><strong>/research</strong> — analise + plano de migracao estruturado</li>
+            <li><strong>/knowledge-ingest</strong> — ingere videos, artigos, PDFs no vault</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <div class="kicker">Qualidade e testes</div>
+          <ul class="clean" style="margin-top: 10px;">
+            <li><strong>/qa</strong> — QA com browser real (gstack/playwright)</li>
+            <li><strong>/browser-qa</strong> — quando e como usar /qa + /browse no fluxo</li>
+            <li><strong>/audit</strong> — scan de qualidade UI/UX multi-dimensional</li>
+            <li><strong>/health-check</strong> — diagnostico de setup e configuracao</li>
+            <li><strong>verification-gates</strong> — previne gaming de testes, dual verify em M/L</li>
+            <li><strong>coverage-tracking</strong> — rastreia quais areas foram exploradas</li>
+            <li><strong>stuck-detection</strong> — detecta loop Debugger-Coder-Tester sem progresso</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <div class="kicker">Vault e sessao</div>
+          <ul class="clean" style="margin-top: 10px;">
+            <li><strong>/vault-maintenance</strong> — arquiva sessoes, agrega metricas, limpa snapshots</li>
+            <li><strong>/commit</strong> — commit semantico com validacoes</li>
+            <li><strong>session-goals</strong> — rastreia metas da sessao do inicio ao fim</li>
+            <li><strong>audit-trail</strong> — log imutavel de mutacoes significativas</li>
+            <li><strong>metrics</strong> — rastreia qualidade, velocidade e rework</li>
+            <li><strong>/skill-creator</strong> — cria novo skill dentro do framework</li>
+            <li><strong>multi-provider</strong> — tabela de delegacao Claude/Codex/Gemini</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <div class="kicker">Design e frontend</div>
+          <ul class="clean" style="margin-top: 10px;">
+            <li><strong>/colorize</strong> — introducao estrategica de cor, paletas OKLCH</li>
+            <li><strong>/typeset</strong> — audit de tipografia, font pairings por mood</li>
+            <li><strong>/design-consultation</strong> — sistema de design completo com BM25 search</li>
+            <li><strong>/brand-bootstrap</strong> — extrai identidade de marca de site existente</li>
+            <li><strong>frontend-implementation</strong> — convencoes de implementacao frontend</li>
+            <li><strong>/api-design</strong> — design e evolucao de APIs HTTP/JSON</li>
+            <li><strong>/pr-description</strong> — gera descricao de PR a partir da sessao</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="card" style="margin-top: 18px;">
+        <h3>Skills que rodam automaticamente (passivos)</h3>
+        <div class="grid grid-3" style="margin-top: 14px;">
+          <div class="muted-box">
+            <strong>cost-routing</strong><br>
+            <small>Maestro consulta antes de cada delegacao tier-2. Roteia para o provider mais barato que resolve.</small>
+          </div>
+          <div class="muted-box">
+            <strong>smart-token-metering</strong><br>
+            <small>Rastreia uso de tokens Opus por task. Ao chegar em 80%, auto-switch para Codex.</small>
+          </div>
+          <div class="muted-box">
+            <strong>lazy-opus-review</strong><br>
+            <small>Apos cada output do Codex. Se confianca >= 8, Opus pula a revisao (economiza tokens).</small>
+          </div>
+          <div class="muted-box">
+            <strong>codex-session-writer</strong><br>
+            <small>No Stop, Codex escreve a nota de sessao no vault. Opus so valida.</small>
+          </div>
+          <div class="muted-box">
+            <strong>codex-pretool-guard</strong><br>
+            <small>Em todo git commit: comprime diff, gate Codex reviewer, registra telemetria JSONL.</small>
+          </div>
+          <div class="muted-box">
+            <strong>plan-review (hook)</strong><br>
+            <small>Ao sair do ExitPlanMode: Codex reviewer o1-pro revisa o plano automaticamente.</small>
+          </div>
+          <div class="muted-box">
+            <strong>budget-controls</strong><br>
+            <small>Define e aplica budgets de tokens por persona e por sessao.</small>
+          </div>
+          <div class="muted-box">
+            <strong>stuck-detection</strong><br>
+            <small>Detecta loop sem progresso no ciclo Debugger-Coder-Tester e escala.</small>
+          </div>
+          <div class="muted-box">
+            <strong>verification-gates</strong><br>
+            <small>Tester e Reviewer: requer saida raw de comandos, dual verify em M/L.</small>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="hooks">
+      <div class="section-header">
+        <div>
+          <span class="eyebrow">Hooks ativos</span>
+          <h2>6. Onde o framework entra sem voce perceber</h2>
+        </div>
+        <p>Esses sao os pontos do runtime que conectam Claude, Codex e o projeto consumidor.</p>
+      </div>
+
+      <div class="grid grid-2">
+        <article class="card">
+          <h3>Mapa dos hooks</h3>
+          <ul class="clean">
+            <li><strong><code>codex-pretool-guard.sh</code></strong> -> intercepta <code>git commit</code>, comprime diff, roda gate e registra telemetria.</li>
+            <li><strong><code>plan-review.sh</code></strong> -> roda review de plano quando o modo de plano termina.</li>
+            <li><strong><code>session-save.sh</code></strong> -> snapshot no <code>Stop</code>.</li>
+            <li><strong><code>pre-compact-save.sh</code></strong> -> persiste estado antes da compactacao.</li>
+            <li><strong><code>session-load.sh</code></strong> -> pode ser chamado manualmente para reidratar o contexto da sessao.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h3>O que o install/update ja prepara</h3>
+          <ul class="clean">
+            <li>Perfis do Codex em <code>~/.codex/config.toml</code>.</li>
+            <li>MCPs nativos para Codex e integracao com o vault.</li>
+            <li>Hooks mesclados em <code>~/.claude/settings.json</code> sem duplicar entradas.</li>
+            <li>Bootstrap de <code>.context.md</code>, <code>docs/FEATURE-MAP.md</code> e digest inicial quando faltarem.</li>
+            <li>Scripts de health check e smoke test disponiveis no projeto.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="visual">
+      <div class="section-header">
+        <div>
+          <span class="eyebrow">Mapa visual</span>
+          <h2>7. Um quadro unico do Canuto</h2>
+        </div>
+        <p>Use este resumo visual quando quiser explicar o framework para outra pessoa em poucos minutos.</p>
+      </div>
+
+      <div class="card">
+        <svg viewBox="0 0 1140 640" role="img" aria-label="Mapa visual geral do Canuto mostrando setup, runtime passivo, comandos explicitos e vault">
+          <defs>
+            <linearGradient id="panelWarm" x1="0" x2="1">
+              <stop offset="0%" stop-color="#fff9ef"/>
+              <stop offset="100%" stop-color="#f7ebd6"/>
+            </linearGradient>
+            <linearGradient id="panelCool" x1="0" x2="1">
+              <stop offset="0%" stop-color="#eef8f7"/>
+              <stop offset="100%" stop-color="#ddeeea"/>
+            </linearGradient>
+            <linearGradient id="panelRust" x1="0" x2="1">
+              <stop offset="0%" stop-color="#fff1eb"/>
+              <stop offset="100%" stop-color="#f5ddd3"/>
+            </linearGradient>
+          </defs>
+
+          <rect x="24" y="30" width="316" height="176" rx="24" fill="url(#panelWarm)" stroke="#d9c8af"/>
+          <text x="52" y="70" fill="#1f2a2c" font-size="24" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">1. Setup</text>
+          <text x="52" y="106" fill="#5f564e" font-size="17" font-family="Avenir Next, Segoe UI, sans-serif">Fresh install</text>
+          <text x="52" y="132" fill="#5f564e" font-size="17" font-family="Avenir Next, Segoe UI, sans-serif">Update via curl (sempre)</text>
+          <text x="52" y="158" fill="#5f564e" font-size="17" font-family="Avenir Next, Segoe UI, sans-serif">Repair / Doctor</text>
+
+          <rect x="412" y="30" width="316" height="176" rx="24" fill="url(#panelCool)" stroke="#9fc9c4"/>
+          <text x="440" y="70" fill="#145d57" font-size="24" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">2. Runtime passivo</text>
+          <text x="440" y="106" fill="#517170" font-size="17" font-family="Avenir Next, Segoe UI, sans-serif">Briefing + goals</text>
+          <text x="440" y="132" fill="#517170" font-size="17" font-family="Avenir Next, Segoe UI, sans-serif">Hooks de plan review e commit gate</text>
+          <text x="440" y="158" fill="#517170" font-size="17" font-family="Avenir Next, Segoe UI, sans-serif">Session save e memory sync</text>
+
+          <rect x="800" y="30" width="316" height="176" rx="24" fill="url(#panelRust)" stroke="#ddb6a9"/>
+          <text x="828" y="70" fill="#a84b2d" font-size="24" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">3. Explicitos</text>
+          <text x="828" y="106" fill="#7f5b50" font-size="17" font-family="Avenir Next, Segoe UI, sans-serif">health check</text>
+          <text x="828" y="132" fill="#7f5b50" font-size="17" font-family="Avenir Next, Segoe UI, sans-serif">set FAST_MODE / STRICT_MODE</text>
+          <text x="828" y="158" fill="#7f5b50" font-size="17" font-family="Avenir Next, Segoe UI, sans-serif">/qa /review /office-hours</text>
+
+          <rect x="160" y="274" width="820" height="150" rx="28" fill="#fffdf9" stroke="#d8c8ad"/>
+          <text x="192" y="322" fill="#1f2a2c" font-size="26" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">4. Entrega</text>
+          <text x="192" y="362" fill="#5f564e" font-size="18" font-family="Avenir Next, Segoe UI, sans-serif">Maestro -> Architect -> Coder -> Tester -> Reviewer</text>
+          <text x="192" y="392" fill="#5f564e" font-size="18" font-family="Avenir Next, Segoe UI, sans-serif">Se falha: Debugger entra, propõe fix, e o ciclo volta para Coder + Tester</text>
+
+          <rect x="280" y="478" width="580" height="116" rx="24" fill="#e8f2f3" stroke="#a8c4c8"/>
+          <text x="314" y="524" fill="#145d57" font-size="24" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">5. Memoria compartilhada</text>
+          <text x="314" y="556" fill="#517170" font-size="17" font-family="Avenir Next, Segoe UI, sans-serif">Vault global em ~/.canuto/vault + contexto local + feature map + digests</text>
+
+          <path d="M340 118 L412 118" stroke="#7d8c8f" stroke-width="4" stroke-linecap="round"/>
+          <path d="M728 118 L800 118" stroke="#7d8c8f" stroke-width="4" stroke-linecap="round"/>
+          <path d="M570 206 L570 274" stroke="#7d8c8f" stroke-width="4" stroke-linecap="round"/>
+          <path d="M570 424 L570 478" stroke="#7d8c8f" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <strong>Arquivos relacionados:</strong> <a href="./TUTORIAL.md">TUTORIAL.md</a>, <a href="../README.md">README.md</a>, <a href="./FEATURE-MAP.md">FEATURE-MAP.md</a> e <a href="./CLAUDE-EXAMPLES.md">CLAUDE-EXAMPLES.md</a>.
+    </footer>
+  </div>
+</body>
+</html>

@@ -128,7 +128,7 @@ Do NOT share your review yet.
 
 | Tool | Purpose |
 |------|---------|
-| `mcp__codex-collab__codex` | Start new Codex session (returns `response` + `threadId`) |
-| `mcp__codex-collab__codex-reply` | Continue session via `threadId` (clarifying questions, retrieval) |
+| `mcp__codex-reviewer__codex` | Start new Codex review session (returns `response` + `threadId`) |
+| `mcp__codex-reviewer__codex-reply` | Continue session via `threadId` (clarifying questions, retrieval) |
 
 Full MCP docs: `.agents/mcp/codex-collab.md`
