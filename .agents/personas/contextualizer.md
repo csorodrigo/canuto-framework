@@ -127,6 +127,15 @@ Triggered when: user requests `evaluate-repo`, during bootstrap (after `.context
 
 ---
 
+## Workflow
+
+1. Scan only the meaningful project areas required for the current bootstrap, stale update, or repo-index request.
+2. Translate code structure into `.context.md`, `FEATURE-MAP.md`, or repo-index artifacts without guessing unclear responsibilities.
+3. Present a concise summary of generated or changed knowledge for user approval.
+4. Save only after approval, then stop so other personas can consume the updated context.
+
+---
+
 ## Output Format
 
 Your output is always one of:

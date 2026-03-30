@@ -25,10 +25,12 @@ Enable the Maestro to orchestrate multiple AI providers for different personas, 
 
 ## Provider Tiers
 
-| Tier | Role | Default Provider | Can Delegate? |
-|------|------|-----------------|---------------|
-| tier-1 | Strategic (Maestro, Architect, Contextualizer) | Claude | No — always Claude |
-| tier-2 | Execution (Coder, Tester, Debugger, Reviewer) | Claude | Yes — can use Codex, GLM, etc. |
+| Tier | Role | Default Provider | Model | MCP Tool | Can Delegate? |
+|------|------|-----------------|-------|----------|---------------|
+| tier-1 | Strategic (Maestro, Architect, Contextualizer) | Claude | opus | — | No — always Claude |
+| tier-2 | Coder | Codex | gpt-5-codex | `mcp__codex-coder__spawn_agent` | Yes — writes code in filesystem |
+| tier-2 | Reviewer | Codex | o1-pro | `mcp__codex-reviewer__codex` | Yes — deep self-review (cross-model) |
+| tier-2 | Tester, Debugger | Codex | gpt-5-codex | `mcp__codex-coder__spawn_agent` | Yes — can use Codex or Claude |
 
 ---
 
@@ -51,7 +53,41 @@ If no provider section exists, all personas default to Claude.
 
 ### 2. Delegation Protocol
 
-When Maestro delegates to a tier-2 persona on a non-Claude provider:
+When Maestro delegates to a tier-2 persona:
+
+#### A. Coding Delegation (preferred: MCP + Context Preload)
+
+1. **Consult cost-routing** (`.agents/skills/cost-routing.md`) — confirm Codex is the right provider.
+
+2. **Prepare context package** (M/L tasks only):
+   - Write `.agents/tmp/context-package.md` with: plan, digests, types, constraints.
+   - See `context-preload` skill for the full procedure.
+   - Codex reads from disk — zero Opus tokens for context.
+
+3. **Spawn Codex agent**:
+   ```
+   mcp__codex-coder__spawn_agent({
+     prompt: "Read .agents/tmp/context-package.md for full task context. Implement per plan."
+   })
+   ```
+
+4. **Codex writes code directly in filesystem** (gpt-5-codex).
+
+5. **Post-code**: Opus reads `git diff`, then triggers Code Review via `mcp__codex-reviewer__codex` (o1-pro self-review).
+
+6. For **XS/S tasks**: Claude codes directly — MCP overhead not justified. No context preload needed.
+
+#### B. Review Delegation (preferred: MCP)
+
+1. **Send plan or diff** to `mcp__codex-reviewer__codex` (o1-pro):
+   - Include full plan between `--- PLAN START/END ---` delimiters.
+   - Or include `git diff` between `--- CHANGES START/END ---` delimiters.
+
+2. **Codex reviews with o1-pro** (ultra think, cross-model perspective).
+
+3. **Multi-turn**: Use `mcp__codex-reviewer__codex-reply(threadId, msg)` for follow-ups.
+
+#### C. Legacy Delegation (fallback: API/CCB)
 
 1. **Prepare the handoff package**:
    - Goal statement (same as normal handoff).
@@ -59,27 +95,54 @@ When Maestro delegates to a tier-2 persona on a non-Claude provider:
    - The Architect's plan (for Coder) or implementation summary (for Tester/Reviewer).
    - The persona's playbook (the full `.md` file content).
 
-2. **Format for the target provider**:
-   - Strip Canuto-specific metadata headers if the provider doesn't understand them.
-   - Include the playbook instructions as a system prompt or preamble.
-   - Attach context files as reference documents.
+2. **Send via CCB** (`ask codex`) or **API** (when MCP unavailable).
 
-3. **Send via API** (when available):
-   - Use the provider's API to submit the task.
-   - Collect the response.
-
-4. **Validate the response**:
-   - Check that the output follows the expected format (implementation summary, test report, etc.).
+3. **Validate the response**:
+   - Check that the output follows the expected format.
    - If the output is malformed, retry once with a clarification prompt.
    - If still malformed, fall back to Claude for that task.
 
-### 3. Fallback Strategy
+### 3. Auto-Escalation: gpt-5-codex → o1-pro
+
+When `codex-coder` (gpt-5-codex) fails a task:
+
+| Failure Type | Detection | Action |
+|-------------|-----------|--------|
+| Tests fail after code | Test runner reports failures | Re-attempt with `/test-fix` loop (3 iterations) |
+| Malformed output | Output doesn't match expected format | Retry once with clarified prompt |
+| Timeout | No response in 120s | Escalate to o1-pro |
+| Logic error | Review catches fundamental flaw | Escalate to o1-pro with error context |
+
+**Escalation procedure:**
+1. Collect: original prompt + gpt-5-codex's output + error/failure details
+2. Send to `mcp__codex-reviewer__codex` (o1-pro) with escalation tag:
+   ```
+   [ESCALATION: gpt-5-codex → o1-pro]
+   The fast model failed this task. Use maximum reasoning depth.
+
+   ## Original Task
+   {original_prompt}
+
+   ## What Failed
+   {failure_details}
+
+   ## gpt-5-codex's Attempt
+   {codex_output_or_diff}
+
+   Please provide the correct implementation.
+   ```
+3. Apply o1-pro's fix
+4. Log escalation in session metrics
+
+**Cost note:** o1-pro is significantly more expensive. Only escalate after gpt-5-codex genuinely fails (not for first attempt).
+
+### 4. Fallback Strategy
 
 ```
-Attempt provider → Malformed output → Retry with clarification → Still bad → Fall back to Claude
+codex-coder MCP (gpt-5-codex) → escalate to codex-reviewer MCP (o1-pro) → CCB ask → Claude-only
 ```
 
-Maestro logs every fallback in the session summary.
+Maestro logs every fallback and escalation in the session summary.
 
 ### 4. Quality Tracking
 
@@ -100,12 +163,45 @@ This data feeds into the metrics system (see `metrics` skill).
 
 ---
 
+## CCB Backend (Optional)
+
+When the CCB plugin is installed (`.agents/plugins/ccb/`), delegation gains a third backend with visible terminal panes:
+
+| Backend | Mechanism | Visibility | Multi-turn | Session Persistence |
+|---------|-----------|------------|------------|---------------------|
+| API (default) | Provider API calls | Invisible | No | No |
+| codex-collab MCP | MCP tools (threadId) | Background subagent | Yes | No |
+| CCB panes | CLI terminal panes (WezTerm/tmux) | Visible terminal panes | Yes | Yes (JSONL, resumable) |
+
+### Backend Selection
+
+Maestro chooses the backend based on:
+
+1. **MCP available** (preferred): `codex-coder` for coding, `codex-reviewer` for reviews
+2. **User preference**: if user says "use CCB", "show me the panes", "visible execution" → CCB
+3. **CCB available**: CCB installed? → fallback to `ask codex`
+4. **Default**: Claude does everything (all-in-one)
+
+### Fallback Chain
+
+```
+codex-coder/codex-reviewer MCP → CCB panes → API delegation → Claude (all-in-one)
+```
+
+If CCB is not installed, the fallback is transparent. No user action needed.
+
+See `.agents/plugins/ccb/skills/ccb-delegate.md` for the full CCB delegation procedure.
+
+---
+
 ## Environment Variables
 
 ```
 ANTHROPIC_API_KEY=...     # Claude (always required)
 OPENAI_API_KEY=...        # Codex (optional)
 GLM_API_KEY=...           # GLM (optional)
+# CCB (optional — only if CCB plugin is installed)
+# CCB reads provider keys from its own config but uses the same env vars above
 ```
 
 These MUST be in `.env` (never committed). See `security-practices` skill.

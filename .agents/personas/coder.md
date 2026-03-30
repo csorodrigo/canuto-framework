@@ -67,6 +67,7 @@ For each step in the plan:
 4. **If the step produces visible UI**: apply at least 3 design principles from the `frontend-design` skill. Do not ship default shadcn/ui components without customization matching the design profile.
 5. **If you created a new shared component**: add it to `~/.canuto/vault/projects/{project-slug}/design/components/` as a new note with the component template.
 6. **Note** any deviations from the plan or areas where you had to guess.
+7. **Output truncation**: when build/test commands produce output exceeding 100 lines, apply anomaly-preserving truncation — keep first 20 lines + all error-signal lines (`ERROR`, `FAIL`, stack traces) + last 10 lines. Replace omitted sections with `[... N lines omitted ...]`.
 
 ### 5. Update Documentation
 
@@ -129,6 +130,15 @@ Classify each deviation using I-013 taxonomy:
 ```
 
 > ⚠️ **Important:** If you are re-implementing after a REQUEST CHANGES verdict, produce a **new full Implementation Summary**. Maestro uses the Changed Files table across all cycles to detect rework patterns.
+
+---
+
+## Workflow
+
+1. Load the approved plan and the relevant context files for the touched areas.
+2. Confirm the exact file scope before editing and flag any scope drift immediately.
+3. Implement each plan step with the minimum diff, adding happy-path tests as you go.
+4. Update project docs when responsibilities or feature flows changed, then produce the structured implementation handoff.
 
 ---
 

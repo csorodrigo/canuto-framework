@@ -87,7 +87,13 @@ Maestro → Architect → Coder → Tester → Reviewer
                              Debugger → Coder (fix) → Tester (re-run)
 ```
 
-## Installation
+## Quick Start
+
+Guia completo: [docs/TUTORIAL.md](docs/TUTORIAL.md)
+Tutorial visual: [docs/TUTORIAL-VISUAL.html](docs/TUTORIAL-VISUAL.html)
+Troubleshooting: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+Catalogo de skills: [registry.md](registry.md)
+Exemplos de `CLAUDE.md`: [docs/CLAUDE-EXAMPLES.md](docs/CLAUDE-EXAMPLES.md)
 
 ### Fresh install (new project)
 
@@ -96,54 +102,67 @@ cd my-project
 curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash
 ```
 
-O script:
-- Baixa todas as personas e skills
-- Cria `~/.canuto/vault/projects/{project-name}/` com toda a estrutura de memoria
-- Cria o `CLAUDE.md` se nao existir, ou adiciona as secoes faltando
-- Configura MCP (pede a API key do Obsidian Local REST API)
-- Instala hooks, ast-grep, gstack, e global skills
-- Oferece commit ao final
-
-### Migrar de v1.5 (flat-file memory) para v1.6 (Obsidian vault)
+To view the visual guide locally:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --migrate
+open docs/TUTORIAL-VISUAL.html
 ```
 
-O `--migrate`:
-- Faz backup de `.agents/memory/`
-- Atualiza framework files (personas, skills, hooks)
-- Cria o vault global em `~/.canuto/vault/`
-- Migra dados do memory antigo para o vault (pula templates vazios)
-- Configura MCP e hooks
-- Oferece deletar o `memory/` antigo
-
-### Atualizar o framework
+### Update an existing project that already uses Canuto
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --update
+cd my-project
+bash install.sh --update
 ```
 
-O `--update` **nunca sobrescreve** `vault/`, `plugins/`, ou `CLAUDE.md` — so atualiza personas, skills, hooks, e SPEC.
+`bash install.sh --update` is now the standard path. The installer refreshes itself from `main` before applying the update, so it still works even if the local `install.sh` is stale.
 
-### Verificar se esta atualizado
+`--update` never overwrites `vault/`, `plugins/`, or `CLAUDE.md`; it updates personas, skills, hooks, runtime helpers, and support docs.
+
+### Validate install or update
 
 ```bash
+# quick integrity check
 bash install.sh --check
+
+# smoke test recommended after install/update
+bash install.sh --test
+
+# repair runtime state without redoing a full install
+bash install.sh --repair
+
+# repair + validate in one command
+bash install.sh --doctor
 ```
 
-### Instalar uma skill opcional
+If you are maintaining the framework itself, run:
+
+```bash
+bash test-framework.sh
+```
+
+### Optional skill install
 
 ```bash
 bash install.sh --skill adr
 bash install.sh --skill adr --skill session-goals
 ```
 
-Veja `registry.md` para a lista completa.
+### One-time migration from v1.5 (flat-file memory) to v1.6 (Obsidian vault)
 
-### Projeto novo (via GitHub Template)
+```bash
+curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --migrate
+```
 
-Clica em **"Use this template"** no topo do repositorio.
+### Passive vs Explicit
+
+| Passive after install | Explicitly ask/run |
+|-----------------------|--------------------|
+| Maestro briefing, normal persona flow, session-save hook, pre-compact-save hook, plan-review hook, Codex pretool guard | `bash install.sh --update`, `bash install.sh --repair`, `bash install.sh --doctor`, `"health check"`, runtime flags like `set FAST_MODE`, slash commands like `/office-hours`, direct skill requests like `"use a skill research"` |
+
+### New project via GitHub template
+
+Click **Use this template** at the top of the repository.
 
 ---
 

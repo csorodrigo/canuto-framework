@@ -1,0 +1,93 @@
+---
+skill: codex-pr-writer
+trigger: /pr-write, or after code review passes and commit is ready
+persona: maestro
+version: 1.0.0
+lastUpdated: 2026-03-30
+shortDescription: >
+  Codex generates PR description + changelog from git diff. Opus only validates.
+  70% savings on documentation tasks.
+usedBy: [maestro]
+evals:
+  - prompt: "write a PR description for these changes"
+    should_trigger: true
+  - prompt: "generate changelog from the diff"
+    should_trigger: true
+  - prompt: "review the code"
+    should_trigger: false
+---
+
+## Purpose
+
+PR descriptions and changelogs require reading diffs, understanding context,
+and writing structured markdown. Delegating to Codex: Opus saves ~10-20K tokens
+per PR. Codex reads the diff directly from git.
+
+---
+
+## Procedure
+
+### 1. Spawn Codex PR Writer
+
+```
+mcp__codex-coder__spawn_agent({
+  prompt: `
+Generate a pull request description and changelog entry.
+
+## Instructions
+1. Run: git log main...HEAD --oneline
+2. Run: git diff main...HEAD --stat
+3. Run: git diff main...HEAD (full diff)
+4. Write the PR description to .agents/tmp/pr-description.md
+5. Write changelog entry to .agents/tmp/changelog-entry.md
+
+## PR Description Format
+## Summary
+<3-5 bullet points describing what changed and why>
+
+## Changes
+<grouped by area: backend, frontend, infra, docs>
+
+## Test Plan
+<how to verify these changes work>
+
+## Breaking Changes
+<list any breaking changes, or "None">
+
+## Changelog Entry Format
+### [version] - {date}
+#### Added
+- ...
+#### Changed
+- ...
+#### Fixed
+- ...
+
+## Rules
+- Focus on WHY, not WHAT (the diff shows what)
+- Group related changes
+- Highlight breaking changes prominently
+- Keep PR description under 30 lines
+- Keep changelog concise
+`
+})
+```
+
+### 2. Opus Validates
+
+Read `.agents/tmp/pr-description.md` and validate:
+- Accurate reflection of changes?
+- Any sensitive info leaked?
+- Tone appropriate?
+
+### 3. Create PR
+
+Use the validated description with `gh pr create`.
+
+---
+
+## Integration
+
+- **/ship skill**: uses this for PR description generation
+- **cost-routing.md**: documentation → Codex (70% savings)
+- **pr-description.md**: existing skill can delegate to this

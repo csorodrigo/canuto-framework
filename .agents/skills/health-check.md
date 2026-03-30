@@ -1,7 +1,7 @@
 shortDescription: Diagnose framework setup integrity and detect misconfigurations before they cause session failures.
 usedBy: [maestro]
-version: 1.2.0
-lastUpdated: 2026-03-23
+version: 1.3.0
+lastUpdated: 2026-03-30
 copyright: Rodrigo Canuto © 2026.
 evals:
   - prompt: "somethings off with the framework, can u check if everythings configured ok? just started a new session"
@@ -94,9 +94,29 @@ Detect broken or missing framework components before they silently degrade sessi
 - [ ] `frontend-design/` directory exists with `SKILL.md` and `references/` subdirectory (progressive disclosure pilot).
 
 ### Hooks
+- [ ] `~/.claude/hooks/codex-pretool-guard.sh` exists and is executable.
+- [ ] `~/.claude/hooks/plan-review.sh` exists and is executable.
 - [ ] `~/.claude/hooks/session-save.sh` exists and is executable.
 - [ ] `~/.claude/hooks/session-load.sh` exists and is executable.
 - [ ] `~/.claude/hooks/pre-compact-save.sh` exists and is executable.
+
+### Codex Integration
+- [ ] `~/.claude/settings.json` has `codex-coder` and `codex-reviewer`.
+- [ ] `~/.claude/settings.json` has `codex-pretool-guard.sh` on `PreToolUse`.
+- [ ] `~/.claude/settings.json` has `plan-review.sh` on `PostToolUse` with matcher `ExitPlanMode`.
+- [ ] `.agents/tools/codex-diff-context.sh` exists and is executable.
+- [ ] `.agents/tools/codex-context-package.sh` exists and is executable.
+- [ ] `.agents/tools/codex-health-check.sh` exists and is executable.
+- [ ] `codex mcp list` is available.
+- [ ] `codex mcp get obsidian-vault --json` includes `OBSIDIAN_API_KEY` and `OBSIDIAN_BASE_URL`.
+- [ ] Context preload assets exist (`.context.md`, `docs/FEATURE-MAP.md`) or are reported as warnings.
+
+### CCB Plugin (Optional — only if `.agents/plugins/ccb/` exists)
+- [ ] `ccb` command available in PATH (`which ccb`).
+- [ ] `ask` command available in PATH (`which ask`).
+- [ ] `pend` command available in PATH (`which pend`).
+- [ ] Terminal multiplexer available (WezTerm or tmux).
+- [ ] CCB daemon responsive (if running): check `~/.askd-state.json` exists.
 
 ### Tools
 - [ ] `python3` is available (required for canvas generation and analyze.sh).
@@ -156,8 +176,11 @@ Detect broken or missing framework components before they silently degrade sessi
 | Old skill SKILL.md in subdir | `bash install.sh --update` |
 | SPEC.md missing | `bash install.sh --update` |
 | Hooks missing | `bash install.sh --update` (reinstalls hooks) |
+| Codex hooks/config degraded | `bash .agents/tools/codex-health-check.sh` |
 | python3 missing | Install: `brew install python3` or `apt install python3` |
 | jq missing | Install: `brew install jq` or `apt install jq` |
+| CCB commands missing | `git clone https://github.com/bfly123/claude_code_bridge.git && cd claude_code_bridge && ./install.sh install` |
+| CCB daemon not responding | Restart with `ccb` (daemon auto-starts) or kill stale `askd` process |
 | global-instincts/ missing | `bash install.sh --update` (creates directory) |
 | Global bases missing | `bash install.sh --update` (copies base templates) |
 

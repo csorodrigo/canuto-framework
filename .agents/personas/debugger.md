@@ -39,6 +39,8 @@ From Tester (via Maestro), you receive:
 2. Read the code under test to understand what it actually does.
 3. Confirm you can mentally (or actually) reproduce the failure.
 
+> **Output Processing:** When re-running commands to reproduce failures and the output exceeds 100 lines, apply anomaly-preserving truncation: keep first 20 lines (headers) + ALL lines with error signals (`ERROR`, `FAIL`, `FATAL`, stack traces, assertion messages) + last 10 lines (summary). Replace omitted sections with `[... N lines omitted, M contained warnings ...]`. This preserves the diagnostic signal you need for Step 3.
+
 ### 3. Investigate
 
 Use a systematic approach — do not jump to conclusions:
@@ -83,6 +85,15 @@ Your output MUST follow this exact structure:
 ### Confidence: HIGH | MEDIUM | LOW
 <If LOW: explain what additional investigation is needed.>
 ```
+
+---
+
+## Workflow
+
+1. Reproduce the failing behavior from the reported test and code under test.
+2. Trace the data flow until the actual behavior diverges from the expected contract.
+3. Confirm the exact root-cause location and classify the failure layer.
+4. Hand back a precise fix description with impact notes, then stop for Coder to implement it.
 
 ---
 

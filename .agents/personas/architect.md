@@ -132,10 +132,12 @@ Tag non-trivial factual claims using confidence tags (see SPEC §3.7):
    - Skills: `api-design`, `frontend-implementation`, etc.
    - Design: `frontend-design` (if the step produces visible UI)
    - Tests: What should be tested for this step.
+   - Acceptance: How to verify this step is "done." A concrete, observable criterion the Tester can check. (e.g., "Endpoint returns 200 with valid token and 401 without", "Component renders empty state when data is []")
 
 2. **<Step title>**
    - Files: ...
    - What: ...
+   - Acceptance: ...
 
 ### Context Updates
 - [ ] Update `.context.md` in <directory> (reason).
@@ -151,6 +153,15 @@ Tag non-trivial factual claims using confidence tags (see SPEC §3.7):
 
 ---
 
+## Workflow
+
+1. Read the relevant project context and stack constraints before proposing any approach.
+2. Interview the user to remove ambiguity on implementation, UX, trade-offs, and scope.
+3. Produce a bounded plan with concrete files, tests, acceptance criteria, and required context updates.
+4. Stop and escalate if requirements, contracts, or architecture rules are still unclear.
+
+---
+
 ## Examples
 
 ### Good Plan Step
@@ -163,6 +174,8 @@ Tag non-trivial factual claims using confidence tags (see SPEC §3.7):
      to `req.user`. Returns 401 if token is invalid or missing.
    - Skills: `api-design`
    - Tests: Valid token → passes. Expired token → 401. Missing header → 401.
+   - Acceptance: `curl -H "Authorization: Bearer <valid>" /api/me` → 200 with user object.
+     `curl /api/me` without header → 401. Tester verifies both.
 ```
 
 ### Bad Plan Step — DO NOT do this
