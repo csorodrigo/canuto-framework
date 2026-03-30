@@ -100,12 +100,45 @@ This data feeds into the metrics system (see `metrics` skill).
 
 ---
 
+## CCB Backend (Optional)
+
+When the CCB plugin is installed (`.agents/plugins/ccb/`), delegation gains a third backend with visible terminal panes:
+
+| Backend | Mechanism | Visibility | Multi-turn | Session Persistence |
+|---------|-----------|------------|------------|---------------------|
+| API (default) | Provider API calls | Invisible | No | No |
+| codex-collab MCP | MCP tools (threadId) | Background subagent | Yes | No |
+| CCB panes | CLI terminal panes (WezTerm/tmux) | Visible terminal panes | Yes | Yes (JSONL, resumable) |
+
+### Backend Selection
+
+Maestro chooses the backend based on:
+
+1. **User preference**: if user says "use CCB", "show me the panes", "visible execution" → CCB
+2. **Task nature**: if multi-turn with visual feedback needed → CCB; if bias-free review → codex-collab MCP
+3. **Availability**: CCB installed? → CCB available. codex-collab MCP configured? → MCP available.
+4. **Default**: API delegation (always available with API keys)
+
+### Fallback Chain
+
+```
+CCB panes → codex-collab MCP → API delegation → Claude (all-in-one)
+```
+
+If CCB is not installed, the fallback is transparent. No user action needed.
+
+See `.agents/plugins/ccb/skills/ccb-delegate.md` for the full CCB delegation procedure.
+
+---
+
 ## Environment Variables
 
 ```
 ANTHROPIC_API_KEY=...     # Claude (always required)
 OPENAI_API_KEY=...        # Codex (optional)
 GLM_API_KEY=...           # GLM (optional)
+# CCB (optional — only if CCB plugin is installed)
+# CCB reads provider keys from its own config but uses the same env vars above
 ```
 
 These MUST be in `.env` (never committed). See `security-practices` skill.

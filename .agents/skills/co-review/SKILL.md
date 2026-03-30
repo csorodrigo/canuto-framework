@@ -52,6 +52,19 @@ claude mcp add codex-collab -- npx -y @openai/codex mcp-server
 
 See `.agents/mcp/codex-collab.md` for full setup documentation.
 
+### Alternative: CCB Backend
+
+If the CCB plugin is installed and codex-collab MCP is not available, co-review can use CCB's `ask` CLI as a fallback:
+
+```bash
+ask codex "<co-review prompt>"
+pend <task-id>  # retrieve when ready
+```
+
+This provides the same parallel review but with visible terminal panes. **Important**: because CCB panes are visible, there is a risk of anchoring bias (seeing Codex's output before completing your own work). When using CCB backend for co-review, **do not look at the Codex pane** until your own review is complete.
+
+Backend preference: codex-collab MCP (background, no bias risk) > CCB `ask` (visible panes, anchoring risk).
+
 ---
 
 ## Core Principle: Independence First, Comparison Second
@@ -105,8 +118,11 @@ For detailed prompts, output formats, and examples, read `references/modes.md`.
 ## Graceful Degradation
 
 If the Codex MCP is not configured or fails:
-- Log: `[Co-Review] Codex MCP not available. Continuing with single-perspective review.`
-- Fall back to Claude-only review.
+- Log: `[Co-Review] Codex MCP not available. Checking CCB fallback...`
+- If CCB plugin installed and `ask` command available: use `ask codex` as fallback.
+  - Log: `[Co-Review] Using CCB ask codex as fallback. Avoid looking at Codex pane until your review is complete.`
+- If CCB also unavailable: fall back to Claude-only review.
+  - Log: `[Co-Review] No external reviewer available. Continuing with single-perspective review.`
 - Do NOT block the flow.
 
 ---

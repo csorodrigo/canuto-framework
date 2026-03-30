@@ -98,6 +98,13 @@ Detect broken or missing framework components before they silently degrade sessi
 - [ ] `~/.claude/hooks/session-load.sh` exists and is executable.
 - [ ] `~/.claude/hooks/pre-compact-save.sh` exists and is executable.
 
+### CCB Plugin (Optional — only if `.agents/plugins/ccb/` exists)
+- [ ] `ccb` command available in PATH (`which ccb`).
+- [ ] `ask` command available in PATH (`which ask`).
+- [ ] `pend` command available in PATH (`which pend`).
+- [ ] Terminal multiplexer available (WezTerm or tmux).
+- [ ] CCB daemon responsive (if running): check `~/.askd-state.json` exists.
+
 ### Tools
 - [ ] `python3` is available (required for canvas generation and analyze.sh).
 - [ ] `jq` is available (required for hooks and MCP setup).
@@ -158,6 +165,8 @@ Detect broken or missing framework components before they silently degrade sessi
 | Hooks missing | `bash install.sh --update` (reinstalls hooks) |
 | python3 missing | Install: `brew install python3` or `apt install python3` |
 | jq missing | Install: `brew install jq` or `apt install jq` |
+| CCB commands missing | `git clone https://github.com/bfly123/claude_code_bridge.git && cd claude_code_bridge && ./install.sh install` |
+| CCB daemon not responding | Restart with `ccb` (daemon auto-starts) or kill stale `askd` process |
 | global-instincts/ missing | `bash install.sh --update` (creates directory) |
 | Global bases missing | `bash install.sh --update` (copies base templates) |
 
