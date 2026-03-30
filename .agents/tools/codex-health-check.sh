@@ -129,7 +129,7 @@ fi
 if command -v codex >/dev/null 2>&1 && codex mcp list >/dev/null 2>&1; then
   pass "codex mcp list is available"
   _MCP_TMP=$(mktemp)
-  trap 'rm -f "$_MCP_TMP"' EXIT
+  trap 'rm -f "$ITEMS_FILE" "$_MCP_TMP"' EXIT
   for server in obsidian-vault ast-grep playwright; do
     if codex mcp get "$server" --json >"$_MCP_TMP" 2>/dev/null; then
       if [ "$server" = "obsidian-vault" ]; then

@@ -109,7 +109,7 @@ fi
 declare -a DIGEST_FILES=()
 if [ -d ".agents/vault/digests" ]; then
   for path in "${TARGET_DIRS[@]-}"; do
-    sanitized=$(printf '%s' "$path" | tr '/.' '--')
+    sanitized=$(printf '%s' "$path" | tr '/.' '--' | tr -d '*?[]')
     while IFS= read -r digest; do
       [ -n "$digest" ] || continue
       DIGEST_FILES+=("$digest")
