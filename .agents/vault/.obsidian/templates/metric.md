@@ -2,6 +2,12 @@
 type: metric
 session: ""
 date: {{date:YYYY-MM-DD}}
+maestro-provider: ""
+maestro-model: ""
+coder-provider: ""
+reviewer-provider: ""
+review-thread-ids: []
+rework-files: []
 quality-verdict:
 must-fix-count: 0
 test-failures: 0
@@ -36,3 +42,10 @@ tags:
 
 - Format compliance: 100%
 - Scope violations: 0
+
+## Runtime
+
+- Maestro provider:
+- Maestro model:
+- Coder provider:
+- Reviewer provider:

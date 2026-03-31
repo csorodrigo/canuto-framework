@@ -12,14 +12,15 @@ copyright: Rodrigo Canuto © 2026.
 - A tier-2 persona (Coder, Tester, Debugger, Reviewer) is being handed off
 
 **Not for:**
-- Tier-1 personas (Maestro, Architect, Contextualizer) — always Claude
+- Switching the active runtime automatically mid-session
+- Tier-1 personas when the runtime is already fixed for the session
 - Projects without API keys configured for secondary providers (fall back to Claude silently)
 
 ---
 
 ## Purpose
 
-Enable the Maestro to orchestrate multiple AI providers for different personas, optimizing cost, speed, and quality. Claude remains the primary provider (always runs Maestro), but execution personas (Coder, Tester, Debugger) can be delegated to other providers.
+Enable the Maestro to orchestrate multiple AI providers for different personas, optimizing cost, speed, and quality. Claude remains the default runtime, but a direct Codex session can also run Maestro via the `maestro` profile. Execution personas (Coder, Tester, Debugger, Reviewer) can still be delegated independently.
 
 ---
 
@@ -27,7 +28,7 @@ Enable the Maestro to orchestrate multiple AI providers for different personas, 
 
 | Tier | Role | Default Provider | Model | MCP Tool | Can Delegate? |
 |------|------|-----------------|-------|----------|---------------|
-| tier-1 | Strategic (Maestro, Architect, Contextualizer) | Claude | opus | — | No — always Claude |
+| tier-1 | Strategic (Maestro, Architect, Contextualizer) | Active runtime (`claude` by default, `codex` in direct Codex sessions) | opus / o1-pro | — | No — stays on the active runtime |
 | tier-2 | Coder | Codex | gpt-5-codex | `mcp__codex-coder__spawn_agent` | Yes — writes code in filesystem |
 | tier-2 | Reviewer | Codex | o1-pro | `mcp__codex-reviewer__codex` | Yes — deep self-review (cross-model) |
 | tier-2 | Tester, Debugger | Codex | gpt-5-codex | `mcp__codex-coder__spawn_agent` | Yes — can use Codex or Claude |
@@ -50,6 +51,8 @@ Configure providers in `CLAUDE.md`:
 ```
 
 If no provider section exists, all personas default to Claude.
+
+Direct Codex sessions are an exception: the active runtime becomes Codex for tier-1 orchestration, using `codex --profile maestro` or `bash .agents/tools/codex-maestro.sh`.
 
 ### 2. Delegation Protocol
 
@@ -234,7 +237,7 @@ This is bad because: Maestro must fall back to Claude and log the failure — ne
 
 ## Guardrails
 
-- Maestro (tier-1) MUST always run on Claude. Never delegate orchestration.
+- Maestro (tier-1) MUST stay on the active runtime for the session. Never switch runtimes automatically mid-session.
 - Never send secrets, API keys, or credentials to any provider as part of the handoff.
 - If a provider is configured but its API key is missing, fall back to Claude silently and log it.
 - Never retry more than once. If two attempts fail, fall back.

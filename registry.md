@@ -40,7 +40,7 @@ These skills ship with every install and update automatically.
 | `obsidian-bases` | Obsidian Bases: database views over notes (.base files) | obsidian, queries |
 | `obsidian-cli` | Interact with Obsidian vault via CLI | obsidian, cli |
 | `obsidian-markdown` | Obsidian Flavored Markdown: wikilinks, embeds, callouts, properties, tags | obsidian, markdown |
-| `plan-second-opinion` | Automatic Codex CLI review of Architect plans for M/L tasks | planning, review |
+| `plan-second-opinion` | Legacy planning reference for hook-triggered Codex review flows | planning, review, compatibility |
 | `plugin-system` | How to create and manage opt-in plugins | extensibility |
 | `pr-description` | Auto-generate PR descriptions after review | workflow |
 | `research` | Structured investigation workflow with community intelligence (Reddit, HN, X), codebase scan, and vault lookup | research, planning |
@@ -48,6 +48,7 @@ These skills ship with every install and update automatically.
 | `security-practices` | Rules for secrets, env vars, and security hygiene | security |
 | `squads` | Parallel domain-based workstreams | orchestration |
 | `stack-lock` | Prevent library drift via approved stack | governance, dependencies |
+| `vault-sync` | Flush offline pending-sync entries back into vault or legacy memory | obsidian, memory, offline |
 
 ---
 
@@ -78,6 +79,7 @@ These skills are slash commands invokable directly in Claude Code. Installed aut
 | `/retro` | Weekly retrospective — reads metrics.md, audit-log.md, instincts.md to generate Shipped / Delayed / Learned / Next. | learning, memory |
 | `/auto-analysis` | Deep project scan + cross-reference with other vault projects. Generates project-index.json and onboarding-report.md. | analytics, onboarding |
 | `/vault-maintenance` | Periodic vault cleanup — archives old sessions, aggregates metrics/audits, cleans snapshots. | maintenance, vault |
+| `/vault-sync` | Syncs `.agents/.cache/pending-sync/` back into the active vault or legacy memory backend after offline work. | maintenance, vault, offline |
 
 ### Design Skills (via Impeccable)
 

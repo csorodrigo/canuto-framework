@@ -1,6 +1,6 @@
 # Canuto Framework v1.6
 
-Personal multi-agent framework for AI-assisted development. Claude-first, provider-agnostic. Obsidian-native memory.
+Personal multi-agent framework for AI-assisted development. Claude-first by default, Codex-maestro when you are talking directly to Codex. Obsidian-native memory.
 
 ## Structure
 
@@ -58,6 +58,9 @@ Personal multi-agent framework for AI-assisted development. Claude-first, provid
     session-save.sh     — Auto-backup vault on Stop.
     session-load.sh     — Load session context on start.
     pre-compact-save.sh — Save context before token compaction.
+  tools/
+    codex-maestro.sh    — Launch direct Codex runtime with the `maestro` profile.
+    vault-sync.sh       — Flush pending sync notes into the active vault backend.
   plugins/              — Opt-in plugin extensions (see plugin-system skill).
   SPEC.md               — Full specification and design decisions.
 
@@ -68,6 +71,7 @@ Personal multi-agent framework for AI-assisted development. Claude-first, provid
       decisions/          — One note per architectural decision
       instincts/          — Learned patterns from sessions
       pending/            — Unfinished tasks
+      handoffs/           — Persisted handoff/review envelopes + resumable context links
       audit/              — Event log (handoffs, gates, rework)
       metrics/            — Session metrics
       design/             — Design profile + component inventory
@@ -86,6 +90,12 @@ Maestro → Architect → Coder → Tester → Reviewer
                                  ↓ (if tests fail)
                              Debugger → Coder (fix) → Tester (re-run)
 ```
+
+## Runtime Maestro
+
+- Claude session: Claude Opus remains the Maestro and keeps the existing orchestration flow.
+- Direct Codex session: launch `bash .agents/tools/codex-maestro.sh` and Codex becomes the Maestro using `~/.codex/config.toml` profile `maestro` (default model `o1-pro`).
+- Cross-runtime handoff: `context-package.md` now carries a persisted handoff envelope (`task_id`, `goal`, `constraints`, `done_definition`, `thread_id`) into the vault so Claude and Codex resume with less reread.
 
 ## Quick Start
 
@@ -132,6 +142,7 @@ bash install.sh --test
 bash install.sh --repair
 
 # repair + validate in one command
+# also bootstraps .agents/tmp/context-package.md and a handoff envelope in the vault
 bash install.sh --doctor
 ```
 
@@ -177,16 +188,18 @@ O framework usa um vault Obsidian global em `~/.canuto/vault/` para memoria. Set
 
 Depois disso, nunca mais precisa mexer. O vault fica aberto no Obsidian e todos os projetos gravam memoria ali, cada um na sua pasta `projects/{nome}/`.
 
+O runtime grava handoffs persistidos em `projects/{nome}/handoffs/`. Se a sessao estiver offline ou sem MCP no momento do save, os envelopes vao para `.agents/.cache/pending-sync/` e podem ser sincronizados depois com `/vault-sync` ou `bash .agents/tools/vault-sync.sh`.
+
 ---
 
 ## Como Funciona
 
-Apos a instalacao, abre o projeto em Claude. O Maestro vai:
+Apos a instalacao, abra o projeto em Claude ou inicie o runtime direto do Codex com `bash .agents/tools/codex-maestro.sh`. O Maestro vai:
 1. Carregar a memoria do vault via MCP e apresentar o briefing da sessao.
 2. Pedir os objetivos da sessao (ate 3 goals).
 3. Detectar o estilo do projeto (Canuto / foreign-schema / novo).
 4. Orquestrar as personas para a sua tarefa.
-5. Ao encerrar: marcar goals, gravar memoria no vault, gerar metricas.
+5. Ao encerrar: marcar goals, gravar memoria no vault, persistir o envelope de handoff/review, gerar metricas.
 
 ## Goals vs Pending Tasks
 
@@ -239,6 +252,10 @@ You are my coding orchestrator for this repository.
 
 **Session memory**: O vault persiste contexto entre sessoes como notas atomizadas com frontmatter, reduzindo tokens e evitando retrabalho.
 
+**Bootstrap context package**: `bash install.sh --doctor` e `bash install.sh --repair` garantem um `.agents/tmp/context-package.md` inicial para retomada rapida entre Claude e Codex.
+
+**Handoff envelope**: Toda passagem relevante entre runtimes pode carregar `task_id`, `goal`, `constraints`, `done_definition` e `thread_id`, persistidos em `handoffs/`.
+
 **Rework detection**: Maestro avisa quando o mesmo arquivo e modificado 3+ vezes na sessao.
 
 **PR description auto**: Reviewer gera o body do PR automaticamente no APPROVE.
@@ -247,7 +264,7 @@ You are my coding orchestrator for this repository.
 
 **Plugins**: Extensoes opcionais em `.agents/plugins/` sem tocar nos arquivos core.
 
-**Multi-provider**: Maestro pode delegar personas tier-2 para Codex ou GLM.
+**Multi-provider**: Claude continua Claude-first; Codex pode assumir como maestro quando o runtime e iniciado direto no Codex. Os handoffs usam o mesmo vault.
 
 **Design knobs**: Tres parametros tunaveis (DESIGN_VARIANCE, MOTION_INTENSITY, VISUAL_DENSITY) controlam o output visual globalmente. Configuraveis por projeto em `design/profile.md`.
 

@@ -14,15 +14,15 @@ Use `mcp__codex-reviewer__codex-reply(threadId, message)` to resume.
 
 ## Active Threads
 
-| Date | Branch | Review Type | threadId | Status | Notes |
-|------|--------|-------------|----------|--------|-------|
-| — | — | — | — | — | No threads yet |
+| Date | Branch | Review Type | Provider | Task ID | threadId | Status | Notes |
+|------|--------|-------------|----------|---------|----------|--------|-------|
+| — | — | — | — | — | — | — | No threads yet |
 
 ## Usage
 
 ### Save after review:
 ```
-| 2026-03-30 | feat/auth | co-validate | thread_abc123 | open | Initial plan review |
+| 2026-03-30 | feat/auth | co-validate | codex-reviewer | task-auth-plan | thread_abc123 | open | Initial plan review |
 ```
 
 ### Resume in next session:

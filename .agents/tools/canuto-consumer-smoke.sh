@@ -70,6 +70,7 @@ fi
 for file_path in \
   "$ROOT_DIR/CLAUDE.md" \
   "$ROOT_DIR/AGENTS.md" \
+  "$ROOT_DIR/CODEX.md" \
   "$ROOT_DIR/.context.md" \
   "$ROOT_DIR/docs/FEATURE-MAP.md"; do
   if [ -f "$file_path" ]; then
@@ -87,12 +88,29 @@ for section in "## Framework" "## Preferences" "## On Session Start"; do
   fi
 done
 
+for marker in "codex-maestro.sh" ".agents/.cache/pending-sync/"; do
+  if [ -f "$ROOT_DIR/CODEX.md" ] && grep -q "$marker" "$ROOT_DIR/CODEX.md" 2>/dev/null; then
+    pass "CODEX.md runtime marker present: $marker"
+  else
+    fail "CODEX.md missing runtime marker: $marker"
+  fi
+done
+
+if [ -f "$ROOT_DIR/.agents/skills/vault-sync.md" ]; then
+  pass "skill present: .agents/skills/vault-sync.md"
+else
+  fail "missing skill: .agents/skills/vault-sync.md"
+fi
+
 for file_path in \
   "$ROOT_DIR/.agents/hooks/install.sh" \
   "$ROOT_DIR/.agents/hooks/plan-review.sh" \
   "$ROOT_DIR/.agents/hooks/codex-pretool-guard.sh" \
+  "$ROOT_DIR/.agents/tools/canuto-memory.sh" \
+  "$ROOT_DIR/.agents/tools/codex-maestro.sh" \
   "$ROOT_DIR/.agents/tools/codex-health-check.sh" \
-  "$ROOT_DIR/.agents/tools/canuto-consumer-smoke.sh"; do
+  "$ROOT_DIR/.agents/tools/canuto-consumer-smoke.sh" \
+  "$ROOT_DIR/.agents/tools/vault-sync.sh"; do
   if [ -x "$file_path" ]; then
     pass "runtime executable: ${file_path#$ROOT_DIR/}"
   else

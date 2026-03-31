@@ -15,34 +15,51 @@ set -euo pipefail
 
 # ── Locate vault ──────────────────────────────────────────────────────────
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-GLOBAL_VAULT="$HOME/.canuto/vault"
-LOCAL_VAULT="$PROJECT_DIR/.agents/vault"
-CACHE_DIR="$PROJECT_DIR/.agents/.cache"
+ROOT_DIR="$(cd "$PROJECT_DIR" && git rev-parse --show-toplevel 2>/dev/null || pwd)"
+MEMORY_LIB="$ROOT_DIR/.agents/tools/canuto-memory.sh"
 
-# Support project-slug override in CLAUDE.md
-SLUG_OVERRIDE=""
-if [ -f "$PROJECT_DIR/CLAUDE.md" ]; then
-  SLUG_OVERRIDE=$(grep -oP 'project-slug:\s*\K\S+' "$PROJECT_DIR/CLAUDE.md" 2>/dev/null || true)
+if [ -f "$MEMORY_LIB" ]; then
+  # shellcheck source=/dev/null
+  source "$MEMORY_LIB"
 fi
-PROJECT_SLUG="${SLUG_OVERRIDE:-$(basename "$PROJECT_DIR")}"
 
-VAULT_AVAILABLE=true
+PROJECT_DIR=$(canuto_project_dir "$PROJECT_DIR")
+PROJECT_SLUG=$(canuto_project_slug "$PROJECT_DIR")
+CACHE_DIR=$(canuto_cache_dir "$PROJECT_DIR")
+BACKEND_KIND=""
+BACKEND_DIR=""
 
-# Use global vault if it exists, fallback to local
-if [ -d "$GLOBAL_VAULT/projects/$PROJECT_SLUG" ]; then
-  VAULT_DIR="$GLOBAL_VAULT/projects/$PROJECT_SLUG"
-elif [ -d "$LOCAL_VAULT" ]; then
-  VAULT_DIR="$LOCAL_VAULT"
-else
-  VAULT_AVAILABLE=false
+IFS=$'\t' read -r BACKEND_KIND BACKEND_DIR < <(canuto_resolve_memory_backend "$PROJECT_DIR")
+
+VAULT_AVAILABLE=false
+if [ "$BACKEND_KIND" = "global" ] || [ "$BACKEND_KIND" = "local" ]; then
+  VAULT_AVAILABLE=true
+  VAULT_DIR="$BACKEND_DIR"
 fi
 
 # ── Fallback: save to pending-sync if vault unavailable ───────────────────
-if [ "$VAULT_AVAILABLE" = false ]; then
+if [ "$BACKEND_KIND" = "none" ]; then
   PENDING_SYNC="$CACHE_DIR/pending-sync"
   mkdir -p "$PENDING_SYNC"
   TIMESTAMP=$(date +%Y-%m-%d_%H%M%S)
-  echo "Session saved offline at $TIMESTAMP" > "$PENDING_SYNC/$TIMESTAMP-session-marker.md"
+  cat > "$PENDING_SYNC/$TIMESTAMP-session-marker.md" <<EOF
+---
+type: pending-sync-marker
+status: pending
+timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+project: $PROJECT_SLUG
+source: session-save
+tags:
+  - pending-sync
+  - offline
+---
+
+# Offline Session Marker
+
+- recorded_at: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+- project: $PROJECT_SLUG
+- note: No vault or legacy memory backend was available when session-save ran.
+EOF
   echo ""
   echo "════════════════════════════════════════"
   echo "  Canuto — OFFLINE Save"
@@ -51,7 +68,34 @@ if [ "$VAULT_AVAILABLE" = false ]; then
   echo "  $PENDING_SYNC/"
   echo ""
   echo "  On next session with vault available,"
-  echo "  run /vault-sync to push pending notes."
+  echo "  run /vault-sync or bash .agents/tools/vault-sync.sh."
+  echo "════════════════════════════════════════"
+  echo ""
+  exit 0
+fi
+
+if [ "$BACKEND_KIND" = "legacy" ]; then
+  SNAPSHOT_DIR="$BACKEND_DIR/.snapshots"
+  TIMESTAMP=$(date +%Y-%m-%d_%H%M%S)_$$
+  SNAPSHOT_PATH="$SNAPSHOT_DIR/$TIMESTAMP"
+
+  mkdir -p "$SNAPSHOT_PATH"
+  for file in last-session.md decisions.md instincts.md pending.md metrics.md audit-log.md design-profile.md component-inventory.md; do
+    if [ -f "$BACKEND_DIR/$file" ]; then
+      cp "$BACKEND_DIR/$file" "$SNAPSHOT_PATH/$file"
+    fi
+  done
+
+  echo "$TIMESTAMP" > "$BACKEND_DIR/.last-save-timestamp"
+
+  echo ""
+  echo "════════════════════════════════════════"
+  echo "  Canuto — Legacy Session State Saved"
+  echo "════════════════════════════════════════"
+  echo "  Snapshot: $SNAPSHOT_PATH"
+  echo ""
+  echo "  Legacy .agents/memory backend detected."
+  echo "  Upgrade when ready, but current compatibility state was preserved."
   echo "════════════════════════════════════════"
   echo ""
   exit 0

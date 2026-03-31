@@ -3,16 +3,34 @@
 set -euo pipefail
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+ROOT_DIR="$(cd "$PROJECT_DIR" && git rev-parse --show-toplevel 2>/dev/null || pwd)"
+PROJECT_DIR="$ROOT_DIR"
+MEMORY_LIB="$ROOT_DIR/.agents/tools/canuto-memory.sh"
 TASK_NAME=""
+TASK_ID=""
+GOAL=""
 PLAN_FILE=""
 OUTPUT_FILE=""
+THREAD_ID=""
+PROVIDER="${CANUTO_HANDOFF_PROVIDER:-codex}"
+SOURCE_SESSION=""
 declare -a TARGET_FILES=()
 declare -a TARGET_DIRS=()
+declare -a CONSTRAINTS=()
+declare -a DONE_DEFINITION=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --task)
       TASK_NAME="${2:-}"
+      shift
+      ;;
+    --task-id)
+      TASK_ID="${2:-}"
+      shift
+      ;;
+    --goal)
+      GOAL="${2:-}"
       shift
       ;;
     --plan)
@@ -31,8 +49,28 @@ while [ $# -gt 0 ]; do
       OUTPUT_FILE="${2:-}"
       shift
       ;;
+    --thread-id)
+      THREAD_ID="${2:-}"
+      shift
+      ;;
+    --provider)
+      PROVIDER="${2:-}"
+      shift
+      ;;
+    --source-session)
+      SOURCE_SESSION="${2:-}"
+      shift
+      ;;
+    --constraint)
+      CONSTRAINTS+=("${2:-}")
+      shift
+      ;;
+    --done-definition)
+      DONE_DEFINITION+=("${2:-}")
+      shift
+      ;;
     *)
-      echo "Usage: $0 --task <name> --output <file> [--plan <file>] [--file <path>] [--dir <path>]" >&2
+      echo "Usage: $0 --task <name> --output <file> [--task-id <id>] [--goal <text>] [--plan <file>] [--file <path>] [--dir <path>] [--constraint <text>] [--done-definition <text>] [--thread-id <id>] [--provider <name>] [--source-session <id>]" >&2
       exit 1
       ;;
   esac
@@ -42,6 +80,163 @@ done
 if [ -z "$TASK_NAME" ] || [ -z "$OUTPUT_FILE" ]; then
   echo "--task and --output are required." >&2
   exit 1
+fi
+
+slugify() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-'
+}
+
+timestamp_now() {
+  date -u +%Y-%m-%dT%H:%M:%SZ
+}
+
+markdown_list() {
+  if [ "$#" -eq 0 ]; then
+    echo "- none"
+    return
+  fi
+  local item
+  for item in "$@"; do
+    [ -n "$item" ] || continue
+    echo "- $item"
+  done
+}
+
+yaml_list() {
+  if [ "$#" -eq 0 ]; then
+    echo "  - none"
+    return
+  fi
+  local item
+  for item in "$@"; do
+    [ -n "$item" ] || continue
+    printf '  - "%s"\n' "${item//\"/\\\"}"
+  done
+}
+
+write_envelope_markdown() {
+  local note_path="$1"
+  mkdir -p "$(dirname "$note_path")"
+  cat > "$note_path" <<EOF
+---
+type: handoff-review
+task_id: "$TASK_ID"
+goal: "$GOAL"
+provider: "$PROVIDER"
+thread_id: "$THREAD_ID"
+source_session: "$SOURCE_SESSION"
+context_package: "$OUTPUT_FILE"
+status: active
+constraints:
+$(yaml_list "${CONSTRAINTS[@]}")
+done_definition:
+$(yaml_list "${DONE_DEFINITION[@]}")
+tags:
+  - handoff
+  - review
+---
+
+# Handoff Review Envelope — $TASK_ID
+
+## Goal
+
+$GOAL
+
+## Constraints
+
+$(markdown_list "${CONSTRAINTS[@]}")
+
+## Done Definition
+
+$(markdown_list "${DONE_DEFINITION[@]}")
+
+## Context Package
+
+- $OUTPUT_FILE
+- provider: $PROVIDER
+- thread_id: ${THREAD_ID:-none}
+EOF
+}
+
+persist_envelope_note() {
+  local backend_kind="none"
+  local backend_dir=""
+  local note_path=""
+  local timestamp_slug
+  timestamp_slug=$(date -u +%Y%m%dT%H%M%SZ)
+
+  if [ -f "$MEMORY_LIB" ]; then
+    # shellcheck source=/dev/null
+    source "$MEMORY_LIB"
+    IFS=$'\t' read -r backend_kind backend_dir < <(canuto_resolve_memory_backend "$PROJECT_DIR")
+  fi
+
+  case "$backend_kind" in
+    global|local)
+      if [ "$TASK_ID" = "bootstrap-context" ]; then
+        note_path="$backend_dir/handoffs/bootstrap-context.md"
+      else
+        note_path="$backend_dir/handoffs/${timestamp_slug}-${TASK_ID}.md"
+      fi
+      write_envelope_markdown "$note_path"
+      printf '%s\n' "$note_path"
+      ;;
+    legacy)
+      note_path="$backend_dir/audit-log.md"
+      {
+        echo ""
+        echo "## HANDOFF_REVIEW — $(timestamp_now)"
+        echo "- task_id: $TASK_ID"
+        echo "- goal: $GOAL"
+        echo "- provider: $PROVIDER"
+        echo "- thread_id: ${THREAD_ID:-none}"
+        echo "- context_package: $OUTPUT_FILE"
+        echo "- constraints:"
+        markdown_list "${CONSTRAINTS[@]}"
+        echo "- done_definition:"
+        markdown_list "${DONE_DEFINITION[@]}"
+      } >> "$note_path"
+      printf '%s\n' "$note_path"
+      ;;
+    *)
+      if [ -f "$MEMORY_LIB" ]; then
+        note_path="$(canuto_pending_sync_dir "$PROJECT_DIR")/${timestamp_slug}-HANDOFF-${TASK_ID}.md"
+      else
+        note_path="$PROJECT_DIR/.agents/.cache/pending-sync/${timestamp_slug}-HANDOFF-${TASK_ID}.md"
+      fi
+      write_envelope_markdown "$note_path"
+      printf '%s\n' "$note_path"
+      ;;
+  esac
+}
+
+if [ -z "$TASK_ID" ]; then
+  TASK_ID="$(date -u +%Y%m%dT%H%M%SZ)-$(slugify "$TASK_NAME")"
+fi
+
+if [ -z "$GOAL" ]; then
+  GOAL="Prepare scoped context and handoff package for ${TASK_NAME}."
+fi
+
+if [ -z "$SOURCE_SESSION" ]; then
+  SOURCE_SESSION="$(date +%Y-%m-%d)"
+fi
+
+if [ "${#CONSTRAINTS[@]}" -eq 0 ]; then
+  CONSTRAINTS=(
+    "Use existing patterns in nearby files."
+    "Do not add dependencies unless explicitly approved."
+    "Add or update happy-path tests for the touched behavior."
+    "If context is missing, call it out instead of guessing."
+  )
+fi
+
+if [ "${#DONE_DEFINITION[@]}" -eq 0 ]; then
+  DONE_DEFINITION=(
+    "Context package exists at ${OUTPUT_FILE}."
+    "Files and directories in scope are listed."
+    "Missing context is called out explicitly."
+  )
 fi
 
 cd "$PROJECT_DIR"
@@ -122,6 +317,20 @@ fi
   echo ""
   echo "- generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "- project: $(basename "$PROJECT_DIR")"
+  echo "- task_id: $TASK_ID"
+  echo ""
+
+  echo "## Handoff Envelope"
+  echo "- goal: $GOAL"
+  echo "- provider: $PROVIDER"
+  echo "- thread_id: ${THREAD_ID:-}"
+  echo "- source_session: $SOURCE_SESSION"
+  echo ""
+  echo "### Constraints"
+  markdown_list "${CONSTRAINTS[@]}"
+  echo ""
+  echo "### Done Definition"
+  markdown_list "${DONE_DEFINITION[@]}"
   echo ""
 
   echo "## Files and Directories in Scope"
@@ -181,10 +390,9 @@ fi
   fi
 
   echo "## Constraints"
-  echo "- Use existing patterns in nearby files."
-  echo "- Do not add dependencies unless explicitly approved."
-  echo "- Add or update happy-path tests for the touched behavior."
-  echo "- If context is missing, call it out instead of guessing."
+  markdown_list "${CONSTRAINTS[@]}"
 } > "$OUTPUT_FILE"
 
+ENVELOPE_PATH="$(persist_envelope_note)"
 echo "Wrote context package to $OUTPUT_FILE"
+echo "Persisted handoff envelope to $ENVELOPE_PATH"
