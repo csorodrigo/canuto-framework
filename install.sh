@@ -360,6 +360,9 @@ FRAMEWORK_FILES=(
   ".agents/skills/codex-onboarding.md"
   ".agents/skills/codex-multi-vault.md"
   ".agents/skills/codex-smoke-test.md"
+  # Codex fallback persona (distributed to every project on update)
+  "CODEX.md"
+  ".agents/templates/CODEX.md"
 )
 
 INSTALL_ONLY_FILES=(
@@ -2697,7 +2700,7 @@ if [ "$MODE" = "install" ]; then
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
     log "Staging files for git..."
-    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" 2>/dev/null || true
+    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" "CODEX.md" 2>/dev/null || true
     echo ""
     if confirm_yes "Commit now? [Y/n] " "Y"; then
       git commit -m "chore: add Canuto Framework v1.6"
@@ -2757,7 +2760,7 @@ if [ "$MODE" = "update" ]; then
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
     log "Staging updated files..."
-    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" 2>/dev/null || true
+    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" "CODEX.md" 2>/dev/null || true
     echo ""
     if confirm_yes "Commit now? [Y/n] " "Y"; then
       git commit -m "chore: update Canuto Framework to v1.6"
