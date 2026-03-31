@@ -23,18 +23,65 @@ fi
 
 # ── Locate vault ──────────────────────────────────────────────────────────
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-PROJECT_SLUG=$(basename "$PROJECT_DIR")
-GLOBAL_VAULT="$HOME/.canuto/vault"
-LOCAL_VAULT="$PROJECT_DIR/.agents/vault"
+ROOT_DIR="$(cd "$PROJECT_DIR" && git rev-parse --show-toplevel 2>/dev/null || pwd)"
+MEMORY_LIB="$ROOT_DIR/.agents/tools/canuto-memory.sh"
 
-# Use global vault if it exists, fallback to local
-if [ -d "$GLOBAL_VAULT/projects/$PROJECT_SLUG" ]; then
-  VAULT_DIR="$GLOBAL_VAULT/projects/$PROJECT_SLUG"
-elif [ -d "$LOCAL_VAULT" ]; then
-  VAULT_DIR="$LOCAL_VAULT"
-else
+if [ -f "$MEMORY_LIB" ]; then
+  # shellcheck source=/dev/null
+  source "$MEMORY_LIB"
+fi
+
+PROJECT_DIR=$(canuto_project_dir "$PROJECT_DIR")
+PROJECT_SLUG=$(canuto_project_slug "$PROJECT_DIR")
+BACKEND_KIND=""
+BACKEND_DIR=""
+
+IFS=$'\t' read -r BACKEND_KIND BACKEND_DIR < <(canuto_resolve_memory_backend "$PROJECT_DIR")
+
+if [ "$BACKEND_KIND" = "none" ]; then
   exit 0
 fi
+
+if [ "$BACKEND_KIND" = "legacy" ]; then
+  SNAPSHOT_DIR="$BACKEND_DIR/.snapshots"
+  TIMESTAMP=$(date +%Y-%m-%d_%H%M%S)
+  COMPACT_PATH="$SNAPSHOT_DIR/pre-compact-$TIMESTAMP"
+
+  mkdir -p "$COMPACT_PATH"
+  for file in last-session.md decisions.md instincts.md pending.md metrics.md audit-log.md; do
+    if [ -f "$BACKEND_DIR/$file" ]; then
+      cp "$BACKEND_DIR/$file" "$COMPACT_PATH/$file"
+    fi
+  done
+
+  echo ""
+  echo "════════════════════════════════════════"
+  echo "  Canuto — Pre-Compaction Snapshot"
+  echo "════════════════════════════════════════"
+  echo ""
+  echo "Critical context saved to: $COMPACT_PATH"
+  echo ""
+  echo "── ESSENTIAL CONTEXT (legacy backend) ──"
+  echo ""
+
+  if [ -f "$BACKEND_DIR/pending.md" ]; then
+    echo "Pending tasks:"
+    sed -n '1,15p' "$BACKEND_DIR/pending.md" | sed '/^[[:space:]]*$/d'
+    echo ""
+  fi
+
+  if [ -f "$BACKEND_DIR/instincts.md" ]; then
+    echo "Top instincts:"
+    sed -n '1,15p' "$BACKEND_DIR/instincts.md" | sed '/^[[:space:]]*$/d'
+    echo ""
+  fi
+
+  echo "════════════════════════════════════════"
+  echo ""
+  exit 0
+fi
+
+VAULT_DIR="$BACKEND_DIR"
 
 # ── Save pre-compaction snapshot ────────────────────────────────────────────
 SNAPSHOT_DIR="$VAULT_DIR/.snapshots"

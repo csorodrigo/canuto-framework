@@ -288,6 +288,7 @@ FRAMEWORK_FILES=(
   ".agents/skills/git-workflow.md"
   ".agents/skills/plugin-system.md"
   ".agents/skills/multi-provider.md"
+  ".agents/skills/vault-sync.md"
   ".agents/skills/metrics.md"
   ".agents/skills/squads.md"
   ".agents/skills/pr-description.md"
@@ -344,11 +345,14 @@ FRAMEWORK_FILES=(
   ".agents/skills/codex-browser-qa.md"
   ".agents/mcp/codex-collab.md"
   ".agents/tools/vault-bridge.sh"
+  ".agents/tools/canuto-memory.sh"
   ".agents/tools/codex-common.sh"
   ".agents/tools/codex-diff-context.sh"
   ".agents/tools/codex-context-package.sh"
   ".agents/tools/codex-health-check.sh"
   ".agents/tools/canuto-consumer-smoke.sh"
+  ".agents/tools/codex-maestro.sh"
+  ".agents/tools/vault-sync.sh"
   # Codex economy + integration skills (Fase 3)
   ".agents/skills/codex-context-loader.md"
   ".agents/skills/codex-session-writer.md"
@@ -360,6 +364,9 @@ FRAMEWORK_FILES=(
   ".agents/skills/codex-onboarding.md"
   ".agents/skills/codex-multi-vault.md"
   ".agents/skills/codex-smoke-test.md"
+  # Codex fallback persona (distributed to every project on update)
+  "CODEX.md"
+  ".agents/templates/CODEX.md"
 )
 
 INSTALL_ONLY_FILES=(
@@ -368,6 +375,35 @@ INSTALL_ONLY_FILES=(
   ".agents/vault/.obsidian/community-plugins.json"
   ".agents/vault/.obsidian/core-plugins.json"
   ".agents/vault/.obsidian/.gitignore"
+  ".agents/vault/.obsidian/templates/audit-event.md"
+  ".agents/vault/.obsidian/templates/component.md"
+  ".agents/vault/.obsidian/templates/decision.md"
+  ".agents/vault/.obsidian/templates/handoff-review.md"
+  ".agents/vault/.obsidian/templates/instinct.md"
+  ".agents/vault/.obsidian/templates/metric.md"
+  ".agents/vault/.obsidian/templates/pending-task.md"
+  ".agents/vault/.obsidian/templates/requirements.md"
+  ".agents/vault/.obsidian/templates/session.md"
+  ".agents/vault/bases/all-instincts.base"
+  ".agents/vault/bases/all-metrics.base"
+  ".agents/vault/bases/audit-by-type.base"
+  ".agents/vault/bases/components-registry.base"
+  ".agents/vault/bases/cost-dashboard.base"
+  ".agents/vault/bases/cross-project-patterns.base"
+  ".agents/vault/bases/decisions-timeline.base"
+  ".agents/vault/bases/global-instincts.base"
+  ".agents/vault/bases/handoff-reviews.base"
+  ".agents/vault/bases/instincts-by-confidence.base"
+  ".agents/vault/bases/metrics-dashboard.base"
+  ".agents/vault/bases/pending-tasks.base"
+  ".agents/vault/bases/provider-reliability.base"
+  ".agents/vault/bases/review-threads.base"
+  ".agents/vault/bases/rework-hotspots.base"
+  ".agents/vault/canvas/memory-map.canvas"
+  ".agents/vault/canvas/persona-flow.canvas"
+  ".agents/vault/design/profile.md"
+  ".agents/vault/metrics/review-scores-template.md"
+  ".agents/vault/sessions/review-threads.md"
   ".agents/vault/repo-index.json"
   ".agents/mcp/server.json"
   ".agents/mcp/setup.md"
@@ -381,6 +417,7 @@ VAULT_DIRS=(
   ".agents/vault/decisions"
   ".agents/vault/instincts"
   ".agents/vault/pending"
+  ".agents/vault/handoffs"
   ".agents/vault/audit"
   ".agents/vault/metrics"
   ".agents/vault/design"
@@ -836,6 +873,13 @@ setup_global_vault() {
     ok "Obsidian config already exists"
   fi
 
+  mkdir -p "$vault/.obsidian/templates"
+  for template_file in .agents/vault/.obsidian/templates/*.md; do
+    [ -f "$template_file" ] || continue
+    cp "$template_file" "$vault/.obsidian/templates/$(basename "$template_file")"
+  done
+  ok "Obsidian templates synced"
+
   # Create vault index
   if [ ! -f "$vault/_index.md" ]; then
     cat > "$vault/_index.md" << 'EOF'
@@ -860,7 +904,7 @@ EOF
 
   # Create project-specific directories
   local project_dir="$vault/projects/$project_slug"
-  for dir in sessions decisions instincts pending audit metrics design design/components; do
+  for dir in sessions decisions instincts pending handoffs audit metrics design design/components; do
     mkdir -p "$project_dir/$dir"
   done
   ok "Project directory ready: projects/$project_slug/"
@@ -1122,6 +1166,10 @@ model_reasoning_effort = "high"
 model = "gpt-5-codex"
 model_reasoning_effort = "medium"
 
+[profiles.maestro]
+model = "o1-pro"
+model_reasoning_effort = "high"
+
 [profiles.reviewer]
 model = "o1-pro"
 model_reasoning_effort = "high"
@@ -1134,14 +1182,15 @@ model_reasoning_effort = "high"
 model = "gpt-5-codex"
 model_reasoning_effort = "low"
 TOMLEOF
-    ok "Created $config_toml with profiles (coder, reviewer, architect, fast)"
+    ok "Created $config_toml with profiles (coder, maestro, reviewer, architect, fast)"
   else
     # Patch-merge: add missing profiles without overwriting
     local patched=false
-    for profile in coder reviewer architect fast; do
+    for profile in coder maestro reviewer architect fast; do
       if ! grep -q "\[profiles\.$profile\]" "$config_toml" 2>/dev/null; then
         case $profile in
           coder)     echo -e "\n[profiles.coder]\nmodel = \"gpt-5-codex\"\nmodel_reasoning_effort = \"medium\"" >> "$config_toml" ;;
+          maestro)   echo -e "\n[profiles.maestro]\nmodel = \"o1-pro\"\nmodel_reasoning_effort = \"high\"" >> "$config_toml" ;;
           reviewer)  echo -e "\n[profiles.reviewer]\nmodel = \"o1-pro\"\nmodel_reasoning_effort = \"high\"" >> "$config_toml" ;;
           architect) echo -e "\n[profiles.architect]\nmodel = \"o3\"\nmodel_reasoning_effort = \"high\"" >> "$config_toml" ;;
           fast)      echo -e "\n[profiles.fast]\nmodel = \"gpt-5-codex\"\nmodel_reasoning_effort = \"low\"" >> "$config_toml" ;;
@@ -1342,9 +1391,13 @@ Available profiles in \`~/.codex/config.toml\` — use when spawned with \`--pro
 | Profile | Model | Reasoning | Use For |
 |---------|-------|-----------|---------|
 | \`coder\` | gpt-5-codex | medium | Standard code generation |
+| \`maestro\` | o1-pro | high | Direct Codex runtime orchestration |
 | \`reviewer\` | o1-pro | high | Deep code review, security audit |
 | \`architect\` | o3 | high | Architecture, complex reasoning |
 | \`fast\` | gpt-5-codex | low | Quick edits, formatting, docs |
+
+- Claude sessions keep Claude Opus as Maestro.
+- Direct Codex sessions should use `bash .agents/tools/codex-maestro.sh` or `codex --profile maestro`.
 
 ## Anti-Patterns
 - Do NOT create README.md, documentation files, or CHANGELOG entries
@@ -1376,9 +1429,13 @@ Available profiles in `~/.codex/config.toml` — use when spawned with `--profil
 | Profile | Model | Reasoning | Use For |
 |---------|-------|-----------|---------|
 | `coder` | gpt-5-codex | medium | Standard code generation |
+| `maestro` | o1-pro | high | Direct Codex runtime orchestration |
 | `reviewer` | o1-pro | high | Deep code review, security audit |
 | `architect` | o3 | high | Architecture, complex reasoning |
 | `fast` | gpt-5-codex | low | Quick edits, formatting, docs |
+
+- Claude sessions keep Claude Opus as Maestro.
+- Direct Codex sessions should use `bash .agents/tools/codex-maestro.sh` or `codex --profile maestro`.
 PROFILEPATCH
       patched=true
     fi
@@ -1394,12 +1451,111 @@ bash .agents/tools/vault-bridge.sh search <query>
 VAULTPATCH
       patched=true
     fi
+    if ! grep -q "codex-maestro.sh" "$agents_md" 2>/dev/null; then
+      cat >> "$agents_md" << 'RUNTIMEPATCH'
+
+## Codex Runtime
+- Claude sessions keep Claude Opus as Maestro.
+- Direct Codex sessions should use `bash .agents/tools/codex-maestro.sh` or `codex --profile maestro`.
+- The `maestro` profile is runtime-specific and does not redefine `coder`, `reviewer`, `architect`, or `fast`.
+RUNTIMEPATCH
+      patched=true
+    fi
     if $patched; then
       ok "AGENTS.md patched with missing sections"
     else
       ok "AGENTS.md already up to date"
     fi
   fi
+}
+
+render_codex_md() {
+  local project_dir
+  project_dir=$(resolve_project_dir "$(pwd)")
+  local template="$project_dir/.agents/templates/CODEX.md"
+  local output="$project_dir/CODEX.md"
+  local project_slug
+  local project_rules
+
+  if [ ! -f "$template" ]; then
+    warn "CODEX template missing at $template"
+    return
+  fi
+
+  project_slug=$(detect_project_slug "$project_dir")
+  project_rules=$(awk '
+    /^## Project Rules[[:space:]]*$/ { in_section=1; next }
+    /^## / && in_section { exit }
+    in_section { print }
+  ' "$project_dir/CLAUDE.md" 2>/dev/null)
+
+  if [ -z "$project_rules" ]; then
+    project_rules="- Follow the active project rules from CLAUDE.md."
+  fi
+
+  {
+    while IFS= read -r line || [ -n "$line" ]; do
+      line=${line//'{{PROJECT_SLUG}}'/$project_slug}
+      if [ "$line" = "{{PROJECT_RULES}}" ]; then
+        printf '%s\n' "$project_rules"
+      else
+        printf '%s\n' "$line"
+      fi
+    done < "$template"
+  } > "$output"
+
+  ok "CODEX.md rendered from template"
+}
+
+ensure_bootstrap_context_package() {
+  local output_file=".agents/tmp/context-package.md"
+
+  if [ -x ".agents/tools/codex-context-package.sh" ]; then
+    if bash ".agents/tools/codex-context-package.sh" \
+      --task "Bootstrap Context" \
+      --task-id "bootstrap-context" \
+      --goal "Create a resumable baseline handoff package for this repository." \
+      --done-definition "Bootstrap context package exists at .agents/tmp/context-package.md" \
+      --done-definition "Core repo rules and entrypoints are captured for Claude/Codex handoffs" \
+      --output "$output_file" \
+      --file "CLAUDE.md" \
+      --file ".context.md" \
+      --file "docs/FEATURE-MAP.md" >/dev/null 2>&1 && [ -s "$output_file" ]; then
+      ok "Bootstrap context package ready"
+      return 0
+    fi
+    warn "codex-context-package bootstrap failed — writing fallback context package"
+  fi
+
+  cat > "$output_file" <<'EOF'
+# Context Package — Bootstrap Context
+
+- generated_by: install.sh
+- task_id: bootstrap-context
+
+## Handoff Envelope
+- goal: Create a resumable baseline handoff package for this repository.
+- thread_id:
+
+### Constraints
+- Use existing patterns in nearby files.
+- Do not add dependencies unless explicitly approved.
+- Add or update happy-path tests for the touched behavior.
+- If context is missing, call it out instead of guessing.
+
+### Done Definition
+- Bootstrap context package exists at `.agents/tmp/context-package.md`
+- Core repo rules and entrypoints are captured for Claude/Codex handoffs
+
+## Files and Directories in Scope
+- CLAUDE.md
+- .context.md
+- docs/FEATURE-MAP.md
+
+## Notes
+- Generated as a fallback because the full codex-context-package flow was unavailable.
+EOF
+  ok "Bootstrap context package ready (fallback)"
 }
 
 ensure_project_bootstrap_files() {
@@ -1554,6 +1710,7 @@ repair_runtime() {
   setup_local_script_permissions
   merge_claude_md
   merge_agents_md
+  render_codex_md
   ensure_project_bootstrap_files
   setup_hooks
   setup_search_tools
@@ -1568,14 +1725,7 @@ repair_runtime() {
   if [ ! -f ".agents/tmp/.gitkeep" ]; then
     echo "# Temporary files — gitignored" > ".agents/tmp/.gitkeep"
   fi
-  if [ -x ".agents/tools/codex-context-package.sh" ]; then
-    bash ".agents/tools/codex-context-package.sh" \
-      --task "Bootstrap Context" \
-      --output ".agents/tmp/context-package.md" \
-      --file "CLAUDE.md" \
-      --file ".context.md" \
-      --file "docs/FEATURE-MAP.md" >/dev/null 2>&1 || true
-  fi
+  ensure_bootstrap_context_package
   if [ -f ".gitignore" ] && ! grep -q ".agents/tmp/" ".gitignore" 2>/dev/null; then
     echo ".agents/tmp/" >> ".gitignore"
   fi
@@ -1624,6 +1774,7 @@ setup_global_skills() {
     "retro"
     "auto-analysis"
     "vault-maintenance"
+    "vault-sync"
     # Impeccable design skills
     "audit"
     "animate"
@@ -2634,7 +2785,7 @@ if [ "$MODE" = "migrate" ]; then
   # ── Step 7: Commit ──────────────────────────────────────────────────────
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
-    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" 2>/dev/null || true
+    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" "CODEX.md" ".context.md" "docs/" 2>/dev/null || true
     if confirm_yes "Commit migration? [Y/n] " "Y"; then
       if git diff --cached --quiet; then
         log "Nothing to commit — framework already up to date."
@@ -2697,7 +2848,7 @@ if [ "$MODE" = "install" ]; then
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
     log "Staging files for git..."
-    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" 2>/dev/null || true
+    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" "CODEX.md" 2>/dev/null || true
     echo ""
     if confirm_yes "Commit now? [Y/n] " "Y"; then
       git commit -m "chore: add Canuto Framework v1.6"
@@ -2719,8 +2870,9 @@ if [ "$MODE" = "install" ]; then
     warn "Post-install validation reported issues. Re-run: bash install.sh --doctor"
   fi
 
-  echo -e "${GREEN}  Done! v1.6 installed. Open the project in Claude and${RESET}"
-  echo -e "${GREEN}  the Maestro will take it from here.${RESET}"
+  echo -e "${GREEN}  Done! v1.6 installed.${RESET}"
+  echo -e "${GREEN}  Claude keeps Opus as Maestro by default.${RESET}"
+  echo -e "${GREEN}  For direct Codex Maestro mode: bash .agents/tools/codex-maestro.sh${RESET}"
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
   echo ""
 fi
@@ -2757,7 +2909,7 @@ if [ "$MODE" = "update" ]; then
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
     log "Staging updated files..."
-    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" 2>/dev/null || true
+    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" "CODEX.md" 2>/dev/null || true
     echo ""
     if confirm_yes "Commit now? [Y/n] " "Y"; then
       git commit -m "chore: update Canuto Framework to v1.6"
@@ -2774,6 +2926,8 @@ if [ "$MODE" = "update" ]; then
   echo ""
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
   echo -e "${GREEN}  Framework updated to v1.6 successfully.${RESET}"
+  echo -e "${GREEN}  Claude remains the default Maestro runtime.${RESET}"
+  echo -e "${GREEN}  Direct Codex Maestro launcher: bash .agents/tools/codex-maestro.sh${RESET}"
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
   echo ""
 fi

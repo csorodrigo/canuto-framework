@@ -49,9 +49,16 @@ bash test-framework.sh
 |---------|-------------|-------------------|
 | `bash install.sh --check` | Check rapido depois de instalar/update | Versoes, arquivos e integridade basica |
 | `bash install.sh --test` | Validacao real da integracao | `HEALTHY`, `DEGRADED`, ou `BROKEN` |
-| `bash install.sh --repair` | Hooks/MCP/config fora de sincronia | Reidrata runtime local sem baixar tudo de novo |
-| `bash install.sh --doctor` | Quero consertar e validar em uma vez | Roda repair + smoke test do projeto + health check Codex |
+| `bash install.sh --repair` | Hooks/MCP/config fora de sincronia | Reidrata runtime local, recria bootstrap de contexto e garante arquivos temporarios |
+| `bash install.sh --doctor` | Quero consertar e validar em uma vez | Roda repair + smoke test do projeto + health check Codex + gera `.agents/tmp/context-package.md` |
 | `bash test-framework.sh` | Manutencao do framework em si | Suite estrutural do repo do framework |
+
+## Maestro por runtime
+
+- Se voce estiver conversando com o Claude, o Maestro continua sendo o Claude Opus, exatamente como hoje.
+- Se voce abrir o runtime direto do Codex com `bash .agents/tools/codex-maestro.sh`, o Codex assume o papel de Maestro usando o profile `maestro` do `~/.codex/config.toml`.
+- Nao existe troca automatica de maestro no meio da mesma sessao. O runtime ativo define quem orquestra.
+- O handoff entre runtimes usa o mesmo envelope persistido no vault, entao a retomada fica consistente.
 
 ## O que funciona passivamente
 
@@ -63,10 +70,12 @@ Depois de instalar e abrir o projeto no Claude/Codex com o framework carregado, 
 | Fluxo `Maestro -> Architect -> Coder -> Tester -> Reviewer` | Pedir uma task normal |
 | `session-save.sh` | Evento `Stop` |
 | `pre-compact-save.sh` | Antes de compactacao |
-| `plan-review.sh` | Saida do modo de plano (`ExitPlanMode`) |
+| `plan-review.sh` | Saida do modo de plano (`ExitPlanMode`) como bridge compativel para o co-review |
 | `codex-pretool-guard.sh` | Uso de `git commit` pelo Bash hookado e delegacoes Codex |
 | Coleta de goals/pending/instincts/metrics | Encerramento formal da sessao |
 | MCPs e profiles Codex disponiveis | Apos `install.sh` / `--update` bem-sucedido |
+| Launcher de Codex Maestro | `bash .agents/tools/codex-maestro.sh` |
+| Bootstrap de `context-package.md` | `--repair` e `--doctor` |
 
 ## O que voce precisa pedir explicitamente
 
@@ -76,12 +85,30 @@ Depois de instalar e abrir o projeto no Claude/Codex com o framework carregado, 
 | Atualizar um projeto que ja usa o framework | `bash install.sh --update` |
 | Validar o setup | `bash install.sh --test` |
 | Rodar diagnostico de framework | `"health check"` |
+| Abrir o runtime Maestro no Codex | `bash .agents/tools/codex-maestro.sh` |
+| Sincronizar sessao offline | `/vault-sync` ou `bash .agents/tools/vault-sync.sh` |
 | Trocar modo de sessao | `"continue"`, `"retoma"`, `"quick fix"` |
 | Ativar flags de runtime | `"set FAST_MODE"`, `"set STRICT_MODE"` |
 | Chamar slash commands | `/office-hours`, `/qa`, `/review` |
 | Chamar uma skill especifica | `"use a skill health-check"`, `"use a skill research"` |
 | Instalar skills opcionais | `bash install.sh --skill adr --skill session-goals` |
 | Recarregar contexto manualmente | `bash ~/.claude/hooks/session-load.sh` |
+
+## Bootstrap de contexto e handoff persistido
+
+Depois de `bash install.sh --repair` ou `bash install.sh --doctor`, o framework garante um bootstrap inicial para retomada entre Claude e Codex:
+
+- `.agents/tmp/context-package.md` com regras, contexto base e arquivos de entrada do repo.
+- envelope persistido em `~/.canuto/vault/projects/{projeto}/handoffs/` com `task_id`, `goal`, `constraints`, `done_definition` e `thread_id`.
+- fallback offline em `.agents/.cache/pending-sync/` quando o vault nao estiver disponivel.
+
+Quando precisar reconciliar esse fallback, rode:
+
+```bash
+/vault-sync
+# ou
+bash .agents/tools/vault-sync.sh
+```
 
 ## Frases que o Maestro entende
 
@@ -102,14 +129,14 @@ Depois de instalar e abrir o projeto no Claude/Codex com o framework carregado, 
 | Hook | Evento | O que faz |
 |------|--------|-----------|
 | `codex-pretool-guard.sh` | `PreToolUse` | Faz gate de `git commit`, review de diff e bloqueios de delegacao Codex sem contexto |
-| `plan-review.sh` | `PostToolUse: ExitPlanMode` | Faz review estruturado de planos antes de codar |
+| `plan-review.sh` | `PostToolUse: ExitPlanMode` | Bridge compativel que aciona o fluxo de co-review antes de codar |
 | `session-save.sh` | `Stop` | Salva snapshot de sessao |
 | `pre-compact-save.sh` | `Notification` | Salva contexto antes da compactacao |
 | `session-load.sh` | manual | Recarrega contexto da sessao quando voce chamar explicitamente |
 
 ## 1. Iniciando uma Sessao
 
-Abra o Claude no diretorio do seu projeto. O Maestro automaticamente:
+Abra o Claude no diretorio do seu projeto, ou rode `bash .agents/tools/codex-maestro.sh` para abrir o runtime direto no Codex. O Maestro automaticamente:
 
 1. Determina o projeto pelo nome da pasta (ou pelo nome do projeto no Conductor: `workspaces/{projeto}/{branch}`)
 2. Carrega a memoria do vault (`~/.canuto/vault/projects/{projeto}/`)
@@ -196,7 +223,9 @@ O Maestro vai:
 
 6. **Criar audit event** em `projects/{projeto}/audit/`.
 
-7. **Sugerir cleanup** se 3+ tasks foram completadas.
+7. **Persistir o handoff envelope** em `projects/{projeto}/handoffs/` quando houver contexto relevante para retomada cross-runtime.
+
+8. **Sugerir cleanup** se 3+ tasks foram completadas.
 
 ### Hook automatico
 
@@ -288,7 +317,7 @@ Estas skills podem ser usadas automaticamente pelo Maestro quando o problema ped
 
 #### 3. Contexto, memoria e Obsidian
 
-`context-digest`, `context-preload`, `json-canvas`, `knowledge-ingest`, `mcp-obsidian`, `metrics`, `multi-provider`, `obsidian-bases`, `obsidian-cli`, `obsidian-markdown`, `plugin-system`, `runtime-flags`, `vault-maintenance`
+`context-digest`, `context-preload`, `json-canvas`, `knowledge-ingest`, `mcp-obsidian`, `metrics`, `multi-provider`, `obsidian-bases`, `obsidian-cli`, `obsidian-markdown`, `plugin-system`, `runtime-flags`, `vault-maintenance`, `vault-sync`
 
 #### 4. Frontend, design e UX
 

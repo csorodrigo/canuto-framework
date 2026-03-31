@@ -1,6 +1,10 @@
 ---
-name: defuddle
-description: Extract clean readable markdown from web pages using defuddle CLI. Removes navigation, ads, and clutter. Preferred over WebFetch for standard web pages to reduce token consumption.
+skill: defuddle
+trigger: automatic when fetching web pages for reading/research
+shortDescription: Extract clean readable markdown from web pages using defuddle CLI. Removes navigation, ads, and clutter. Preferred over WebFetch for standard web pages to reduce token consumption.
+usedBy: [architect, coder, maestro]
+version: 1.0.0
+lastUpdated: 2026-03-30
 origin: kepano/obsidian-skills (adapted for Canuto Framework)
 ---
 

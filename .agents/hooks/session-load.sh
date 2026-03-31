@@ -17,30 +17,30 @@ set -euo pipefail
 
 # ── Locate vault ──────────────────────────────────────────────────────────
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-GLOBAL_VAULT="$HOME/.canuto/vault"
-LOCAL_VAULT="$PROJECT_DIR/.agents/vault"
-CACHE_DIR="$PROJECT_DIR/.agents/.cache"
+ROOT_DIR="$(cd "$PROJECT_DIR" && git rev-parse --show-toplevel 2>/dev/null || pwd)"
+MEMORY_LIB="$ROOT_DIR/.agents/tools/canuto-memory.sh"
 
-# Support project-slug override in CLAUDE.md
-SLUG_OVERRIDE=""
-if [ -f "$PROJECT_DIR/CLAUDE.md" ]; then
-  SLUG_OVERRIDE=$(grep -oP 'project-slug:\s*\K\S+' "$PROJECT_DIR/CLAUDE.md" 2>/dev/null || true)
+if [ -f "$MEMORY_LIB" ]; then
+  # shellcheck source=/dev/null
+  source "$MEMORY_LIB"
 fi
-PROJECT_SLUG="${SLUG_OVERRIDE:-$(basename "$PROJECT_DIR")}"
 
-VAULT_AVAILABLE=true
+PROJECT_DIR=$(canuto_project_dir "$PROJECT_DIR")
+PROJECT_SLUG=$(canuto_project_slug "$PROJECT_DIR")
+CACHE_DIR=$(canuto_cache_dir "$PROJECT_DIR")
+BACKEND_KIND=""
+BACKEND_DIR=""
 
-# Use global vault if it exists, fallback to local
-if [ -d "$GLOBAL_VAULT/projects/$PROJECT_SLUG" ]; then
-  VAULT_DIR="$GLOBAL_VAULT/projects/$PROJECT_SLUG"
-elif [ -d "$LOCAL_VAULT" ]; then
-  VAULT_DIR="$LOCAL_VAULT"
-else
-  VAULT_AVAILABLE=false
+IFS=$'\t' read -r BACKEND_KIND BACKEND_DIR < <(canuto_resolve_memory_backend "$PROJECT_DIR")
+
+VAULT_AVAILABLE=false
+if [ "$BACKEND_KIND" = "global" ] || [ "$BACKEND_KIND" = "local" ]; then
+  VAULT_AVAILABLE=true
+  VAULT_DIR="$BACKEND_DIR"
 fi
 
 # ── Fallback: load from cache if vault unavailable ────────────────────────
-if [ "$VAULT_AVAILABLE" = false ]; then
+if [ "$BACKEND_KIND" = "none" ]; then
   if [ -f "$CACHE_DIR/last-briefing.txt" ]; then
     echo ""
     echo "╔══════════════════════════════════════════╗"
@@ -65,6 +65,60 @@ if [ "$VAULT_AVAILABLE" = false ]; then
     echo "Not a Canuto project (no vault found, no cache available)."
     exit 0
   fi
+fi
+
+if [ "$BACKEND_KIND" = "legacy" ]; then
+  LEGACY_DIR="$BACKEND_DIR"
+
+  echo ""
+  echo "╔══════════════════════════════════════════╗"
+  echo "║   Canuto — Legacy Memory Compatibility   ║"
+  echo "╚══════════════════════════════════════════╝"
+  echo ""
+
+  if [ -f "$LEGACY_DIR/last-session.md" ]; then
+    echo "── Last Session (legacy memory) ──"
+    sed -n '1,12p' "$LEGACY_DIR/last-session.md" | sed '/^[[:space:]]*$/d'
+    echo ""
+  else
+    echo "── Last Session: (no previous legacy session recorded) ──"
+    echo ""
+  fi
+
+  if [ -f "$LEGACY_DIR/pending.md" ]; then
+    echo "── Pending Tasks (legacy memory) ──"
+    sed -n '1,20p' "$LEGACY_DIR/pending.md" | sed '/^[[:space:]]*$/d'
+    echo ""
+  else
+    echo "── Pending Tasks: none ──"
+    echo ""
+  fi
+
+  if [ -f "$LEGACY_DIR/instincts.md" ]; then
+    echo "── Instincts (legacy memory) ──"
+    sed -n '1,15p' "$LEGACY_DIR/instincts.md" | sed '/^[[:space:]]*$/d'
+    echo ""
+  fi
+
+  mkdir -p "$CACHE_DIR"
+  {
+    echo "Cached legacy briefing from $(date +%Y-%m-%d\ %H:%M)"
+    echo "Project: $PROJECT_SLUG"
+    echo "Backend: legacy"
+  } > "$CACHE_DIR/last-briefing.txt" 2>/dev/null || true
+
+  if [ -d "$CACHE_DIR/pending-sync" ]; then
+    SYNC_COUNT=$(find "$CACHE_DIR/pending-sync" -maxdepth 1 -type f -name '*.md' | wc -l | tr -d ' ') || SYNC_COUNT=0
+    if [ "$SYNC_COUNT" -gt 0 ]; then
+      echo "── ⚠ Pending Sync: $SYNC_COUNT offline marker(s) ──"
+      echo "  Run /vault-sync or bash .agents/tools/vault-sync.sh when a backend is ready."
+      echo ""
+    fi
+  fi
+
+  echo "Ready. Ask the Maestro what to work on."
+  echo ""
+  exit 0
 fi
 
 echo ""
@@ -186,7 +240,7 @@ if [ -d "$CACHE_DIR/pending-sync" ]; then
   SYNC_COUNT=$(ls "$CACHE_DIR/pending-sync"/*.md 2>/dev/null | wc -l) || SYNC_COUNT=0
   if [ "$SYNC_COUNT" -gt 0 ]; then
     echo "── ⚠ Pending Sync: $SYNC_COUNT notes from offline session ──"
-    echo "  Ask Maestro to run /vault-sync to push these to the vault."
+    echo "  Ask Maestro to run /vault-sync or bash .agents/tools/vault-sync.sh."
     echo ""
   fi
 fi

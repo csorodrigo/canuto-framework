@@ -5,6 +5,11 @@ mode: full
 goals:
   - { text: "", status: pending }
 personas-used: []
+providers-used: []
+review-threads: []
+rework-files: []
+open-questions: []
+next-entrypoint: ""
 tasks-completed: 0
 token-estimate: 0
 tags:
@@ -32,6 +37,14 @@ tags:
 ## What Remains
 
 - (Unfinished tasks, link to [[pending/]] notes.)
+
+## Open Questions
+
+- (Unknowns, blockers, or user decisions still pending.)
+
+## Next Entrypoint
+
+- (Best file, command, or note to resume from.)
 
 ---
 

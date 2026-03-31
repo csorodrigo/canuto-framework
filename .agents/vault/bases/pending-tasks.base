@@ -6,12 +6,21 @@ filters:
 formulas:
   priority_icon: 'if(priority == "high", "🔴", if(priority == "medium", "🟡", "🟢"))'
   is_blocked: 'if(blocked-by, "🚫 " + blocked-by, "")'
+  ownership: 'if(owner, owner, "unassigned")'
+  provider_badge: 'if(provider, provider, "unspecified")'
+  rework_badge: 'if(rework-count >= 3, "🔥 " + rework-count, if(rework-count >= 1, "♻️ " + rework-count, ""))'
 
 properties:
   formula.priority_icon:
     displayName: ""
   formula.is_blocked:
     displayName: "Blocked By"
+  formula.ownership:
+    displayName: "Owner"
+  formula.provider_badge:
+    displayName: "Provider"
+  formula.rework_badge:
+    displayName: "Rework"
 
 views:
   - type: table
@@ -22,12 +31,29 @@ views:
     order:
       - formula.priority_icon
       - file.name
+      - formula.ownership
+      - formula.provider_badge
       - priority
+      - formula.rework_badge
+      - retry-count
       - formula.is_blocked
       - created-session
     groupBy:
       property: priority
       direction: ASC
+
+  - type: table
+    name: "Needs Attention"
+    filters:
+      and:
+        - 'status == "pending"'
+        - 'rework-count >= 2 || retry-count >= 2 || !!blocked-by || !!duplicate-of'
+    order:
+      - formula.rework_badge
+      - retry-count
+      - formula.is_blocked
+      - formula.provider_badge
+      - file.name
 
   - type: table
     name: "Completed"
@@ -36,4 +62,6 @@ views:
         - 'status == "done"'
     order:
       - file.name
+      - formula.provider_badge
+      - formula.rework_badge
       - created-session

@@ -145,7 +145,7 @@ echo ""
 
 echo "── Test 3b: Tooling ──"
 
-CODEX_TOOLS=(codex-common codex-diff-context codex-context-package codex-health-check canuto-consumer-smoke)
+CODEX_TOOLS=(canuto-memory codex-common codex-diff-context codex-context-package codex-health-check canuto-consumer-smoke codex-maestro vault-sync)
 for tool in "${CODEX_TOOLS[@]}"; do
   TFILE="$AGENTS_DIR/tools/$tool.sh"
   if [ ! -f "$TFILE" ]; then
@@ -185,14 +185,14 @@ else
   fail "codex-diff-context.sh happy path failed"
 fi
 
-if bash "$AGENTS_DIR/tools/codex-health-check.sh" --json >/tmp/codex-health-json.$$ 2>/dev/null; then
+if bash "$AGENTS_DIR/tools/codex-health-check.sh" --structural --json >/tmp/codex-health-json.$$ 2>/dev/null; then
   if command -v jq >/dev/null 2>&1 && jq -e '.tool == "codex-health-check" and .verdict' /tmp/codex-health-json.$$ >/dev/null 2>&1; then
     pass "codex-health-check.sh JSON output"
   else
     fail "codex-health-check.sh JSON output invalid"
   fi
 else
-  fail "codex-health-check.sh --json failed"
+  fail "codex-health-check.sh --structural --json failed"
 fi
 rm -f /tmp/codex-health-json.$$
 

@@ -27,6 +27,9 @@ Learned patterns from project experience. Confidence grows with repeated observa
 ### [[pending/|Pending Tasks]]
 Tasks deferred from previous sessions. Prioritized and tracked until completion.
 
+### [[handoffs/|Handoff Reviews]]
+Persisted handoff and review envelopes for cross-runtime resumability.
+
 ### [[audit/|Audit Log]]
 Immutable record of significant session events (handoffs, gates, rework, escalations).
 
@@ -55,11 +58,23 @@ All decisions in chronological order.
 ### [[bases/pending-tasks.base|Pending Tasks]]
 Active tasks ordered by priority.
 
+### [[bases/rework-hotspots.base|Rework Hotspots]]
+Tasks and files showing repeated retries or rework.
+
 ### [[bases/audit-by-type.base|Audit by Type]]
 Audit events grouped by event type.
 
 ### [[bases/metrics-dashboard.base|Metrics Dashboard]]
 Session metrics with summaries and trends.
+
+### [[bases/provider-reliability.base|Provider Reliability]]
+Cross-session quality and rework trends by provider/runtime.
+
+### [[bases/review-threads.base|Review Threads]]
+Review continuity by `thread_id`, provider, and task.
+
+### [[bases/handoff-reviews.base|Handoff Reviews]]
+Persisted handoff envelopes with goal, constraints, done definition, and linked context packages.
 
 ### [[bases/components-registry.base|Components Registry]]
 UI components by source type.

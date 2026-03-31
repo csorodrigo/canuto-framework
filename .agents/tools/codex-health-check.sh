@@ -14,7 +14,10 @@ JSON_OUTPUT=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --smoke)
-      MODE="smoke"
+      MODE="structural"
+      ;;
+    --structural)
+      MODE="structural"
       ;;
     --json)
       JSON_OUTPUT=true
@@ -69,91 +72,97 @@ if [ "$JSON_OUTPUT" = false ]; then
   echo ""
 fi
 
-if command -v codex >/dev/null 2>&1; then
-  pass "codex CLI available: $(codex --version 2>/dev/null || echo unknown)"
-else
-  fail "codex CLI not found"
-fi
-
-CONFIG_TOML="$HOME/.codex/config.toml"
-if [ -f "$CONFIG_TOML" ]; then
-  missing_profiles=0
-  for profile in coder reviewer architect fast; do
-    if grep -q "\[profiles\.$profile\]" "$CONFIG_TOML" 2>/dev/null; then
-      pass "profile configured: $profile"
-    else
-      missing_profiles=$((missing_profiles + 1))
-      fail "missing profile in config.toml: $profile"
-    fi
-  done
-else
-  fail "missing $CONFIG_TOML"
-fi
-
-SETTINGS_FILE="$HOME/.claude/settings.json"
-if [ -f "$SETTINGS_FILE" ] && command -v jq >/dev/null 2>&1; then
-  for server in codex-coder codex-reviewer; do
-    if jq -e --arg server "$server" '.mcpServers[$server]' "$SETTINGS_FILE" >/dev/null 2>&1; then
-      pass "settings.json MCP present: $server"
-    else
-      fail "settings.json missing MCP: $server"
-    fi
-  done
-
-  for hook_name in codex-pretool-guard.sh plan-review.sh; do
-    if grep -q "$hook_name" "$SETTINGS_FILE" 2>/dev/null; then
-      pass "settings.json hook registered: $hook_name"
-    else
-      fail "settings.json hook missing: $hook_name"
-    fi
-  done
-else
-  fail "cannot inspect ~/.claude/settings.json"
-fi
-
-for hook_file in codex-pretool-guard.sh plan-review.sh session-save.sh session-load.sh pre-compact-save.sh; do
-  if [ -x "$HOME/.claude/hooks/$hook_file" ]; then
-    pass "installed hook executable: $hook_file"
-  else
-    fail "hook not installed/executable: ~/.claude/hooks/$hook_file"
-  fi
-done
-
 PROJECT_ROOT=$(codex_project_dir)
-if [ -f "$CONFIG_TOML" ] && grep -q "projects.\"$PROJECT_ROOT\"" "$CONFIG_TOML" 2>/dev/null; then
-  pass "project trust configured for $PROJECT_ROOT"
-else
-  fail "project trust missing for $PROJECT_ROOT"
-fi
+CONFIG_TOML="$HOME/.codex/config.toml"
 
-if command -v codex >/dev/null 2>&1 && codex mcp list >/dev/null 2>&1; then
-  pass "codex mcp list is available"
-  _MCP_TMP=$(mktemp)
-  trap 'rm -f "$ITEMS_FILE" "$_MCP_TMP"' EXIT
-  for server in obsidian-vault ast-grep playwright; do
-    if codex mcp get "$server" --json >"$_MCP_TMP" 2>/dev/null; then
-      if [ "$server" = "obsidian-vault" ]; then
-        if jq -e '(.transport.env.OBSIDIAN_API_KEY // .env.OBSIDIAN_API_KEY) and (.transport.env.OBSIDIAN_BASE_URL // .env.OBSIDIAN_BASE_URL)' "$_MCP_TMP" >/dev/null 2>&1; then
-          pass "obsidian-vault has required env configuration"
+if [ "$MODE" = "full" ]; then
+  if command -v codex >/dev/null 2>&1; then
+    pass "codex CLI available: $(codex --version 2>/dev/null || echo unknown)"
+  else
+    fail "codex CLI not found"
+  fi
+
+  if [ -f "$CONFIG_TOML" ]; then
+    for profile in coder reviewer architect fast maestro; do
+      if grep -q "\[profiles\.$profile\]" "$CONFIG_TOML" 2>/dev/null; then
+        pass "profile configured: $profile"
+      else
+        fail "missing profile in config.toml: $profile"
+      fi
+    done
+  else
+    fail "missing $CONFIG_TOML"
+  fi
+
+  SETTINGS_FILE="$HOME/.claude/settings.json"
+  if [ -f "$SETTINGS_FILE" ] && command -v jq >/dev/null 2>&1; then
+    for server in codex-coder codex-reviewer; do
+      if jq -e --arg server "$server" '.mcpServers[$server]' "$SETTINGS_FILE" >/dev/null 2>&1; then
+        pass "settings.json MCP present: $server"
+      else
+        fail "settings.json missing MCP: $server"
+      fi
+    done
+
+    for hook_name in codex-pretool-guard.sh plan-review.sh; do
+      if grep -q "$hook_name" "$SETTINGS_FILE" 2>/dev/null; then
+        pass "settings.json hook registered: $hook_name"
+      else
+        fail "settings.json hook missing: $hook_name"
+      fi
+    done
+  else
+    fail "cannot inspect ~/.claude/settings.json"
+  fi
+
+  for hook_file in codex-pretool-guard.sh plan-review.sh session-save.sh session-load.sh pre-compact-save.sh; do
+    if [ -x "$HOME/.claude/hooks/$hook_file" ]; then
+      pass "installed hook executable: $hook_file"
+    else
+      fail "hook not installed/executable: ~/.claude/hooks/$hook_file"
+    fi
+  done
+
+  if [ -f "$CONFIG_TOML" ] && grep -q "projects.\"$PROJECT_ROOT\"" "$CONFIG_TOML" 2>/dev/null; then
+    pass "project trust configured for $PROJECT_ROOT"
+  else
+    fail "project trust missing for $PROJECT_ROOT"
+  fi
+
+  if command -v codex >/dev/null 2>&1 && codex mcp list >/dev/null 2>&1; then
+    pass "codex mcp list is available"
+    _MCP_TMP=$(mktemp)
+    trap 'rm -f "$ITEMS_FILE" "$_MCP_TMP"' EXIT
+    for server in obsidian-vault ast-grep playwright; do
+      if codex mcp get "$server" --json >"$_MCP_TMP" 2>/dev/null; then
+        if [ "$server" = "obsidian-vault" ]; then
+          if jq -e '(.transport.env.OBSIDIAN_API_KEY // .env.OBSIDIAN_API_KEY) and (.transport.env.OBSIDIAN_BASE_URL // .env.OBSIDIAN_BASE_URL)' "$_MCP_TMP" >/dev/null 2>&1; then
+            pass "obsidian-vault has required env configuration"
+          else
+            warn "obsidian-vault missing env configuration"
+          fi
         else
-          warn "obsidian-vault missing env configuration"
+          pass "codex native MCP present: $server"
         fi
       else
-        pass "codex native MCP present: $server"
+        warn "codex native MCP missing: $server"
       fi
-    else
-      warn "codex native MCP missing: $server"
-    fi
-  done
+    done
+  else
+    fail "codex mcp list unavailable"
+  fi
 else
-  fail "codex mcp list unavailable"
+  pass "structural mode: skipped user-environment Codex checks"
 fi
 
 for script_file in \
+  "$ROOT_DIR/.agents/tools/canuto-memory.sh" \
   "$ROOT_DIR/.agents/tools/codex-common.sh" \
   "$ROOT_DIR/.agents/tools/codex-diff-context.sh" \
   "$ROOT_DIR/.agents/tools/codex-context-package.sh" \
-  "$ROOT_DIR/.agents/tools/codex-health-check.sh"; do
+  "$ROOT_DIR/.agents/tools/codex-health-check.sh" \
+  "$ROOT_DIR/.agents/tools/codex-maestro.sh" \
+  "$ROOT_DIR/.agents/tools/vault-sync.sh"; do
   if [ -x "$script_file" ]; then
     pass "tool executable: $(basename "$script_file")"
   else
@@ -171,6 +180,12 @@ if [ -f "$PROJECT_ROOT/docs/FEATURE-MAP.md" ]; then
   pass "docs/FEATURE-MAP.md present"
 else
   warn "docs/FEATURE-MAP.md missing"
+fi
+
+if [ -f "$PROJECT_ROOT/CODEX.md" ] && grep -q "codex-maestro.sh" "$PROJECT_ROOT/CODEX.md" 2>/dev/null; then
+  pass "CODEX.md rendered for direct Codex runtime"
+else
+  warn "CODEX.md missing direct Codex runtime marker"
 fi
 
 if find "$PROJECT_ROOT/.agents/vault/digests" -maxdepth 1 -type f ! -name '.gitkeep' -print -quit 2>/dev/null | grep -q .; then

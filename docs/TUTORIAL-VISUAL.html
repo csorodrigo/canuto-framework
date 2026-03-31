@@ -480,7 +480,7 @@
         <div class="mini-card">
           <span class="pill">1 comando para validar</span>
           <strong><code>curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --doctor</code></strong>
-          <p>Repara hooks, MCPs, profiles, arquivos bootstrap e depois roda os checks reais. Sempre puxa a versao mais recente do GitHub.</p>
+          <p>Repara hooks, MCPs, profiles, arquivos bootstrap, recria o <code>context-package.md</code> inicial e depois roda os checks reais. Sempre puxa a versao mais recente do GitHub.</p>
         </div>
         <div class="mini-card">
           <span class="pill">update facil</span>
@@ -527,7 +527,7 @@ curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/in
           <span class="step-number">03</span>
           <div class="kicker">Se algo saiu do eixo</div>
           <h3>Repair e doctor</h3>
-          <p><code>--repair</code> reidrata o runtime. <code>--doctor</code> repara e valida tudo em uma so passada. Ambos sempre via curl.</p>
+          <p><code>--repair</code> reidrata o runtime. <code>--doctor</code> repara, valida e garante um bootstrap resumivel com <code>.agents/tmp/context-package.md</code> e envelope persistido no vault. Ambos sempre via curl.</p>
           <div class="code"><pre><code>curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --repair
 
 curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --doctor</code></pre></div>
@@ -644,28 +644,31 @@ curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/in
 
       <!-- Handoff Claude <-> Codex -->
       <div class="card" style="margin-top: 18px; padding: 26px;">
-        <div class="kicker">Handoff Claude ↔ Codex</div>
-        <h3>Quando Claude executa e quando passa para o Codex</h3>
-        <p>O Codex nao e um assistente separado — e um executor especializado que Claude aciona em momentos especificos. O trigger e automatico baseado em tamanho de task e evento.</p>
+        <div class="kicker">Runtime Claude ↔ Codex</div>
+        <h3>Quem vira Maestro e como o handoff persiste</h3>
+        <p>O maestro agora depende do runtime ativo. Em sessao Claude, Opus continua orquestrando. Em sessao iniciada diretamente no Codex, o Codex assume como Maestro via profile <code>maestro</code>. Os handoffs usam o mesmo envelope persistido no vault.</p>
 
         <div class="matrix" style="margin-top: 18px;">
           <div class="card" style="background: linear-gradient(135deg, #eef8f7, #d8f0ec);">
             <div class="kicker" style="color: #145d57; background: rgba(15,118,110,0.1); border-color: rgba(15,118,110,0.15);">Claude executa diretamente</div>
             <ul class="clean">
+              <li><strong>Sessao Claude</strong> — Claude Opus continua como Maestro sem mudar o contrato legado.</li>
               <li><strong>Tasks XS e S</strong> — Claude implementa sem spawn. Overhead de MCP nao justificado.</li>
-              <li><strong>Maestro, Architect, Tester, Debugger, Reviewer</strong> — sempre rodando em Claude.</li>
+              <li><strong>Architect, Tester, Debugger, Reviewer</strong> — seguem disponiveis no fluxo Claude-first.</li>
               <li><strong>Plano e briefing</strong> — entrevista, sizing, routing, contexto.</li>
               <li><strong>Quick fixes e docs</strong> — Claude edita diretamente.</li>
             </ul>
           </div>
 
           <div class="card" style="background: linear-gradient(135deg, #fff1eb, #f5ddd3);">
-            <div class="kicker" style="color: #a84b2d; background: rgba(198,93,58,0.1); border-color: rgba(198,93,58,0.15);">Codex entra via spawn</div>
+            <div class="kicker" style="color: #a84b2d; background: rgba(198,93,58,0.1); border-color: rgba(198,93,58,0.15);">Codex direto ou via spawn</div>
             <ul class="clean">
+              <li><strong>Runtime direto</strong> — <code>bash .agents/tools/codex-maestro.sh</code> sobe o Codex como Maestro com profile <code>maestro</code> (default <code>o1-pro</code>).</li>
               <li><strong>Tasks M e L</strong> — Architect gera <code>context-package.md</code>, chama <code>mcp__codex-coder__spawn_agent</code>.</li>
               <li><strong>Tasks paralelas</strong> — <code>spawn_agents_parallel</code> com context package por agente.</li>
               <li><strong>Pre-commit gate</strong> — <code>codex-pretool-guard.sh</code> dispara <em>Codex reviewer (o1-pro)</em> em todo <code>git commit</code> automaticamente.</li>
               <li><strong>Plan review</strong> — ao sair do modo de plano, <code>plan-review.sh</code> chama o <em>Codex reviewer</em> automaticamente.</li>
+              <li><strong>Retomada</strong> — o envelope com <code>task_id</code>, <code>goal</code>, <code>constraints</code>, <code>done_definition</code> e <code>thread_id</code> fica persistido em <code>handoffs/</code>.</li>
             </ul>
           </div>
         </div>
@@ -710,9 +713,9 @@ curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/in
         </div>
 
         <div class="badge-row" style="margin-top: 14px;">
-          <span class="badge" style="background:rgba(15,118,110,0.1); color:#145d57; border-color:rgba(15,118,110,0.15);">🟢 Claude = Maestro, Architect, Tester, Debugger, Reviewer</span>
-          <span class="badge" style="background:rgba(198,93,58,0.1); color:#a84b2d; border-color:rgba(198,93,58,0.15);">🟠 Codex = Coder (M/L), Reviewer (pre-commit + plan review)</span>
-          <span class="badge">context-package.md obrigatorio para spawn M/L</span>
+          <span class="badge" style="background:rgba(15,118,110,0.1); color:#145d57; border-color:rgba(15,118,110,0.15);">Claude session = Opus continua como Maestro</span>
+          <span class="badge" style="background:rgba(198,93,58,0.1); color:#a84b2d; border-color:rgba(198,93,58,0.15);">Codex direto = profile maestro com o1-pro</span>
+          <span class="badge">context-package.md + handoff envelope persistido</span>
           <span class="badge">codex-pretool-guard intercepta todo git commit automaticamente</span>
         </div>
       </div>
@@ -817,6 +820,12 @@ curl -fsSL $CANUTO | bash -s -- --repair
 
 # Repair + validacao completa em uma so passada
 curl -fsSL $CANUTO | bash -s -- --doctor
+
+# Abrir runtime direto do Codex como Maestro
+bash .agents/tools/codex-maestro.sh
+
+# Sincronizar handoffs/contextos que ficaram offline
+bash .agents/tools/vault-sync.sh
 
 # Migracao de projeto existente para versao nova do framework
 curl -fsSL $CANUTO | bash -s -- --migrate
