@@ -1,4 +1,6 @@
 ---
+skill: context-maintenance
+trigger: automatic when context files are stale or after structural changes
 shortDescription: How to maintain .context.md, FEATURE-MAP.md, and the Repo Index (evaluate-repo pipeline) as the project evolves.
 usedBy: [contextualizer, coder, architect, maestro]
 version: 2.2.0

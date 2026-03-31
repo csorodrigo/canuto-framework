@@ -1,6 +1,6 @@
 ---
 skill: co-review
-trigger: /co-brainstorm, /co-plan, /co-validate, or automatic for M/L plan review and pre-commit
+trigger: "/co-brainstorm, /co-plan, /co-validate, or automatic for M/L plan review and pre-commit"
 persona: maestro
 version: 2.0.0
 lastUpdated: 2026-03-30
