@@ -182,7 +182,7 @@ Maestro → Architect → [Co-Review — Codex, se M/L] → Coder → Tester →
 > **Co-Review (co-review skill):** Para tasks **M** e **L**, após o Architect chamar `ExitPlanMode`, o Maestro executa automaticamente `/co-validate` via MCP quando disponível. O hook legado `plan-review.sh` continua como bridge compatível para esse trigger.
 >
 > **Como funciona (bias-free parallel review):**
-> 1. Spawnar um background subagent que chama Codex via MCP (`mcp__codex-reviewer__codex`) com o plano + prompt adversarial
+> 1. Spawnar um background subagent que chama Codex via MCP (`mcp__codex-reviewer__spawn_agent`) com o plano + prompt adversarial
 > 2. Codex é instruído a dizer "My review is complete and I'm ready to present" quando terminar (NÃO mostrar resultado antes)
 > 3. Enquanto isso, o agente principal faz sua própria revisão independente do plano
 > 4. Quando ambos terminarem: recuperar o output do Codex e comparar com a revisão do Claude
@@ -479,7 +479,7 @@ Claude remains the default Maestro runtime. Codex becomes Maestro only when the 
 ### Runtime rules
 - Do NOT switch providers automatically mid-session.
 - Claude runtime keeps Claude Opus as Maestro.
-- Direct Codex runtime uses `CODEX.md` plus the `maestro` profile (`o1-pro` by default).
+- Direct Codex runtime uses `CODEX.md` plus the `maestro` profile (`o1-pro` by default when the account supports it).
 - Cross-runtime handoff is explicit, never implicit.
 
 ### Triggering conditions

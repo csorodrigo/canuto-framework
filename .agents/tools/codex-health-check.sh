@@ -2,8 +2,14 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-ROOT_DIR="$(cd "$PROJECT_DIR" && git rev-parse --show-toplevel 2>/dev/null || pwd)"
+ROOT_DIR="$(cd "$PROJECT_DIR" && git rev-parse --show-toplevel 2>/dev/null || printf '%s\n' "$SCRIPT_ROOT")"
+
+if [ ! -f "$ROOT_DIR/.agents/tools/codex-common.sh" ]; then
+  ROOT_DIR="$SCRIPT_ROOT"
+fi
 
 # shellcheck source=/dev/null
 source "$ROOT_DIR/.agents/tools/codex-common.sh"
@@ -66,6 +72,82 @@ fail() {
   fi
 }
 
+run_codex_smoke_exec() {
+  local label="$1"
+  shift
+  local tmp_output
+  local tmp_error
+  tmp_output=$(mktemp)
+  tmp_error=$(mktemp)
+
+  if printf '%s\n' 'Reply with exactly: OK' | codex exec -C "$PROJECT_ROOT" --skip-git-repo-check "$@" --output-last-message "$tmp_output" - >/dev/null 2>"$tmp_error"; then
+    local output
+    output=$(tr -d '\r' < "$tmp_output" | tail -n 1 | tr -d '\n')
+    if [ "$output" = "OK" ]; then
+      pass "$label"
+    else
+      fail "$label returned unexpected output: ${output:-<empty>}"
+    fi
+  else
+    fail "$label failed: $(head -n 1 "$tmp_error")"
+  fi
+
+  rm -f "$tmp_output" "$tmp_error"
+}
+
+run_codex_reviewer_profile_smoke() {
+  local tmp_output
+  local tmp_error
+  tmp_output=$(mktemp)
+  tmp_error=$(mktemp)
+
+  if printf '%s\n' 'Reply with exactly: OK' | codex exec -C "$PROJECT_ROOT" --skip-git-repo-check --profile reviewer --output-last-message "$tmp_output" - >/dev/null 2>"$tmp_error"; then
+    local output
+    output=$(tr -d '\r' < "$tmp_output" | tail -n 1 | tr -d '\n')
+    if [ "$output" = "OK" ]; then
+      pass "reviewer profile smoke test"
+    else
+      warn "reviewer profile returned unexpected output: ${output:-<empty>}"
+    fi
+  else
+    warn "reviewer profile unavailable: $(head -n 1 "$tmp_error")"
+  fi
+
+  rm -f "$tmp_output" "$tmp_error"
+}
+
+run_codex_reviewer_helper_smoke() {
+  local tmp_dir
+  tmp_dir=$(mktemp -d)
+  local schema_file="$tmp_dir/schema.json"
+  local prompt_file="$tmp_dir/prompt.txt"
+  local output_file="$tmp_dir/output.json"
+  local used_file="$tmp_dir/used.txt"
+  local error_file="$tmp_dir/error.txt"
+
+  cat > "$schema_file" <<'EOF'
+{"type":"object","additionalProperties":false,"required":["verdict","summary","score","issues"],"properties":{"verdict":{"type":"string","enum":["LGTM","CONCERNS"]},"summary":{"type":"string"},"score":{"type":"number"},"issues":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["severity","issue","fix"],"properties":{"severity":{"type":"string","enum":["high","medium","low"]},"issue":{"type":"string"},"fix":{"type":"string"}}}}}}
+EOF
+
+  cat > "$prompt_file" <<'EOF'
+You are reviewing an implementation plan before coding starts.
+Return JSON only, matching the provided schema.
+Use verdict LGTM.
+Plan:
+- Step 1: Confirm the helper works.
+EOF
+
+  if codex_run_reviewer "$tmp_dir" "$schema_file" "$output_file" "$prompt_file" "$used_file" "$error_file"; then
+    local used_candidate
+    used_candidate=$(cat "$used_file" 2>/dev/null || echo "unknown")
+    pass "reviewer helper smoke test: $used_candidate"
+  else
+    fail "reviewer helper smoke test failed: $(head -n 1 "$error_file")"
+  fi
+
+  rm -rf "$tmp_dir"
+}
+
 if [ "$JSON_OUTPUT" = false ]; then
   echo ""
   echo "Codex Integration Health Check"
@@ -74,6 +156,10 @@ fi
 
 PROJECT_ROOT=$(codex_project_dir)
 CONFIG_TOML="$HOME/.codex/config.toml"
+CLAUDE_SCRIPTS_DIR="$HOME/.claude/scripts"
+EXPECTED_CODEX_CODER="$CLAUDE_SCRIPTS_DIR/codex-coder.sh"
+EXPECTED_CODEX_REVIEWER="$CLAUDE_SCRIPTS_DIR/codex-reviewer.sh"
+EXPECTED_CODEX_AGENT_MCP="$CLAUDE_SCRIPTS_DIR/codex-agent-mcp.py"
 
 if [ "$MODE" = "full" ]; then
   if command -v codex >/dev/null 2>&1; then
@@ -104,6 +190,18 @@ if [ "$MODE" = "full" ]; then
       fi
     done
 
+    if jq -e --arg command "$EXPECTED_CODEX_CODER" '.mcpServers["codex-coder"].command == $command' "$SETTINGS_FILE" >/dev/null 2>&1; then
+      pass "settings.json codex-coder points to wrapper script"
+    else
+      fail "settings.json codex-coder is not using $EXPECTED_CODEX_CODER"
+    fi
+
+    if jq -e --arg command "$EXPECTED_CODEX_REVIEWER" '.mcpServers["codex-reviewer"].command == $command' "$SETTINGS_FILE" >/dev/null 2>&1; then
+      pass "settings.json codex-reviewer points to wrapper script"
+    else
+      fail "settings.json codex-reviewer is not using $EXPECTED_CODEX_REVIEWER"
+    fi
+
     for hook_name in codex-pretool-guard.sh plan-review.sh; do
       if grep -q "$hook_name" "$SETTINGS_FILE" 2>/dev/null; then
         pass "settings.json hook registered: $hook_name"
@@ -113,6 +211,24 @@ if [ "$MODE" = "full" ]; then
     done
   else
     fail "cannot inspect ~/.claude/settings.json"
+  fi
+
+  if [ -x "$EXPECTED_CODEX_CODER" ]; then
+    pass "codex-coder wrapper installed: $EXPECTED_CODEX_CODER"
+  else
+    fail "codex-coder wrapper missing or not executable: $EXPECTED_CODEX_CODER"
+  fi
+
+  if [ -x "$EXPECTED_CODEX_REVIEWER" ]; then
+    pass "codex-reviewer wrapper installed: $EXPECTED_CODEX_REVIEWER"
+  else
+    fail "codex-reviewer wrapper missing or not executable: $EXPECTED_CODEX_REVIEWER"
+  fi
+
+  if [ -x "$EXPECTED_CODEX_AGENT_MCP" ]; then
+    pass "codex-agent MCP wrapper installed: $EXPECTED_CODEX_AGENT_MCP"
+  else
+    fail "codex-agent MCP wrapper missing or not executable: $EXPECTED_CODEX_AGENT_MCP"
   fi
 
   for hook_file in codex-pretool-guard.sh plan-review.sh session-save.sh session-load.sh pre-compact-save.sh; do
@@ -151,6 +267,11 @@ if [ "$MODE" = "full" ]; then
   else
     fail "codex mcp list unavailable"
   fi
+
+  run_codex_smoke_exec "default codex exec smoke test"
+  run_codex_smoke_exec "coder profile smoke test" --profile coder
+  run_codex_reviewer_profile_smoke
+  run_codex_reviewer_helper_smoke
 else
   pass "structural mode: skipped user-environment Codex checks"
 fi

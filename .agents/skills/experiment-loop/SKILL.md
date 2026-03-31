@@ -1,4 +1,6 @@
 ---
+name: experiment-loop
+description: Run controlled experiment loops that change one variable, measure the result, and keep only winning iterations.
 shortDescription: Run systematic experiment loops — change a variable, test, measure, keep or discard, repeat. Automated optimization for any process with a measurable metric.
 usedBy: [maestro, architect]
 version: 1.2.0

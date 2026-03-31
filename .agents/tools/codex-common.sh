@@ -129,6 +129,25 @@ codex_reviewer_args() {
   fi
 }
 
+codex_profile_model() {
+  local profile="${1:-}"
+  local config_toml="$HOME/.codex/config.toml"
+
+  [ -n "$profile" ] || return 1
+  [ -f "$config_toml" ] || return 1
+
+  awk -v profile="$profile" '
+    $0 ~ "^\\[profiles\\." profile "\\]$" { in_profile=1; next }
+    /^\[.*\]$/ && in_profile { exit }
+    in_profile && $1 == "model" {
+      value = $3
+      gsub(/"/, "", value)
+      print value
+      exit
+    }
+  ' "$config_toml"
+}
+
 codex_reviewer_candidates() {
   local config_toml="$HOME/.codex/config.toml"
   if [ -f "$config_toml" ] && grep -q '\[profiles\.reviewer\]' "$config_toml" 2>/dev/null; then
@@ -138,6 +157,51 @@ codex_reviewer_candidates() {
   fi
   printf '%s\n' "model:o3"
   printf '%s\n' "model:gpt-5-codex"
+}
+
+codex_reviewer_preferred_candidate() {
+  codex_reviewer_candidates | head -1
+}
+
+codex_candidate_path_label() {
+  local candidate="${1:-}"
+  if [ -z "$candidate" ]; then
+    printf '%s\n' "unavailable"
+  else
+    printf '%s\n' "$candidate"
+  fi
+}
+
+codex_candidate_model_name() {
+  local candidate="${1:-}"
+  case "$candidate" in
+    profile:*)
+      codex_profile_model "${candidate#profile:}" 2>/dev/null || printf '%s\n' "${candidate#profile:}"
+      ;;
+    model:*)
+      printf '%s\n' "${candidate#model:}"
+      ;;
+    *)
+      printf '%s\n' "unknown"
+      ;;
+  esac
+}
+
+codex_candidate_fallback_occurred() {
+  local candidate="${1:-}"
+  local preferred
+  preferred=$(codex_reviewer_preferred_candidate 2>/dev/null || true)
+
+  if [ -z "$candidate" ] || [ -z "$preferred" ]; then
+    printf '%s\n' "true"
+    return
+  fi
+
+  if [ "$candidate" = "$preferred" ]; then
+    printf '%s\n' "false"
+  else
+    printf '%s\n' "true"
+  fi
 }
 
 codex_run_reviewer() {
@@ -151,6 +215,7 @@ codex_run_reviewer() {
   local candidate=""
   local local_error_file=""
   local -a cmd=()
+  local candidate_error_file=""
 
   if [ -n "$error_file" ]; then
     : > "$error_file"
@@ -161,7 +226,8 @@ codex_run_reviewer() {
 
   while IFS= read -r candidate; do
     [ -n "$candidate" ] || continue
-    cmd=(codex exec -C "$exec_dir" -s read-only --skip-git-repo-check --ephemeral)
+    candidate_error_file=$(mktemp)
+    cmd=(codex exec -C "$exec_dir" -s read-only --skip-git-repo-check --ephemeral -c 'model_reasoning_effort="high"')
     case "$candidate" in
       profile:*)
         cmd+=(--profile "${candidate#profile:}")
@@ -172,11 +238,24 @@ codex_run_reviewer() {
     esac
     cmd+=(--output-schema "$schema_file" -o "$output_file" -)
 
-    if "${cmd[@]}" < "$prompt_file" >/dev/null 2>"$error_file"; then
+    if "${cmd[@]}" < "$prompt_file" >/dev/null 2>"$candidate_error_file"; then
       printf '%s\n' "$candidate" > "$used_file"
+      if [ -s "$candidate_error_file" ]; then
+        cat "$candidate_error_file" > "$error_file"
+      else
+        : > "$error_file"
+      fi
+      rm -f "$candidate_error_file"
       [ -n "$local_error_file" ] && rm -f "$local_error_file"
       return 0
     fi
+
+    {
+      printf '[candidate=%s]\n' "$candidate"
+      cat "$candidate_error_file"
+      printf '\n'
+    } >> "$error_file"
+    rm -f "$candidate_error_file"
   done < <(codex_reviewer_candidates)
 
   [ -n "$local_error_file" ] && rm -f "$local_error_file"

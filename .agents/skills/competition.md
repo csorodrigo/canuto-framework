@@ -93,10 +93,10 @@ Run comparison on both implementations:
 
 ### 5. Deep Review (optional)
 
-Send BOTH implementations to o1-pro for unbiased comparison:
+Send BOTH implementations to the reviewer path for an independent comparison:
 
 ```
-mcp__codex-reviewer__codex({
+mcp__codex-reviewer__spawn_agent({
   prompt: `
 [COMPETITION REVIEW]
 Two implementations of the same feature. Compare objectively.

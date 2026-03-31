@@ -5,7 +5,7 @@ persona: maestro
 version: 1.0.0
 lastUpdated: 2026-03-30
 shortDescription: >
-  Security scan via o1-pro before merge. OWASP Top 10, injection detection, auth bypass,
+  Security scan via the reviewer path before merge. OWASP Top 10, injection detection, auth bypass,
   race conditions, secrets leakage. Gate that blocks merge if critical issues found.
 usedBy: [maestro, cso]
 evals:
@@ -54,10 +54,10 @@ git diff --staged  # or git diff main...HEAD for full branch diff
 | .env, config/ | CRITICAL — secrets exposure |
 | styles/, docs/, tests/ | LOW — skip scan |
 
-### 3. Send to o1-pro Security Review
+### 3. Send to Reviewer Security Review
 
 ```
-mcp__codex-reviewer__codex({
+mcp__codex-reviewer__spawn_agent({
   prompt: `
 [SECURITY REVIEW REQUEST]
 You are a senior security engineer performing a pre-merge security audit.
@@ -158,9 +158,9 @@ The security gate feeds data to CSO's trend tracking.
 
 ## Graceful Degradation
 
-- o1-pro MCP unavailable → Claude performs security review (less thorough)
+- reviewer MCP unavailable → Claude performs security review (less thorough)
 - No diff available → scan full files in changed list
-- Log: `[Security] ⚠️ Using Claude fallback (o1-pro unavailable)`
+- Log: `[Security] ⚠️ Using Claude fallback (reviewer path unavailable)`
 
 ---
 

@@ -93,7 +93,7 @@ You are a test-fixer agent. Your job is to make all tests pass.
 If Codex made fixes:
 1. Read `git diff` to see what changed
 2. Verify fixes are correct (not just test-silencing hacks)
-3. If suspicious, trigger `mcp__codex-reviewer__codex` for review
+3. If suspicious, trigger `mcp__codex-reviewer__spawn_agent` for review
 
 ---
 
@@ -101,10 +101,10 @@ If Codex made fixes:
 
 If `codex-coder` (gpt-5-codex) fails all 3 attempts:
 1. Collect the test output + Codex's analysis
-2. Escalate to `mcp__codex-reviewer__codex` (o1-pro):
+2. Escalate to `mcp__codex-reviewer__spawn_agent` (reviewer profile):
 
 ```
-mcp__codex-reviewer__codex({
+mcp__codex-reviewer__spawn_agent({
   prompt: `
 [TEST-FIX ESCALATION]
 gpt-5-codex failed to fix these tests after 3 attempts.
@@ -123,7 +123,7 @@ Analyze the root cause and provide the exact fix needed.
 })
 ```
 
-3. Apply o1-pro's fix manually
+3. Apply the reviewer guidance manually
 4. Re-run tests to verify
 
 ---

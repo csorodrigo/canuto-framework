@@ -350,6 +350,9 @@ FRAMEWORK_FILES=(
   ".agents/tools/codex-diff-context.sh"
   ".agents/tools/codex-context-package.sh"
   ".agents/tools/codex-health-check.sh"
+  ".agents/tools/codex-agent-mcp.py"
+  ".agents/tools/codex-coder.sh"
+  ".agents/tools/codex-reviewer.sh"
   ".agents/tools/canuto-consumer-smoke.sh"
   ".agents/tools/codex-maestro.sh"
   ".agents/tools/vault-sync.sh"
@@ -1125,6 +1128,9 @@ setup_obsidian_mcp() {
 setup_codex() {
   local settings="$HOME/.claude/settings.json"
   local config_toml="$HOME/.codex/config.toml"
+  local claude_scripts_dir="$HOME/.claude/scripts"
+  local coder_wrapper="$claude_scripts_dir/codex-coder.sh"
+  local reviewer_wrapper="$claude_scripts_dir/codex-reviewer.sh"
 
   log "Setting up Codex CLI integration..."
 
@@ -1242,6 +1248,30 @@ TRUSTEOF2
     fi
   fi
 
+  # ── Install Claude-side Codex MCP wrappers ──────────────────────────────
+  mkdir -p "$claude_scripts_dir"
+
+  install_codex_wrapper() {
+    local src="$1"
+    local dst="$claude_scripts_dir/$(basename "$src")"
+
+    if [ ! -f "$src" ]; then
+      warn "Missing Codex wrapper source: $src"
+      return 1
+    fi
+
+    cp "$src" "$dst"
+    chmod +x "$dst"
+    ok "Installed Codex wrapper: $dst"
+    return 0
+  }
+
+  install_codex_wrapper ".agents/tools/codex-agent-mcp.py" || return
+  install_codex_wrapper ".agents/tools/codex-coder.sh" || return
+  install_codex_wrapper ".agents/tools/codex-reviewer.sh" || return
+  install_codex_wrapper ".agents/tools/codex-common.sh" || return
+  install_codex_wrapper ".agents/tools/codex-diff-context.sh" || return
+
   # ── Register codex-coder MCP in settings.json ───────────────────────────
   if ! command -v jq &> /dev/null; then
     warn "jq not found — skipping Codex MCP registration."
@@ -1252,27 +1282,19 @@ TRUSTEOF2
     echo '{}' > "$settings"
   fi
 
-  if ! jq -e '.mcpServers["codex-coder"]' "$settings" &>/dev/null; then
-    local updated
-    updated=$(jq '.mcpServers["codex-coder"] = {"command":"uvx","args":["codex-as-mcp@latest"],"type":"stdio"}' "$settings")
-    if [[ -n "$updated" ]]; then
-      echo "$updated" > "$settings"
-      ok "codex-coder MCP added to settings.json (gpt-5-codex)"
-    fi
-  else
-    ok "codex-coder MCP already in settings.json"
-  fi
-
-  # ── Register codex-reviewer MCP in settings.json ────────────────────────
-  if ! jq -e '.mcpServers["codex-reviewer"]' "$settings" &>/dev/null; then
-    local updated
-    updated=$(jq '.mcpServers["codex-reviewer"] = {"command":"codex","args":["mcp","serve","-c","model=o1-pro"],"type":"stdio"}' "$settings")
-    if [[ -n "$updated" ]]; then
-      echo "$updated" > "$settings"
-      ok "codex-reviewer MCP added to settings.json (o1-pro)"
-    fi
-  else
-    ok "codex-reviewer MCP already in settings.json"
+  local updated
+  updated=$(jq \
+    --arg coder "$coder_wrapper" \
+    --arg reviewer "$reviewer_wrapper" \
+    '
+      .mcpServers = (.mcpServers // {})
+      | .mcpServers["codex-coder"] = {"command": $coder, "type": "stdio"}
+      | .mcpServers["codex-reviewer"] = {"command": $reviewer, "type": "stdio"}
+    ' "$settings")
+  if [[ -n "$updated" ]]; then
+    echo "$updated" > "$settings"
+    ok "codex-coder MCP configured in settings.json via wrapper"
+    ok "codex-reviewer MCP configured in settings.json via wrapper"
   fi
 }
 
@@ -1391,13 +1413,14 @@ Available profiles in \`~/.codex/config.toml\` — use when spawned with \`--pro
 | Profile | Model | Reasoning | Use For |
 |---------|-------|-----------|---------|
 | \`coder\` | gpt-5-codex | medium | Standard code generation |
-| \`maestro\` | o1-pro | high | Direct Codex runtime orchestration |
-| \`reviewer\` | o1-pro | high | Deep code review, security audit |
+| \`maestro\` | o1-pro (when supported) | high | Direct Codex runtime orchestration |
+| \`reviewer\` | o1-pro (when supported) | high | Deep code review, security audit |
 | \`architect\` | o3 | high | Architecture, complex reasoning |
 | \`fast\` | gpt-5-codex | low | Quick edits, formatting, docs |
 
 - Claude sessions keep Claude Opus as Maestro.
 - Direct Codex sessions should use `bash .agents/tools/codex-maestro.sh` or `codex --profile maestro`.
+- `maestro` and `reviewer` default to `o1-pro`, but account support is required and any fallback must be reported explicitly.
 
 ## Anti-Patterns
 - Do NOT create README.md, documentation files, or CHANGELOG entries
@@ -1429,13 +1452,14 @@ Available profiles in `~/.codex/config.toml` — use when spawned with `--profil
 | Profile | Model | Reasoning | Use For |
 |---------|-------|-----------|---------|
 | `coder` | gpt-5-codex | medium | Standard code generation |
-| `maestro` | o1-pro | high | Direct Codex runtime orchestration |
-| `reviewer` | o1-pro | high | Deep code review, security audit |
+| `maestro` | o1-pro (when supported) | high | Direct Codex runtime orchestration |
+| `reviewer` | o1-pro (when supported) | high | Deep code review, security audit |
 | `architect` | o3 | high | Architecture, complex reasoning |
 | `fast` | gpt-5-codex | low | Quick edits, formatting, docs |
 
 - Claude sessions keep Claude Opus as Maestro.
 - Direct Codex sessions should use `bash .agents/tools/codex-maestro.sh` or `codex --profile maestro`.
+- `maestro` and `reviewer` default to `o1-pro`, but account support is required and any fallback must be reported explicitly.
 PROFILEPATCH
       patched=true
     fi
@@ -1458,6 +1482,7 @@ VAULTPATCH
 - Claude sessions keep Claude Opus as Maestro.
 - Direct Codex sessions should use `bash .agents/tools/codex-maestro.sh` or `codex --profile maestro`.
 - The `maestro` profile is runtime-specific and does not redefine `coder`, `reviewer`, `architect`, or `fast`.
+- `maestro` and `reviewer` default to `o1-pro`, but account support is required and any fallback must be reported explicitly.
 RUNTIMEPATCH
       patched=true
     fi
@@ -1768,6 +1793,7 @@ setup_gstack() {
 setup_global_skills() {
   local -a global_skills=(
     # Canuto originals
+    "co-plan"
     "office-hours"
     "investigate"
     "document-release"
@@ -1793,9 +1819,16 @@ setup_global_skills() {
   for skill in "${global_skills[@]}"; do
     local remote="global-skills/${skill}/SKILL.md"
     local dst="$HOME/.claude/skills/${skill}/SKILL.md"
-    download "$remote" "$dst" \
-      && ok "/$skill" \
-      || warn "Could not download $remote"
+    if [ -f "$remote" ]; then
+      mkdir -p "$(dirname "$dst")"
+      cp "$remote" "$dst" \
+        && ok "/$skill" \
+        || warn "Could not copy local skill $remote"
+    else
+      download "$remote" "$dst" \
+        && ok "/$skill" \
+        || warn "Could not download $remote"
+    fi
   done
 }
 

@@ -2,28 +2,21 @@
 
 Loaded on demand when a co-review mode activates. See `SKILL.md` for the summary.
 
+The current `codex-reviewer` contract is one-shot via `mcp__codex-reviewer__spawn_agent`.
+Do not assume reviewer-side `threadId` or `codex-reply`.
+
 ---
 
-## Mode 1: /co-brainstorm — Full Procedure
+## Mode 1: /co-brainstorm
 
 ### Codex Prompt Template
 
-```
+```text
 Brainstorm approaches for: {topic}
 Context: {relevant project files and constraints}
 
 Generate 3-5 distinct approaches with pros/cons for each.
-When done, reply ONLY with: "My brainstorming is complete and I'm ready to present"
-Do NOT share your ideas yet — wait until explicitly asked.
-```
-
-- If Codex asks clarifying questions via `codex-reply`, the subagent answers using codebase context.
-- Wait for the "ready to present" signal before retrieving.
-
-### Retrieval Prompt
-
-```
-Please share your brainstorming results now.
+Return the ideas directly in this response.
 ```
 
 ### Output Format
@@ -33,32 +26,34 @@ Please share your brainstorming results now.
 
 ### Claude's Approaches
 1. {approach} — {pros/cons}
-...
 
 ### Codex's Approaches
 1. {approach} — {pros/cons}
-...
 
 ### Synthesis
-- **Convergent** (both suggested): {list}
-- **Codex-unique**: {list}
-- **Claude-unique**: {list}
-- **Recommended**: {which approach and why}
+- Convergent: {list}
+- Codex-unique: {list}
+- Claude-unique: {list}
+- Recommended: {which approach and why}
 ```
 
 ---
 
-## Mode 2: /co-plan — Full Procedure
+## Mode 2: /co-plan
 
 ### Codex Prompt Template
 
-```
+```text
 Create an implementation plan for: {task description}
 Project context: {stack, constraints, relevant files}
 
-Include: steps, files to modify, risks, test strategy.
-When done, reply ONLY with: "My plan is ready to present"
-Do NOT share your plan yet — wait until explicitly asked.
+Include:
+- steps
+- files to modify
+- risks
+- test strategy
+
+Return the plan directly in this response.
 ```
 
 ### Output Format
@@ -83,11 +78,11 @@ Do NOT share your plan yet — wait until explicitly asked.
 
 ---
 
-## Mode 3: /co-validate — Full Procedure
+## Mode 3: /co-validate
 
 ### Codex Prompt Template
 
-```
+```text
 You are a staff engineer reviewing this implementation plan.
 Be critical and thorough. Look for:
 1. What could make this plan fail?
@@ -101,8 +96,7 @@ Plan:
 {plan content}
 ---
 
-When done, reply ONLY with: "My review is complete and I'm ready to present"
-Do NOT share your review yet.
+Return the review directly in this response.
 ```
 
 ### Output Format
@@ -110,13 +104,13 @@ Do NOT share your review yet.
 ```markdown
 ## Co-Validate: {plan name}
 
-### Convergent Issues (both found — high confidence)
+### Convergent Issues
 - {issue}: {description}
 
-### Codex-Only Issues (evaluate)
+### Codex-Only Issues
 - {issue}: {description} — [Accept | Override: {reason}]
 
-### Claude-Only Issues (evaluate)
+### Claude-Only Issues
 - {issue}: {description} — [Accept | Override: {reason}]
 
 ### Verdict: ✓ LGTM | ⚠️ Concerns ({N} issues to address)
@@ -124,11 +118,12 @@ Do NOT share your review yet.
 
 ---
 
-## MCP Tool Reference (Quick)
+## MCP Tool Reference
 
 | Tool | Purpose |
 |------|---------|
-| `mcp__codex-reviewer__codex` | Start new Codex review session (returns `response` + `threadId`) |
-| `mcp__codex-reviewer__codex-reply` | Continue session via `threadId` (clarifying questions, retrieval) |
+| `mcp__codex-coder__spawn_agents_parallel` | Parallel brainstorm or implementation |
+| `mcp__codex-reviewer__spawn_agent` | One-shot reviewer pass using the `reviewer` profile |
 
-Full MCP docs: `.agents/mcp/codex-collab.md`
+If reviewer MCP is unavailable, the explicit degraded path is:
+`codex exec --profile reviewer` -> `/ask codex` only when a CCB Codex session is active -> Claude-only review.

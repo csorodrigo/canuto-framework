@@ -28,9 +28,9 @@ Enable the Maestro to orchestrate multiple AI providers for different personas, 
 
 | Tier | Role | Default Provider | Model | MCP Tool | Can Delegate? |
 |------|------|-----------------|-------|----------|---------------|
-| tier-1 | Strategic (Maestro, Architect, Contextualizer) | Active runtime (`claude` by default, `codex` in direct Codex sessions) | opus / o1-pro | — | No — stays on the active runtime |
+| tier-1 | Strategic (Maestro, Architect, Contextualizer) | Active runtime (`claude` by default, `codex` in direct Codex sessions) | opus / reviewer profile | — | No — stays on the active runtime |
 | tier-2 | Coder | Codex | gpt-5-codex | `mcp__codex-coder__spawn_agent` | Yes — writes code in filesystem |
-| tier-2 | Reviewer | Codex | o1-pro | `mcp__codex-reviewer__codex` | Yes — deep self-review (cross-model) |
+| tier-2 | Reviewer | Codex | reviewer profile (`o1-pro` when supported) | `mcp__codex-reviewer__spawn_agent` | Yes — deep self-review (cross-model) |
 | tier-2 | Tester, Debugger | Codex | gpt-5-codex | `mcp__codex-coder__spawn_agent` | Yes — can use Codex or Claude |
 
 ---
@@ -76,19 +76,19 @@ When Maestro delegates to a tier-2 persona:
 
 4. **Codex writes code directly in filesystem** (gpt-5-codex).
 
-5. **Post-code**: Opus reads `git diff`, then triggers Code Review via `mcp__codex-reviewer__codex` (o1-pro self-review).
+5. **Post-code**: Opus reads `git diff`, then triggers Code Review via `mcp__codex-reviewer__spawn_agent` (reviewer profile self-review).
 
 6. For **XS/S tasks**: Claude codes directly — MCP overhead not justified. No context preload needed.
 
 #### B. Review Delegation (preferred: MCP)
 
-1. **Send plan or diff** to `mcp__codex-reviewer__codex` (o1-pro):
+1. **Send plan or diff** to `mcp__codex-reviewer__spawn_agent` (reviewer profile):
    - Include full plan between `--- PLAN START/END ---` delimiters.
    - Or include `git diff` between `--- CHANGES START/END ---` delimiters.
 
-2. **Codex reviews with o1-pro** (ultra think, cross-model perspective).
+2. **Codex reviews with the reviewer profile** (cross-model perspective).
 
-3. **Multi-turn**: Use `mcp__codex-reviewer__codex-reply(threadId, msg)` for follow-ups.
+3. The current wrapper is **one-shot**. There is no reviewer-side `threadId` contract for follow-ups.
 
 #### C. Legacy Delegation (fallback: API/CCB)
 
@@ -105,7 +105,7 @@ When Maestro delegates to a tier-2 persona:
    - If the output is malformed, retry once with a clarification prompt.
    - If still malformed, fall back to Claude for that task.
 
-### 3. Auto-Escalation: gpt-5-codex → o1-pro
+### 3. Auto-Escalation: gpt-5-codex → reviewer profile
 
 When `codex-coder` (gpt-5-codex) fails a task:
 
@@ -118,10 +118,10 @@ When `codex-coder` (gpt-5-codex) fails a task:
 
 **Escalation procedure:**
 1. Collect: original prompt + gpt-5-codex's output + error/failure details
-2. Send to `mcp__codex-reviewer__codex` (o1-pro) with escalation tag:
+2. Send to `mcp__codex-reviewer__spawn_agent` (reviewer profile) with escalation tag:
    ```
-   [ESCALATION: gpt-5-codex → o1-pro]
-   The fast model failed this task. Use maximum reasoning depth.
+   [ESCALATION: gpt-5-codex -> reviewer profile]
+   The fast model failed this task. Use deeper reasoning than the coding pass.
 
    ## Original Task
    {original_prompt}
@@ -134,15 +134,15 @@ When `codex-coder` (gpt-5-codex) fails a task:
 
    Please provide the correct implementation.
    ```
-3. Apply o1-pro's fix
+3. Apply the reviewer guidance
 4. Log escalation in session metrics
 
-**Cost note:** o1-pro is significantly more expensive. Only escalate after gpt-5-codex genuinely fails (not for first attempt).
+**Cost note:** reviewer-grade paths are more expensive. Only escalate after gpt-5-codex genuinely fails.
 
 ### 4. Fallback Strategy
 
 ```
-codex-coder MCP (gpt-5-codex) → escalate to codex-reviewer MCP (o1-pro) → CCB ask → Claude-only
+codex-coder MCP (gpt-5-codex) -> escalate to codex-reviewer MCP (reviewer profile) -> CCB ask with active Codex session -> Claude-only
 ```
 
 Maestro logs every fallback and escalation in the session summary.
@@ -173,7 +173,7 @@ When the CCB plugin is installed (`.agents/plugins/ccb/`), delegation gains a th
 | Backend | Mechanism | Visibility | Multi-turn | Session Persistence |
 |---------|-----------|------------|------------|---------------------|
 | API (default) | Provider API calls | Invisible | No | No |
-| codex-collab MCP | MCP tools (threadId) | Background subagent | Yes | No |
+| codex-collab MCP | MCP tools (`spawn_agent`) | Background subagent | No | No |
 | CCB panes | CLI terminal panes (WezTerm/tmux) | Visible terminal panes | Yes | Yes (JSONL, resumable) |
 
 ### Backend Selection
@@ -188,7 +188,7 @@ Maestro chooses the backend based on:
 ### Fallback Chain
 
 ```
-codex-coder/codex-reviewer MCP → CCB panes → API delegation → Claude (all-in-one)
+codex-coder/codex-reviewer MCP -> CCB panes -> API delegation -> Claude (all-in-one)
 ```
 
 If CCB is not installed, the fallback is transparent. No user action needed.

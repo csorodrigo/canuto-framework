@@ -13,6 +13,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOKS_DIR="$HOME/.claude/hooks"
 SETTINGS_FILE="$HOME/.claude/settings.json"
+SCRIPTS_DIR="$HOME/.claude/scripts"
 
 echo "🔍 Verificando pré-requisitos..."
 
@@ -32,6 +33,19 @@ for hook in plan-review.sh codex-pretool-guard.sh session-save.sh session-load.s
     cp "$SCRIPT_DIR/$hook" "$HOOKS_DIR/$hook"
     chmod +x "$HOOKS_DIR/$hook"
     echo "   ✅ $hook"
+  fi
+done
+
+echo ""
+echo "🧠 Instalando wrappers do Codex em ~/.claude/scripts/..."
+mkdir -p "$SCRIPTS_DIR"
+
+TOOLS_DIR="$(cd "$SCRIPT_DIR/../tools" && pwd)"
+for script in codex-agent-mcp.py codex-coder.sh codex-reviewer.sh codex-common.sh codex-diff-context.sh; do
+  if [ -f "$TOOLS_DIR/$script" ]; then
+    cp "$TOOLS_DIR/$script" "$SCRIPTS_DIR/$script"
+    chmod +x "$SCRIPTS_DIR/$script"
+    echo "   ✅ $script"
   fi
 done
 
@@ -95,6 +109,19 @@ elif [ -f "$SNIPPET" ]; then
   echo "   ✅ settings.json criado com hooks e MCP servers"
 else
   echo "   ⚠️  settings-snippet.json não encontrado — pulando MCP setup."
+fi
+
+if [ -f "$SETTINGS_FILE" ]; then
+  MERGED=$(jq \
+    --arg coder "$SCRIPTS_DIR/codex-coder.sh" \
+    --arg reviewer "$SCRIPTS_DIR/codex-reviewer.sh" \
+    '
+      .mcpServers = (.mcpServers // {})
+      | .mcpServers["codex-coder"] = {"command": $coder, "type": "stdio"}
+      | .mcpServers["codex-reviewer"] = {"command": $reviewer, "type": "stdio"}
+    ' "$SETTINGS_FILE")
+  echo "$MERGED" > "$SETTINGS_FILE"
+  echo "   ✅ codex-coder e codex-reviewer apontando para wrappers compatíveis"
 fi
 
 echo "      - ast-grep (análise AST)"

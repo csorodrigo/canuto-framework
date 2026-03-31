@@ -115,6 +115,11 @@ handle_commit_gate() {
   local error_file
   local used_candidate="model:unknown"
   local model_name="unknown"
+  local reviewer_path="unavailable"
+  local preferred_candidate
+  local preferred_path
+  local preferred_model
+  local fallback_occurred="true"
 
   if ! printf '%s' "$command_text" | grep -Eq '(^|[[:space:]])git[[:space:]]+commit([[:space:]]|$)'; then
     return 0
@@ -174,6 +179,9 @@ handle_commit_gate() {
   used_file="$tmp_dir/pre-commit-$review_id.used"
   error_file="$tmp_dir/pre-commit-$review_id.err"
   review_markdown=$(codex_review_markdown_path "$ROOT_DIR" "latest-pre-commit-review")
+  preferred_candidate=$(codex_reviewer_preferred_candidate 2>/dev/null || true)
+  preferred_path=$(codex_candidate_path_label "$preferred_candidate")
+  preferred_model=$(codex_candidate_model_name "$preferred_candidate")
 
   cat > "$schema_file" <<'EOF'
 {
@@ -230,6 +238,26 @@ EOF
   } > "$prompt_file"
 
   if ! reviewer_cmd "$ROOT_DIR" "$schema_file" "$output_file" "$prompt_file" "$used_file" "$error_file" >/dev/null 2>&1; then
+    {
+      echo "# Codex Pre-Commit Review"
+      echo ""
+      echo "- review_id: $review_id"
+      echo "- kind: $review_kind"
+      echo "- preferred_reviewer_path: $preferred_path"
+      echo "- preferred_model: $preferred_model"
+      echo "- reviewer_path: unavailable"
+      echo "- model: none"
+      echo "- verdict: DEGRADED"
+      echo "- fallback_occurred: true"
+      echo ""
+      echo "## Summary"
+      echo "Reviewer path unavailable. Commit review ran in degraded advisory mode."
+      if [ -s "$error_file" ]; then
+        echo ""
+        echo "## Reviewer Errors"
+        sed 's/^/    /' "$error_file"
+      fi
+    } > "$review_markdown"
     event_json=$(jq -cn \
       --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
       --arg review_id "$review_id" \
@@ -237,9 +265,12 @@ EOF
       --arg status "degraded" \
       --arg command "$command_text" \
       --arg error_file "$error_file" \
+      --arg preferred_path "$preferred_path" \
+      --arg preferred_model "$preferred_model" \
       --arg files "$staged_files" \
-      '{timestamp:$timestamp,review_id:$review_id,review_type:$review_kind,status:$status,provider:"codex",model:"reviewer",command:$command,error_file:$error_file,files:($files | split("\n") | map(select(length > 0)))}')
+      '{timestamp:$timestamp,review_id:$review_id,review_type:$review_kind,status:$status,provider:"codex",preferred_reviewer_path:$preferred_path,preferred_model:$preferred_model,reviewer_path:"unavailable",model:"none",fallback_occurred:true,summary:"Reviewer path unavailable. Commit review ran in degraded advisory mode.",command:$command,error_file:$error_file,files:($files | split("\n") | map(select(length > 0)))}')
     codex_append_event "$ROOT_DIR" "$event_json"
+    printf '%s\n' "Codex commit review degraded: reviewer path unavailable. See .agents/tmp/codex/latest-pre-commit-review.md for details." >&2
     return 0
   fi
 
@@ -249,6 +280,9 @@ EOF
     and (.score | type == "number")
     and (.issues | type == "array")
   ' "$output_file" >/dev/null 2>&1; then
+    used_candidate=$(cat "$used_file" 2>/dev/null || true)
+    reviewer_path=$(codex_candidate_path_label "$used_candidate")
+    model_name=$(codex_candidate_model_name "$used_candidate")
     event_json=$(jq -cn \
       --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
       --arg review_id "$review_id" \
@@ -257,18 +291,42 @@ EOF
       --arg command "$command_text" \
       --arg error_file "$error_file" \
       --arg output_file "$output_file" \
+      --arg preferred_path "$preferred_path" \
+      --arg preferred_model "$preferred_model" \
+      --arg reviewer_path "$reviewer_path" \
+      --arg model "$model_name" \
       --arg files "$staged_files" \
-      '{timestamp:$timestamp,review_id:$review_id,review_type:$review_kind,status:$status,provider:"codex",model:"reviewer",command:$command,error_file:$error_file,output_file:$output_file,files:($files | split("\n") | map(select(length > 0)))}')
+      '{timestamp:$timestamp,review_id:$review_id,review_type:$review_kind,status:$status,provider:"codex",preferred_reviewer_path:$preferred_path,preferred_model:$preferred_model,reviewer_path:$reviewer_path,model:$model,fallback_occurred:true,summary:"Reviewer returned invalid output. Commit review ran in degraded advisory mode.",command:$command,error_file:$error_file,output_file:$output_file,files:($files | split("\n") | map(select(length > 0)))}')
     codex_append_event "$ROOT_DIR" "$event_json"
+    {
+      echo "# Codex Pre-Commit Review"
+      echo ""
+      echo "- review_id: $review_id"
+      echo "- kind: $review_kind"
+      echo "- preferred_reviewer_path: $preferred_path"
+      echo "- preferred_model: $preferred_model"
+      echo "- reviewer_path: $reviewer_path"
+      echo "- model: $model_name"
+      echo "- verdict: DEGRADED"
+      echo "- fallback_occurred: true"
+      echo ""
+      echo "## Summary"
+      echo "Reviewer returned invalid output. Commit review ran in degraded advisory mode."
+      if [ -s "$error_file" ]; then
+        echo ""
+        echo "## Reviewer Errors"
+        sed 's/^/    /' "$error_file"
+      fi
+    } > "$review_markdown"
+    printf '%s\n' "Codex commit review degraded: reviewer returned invalid output. See .agents/tmp/codex/latest-pre-commit-review.md for details." >&2
     return 0
   fi
 
   if [ -f "$used_file" ]; then
     used_candidate=$(cat "$used_file" 2>/dev/null || echo "model:unknown")
-    case "$used_candidate" in
-      profile:*) model_name="${used_candidate#profile:}" ;;
-      model:*) model_name="${used_candidate#model:}" ;;
-    esac
+    reviewer_path=$(codex_candidate_path_label "$used_candidate")
+    model_name=$(codex_candidate_model_name "$used_candidate")
+    fallback_occurred=$(codex_candidate_fallback_occurred "$used_candidate")
   fi
 
   verdict=$(jq -r '.verdict' "$output_file" 2>/dev/null || echo "COMMIT")
@@ -282,7 +340,11 @@ EOF
     echo ""
     echo "- review_id: $review_id"
     echo "- kind: $review_kind"
+    echo "- preferred_reviewer_path: $preferred_path"
+    echo "- preferred_model: $preferred_model"
+    echo "- reviewer_path: $reviewer_path"
     echo "- model: $model_name"
+    echo "- fallback_occurred: $fallback_occurred"
     echo "- verdict: $verdict"
     echo "- score: $score"
     echo ""
@@ -300,11 +362,15 @@ EOF
     --arg status "$event_status" \
     --arg command "$command_text" \
     --arg summary "$summary" \
+    --arg preferred_path "$preferred_path" \
+    --arg preferred_model "$preferred_model" \
+    --arg reviewer_path "$reviewer_path" \
     --arg model "$model_name" \
+    --argjson fallback_occurred "$fallback_occurred" \
     --argjson score "$score" \
     --argjson issues "$issues_count" \
     --arg files "$staged_files" \
-    '{timestamp:$timestamp,review_id:$review_id,review_type:$review_kind,status:$status,provider:"codex",model:$model,score:$score,issues_count:$issues,summary:$summary,command:$command,files:($files | split("\n") | map(select(length > 0)))}')
+    '{timestamp:$timestamp,review_id:$review_id,review_type:$review_kind,status:$status,provider:"codex",preferred_reviewer_path:$preferred_path,preferred_model:$preferred_model,reviewer_path:$reviewer_path,model:$model,fallback_occurred:$fallback_occurred,score:$score,issues_count:$issues,summary:$summary,command:$command,files:($files | split("\n") | map(select(length > 0)))}')
   codex_append_event "$ROOT_DIR" "$event_json"
 
   if [ "$verdict" = "HOLD" ]; then
