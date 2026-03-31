@@ -163,6 +163,12 @@ Announce the classification when routing:
 For **XS**: include in Coder handoff: goal, exact file(s), and expected change. No interview.
 For **S**: Architect conducts an abbreviated interview (see `architect.md`).
 
+> **REGRA CRÍTICA — Tasks M e L:** Após o usuário aprovar o plano, **NÃO use Edit/Write diretamente**. Chame imediatamente:
+> ```
+> mcp__codex-coder__spawn_agent(prompt="<plano completo + arquivos + constraints>")
+> ```
+> Maestro nunca implementa código. Delegar ao executor via MCP é obrigatório para tasks M/L.
+
 ---
 
 ### Choosing Personas and Order
