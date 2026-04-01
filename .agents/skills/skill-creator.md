@@ -193,9 +193,90 @@ After the skill is written and reviewed:
 
 ---
 
+## Self-Extending Skills (inspired by OpenClaw)
+
+### Auto-Scaffold
+
+When creating a new skill, use this quick-start command to scaffold the directory:
+
+```bash
+# Creates skill-name/SKILL.md with frontmatter template pre-filled
+mkdir -p .agents/skills/<skill-name>
+cat > .agents/skills/<skill-name>/SKILL.md <<'SCAFFOLD'
+---
+skill: <skill-name>
+trigger: /<skill-name>
+persona: maestro
+version: 1.0.0
+lastUpdated: <TODAY>
+shortDescription: <FILL>
+usedBy: [maestro]
+requires:
+  bins: []       # CLI tools needed (e.g., ["jq", "curl"])
+  env: []        # Environment variables needed (e.g., ["API_KEY"])
+  config: []     # Config keys needed (e.g., ["codex.profiles.coder"])
+evals:
+  - prompt: "<FILL obvious trigger>"
+    should_trigger: true
+  - prompt: "<FILL edge case trigger>"
+    should_trigger: true
+  - prompt: "<FILL near-miss>"
+    should_trigger: false
+  - prompt: "<FILL near-miss>"
+    should_trigger: false
+---
+
+## When to Use
+**Triggers:** <FILL>
+**Not for:** <FILL>
+
+## Purpose
+<FILL>
+
+## Procedure
+<FILL>
+
+## Guardrails
+<FILL>
+SCAFFOLD
+```
+
+### Metadata Gating (requires field)
+
+Skills can declare runtime dependencies in frontmatter. The health check and skill-check-protocol
+validate these at load time:
+
+```yaml
+requires:
+  bins: ["codex", "jq"]           # Required CLI tools
+  env: ["OPENAI_API_KEY"]         # Required environment variables
+  config: ["codex.profiles.coder"] # Required config.toml keys
+```
+
+If requirements aren't met, the skill is skipped with a warning instead of failing at runtime.
+
+### Gap Detection (auto-trigger)
+
+When the agent encounters repeated failures or workarounds for a missing capability:
+1. After 3+ similar failures in the same domain → Maestro should suggest creating a skill
+2. The suggestion includes: observed pattern, proposed trigger, estimated scope
+3. User confirms before proceeding to the intent interview
+
+### Skill Precedence (multi-tier loading)
+
+Skills are loaded with this precedence (highest first):
+1. `<project>/.agents/skills/` — project-specific
+2. `~/conductor/repos/<framework>/global-skills/` — framework global
+3. Bundled skills from install — default set
+
+Higher-precedence skills override lower ones by name.
+
+---
+
 ## Guardrails
 
 - Do not create a skill before completing the intent interview — incorrect assumptions lead to rework
 - Do not create a new skill if an existing one covers 80%+ of the intent — extend instead
 - Do not write skills with MUST/NEVER in all-caps unless you've tried explaining the reasoning first
 - Do not overfit instructions to specific examples — write for the general category
+- Do not auto-generate skills without user confirmation — gap detection suggests, user decides

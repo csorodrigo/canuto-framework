@@ -104,7 +104,7 @@ codex_review_markdown_path() {
 
 codex_context_package_valid() {
   local package_path="${1:-}"
-  local max_age_seconds="${2:-14400}"
+  local max_age_seconds="${2:-${CODEX_CONTEXT_MAX_AGE:-14400}}"
 
   [ -n "$package_path" ] || return 1
   [ -f "$package_path" ] || return 1
@@ -114,7 +114,11 @@ codex_context_package_valid() {
   local now_ts
   local file_ts
   now_ts=$(date +%s)
-  file_ts=$(stat -f %m "$package_path" 2>/dev/null || echo 0)
+  if [[ "$(uname)" == "Darwin" ]]; then
+    file_ts=$(stat -f %m "$package_path" 2>/dev/null || echo 0)
+  else
+    file_ts=$(stat -c %Y "$package_path" 2>/dev/null || echo 0)
+  fi
 
   [ "$file_ts" -gt 0 ] || return 1
   [ $((now_ts - file_ts)) -le "$max_age_seconds" ] || return 1
@@ -155,6 +159,7 @@ codex_reviewer_candidates() {
   else
     printf '%s\n' "model:o1-pro"
   fi
+  printf '%s\n' "profile:maestro"
   printf '%s\n' "model:o3"
   printf '%s\n' "model:gpt-5-codex"
 }
@@ -227,7 +232,8 @@ codex_run_reviewer() {
   while IFS= read -r candidate; do
     [ -n "$candidate" ] || continue
     candidate_error_file=$(mktemp)
-    cmd=(codex exec -C "$exec_dir" -s read-only --skip-git-repo-check --ephemeral -c 'model_reasoning_effort="high"')
+    local reviewer_timeout="${CODEX_REVIEWER_TIMEOUT:-120}"
+    cmd=(timeout "$reviewer_timeout" codex exec -C "$exec_dir" -s read-only --skip-git-repo-check --ephemeral -c 'model_reasoning_effort="high"')
     case "$candidate" in
       profile:*)
         cmd+=(--profile "${candidate#profile:}")
@@ -244,6 +250,12 @@ codex_run_reviewer() {
         cat "$candidate_error_file" > "$error_file"
       else
         : > "$error_file"
+      fi
+      # C9: notify user when fallback occurred
+      local preferred
+      preferred=$(codex_reviewer_preferred_candidate 2>/dev/null || true)
+      if [ -n "$preferred" ] && [ "$candidate" != "$preferred" ]; then
+        printf '[codex-reviewer] FALLBACK: preferred %s unavailable, used %s instead\n' "$preferred" "$candidate" >&2
       fi
       rm -f "$candidate_error_file"
       [ -n "$local_error_file" ] && rm -f "$local_error_file"

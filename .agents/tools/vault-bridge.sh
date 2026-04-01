@@ -58,16 +58,26 @@ cmd_read() {
 cmd_write() {
   local path="$1"
   local body="$2"
-  printf '%s' "$body" | curl "${CURL_OPTS[@]}" -X PUT \
+  local http_code
+  http_code=$(printf '%s' "$body" | curl "${CURL_OPTS[@]}" -X PUT \
     -H "Content-Type: text/markdown" \
     --data-binary @- \
-    "$BASE_URL/vault/$path" 2>/dev/null
-  local status=$?
-  if [ $status -ne 0 ]; then
-    echo "ERROR: Failed to write $path" >&2
+    -o /dev/null -w '%{http_code}' \
+    "$BASE_URL/vault/$path" 2>/dev/null)
+  local curl_status=$?
+  if [ $curl_status -ne 0 ]; then
+    echo "ERROR: Failed to write $path (curl error $curl_status)" >&2
     exit 1
   fi
-  echo "OK: Written to $path"
+  case "$http_code" in
+    200|201|204)
+      echo "OK: Written to $path (HTTP $http_code)"
+      ;;
+    *)
+      echo "ERROR: Failed to write $path (HTTP $http_code)" >&2
+      exit 1
+      ;;
+  esac
 }
 
 cmd_search() {

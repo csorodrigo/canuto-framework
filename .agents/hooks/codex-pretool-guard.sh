@@ -6,7 +6,15 @@ HOOK_INPUT=$(cat 2>/dev/null || echo "")
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 ROOT_DIR="$(cd "$PROJECT_DIR" && git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
+_degraded_flag() {
+  local flag_dir="$ROOT_DIR/.agents/tmp/codex"
+  mkdir -p "$flag_dir" 2>/dev/null || true
+  printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" >> "$flag_dir/degraded-mode.flag"
+  printf '[codex-pretool-guard] DEGRADED: %s\n' "$1" >&2
+}
+
 if ! command -v jq >/dev/null 2>&1; then
+  _degraded_flag "jq not found — all Codex validation skipped"
   exit 0
 fi
 
@@ -14,6 +22,7 @@ COMMON_LIB="$ROOT_DIR/.agents/tools/codex-common.sh"
 DIFF_SCRIPT="$ROOT_DIR/.agents/tools/codex-diff-context.sh"
 
 if [ ! -f "$COMMON_LIB" ]; then
+  _degraded_flag "codex-common.sh not found — all Codex validation skipped"
   exit 0
 fi
 
@@ -87,6 +96,11 @@ handle_codex_spawn() {
     block_with_message "Codex delegation blocked: parallel spawn requires scoped context packages in .agents/tmp/. Generate them first with .agents/tools/codex-context-package.sh."
   fi
 
+  # C6: Basic prompt injection guard
+  if printf '%s' "$prompt_blob" | grep -qiE '(ignore (previous|all|above) instructions|you are now|system prompt override|disregard.*instructions|new persona|forget everything)'; then
+    block_with_message "Codex delegation blocked: prompt contains patterns resembling injection. Review the prompt content before delegating."
+  fi
+
   if [ "$prompt_count" -gt 240 ] && [ "$context_hint" = false ]; then
     block_with_message "Codex delegation blocked: missing context package for a medium/large task. Generate .agents/tmp/context-package.md before calling spawn_agent."
   fi
@@ -100,6 +114,8 @@ handle_commit_gate() {
   local diff_mode="index"
   local event_status="skipped"
   local event_json=""
+  local hook_start_ts
+  hook_start_ts=$(date +%s)
   local review_id
   local tmp_dir
   local prompt_file
@@ -170,6 +186,27 @@ handle_commit_gate() {
     fi
   done
 
+  # ── Threshold: skip or downgrade review by diff size ──────────────────
+  local diff_line_count=0
+  local _shortstat=""
+  if [ "$diff_mode" = "all-tracked" ] && git rev-parse --verify HEAD >/dev/null 2>&1; then
+    _shortstat=$(git diff HEAD --shortstat 2>/dev/null)
+  else
+    _shortstat=$(git diff --cached --shortstat 2>/dev/null)
+  fi
+  if [ -n "$_shortstat" ]; then
+    diff_line_count=$(printf '%s' "$_shortstat" | grep -oE '[0-9]+ (insertion|deletion)' | awk '{s+=$1} END{print s+0}')
+  fi
+
+  local review_tier="full"
+  if [ "$sensitive" = true ]; then
+    review_tier="full"
+  elif [ "$diff_line_count" -lt 20 ]; then
+    return 0
+  elif [ "$diff_line_count" -le 100 ]; then
+    review_tier="fast"
+  fi
+
   diff_payload=$(bash "$DIFF_SCRIPT" --commit-candidate "$diff_mode")
   tmp_dir=$(codex_tmp_dir "$ROOT_DIR")
   review_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
@@ -187,8 +224,9 @@ handle_commit_gate() {
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["verdict", "summary", "score", "issues"],
+  "required": ["schema_version", "verdict", "summary", "score", "issues"],
   "properties": {
+    "schema_version": { "type": "string", "const": "1.0" },
     "verdict": { "type": "string", "enum": ["COMMIT", "HOLD"] },
     "summary": { "type": "string" },
     "score": { "type": "number" },
@@ -237,7 +275,21 @@ EOF
     printf '%s\n' "$diff_payload"
   } > "$prompt_file"
 
-  if ! reviewer_cmd "$ROOT_DIR" "$schema_file" "$output_file" "$prompt_file" "$used_file" "$error_file" >/dev/null 2>&1; then
+  local review_ok=false
+  if [ "$review_tier" = "fast" ]; then
+    # Fast review: use gpt-5-codex with low reasoning instead of o1-pro
+    local fast_cmd=(codex exec -C "$ROOT_DIR" -s read-only --skip-git-repo-check --ephemeral --profile fast -c 'model_reasoning_effort="low"' --output-schema "$schema_file" -o "$output_file" -)
+    if "${fast_cmd[@]}" < "$prompt_file" >/dev/null 2>&1; then
+      review_ok=true
+      printf '%s\n' "profile:fast" > "$used_file"
+    fi
+  else
+    if reviewer_cmd "$ROOT_DIR" "$schema_file" "$output_file" "$prompt_file" "$used_file" "$error_file" >/dev/null 2>&1; then
+      review_ok=true
+    fi
+  fi
+
+  if [ "$review_ok" = false ]; then
     {
       echo "# Codex Pre-Commit Review"
       echo ""
@@ -355,6 +407,10 @@ EOF
     jq -r '.issues[]? | "- [" + .severity + "] " + .file + ":" + ((.line // 0)|tostring) + " - " + .issue + " -> " + .fix' "$output_file"
   } > "$review_markdown"
 
+  local hook_end_ts
+  hook_end_ts=$(date +%s)
+  local hook_duration_s=$((hook_end_ts - hook_start_ts))
+
   event_json=$(jq -cn \
     --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     --arg review_id "$review_id" \
@@ -369,8 +425,10 @@ EOF
     --argjson fallback_occurred "$fallback_occurred" \
     --argjson score "$score" \
     --argjson issues "$issues_count" \
+    --argjson hook_duration_s "$hook_duration_s" \
+    --arg review_tier "$review_tier" \
     --arg files "$staged_files" \
-    '{timestamp:$timestamp,review_id:$review_id,review_type:$review_kind,status:$status,provider:"codex",preferred_reviewer_path:$preferred_path,preferred_model:$preferred_model,reviewer_path:$reviewer_path,model:$model,fallback_occurred:$fallback_occurred,score:$score,issues_count:$issues,summary:$summary,command:$command,files:($files | split("\n") | map(select(length > 0)))}')
+    '{timestamp:$timestamp,review_id:$review_id,review_type:$review_kind,status:$status,provider:"codex",preferred_reviewer_path:$preferred_path,preferred_model:$preferred_model,reviewer_path:$reviewer_path,model:$model,fallback_occurred:$fallback_occurred,score:$score,issues_count:$issues,hook_duration_s:$hook_duration_s,review_tier:$review_tier,summary:$summary,command:$command,files:($files | split("\n") | map(select(length > 0)))}')
   codex_append_event "$ROOT_DIR" "$event_json"
 
   if [ "$verdict" = "HOLD" ]; then

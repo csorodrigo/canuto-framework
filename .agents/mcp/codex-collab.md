@@ -5,10 +5,11 @@ Auto-configured by `install.sh` via wrapper scripts in `~/.claude/scripts/`.
 
 ## Architecture
 
-| MCP Server | Target Profile | Default Model | Role | Tools |
-|------------|----------------|---------------|------|-------|
-| **codex-coder** | `coder` | `gpt-5-codex` | Coder, Brainstorm, Tester | `spawn_agent`, `spawn_agents_parallel` |
-| **codex-reviewer** | `reviewer` | `o1-pro` when supported | Reviewer (deep review) | `spawn_agent` |
+| MCP Server | Target Profile | Default Model | Sandbox | Role | Tools |
+|------------|----------------|---------------|---------|------|-------|
+| **codex-coder** | `coder` | `gpt-5-codex` | full write | Coder, Brainstorm, Tester | `spawn_agent`, `spawn_agents_parallel` |
+| **codex-reviewer** | `reviewer` | `o1-pro` when supported | read-only | Reviewer (deep review) | `spawn_agent` |
+| **codex-maestro** | `maestro` | `o1-pro` when supported | full write | Maestro orchestration (o1-pro with write access) | `spawn_agent`, `spawn_agents_parallel` |
 
 **Principle**: `gpt-5-codex` writes code fast. The `reviewer` profile performs the second-opinion review. If the preferred reviewer model is unavailable, the fallback must be reported explicitly.
 

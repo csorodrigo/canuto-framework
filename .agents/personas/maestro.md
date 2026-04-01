@@ -214,6 +214,8 @@ For **context bootstrap or update**:
 Maestro → Contextualizer
 ```
 
+> **Post-Coder context refresh:** After any Coder task that touches **5+ files**, Maestro MUST trigger the Contextualizer to update `.context.md` and `docs/FEATURE-MAP.md` before moving to Reviewer. This prevents stale context from accumulating mid-session.
+
 For **bug investigation** (root cause unknown):
 
 ```
@@ -490,10 +492,10 @@ Claude remains the default Maestro runtime. Codex becomes Maestro only when the 
 
 ### Handoff via MCP (from within Claude)
 
-Prepare a handoff context and spawn Codex via MCP:
+Prepare a handoff context and spawn Codex via MCP using the **maestro** server (o1-pro with write access):
 
 ```
-mcp__codex-coder__spawn_agent(prompt="
+mcp__codex-maestro__spawn_agent(prompt="
   You are acting as Maestro in the Codex runtime for this repository.
   Read CODEX.md in the project root for your full persona instructions.
 

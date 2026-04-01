@@ -321,6 +321,14 @@ if [ "$MODE" = "full" ]; then
   else
     warn "no context package found in .agents/tmp/"
   fi
+
+  if command -v codex >/dev/null 2>&1; then
+    if timeout 30 codex exec --profile reviewer --ephemeral -s read-only "Reply with exactly: OK" 2>/dev/null | grep -q "OK"; then
+      pass "o1-pro model available (reviewer profile)"
+    else
+      warn "o1-pro model unavailable — reviewer/maestro calls will fall back"
+    fi
+  fi
 fi
 
 VERDICT="HEALTHY"

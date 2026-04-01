@@ -204,6 +204,18 @@ This is bad because: no file paths, no contract definition, no test expectations
 
 ---
 
+## Abbreviated Mode (S Tasks)
+
+When Maestro routes a task sized **S**, use this streamlined flow:
+
+1. **Interview**: Ask only the 1-2 most critical questions. Skip concerns and trade-offs unless high-risk.
+2. **Plan format**: Use only Goal, Steps (3-4 max), and Context Updates. Omit Non-Goals, Risks, Design Direction, Requirements, and Review Checklist sections.
+3. **Steps**: Each step needs only Files, What, and Acceptance. Skip Skills, Tests, and confidence tags.
+4. **Hard gate**: Still required — do not skip the interview entirely.
+5. **No plan-review hook**: S plans do not trigger the Codex plan-review gate.
+
+---
+
 ## Handoff
 
 Your output to the next persona (Coder) is:

@@ -93,6 +93,21 @@ if [ -z "$DIFF_OUTPUT" ]; then
   DIFF_OUTPUT="No changes detected."
 fi
 
+# C7: Mask potential secrets/tokens in diff output
+_mask_secrets="${CODEX_DIFF_MASK_SECRETS:-true}"
+if [ "$_mask_secrets" != "false" ] && [ "$_mask_secrets" != "FALSE" ] && [ "$_mask_secrets" != "0" ]; then
+  # Case-insensitive matching via piping through two passes (sed -E on macOS doesn't support /I)
+  DIFF_OUTPUT=$(printf '%s' "$DIFF_OUTPUT" | \
+    sed -E \
+      -e 's/([Aa][Pp][Ii][_-]?[Kk][Ee][Yy]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Bb][Ee][Aa][Rr][Ee][Rr]|[Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll][Ss]?)[[:space:]]*[:=][[:space:]]*"?[A-Za-z0-9+\/_.~-]{8,}"?/\1=<REDACTED>/g' \
+      -e 's/(sk_live_|pk_live_|sk_test_|pk_test_|xox[bpsar])-[A-Za-z0-9]{8,}/<REDACTED_KEY>/g' \
+      -e 's/ghp_[A-Za-z0-9]{36,}/<REDACTED_GITHUB_PAT>/g' \
+      -e 's/gho_[A-Za-z0-9]{36,}/<REDACTED_GITHUB_OAUTH>/g' \
+      -e 's/github_pat_[A-Za-z0-9_]{20,}/<REDACTED_GITHUB_PAT>/g' \
+      -e 's/eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}/<REDACTED_JWT>/g' \
+  )
+fi
+
 STAT_OUTPUT="$("${STAT_CMD[@]}" 2>/dev/null || true)"
 if [ -z "$STAT_OUTPUT" ]; then
   STAT_OUTPUT="No file-level diff summary detected."
