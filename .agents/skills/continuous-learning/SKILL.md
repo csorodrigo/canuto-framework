@@ -1,4 +1,6 @@
 ---
+name: continuous-learning
+description: Extract reusable project instincts from session outcomes and reinforce them over time.
 shortDescription: Extract, store, and evolve reusable patterns (instincts) from session experience.
 usedBy: [maestro, reviewer, coder]
 version: 1.2.0

@@ -81,7 +81,7 @@ After all agents complete:
 
 ### 5. Review
 
-Trigger code review via `mcp__codex-reviewer__codex`:
+Trigger code review via `mcp__codex-reviewer__spawn_agent`:
 ```
 [CODE REVIEW REQUEST]
 --- CHANGES START ---
@@ -126,7 +126,7 @@ You are implementing ONE part of a larger feature. Other agents are working on o
 
 - **Max parallel agents**: 5 (diminishing returns beyond this)
 - **Max files per agent**: 3 (too many = agent loses focus)
-- **Timeout**: 120s per agent (escalate to o1-pro if timeout)
+- **Timeout**: 120s per agent (escalate to the reviewer path if timeout)
 
 ---
 

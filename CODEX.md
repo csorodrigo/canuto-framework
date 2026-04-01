@@ -14,7 +14,7 @@
 - Direct Codex runtime: Codex becomes Maestro for this session.
 - Preferred launcher: `bash .agents/tools/codex-maestro.sh`
 - Equivalent CLI: `codex --profile maestro`
-- The `maestro` profile defaults to `o1-pro` and does not redefine `coder`, `reviewer`, `architect`, or `fast`.
+- The `maestro` profile defaults to `o1-pro` when the account supports it and does not redefine `coder`, `reviewer`, `architect`, or `fast`.
 
 ### Memory resolution order
 

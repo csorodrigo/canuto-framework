@@ -1,4 +1,6 @@
 ---
+name: co-review
+description: Coordinate independent Claude and Codex planning or review passes, then compare results without anchoring bias.
 skill: co-review
 trigger: "/co-brainstorm, /co-plan, /co-validate, or automatic for M/L plan review and pre-commit"
 persona: maestro
@@ -47,11 +49,8 @@ evals:
 Two Codex MCP servers must be configured (global `settings.json`):
 
 ```bash
-# Coder — gpt-5-codex for coding + brainstorm (fire-and-forget)
-claude mcp add -s user codex-coder -- uvx codex-as-mcp@latest
-
-# Reviewer — o1-pro for deep reviews (multi-turn)
-claude mcp add -s user codex-reviewer -- codex mcp serve -c 'model=o1-pro'
+# Recommended: let install.sh configure these wrapper-backed MCPs
+bash install.sh --repair
 ```
 
 Verify: `claude mcp list` → both should show `✓ Connected`.
@@ -61,15 +60,15 @@ Verify: `claude mcp list` → both should show `✓ Connected`.
 | Mode | MCP Server | Tool | Model |
 |------|-----------|------|-------|
 | co-brainstorm | codex-coder | `spawn_agents_parallel` | gpt-5-codex |
-| co-plan | codex-reviewer | `codex` + `codex-reply` | o1-pro |
-| co-validate | codex-reviewer | `codex` + `codex-reply` | o1-pro |
+| co-plan | codex-reviewer | `spawn_agent` | `reviewer` profile (defaults to `o1-pro` when supported) |
+| co-validate | codex-reviewer | `spawn_agent` | `reviewer` profile (defaults to `o1-pro` when supported) |
 
 ### Backend Preference (fallback chain)
 
 ```
-1. codex-reviewer MCP (o1-pro, multi-turn) — REVIEWS / CO-PLAN / CO-VALIDATE
+1. codex-reviewer MCP (`spawn_agent`, one-shot) — REVIEWS / CO-PLAN / CO-VALIDATE
 2. codex-coder MCP (gpt-5-codex, parallel) — CO-BRAINSTORM
-3. CCB `ask codex` (visible panes, anchoring risk) — FALLBACK
+3. CCB `ask codex` (only with active Codex session, visible panes, anchoring risk) — FALLBACK
 4. Claude-only review — LAST RESORT
 ```
 
@@ -82,7 +81,9 @@ ask codex "<co-review prompt>"
 pend <task-id>  # retrieve when ready
 ```
 
-**Important**: CCB panes are visible — risk of anchoring bias. Do not look at the Codex pane until your own review is complete.
+**Important**:
+- CCB fallback only works when a Codex CCB session is already active for this workspace.
+- CCB panes are visible — risk of anchoring bias. Do not look at the Codex pane until your own review is complete.
 
 ---
 
@@ -110,16 +111,16 @@ For detailed prompts, output formats, and examples, read `references/modes.md`.
 4. Compare: convergent ideas (high confidence), unique ideas from each, recommend best
 
 ### Mode 2: /co-plan
-1. `mcp__codex-reviewer__codex` → Codex (o1-pro) creates implementation plan independently
+1. `mcp__codex-reviewer__spawn_agent` → Codex reviewer creates an implementation plan independently
 2. Architect creates its own plan (standard flow)
-3. After both complete → `mcp__codex-reviewer__codex-reply` to retrieve Codex's plan
+3. After both complete → compare Claude's plan with the one-shot reviewer response
 4. Compare: shared steps (validated), unique steps (gaps?), different approaches (trade-offs)
 
 ### Mode 3: /co-validate (auto for M/L)
 1. Read the plan file
-2. `mcp__codex-reviewer__codex` → Codex (o1-pro) reviews as staff engineer
+2. `mcp__codex-reviewer__spawn_agent` → Codex reviewer reviews as staff engineer
 3. Main agent conducts independent review
-4. After both complete → `mcp__codex-reviewer__codex-reply` to retrieve review
+4. After both complete → compare the independent review with the one-shot reviewer response
 5. Compare: convergent issues (fix these), unique issues from each (evaluate)
 6. Present verdict: `✓ LGTM` or `⚠️ Concerns (N issues)`
 
@@ -138,9 +139,9 @@ For detailed prompts, output formats, and examples, read `references/modes.md`.
 
 If Codex MCP servers are not configured or fail:
 - Log: `[Co-Review] codex-reviewer MCP not available. Checking fallbacks...`
-- Try codex-coder MCP as one-shot alternative (if reviewer unavailable).
-  - Log: `[Co-Review] Using codex-coder MCP (one-shot mode).`
-- If no MCP available, try CCB: use `ask codex` as fallback.
+- Try `codex exec --profile reviewer` as the first degraded reviewer path.
+  - Log: `[Co-Review] Using codex exec --profile reviewer (degraded path).`
+- If no reviewer path is available, try CCB only when a Codex session is active.
   - Log: `[Co-Review] Using CCB ask codex as fallback. Avoid looking at Codex pane until your review is complete.`
 - If CCB also unavailable: fall back to Claude-only review.
   - Log: `[Co-Review] No external reviewer available. Continuing with single-perspective review.`
@@ -160,10 +161,10 @@ If Codex MCP servers are not configured or fail:
 ### Flow
 1. Before commit, collect `git diff --staged`
 2. If diff touches security-sensitive files → also trigger `/security-gate`
-3. Send to `mcp__codex-reviewer__codex` (o1-pro):
+3. Send to `mcp__codex-reviewer__spawn_agent` (reviewer profile):
 
 ```
-mcp__codex-reviewer__codex({
+mcp__codex-reviewer__spawn_agent({
   prompt: `
 [PRE-COMMIT REVIEW]
 Review this staged diff before commit. Focus on:
@@ -219,7 +220,7 @@ type Role = 'admin' | 'user' | 'guest';
 
 ### Implementation
 
-Before calling `mcp__codex-reviewer__codex`, Maestro MUST compress the diff:
+Before calling the reviewer path, Maestro MUST compress the diff:
 
 ```bash
 # Implemented helper:
@@ -232,45 +233,20 @@ bash .agents/tools/codex-diff-context.sh --base main
 If the compressed diff exceeds 5000 lines, split into per-file reviews.
 
 ### Why
-- o1-pro charges per token — less context = cheaper reviews
+- reviewer-grade models charge per token — less context = cheaper reviews
 - Focused context = more relevant review comments
 - 20 lines is enough for a reviewer to understand the change
 
 ---
 
-## Session Continuity (threadId Persistence)
+## Session Continuity
 
-The `codex-reviewer` MCP returns a `threadId` on each review session. Persist this for multi-turn and cross-session continuity.
+The current `codex-reviewer` MCP wrapper is one-shot. It does **not** return `threadId` and does not support `codex-reply`.
 
-### How to Persist
-1. After `mcp__codex-reviewer__codex` returns, save `threadId`:
-   ```
-   .agents/vault/sessions/review-threads.md
-   ```
-   Format:
-   ```markdown
-   | Date | Branch | threadId | Status |
-   |------|--------|----------|--------|
-   | 2026-03-30 | feat/auth | thread_abc123 | open |
-   ```
-
-2. To resume a previous review:
-   ```
-   mcp__codex-reviewer__codex-reply({
-     threadId: "thread_abc123",
-     message: "The issues from your last review have been fixed. Here's the updated diff: ..."
-   })
-   ```
-
-### Use Cases
-- "Did I fix all the issues from the last review?" → resume thread
-- "Continue the review from yesterday" → lookup threadId in vault
-- Track review history per branch
-- Structured event log: `.agents/vault/metrics/codex-review-events.jsonl`
-
-### Cleanup
-- Mark threads as `closed` after merge
-- `/vault-maintenance` skill archives old threads monthly
+Persist instead:
+- the generated markdown review in `.agents/tmp/codex/`
+- the JSONL audit trail in `codex-review-events.jsonl`
+- any higher-level handoff metadata you want in the vault
 
 ---
 
@@ -282,4 +258,4 @@ The `codex-reviewer` MCP returns a `threadId` on each review session. Persist th
 - DO NOT run co-review on XS/S tasks — overhead not justified.
 - DO NOT block the workflow if Codex is unavailable — degrade gracefully.
 - DO NOT send full files to reviewer — use diff compression to reduce tokens.
-- DO NOT lose threadIds — persist them for session continuity.
+- DO NOT claim `o1-pro` ran unless the reviewer path actually used it.

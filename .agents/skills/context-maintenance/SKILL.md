@@ -1,4 +1,6 @@
 ---
+name: context-maintenance
+description: Maintain .context.md files, the feature map, and the evaluate-repo indexing pipeline as the codebase evolves.
 skill: context-maintenance
 trigger: automatic when context files are stale or after structural changes
 shortDescription: How to maintain .context.md, FEATURE-MAP.md, and the Repo Index (evaluate-repo pipeline) as the project evolves.

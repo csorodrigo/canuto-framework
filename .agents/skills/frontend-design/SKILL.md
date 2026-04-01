@@ -1,3 +1,6 @@
+---
+name: frontend-design
+description: Apply opinionated visual direction and design guardrails so frontend work avoids generic default UI.
 shortDescription: How to make frontend features visually distinctive and design-coherent.
 usedBy: [coder, reviewer, architect]
 version: 4.0.0
@@ -12,6 +15,7 @@ evals:
     should_trigger: false
   - prompt: "write unit tests for the dashboard component"
     should_trigger: false
+---
 
 ## When to Use
 

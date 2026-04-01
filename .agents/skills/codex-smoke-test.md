@@ -20,7 +20,7 @@ evals:
 ## Purpose
 
 After `install.sh` configures Codex MCPs, verify they actually work.
-Tests: spawn_agent with trivial task + codex-reviewer with mock review.
+Tests: spawn_agent with trivial task + one-shot reviewer call.
 
 ---
 
@@ -40,12 +40,12 @@ mcp__codex-coder__spawn_agent({
 ### Test 2: codex-reviewer
 
 ```
-mcp__codex-reviewer__codex({
+mcp__codex-reviewer__spawn_agent({
   prompt: "Review this trivial code and respond with JSON: {\"verdict\": \"PASS\", \"test\": true}\n\nCode: const x = 1 + 1;"
 })
 ```
 
-**Pass**: response contains `"verdict": "PASS"` and a `threadId`.
+**Pass**: response contains `"verdict": "PASS"`.
 **Fail**: timeout, error, or no response.
 
 ### Test 3: Codex Native MCPs (optional)

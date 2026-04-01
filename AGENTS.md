@@ -38,8 +38,8 @@ Available profiles in `~/.codex/config.toml` — use when spawned with `--profil
 | Profile | Model | Reasoning | Use For |
 |---------|-------|-----------|---------|
 | `coder` | gpt-5-codex | medium | Standard code generation |
-| `maestro` | o1-pro | high | Direct Codex runtime orchestration |
-| `reviewer` | o1-pro | high | Deep code review, security audit |
+| `maestro` | o1-pro (when supported) | high | Direct Codex runtime orchestration |
+| `reviewer` | o1-pro (when supported) | high | Deep code review, security audit |
 | `architect` | o3 | high | Architecture, complex reasoning |
 | `fast` | gpt-5-codex | low | Quick edits, formatting, docs |
 

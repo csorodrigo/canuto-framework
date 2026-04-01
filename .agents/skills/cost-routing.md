@@ -30,7 +30,7 @@ which provider should handle it. The goal: **minimize Anthropic spend without lo
 |-----------|------|----------|------|---------------------|
 | **Code generation** | M/L | Codex (gpt-5-codex) | `mcp__codex-coder__spawn_agent` | 60-70% |
 | **Code generation** | XS/S | Claude (direct) | — | 0% (MCP overhead exceeds benefit) |
-| **Code review** | M/L | Codex (o1-pro) | `mcp__codex-reviewer__codex` | 40-50% |
+| **Code review** | M/L | Codex (reviewer profile) | `mcp__codex-reviewer__spawn_agent` | 40-50% |
 | **Code review** | XS/S | Claude (direct) | — | 0% |
 | **Test-fix loop** | Any | Codex (gpt-5-codex) | `mcp__codex-coder__spawn_agent` | 80% |
 | **Context reading** | Any | Codex (vault MCP) | Codex reads via obsidian-vault MCP | 90% |
@@ -39,7 +39,7 @@ which provider should handle it. The goal: **minimize Anthropic spend without lo
 | **Architecture** | Any | Claude Opus | — | N/A |
 | **User interview** | Any | Claude Opus | — | N/A (needs AskUserQuestion) |
 | **Brainstorm** | Any | Codex (parallel) | `spawn_agents_parallel` | 60% |
-| **Security scan** | Any | Codex (o1-pro) | `mcp__codex-reviewer__codex` | 40% |
+| **Security scan** | Any | Codex (reviewer profile) | `mcp__codex-reviewer__spawn_agent` | 40% |
 | **Documentation** | Any | Codex (gpt-5-codex) | `mcp__codex-coder__spawn_agent` | 70% |
 | **Context loading** | Any | Codex (context-loader) | `mcp__codex-coder__spawn_agent` | 90% |
 | **Session notes** | Any | Codex (session-writer) | `mcp__codex-coder__spawn_agent` | 80% |
@@ -70,8 +70,8 @@ Before each delegation, Maestro follows this flowchart:
 
 4. Route to Codex per the matrix above.
    → If codex-coder MCP available: use spawn_agent
-   → If codex-reviewer MCP available: use codex
-   → Fallback: CCB ask codex → Claude direct
+   → If codex-reviewer MCP available: use spawn_agent
+   → Fallback: CCB ask codex only when an active Codex session exists → Claude direct
 ```
 
 ---
