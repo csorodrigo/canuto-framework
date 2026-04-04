@@ -177,6 +177,14 @@ Save experiment series to vault after user approval.
 
 → **Full vault schema** (frontmatter + experiment table template): read `references/vault-schema.md`
 
+## Auto-Triggered Experiments
+
+- `trace-analysis` can recommend experiment series when review score trends dip (see `references/auto-triggers.md`).
+- Trigger: moving average of the last 5 review scores for any dimension drops below 7.0 with ≥5 data points.
+- Include task-type, dimension, evidence table, and model-affinity in the proposal.
+- Proposals are surfaced to the user only; they never auto-start experiments. Wait for explicit approval before creating a series.
+- If the moving average recovers before approval, mark the proposal as stale in the next trace digest and do not start anything.
+
 ---
 
 ## Guardrails

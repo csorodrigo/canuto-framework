@@ -1,6 +1,6 @@
 # Canuto Framework — Quick Start Guide
 
-> Version 1.5 · Full specification: [SPEC.md](SPEC.md) · Technical reference for personas: `personas/` · Skills catalog: `skills/`
+> Version 1.8 · Full specification: [SPEC.md](SPEC.md) · Technical reference for personas: `personas/` · Skills catalog: `skills/`
 
 ---
 
@@ -32,9 +32,10 @@ Every conversation follows this structure:
 SESSION START                  DURING SESSION              SESSION END
 ─────────────                  ──────────────              ───────────
 Load vault briefing            Maestro routes tasks        Mark goals ✅ ⏳ ❌
-Check pending tasks            Instincts auto-applied      Extract instincts
-Check stale contexts           Governance gates active     Write session note
-Set session goals (≤3)         Rework detection on         Create pending tasks
+Check pending tasks            Instincts auto-applied      Trace analysis (v1.8)
+Check stale contexts           Governance gates active     Extract instincts
+Check blind-spot candidates    Rework detection on         Write session note
+Set session goals (≤3)         Routing checks (v1.8)       Create pending tasks
 Detect session mode            Coverage tracking (M/L)     Write metrics + audit
 ```
 
@@ -126,7 +127,8 @@ Skills are playbooks that personas follow. You can also invoke them directly.
 |-------|----------------|--------------|
 | `health-check` | "health check", "diagnose the framework" | Validates full framework setup — personas, vault, MCP, hooks |
 | `context-maintenance` | "update context", "refresh .context.md" | Regenerates `.context.md` + `FEATURE-MAP.md` |
-| `continuous-learning` | (runs at session end via Maestro) | Extracts instincts from session patterns |
+| `trace-analysis` | (runs at session end before instincts) | Classifies session signals: playbook gaps, blind-spot gaps, routing misfires, skill gaps |
+| `continuous-learning` | (runs at session end via Maestro) | Extracts instincts from session patterns (fed by trace-analysis) |
 | `auto-analysis` | "analyze the project", "cross-reference projects" | Deep scan → generates `project-index.json` + `onboarding-report.md` |
 | `skill-creator` | "create a new skill" | 7-phase workflow for building new framework skills |
 | `vault-maintenance` | "clean up vault", "archive sessions" | Archives old sessions, aggregates metrics, prunes orphans |
@@ -197,6 +199,73 @@ You: (just start a new conversation)
 → Maestro automatically presents a 5-line briefing from vault
 → Includes: last session summary, deferred goals, pending tasks, active instincts
 ```
+
+---
+
+## §8 — v1.8: Self-Improving Agent Loop (AutoAgent-inspired)
+
+v1.8 adds trace-based learning, inspired by [AutoAgent](https://github.com/kevinrgu/autoagent). The framework now systematically mines session traces to propose improvements.
+
+### How it works
+
+```
+SESSION END (Maestro)
+  1. Trace Analysis ← reads audit events, metrics, session note
+     ↓ classifies signals
+  2. Outputs:
+     - vault/traces/{date}-digest.md     (signal digest)
+     - blind-spots/_candidates/*.md       (new pitfall proposals)
+     - instinct-candidate signals         (fed to continuous-learning)
+  3. Continuous Learning ← receives candidates, asks user approval
+```
+
+### New capabilities
+
+| Feature | What it does | How to use |
+|---------|-------------|------------|
+| **Trace analysis** | Mines session data for actionable signals | Automatic at session end (needs `CANUTO_TRACE_ANALYSIS=1`) |
+| **Auto blind spots** | Proposes new domain pitfalls from session failures | Candidates shown at next session briefing |
+| **Adaptive routing** | Detects wrong task sizing mid-session | Maestro suggests reroute after Architect/Coder handoff |
+| **Skill auto-discovery** | Detects recurring manual workflows | Proposes skill creation after 3+ occurrences |
+| **Experiment auto-triggers** | Finds weak review score dimensions | Proposes experiment series (never auto-starts) |
+
+### Enabling trace analysis
+
+Set the env var before starting a session:
+```bash
+export CANUTO_TRACE_ANALYSIS=1
+```
+
+Or add to your shell profile (`~/.zshrc`):
+```bash
+export CANUTO_TRACE_ANALYSIS=1
+```
+
+### Blind-spot candidate lifecycle
+
+```
+trace-analysis detects gap → creates _candidates/{domain}--{slug}.md
+                                          ↓
+next session briefing → Maestro presents candidates
+                                          ↓
+              [promote] → appended to blind-spot file + archived
+              [dismiss] → moved to .archive/
+              [review]  → read full candidate before deciding
+```
+
+### Routing check example
+
+```
+[Maestro] Routing Check
+Sizing: S | Architect produced 6 steps across 5 files
+Signal: blast radius exceeds S threshold (1-2 files)
+Recommendation: Promote to M, add Tester
+Proceed with reroute? [Promote to M / Keep S]
+```
+
+### Overfitting guard
+
+Every trace-analysis proposal is tested: **"If this exact task disappeared, would this still matter?"** If no, the signal is recorded but not promoted.
 
 ---
 

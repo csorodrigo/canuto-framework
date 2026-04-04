@@ -19,3 +19,8 @@
 | CLAUDE examples | implemented | `docs/CLAUDE-EXAMPLES.md` | Reference setups for common project types |
 | Native Codex MCP auto-registration | partial | `install.sh`, `setup_codex_mcps` | Works when Codex CLI + required creds/tools are available |
 | Obsidian vault integration | partial | `setup_obsidian_mcp`, `setup_codex_mcps` | Fully automatic if API key is already available; otherwise degrades gracefully |
+| Trace analysis (v1.8) | implemented | `.agents/skills/trace-analysis/SKILL.md` | Session-end trace mining — classifies signals, proposes blind spots and instincts. Gated by `CANUTO_TRACE_ANALYSIS=1` |
+| Auto-generated blind spots (v1.8) | implemented | `.agents/blind-spots/_candidates/` | Staging area for trace-derived blind-spot candidates. Lifecycle: create → review → promote/dismiss |
+| Adaptive routing (v1.8) | implemented | `.agents/skills/adaptive-routing/SKILL.md` | Mid-session routing-check after Architect/Coder handoff. User-confirmed reroutes only |
+| Skill auto-discovery (v1.8) | implemented | `.agents/skills/trace-analysis/references/skill-proposer.md` | Detects recurring manual workflows (3+ sessions) and proposes skill creation |
+| Experiment auto-triggers (v1.8) | implemented | `.agents/skills/experiment-loop/references/auto-triggers.md` | Proposes experiments when review scores trend below 7.0 (proposal only, never auto-start) |

@@ -80,7 +80,7 @@ run_codex_smoke_exec() {
   tmp_output=$(mktemp)
   tmp_error=$(mktemp)
 
-  if printf '%s\n' 'Reply with exactly: OK' | codex exec -C "$PROJECT_ROOT" --skip-git-repo-check "$@" --output-last-message "$tmp_output" - >/dev/null 2>"$tmp_error"; then
+  if printf '%s\n' 'Reply with exactly: OK' | codex_run_with_timeout "${CODEX_HEALTH_TIMEOUT:-60}" codex exec -C "$PROJECT_ROOT" --skip-git-repo-check "$@" --output-last-message "$tmp_output" - >/dev/null 2>"$tmp_error"; then
     local output
     output=$(tr -d '\r' < "$tmp_output" | tail -n 1 | tr -d '\n')
     if [ "$output" = "OK" ]; then
@@ -101,7 +101,7 @@ run_codex_reviewer_profile_smoke() {
   tmp_output=$(mktemp)
   tmp_error=$(mktemp)
 
-  if printf '%s\n' 'Reply with exactly: OK' | codex exec -C "$PROJECT_ROOT" --skip-git-repo-check --profile reviewer --output-last-message "$tmp_output" - >/dev/null 2>"$tmp_error"; then
+  if printf '%s\n' 'Reply with exactly: OK' | codex_run_with_timeout "${CODEX_HEALTH_TIMEOUT:-60}" codex exec -C "$PROJECT_ROOT" --skip-git-repo-check --profile reviewer --output-last-message "$tmp_output" - >/dev/null 2>"$tmp_error"; then
     local output
     output=$(tr -d '\r' < "$tmp_output" | tail -n 1 | tr -d '\n')
     if [ "$output" = "OK" ]; then
@@ -323,7 +323,7 @@ if [ "$MODE" = "full" ]; then
   fi
 
   if command -v codex >/dev/null 2>&1; then
-    if timeout 30 codex exec --profile reviewer --ephemeral -s read-only "Reply with exactly: OK" 2>/dev/null | grep -q "OK"; then
+    if codex_run_with_timeout 30 codex exec --profile reviewer --ephemeral -s read-only "Reply with exactly: OK" 2>/dev/null | grep -q "OK"; then
       pass "o1-pro model available (reviewer profile)"
     else
       warn "o1-pro model unavailable — reviewer/maestro calls will fall back"

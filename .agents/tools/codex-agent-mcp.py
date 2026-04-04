@@ -360,10 +360,6 @@ def _build_server(config: ServerConfig) -> FastMCP:
 
         result = await _run_agent(ctx, prompt, config)
 
-        # Tag output with thread ID for downstream traceability (markdown-safe)
-        if not result.startswith("Error:"):
-            result = f"{result}\n\n---\n_thread: {tid}_"
-
         return result
 
     @mcp.tool()
@@ -412,19 +408,45 @@ def _build_server(config: ServerConfig) -> FastMCP:
                 return {"index": str(index), "error": output}
             return {"index": str(index), "output": output}
 
-        results = await asyncio.gather(
-            *(run_one(i, agent) for i, agent in enumerate(agents)),
-            return_exceptions=True,
-        )
+        tasks = [asyncio.create_task(run_one(i, agent)) for i, agent in enumerate(agents)]
 
-        final_results: list[dict[str, str]] = []
-        for index, result in enumerate(results):
-            if isinstance(result, Exception):
-                final_results.append(
-                    {"index": str(index), "error": f"Unexpected error: {result}"}
-                )
-            else:
-                final_results.append(result)
+        if cancel_on_failure:
+            # Wait for tasks individually so we can cancel on first failure
+            final_results: list[dict[str, str]] = [{}] * len(tasks)
+            done: set[int] = set()
+            while len(done) < len(tasks):
+                await asyncio.sleep(0.05)
+                for i, task in enumerate(tasks):
+                    if i in done:
+                        continue
+                    if task.done():
+                        done.add(i)
+                        if task.cancelled():
+                            final_results[i] = {"index": str(i), "status": "Cancelled: another agent failed."}
+                            continue
+                        exc = task.exception()
+                        if exc:
+                            final_results[i] = {"index": str(i), "error": f"Unexpected error: {exc}"}
+                            cancel_event.set()  # type: ignore[union-attr]
+                        else:
+                            final_results[i] = task.result()
+                            if "error" in final_results[i]:
+                                cancel_event.set()  # type: ignore[union-attr]
+                        # Cancel remaining tasks if failure detected
+                        if cancel_event and cancel_event.is_set():
+                            for j, t in enumerate(tasks):
+                                if j not in done and not t.done():
+                                    t.cancel()
+        else:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            final_results = []
+            for index, result in enumerate(results):
+                if isinstance(result, Exception):
+                    final_results.append(
+                        {"index": str(index), "error": f"Unexpected error: {result}"}
+                    )
+                else:
+                    final_results.append(result)
 
         return final_results
 

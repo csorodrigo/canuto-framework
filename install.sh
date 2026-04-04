@@ -1308,9 +1308,9 @@ TRUSTEOF2
     --arg maestro "$maestro_wrapper" \
     '
       .mcpServers = (.mcpServers // {})
-      | .mcpServers["codex-coder"] = {"command": $coder, "type": "stdio"}
-      | .mcpServers["codex-reviewer"] = {"command": $reviewer, "type": "stdio"}
-      | .mcpServers["codex-maestro"] = {"command": $maestro, "type": "stdio"}
+      | .mcpServers["codex-coder"] = ((.mcpServers["codex-coder"] // {}) * {"command": $coder, "type": "stdio"})
+      | .mcpServers["codex-reviewer"] = ((.mcpServers["codex-reviewer"] // {}) * {"command": $reviewer, "type": "stdio"})
+      | .mcpServers["codex-maestro"] = ((.mcpServers["codex-maestro"] // {}) * {"command": $maestro, "type": "stdio"})
     ' "$settings")
   if [[ -n "$updated" ]]; then
     echo "$updated" > "$settings"
@@ -2674,7 +2674,11 @@ if [ "$MODE" = "skill" ]; then
   INSTALLED=()
   for skill_name in "${SKILLS_TO_INSTALL[@]}"; do
     log "Installing skill: $skill_name..."
-    mapfile -t skill_files < <(skill_remote_files "$skill_name")
+    skill_files=()
+    while IFS= read -r skill_file; do
+      [ -n "$skill_file" ] || continue
+      skill_files+=("$skill_file")
+    done < <(skill_remote_files "$skill_name")
     installed_skill=true
     for skill_file in "${skill_files[@]}"; do
       if ! download "$skill_file" "$skill_file"; then

@@ -437,7 +437,7 @@ EOF
 }
 
 case "$TOOL_NAME" in
-  mcp__codex-coder__spawn_agent|mcp__codex-coder__spawn_agents_parallel)
+  mcp__codex-coder__spawn_agent|mcp__codex-coder__spawn_agents_parallel|mcp__codex-maestro__spawn_agent|mcp__codex-maestro__spawn_agents_parallel)
     handle_codex_spawn
     ;;
   Bash)

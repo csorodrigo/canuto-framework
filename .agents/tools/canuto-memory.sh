@@ -4,7 +4,7 @@ set -euo pipefail
 
 canuto_project_dir() {
   local dir="${1:-${CLAUDE_PROJECT_DIR:-$(pwd)}}"
-  printf '%s\n' "$dir"
+  git -C "$dir" rev-parse --show-toplevel 2>/dev/null || printf '%s\n' "$dir"
 }
 
 canuto_project_slug() {

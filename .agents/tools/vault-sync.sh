@@ -27,7 +27,11 @@ if [ ! -d "$PENDING_SYNC_DIR" ]; then
   exit 0
 fi
 
-mapfile -t PENDING_FILES < <(find "$PENDING_SYNC_DIR" -maxdepth 1 -type f -name '*.md' | sort)
+PENDING_FILES=()
+while IFS= read -r pending_file; do
+  [ -n "$pending_file" ] || continue
+  PENDING_FILES+=("$pending_file")
+done < <(find "$PENDING_SYNC_DIR" -maxdepth 1 -type f -name '*.md' | sort)
 if [ "${#PENDING_FILES[@]}" -eq 0 ]; then
   echo "No pending sync files to process."
   exit 0

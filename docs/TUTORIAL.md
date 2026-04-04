@@ -213,7 +213,9 @@ O Maestro vai:
    - ⏳ parcial / adiado
    - ❌ nao iniciado
 
-2. **Extrair instincts** — padroes aprendidos na sessao (rework, correcoes do usuario, rejeicoes). Pede aprovacao antes de salvar.
+1.5. **Trace Analysis** (v1.8, se `CANUTO_TRACE_ANALYSIS=1`) — analisa audit events, metricas e session note. Classifica sinais em 5 categorias (playbook-gap, blind-spot-gap, instinct-candidate, routing-misfire, skill-gap). Gera digest em `vault/traces/` e alimenta o proximo passo.
+
+2. **Extrair instincts** — padroes aprendidos na sessao (rework, correcoes do usuario, rejeicoes). Recebe candidatos do trace analysis (v1.8). Pede aprovacao antes de salvar.
 
 3. **Criar session note** em `projects/{projeto}/sessions/YYYY-MM-DD.md` com goals, o que foi feito, decisoes, links.
 
@@ -230,6 +232,62 @@ O Maestro vai:
 ### Hook automatico
 
 O hook `session-save.sh` dispara automaticamente no Stop e cria um backup snapshot do vault. E uma rede de seguranca — nao substitui o fechamento formal pelo Maestro.
+
+---
+
+## 3.5. v1.8 — Loop de Auto-Aprimoramento (inspirado pelo AutoAgent)
+
+A v1.8 traz aprendizado baseado em traces. O framework agora minera sistematicamente os dados de cada sessao para propor melhorias.
+
+### Como ativar
+
+```bash
+export CANUTO_TRACE_ANALYSIS=1
+```
+
+### O que acontece automaticamente
+
+| Quando | O que | Resultado |
+|--------|-------|-----------|
+| **Session end** | Trace analysis roda antes dos instincts | Digest em `vault/traces/{data}-digest.md` |
+| **Session end** | Blind-spot gaps detectados | Candidatos em `.agents/blind-spots/_candidates/` |
+| **Proximo session start** | Maestro apresenta blind-spot candidates | Voce decide: promover, dispensar ou revisar |
+| **Apos Architect/Coder** | Routing check (v1.8) | Maestro sugere re-sizing se os dados indicam |
+
+### Blind-spot candidates
+
+Quando o trace analysis detecta um pitfall de dominio nao coberto, ele cria um candidato:
+
+```
+.agents/blind-spots/_candidates/auth--pkce-mobile.md
+```
+
+No proximo briefing, o Maestro vai apresentar:
+```
+[Maestro] 1 blind-spot candidate pendente:
+- auth--pkce-mobile.md: "OAuth PKCE obrigatorio em mobile" (2026-04-02)
+Promover para blind spots ativos? [Y/n/review]
+```
+
+Se voce promover, o pitfall e adicionado ao arquivo `auth.md` e arquivado.
+
+### Routing check
+
+Se voce pedir uma task S mas o Architect produz um plano com 6 passos e 5 arquivos, o Maestro vai perguntar:
+
+```
+[Maestro] Routing Check
+Sizing: S | Architect produziu 6 steps em 5 arquivos
+Sinal: blast radius excede threshold S (1-2 files)
+Recomendacao: Promover para M, adicionar Tester
+Prosseguir com reroute? [Promover para M / Manter S]
+```
+
+Voce SEMPRE decide. O framework nunca re-rota sozinho.
+
+### Overfitting guard
+
+Toda proposta do trace analysis passa pelo teste: **"Se essa task exata sumisse, essa melhoria ainda valeria?"**
 
 ---
 

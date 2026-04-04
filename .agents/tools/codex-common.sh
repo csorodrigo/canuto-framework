@@ -124,6 +124,43 @@ codex_context_package_valid() {
   [ $((now_ts - file_ts)) -le "$max_age_seconds" ] || return 1
 }
 
+codex_run_with_timeout() {
+  local timeout_seconds="${1:-0}"
+  shift
+
+  if [ "${timeout_seconds:-0}" -le 0 ] 2>/dev/null; then
+    "$@"
+    return $?
+  fi
+
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$timeout_seconds" "$@"
+    return $?
+  fi
+
+  python3 -c '
+import subprocess
+import sys
+
+timeout_seconds = float(sys.argv[1])
+cmd = sys.argv[2:]
+
+try:
+    completed = subprocess.run(
+        cmd,
+        stdin=sys.stdin,
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+        timeout=timeout_seconds,
+        check=False,
+    )
+except subprocess.TimeoutExpired:
+    raise SystemExit(124)
+
+raise SystemExit(completed.returncode)
+' "$timeout_seconds" "$@"
+}
+
 codex_reviewer_args() {
   local config_toml="$HOME/.codex/config.toml"
   if [ -f "$config_toml" ] && grep -q '\[profiles\.reviewer\]' "$config_toml" 2>/dev/null; then
@@ -233,7 +270,7 @@ codex_run_reviewer() {
     [ -n "$candidate" ] || continue
     candidate_error_file=$(mktemp)
     local reviewer_timeout="${CODEX_REVIEWER_TIMEOUT:-120}"
-    cmd=(timeout "$reviewer_timeout" codex exec -C "$exec_dir" -s read-only --skip-git-repo-check --ephemeral -c 'model_reasoning_effort="high"')
+    cmd=(codex exec -C "$exec_dir" -s read-only --skip-git-repo-check --ephemeral -c 'model_reasoning_effort="high"')
     case "$candidate" in
       profile:*)
         cmd+=(--profile "${candidate#profile:}")
@@ -244,7 +281,7 @@ codex_run_reviewer() {
     esac
     cmd+=(--output-schema "$schema_file" -o "$output_file" -)
 
-    if "${cmd[@]}" < "$prompt_file" >/dev/null 2>"$candidate_error_file"; then
+    if codex_run_with_timeout "$reviewer_timeout" "${cmd[@]}" < "$prompt_file" >/dev/null 2>"$candidate_error_file"; then
       printf '%s\n' "$candidate" > "$used_file"
       if [ -s "$candidate_error_file" ]; then
         cat "$candidate_error_file" > "$error_file"

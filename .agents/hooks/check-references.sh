@@ -12,8 +12,9 @@
 set -euo pipefail
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
+ROOT_DIR="$(cd "$PROJECT_DIR" && git rev-parse --show-toplevel 2>/dev/null || pwd)"
 GLOBAL_VAULT="$HOME/.canuto/vault"
-LOCAL_VAULT="$PROJECT_DIR/.agents/vault"
+LOCAL_VAULT="$ROOT_DIR/.agents/vault"
 
 # Use global vault if it exists, fall back to local
 if [ -d "$GLOBAL_VAULT" ]; then
@@ -30,55 +31,86 @@ CHANGED_ONLY=false
 
 BROKEN_COUNT=0
 CHECKED_COUNT=0
+FILES_LIST=$(mktemp)
+NOTE_INDEX_FILE=$(mktemp)
+
+cleanup() {
+  rm -f "$FILES_LIST" "$NOTE_INDEX_FILE"
+}
+trap cleanup EXIT
+
+trim_whitespace() {
+  printf '%s' "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
+note_index_contains() {
+  local key="${1:-}"
+  [ -n "$key" ] || return 1
+  grep -Fqx "$key" "$NOTE_INDEX_FILE" 2>/dev/null
+}
 
 # ── Collect files to check ───────────────────────────────────────────────
 if $CHANGED_ONLY; then
-  mapfile -t FILES < <(git diff --name-only --diff-filter=ACMR 2>/dev/null | grep '\.md$' || true)
-  # Also check staged files
-  mapfile -t STAGED < <(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null | grep '\.md$' || true)
-  FILES=("${FILES[@]}" "${STAGED[@]}")
+  while IFS= read -r rel_file; do
+    [ -n "$rel_file" ] || continue
+    case "$rel_file" in
+      *.md) printf '%s\n' "$ROOT_DIR/$rel_file" >> "$FILES_LIST" ;;
+    esac
+  done < <(git -C "$ROOT_DIR" diff --name-only --diff-filter=ACMR 2>/dev/null || true)
+
+  while IFS= read -r rel_file; do
+    [ -n "$rel_file" ] || continue
+    case "$rel_file" in
+      *.md) printf '%s\n' "$ROOT_DIR/$rel_file" >> "$FILES_LIST" ;;
+    esac
+  done < <(git -C "$ROOT_DIR" diff --cached --name-only --diff-filter=ACMR 2>/dev/null || true)
+
+  if [ -s "$FILES_LIST" ]; then
+    sort -u "$FILES_LIST" -o "$FILES_LIST"
+  fi
 else
-  mapfile -t FILES < <(find "$VAULT_DIR" -name "*.md" -type f 2>/dev/null)
+  find "$VAULT_DIR" -name "*.md" -type f 2>/dev/null > "$FILES_LIST"
 fi
 
-if [ ${#FILES[@]} -eq 0 ]; then
+if [ ! -s "$FILES_LIST" ]; then
   echo "[check-references] No markdown files to check."
   exit 0
 fi
 
 # ── Build index of existing notes ────────────────────────────────────────
-declare -A NOTE_INDEX
 while IFS= read -r note; do
-  # Index by filename without extension (for wikilink resolution)
+  [ -n "$note" ] || continue
   basename_no_ext=$(basename "$note" .md)
-  NOTE_INDEX["$basename_no_ext"]="$note"
-  # Also index by relative path from vault root
   rel_path="${note#"$VAULT_DIR"/}"
-  NOTE_INDEX["$rel_path"]="$note"
+  printf '%s\n' "$basename_no_ext" >> "$NOTE_INDEX_FILE"
+  printf '%s\n' "$rel_path" >> "$NOTE_INDEX_FILE"
+  printf '%s\n' "${rel_path%.md}" >> "$NOTE_INDEX_FILE"
 done < <(find "$VAULT_DIR" -name "*.md" -type f 2>/dev/null)
 
-# ── Check each file ─────────────────────────────────────────────────────
-for file in "${FILES[@]}"; do
+if [ -s "$NOTE_INDEX_FILE" ]; then
+  sort -u "$NOTE_INDEX_FILE" -o "$NOTE_INDEX_FILE"
+fi
+
+# ── Check each file ──────────────────────────────────────────────────────
+while IFS= read -r file; do
   [ -f "$file" ] || continue
   CHECKED_COUNT=$((CHECKED_COUNT + 1))
   file_dir=$(dirname "$file")
 
   # Check wikilinks: [[target]] or [[target|alias]]
-  while IFS= read -r match; do
-    target=$(echo "$match" | sed 's/\[\[//;s/\]\]//;s/|.*//' | xargs)
+  while IFS= read -r target; do
+    target=$(trim_whitespace "${target%%|*}")
     [ -z "$target" ] && continue
 
-    # Skip external links and anchors
-    [[ "$target" == http* ]] && continue
-    [[ "$target" == \#* ]] && continue
+    case "$target" in
+      http*|\#*) continue ;;
+    esac
 
-    # Strip anchor from target
     target_base="${target%%#*}"
     [ -z "$target_base" ] && continue
 
-    # Try to resolve: by name, by relative path, by path with .md
-    if [ -z "${NOTE_INDEX[$target_base]:-}" ] && \
-       [ -z "${NOTE_INDEX[$target_base.md]:-}" ] && \
+    if ! note_index_contains "$target_base" && \
+       ! note_index_contains "$target_base.md" && \
        [ ! -f "$file_dir/$target_base" ] && \
        [ ! -f "$file_dir/$target_base.md" ] && \
        [ ! -f "$VAULT_DIR/$target_base" ] && \
@@ -86,33 +118,40 @@ for file in "${FILES[@]}"; do
       echo "  BROKEN wikilink in $(basename "$file"): [[$target]]"
       BROKEN_COUNT=$((BROKEN_COUNT + 1))
     fi
-  done < <(grep -oP '\[\[[^\]]+\]\]' "$file" 2>/dev/null || true)
+  done < <(perl -ne 'while(/\[\[([^\]]+)\]\]/g){print "$1\n"}' "$file" 2>/dev/null || true)
 
   # Check relative markdown links: [text](path)
-  while IFS= read -r match; do
-    link_path=$(echo "$match" | grep -oP '\]\(\K[^)]+' | head -1)
+  while IFS= read -r link_path; do
+    link_path=$(trim_whitespace "$link_path")
     [ -z "$link_path" ] && continue
 
-    # Skip external links, anchors, and mailto
-    [[ "$link_path" == http* ]] && continue
-    [[ "$link_path" == \#* ]] && continue
-    [[ "$link_path" == mailto:* ]] && continue
+    case "$link_path" in
+      http*|\#*|mailto:*) continue ;;
+    esac
 
-    # Strip anchor
     link_path_base="${link_path%%#*}"
     [ -z "$link_path_base" ] && continue
 
-    # Resolve relative to file's directory
-    if [ ! -f "$file_dir/$link_path_base" ] && [ ! -f "$link_path_base" ]; then
+    if [[ "$link_path_base" == /* ]]; then
+      if [ ! -f "$link_path_base" ]; then
+        echo "  BROKEN link in $(basename "$file"): ($link_path)"
+        BROKEN_COUNT=$((BROKEN_COUNT + 1))
+      fi
+      continue
+    fi
+
+    if [ ! -f "$file_dir/$link_path_base" ] && \
+       [ ! -f "$ROOT_DIR/$link_path_base" ] && \
+       [ ! -f "$VAULT_DIR/$link_path_base" ]; then
       echo "  BROKEN link in $(basename "$file"): ($link_path)"
       BROKEN_COUNT=$((BROKEN_COUNT + 1))
     fi
-  done < <(grep -oP '\[[^\]]*\]\([^)]+\)' "$file" 2>/dev/null || true)
-done
+  done < <(perl -ne 'while(/\[[^\]]*\]\(([^)]+)\)/g){print "$1\n"}' "$file" 2>/dev/null || true)
+done < "$FILES_LIST"
 
 # ── Summary ──────────────────────────────────────────────────────────────
 echo ""
-if [ $BROKEN_COUNT -eq 0 ]; then
+if [ "$BROKEN_COUNT" -eq 0 ]; then
   echo "[check-references] ✓ All references OK ($CHECKED_COUNT files checked)"
   exit 0
 else

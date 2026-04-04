@@ -113,7 +113,53 @@ if [ -f "$ROOT_DIR/.agents/tools/canuto-memory.sh" ]; then
   fi
 fi
 
-# ── 7. Persona frontmatter ──────────────────────────────────────────────
+# ── 7. Runtime portability ───────────────────────────────────────────────
+echo ""
+echo "## Runtime Portability"
+
+if bash -c "cd '$ROOT_DIR/docs' && source '$ROOT_DIR/.agents/tools/canuto-memory.sh' && [ \"\$(canuto_project_dir)\" = '$ROOT_DIR' ] && [ \"\$(canuto_project_slug)\" = 'canuto-framework-v1' ]" >/dev/null 2>&1; then
+  pass "canuto-memory.sh resolves project root from subdirectories"
+else
+  fail "canuto-memory.sh is cwd-sensitive from subdirectories"
+fi
+
+if bash -c "source '$ROOT_DIR/.agents/tools/codex-common.sh' && codex_run_with_timeout 2 bash -lc 'exit 0'" >/dev/null 2>&1; then
+  pass "codex-common.sh timeout wrapper works without GNU timeout"
+else
+  fail "codex-common.sh timeout wrapper failed"
+fi
+
+PORTABILITY_HOME="$(mktemp -d)"
+mkdir -p "$PORTABILITY_HOME/.canuto/vault"
+cat > "$PORTABILITY_HOME/.canuto/vault/A.md" <<'EOF'
+[[B]]
+[Local](B.md)
+EOF
+cat > "$PORTABILITY_HOME/.canuto/vault/B.md" <<'EOF'
+[[A]]
+EOF
+
+if HOME="$PORTABILITY_HOME" CLAUDE_PROJECT_DIR="$ROOT_DIR" bash "$ROOT_DIR/.agents/hooks/check-references.sh" >/dev/null 2>&1; then
+  pass "check-references.sh runs on a portable synthetic vault"
+else
+  fail "check-references.sh failed on a portable synthetic vault"
+fi
+
+if HOME="$PORTABILITY_HOME" CLAUDE_PROJECT_DIR="$ROOT_DIR" bash "$ROOT_DIR/.agents/hooks/check-orphans.sh" >/dev/null 2>&1; then
+  pass "check-orphans.sh runs on a portable synthetic vault"
+else
+  fail "check-orphans.sh failed on a portable synthetic vault"
+fi
+
+rm -rf "$PORTABILITY_HOME"
+
+if CLAUDE_PROJECT_DIR="$ROOT_DIR" bash "$ROOT_DIR/.agents/tools/vault-sync.sh" >/dev/null 2>&1; then
+  pass "vault-sync.sh runs cleanly with no pending sync files"
+else
+  fail "vault-sync.sh failed with no pending sync files"
+fi
+
+# ── 8. Persona frontmatter ──────────────────────────────────────────────
 echo ""
 echo "## Persona Frontmatter"
 for f in .agents/personas/*.md; do
