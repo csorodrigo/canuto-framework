@@ -28,7 +28,7 @@ echo ""
 echo "📁 Instalando hooks em ~/.claude/hooks/..."
 mkdir -p "$HOOKS_DIR"
 
-for hook in plan-review.sh codex-pretool-guard.sh session-save.sh session-load.sh pre-compact-save.sh; do
+for hook in plan-review.sh codex-pretool-guard.sh session-save.sh session-load.sh pre-compact-save.sh protect-files.sh require-tests-for-pr.sh log-commands.sh; do
   if [ -f "$SCRIPT_DIR/$hook" ]; then
     cp "$SCRIPT_DIR/$hook" "$HOOKS_DIR/$hook"
     chmod +x "$HOOKS_DIR/$hook"
@@ -41,7 +41,7 @@ echo "🧠 Instalando wrappers do Codex em ~/.claude/scripts/..."
 mkdir -p "$SCRIPTS_DIR"
 
 TOOLS_DIR="$(cd "$SCRIPT_DIR/../tools" && pwd)"
-for script in codex-agent-mcp.py codex-coder.sh codex-reviewer.sh codex-common.sh codex-diff-context.sh; do
+for script in codex-agent-mcp.py codex-coder.sh codex-reviewer.sh codex-maestro-mcp.sh codex-common.sh codex-diff-context.sh; do
   if [ -f "$TOOLS_DIR/$script" ]; then
     cp "$TOOLS_DIR/$script" "$SCRIPTS_DIR/$script"
     chmod +x "$SCRIPTS_DIR/$script"
@@ -115,13 +115,15 @@ if [ -f "$SETTINGS_FILE" ]; then
   MERGED=$(jq \
     --arg coder "$SCRIPTS_DIR/codex-coder.sh" \
     --arg reviewer "$SCRIPTS_DIR/codex-reviewer.sh" \
+    --arg maestro "$SCRIPTS_DIR/codex-maestro-mcp.sh" \
     '
       .mcpServers = (.mcpServers // {})
       | .mcpServers["codex-coder"] = {"command": $coder, "type": "stdio"}
       | .mcpServers["codex-reviewer"] = {"command": $reviewer, "type": "stdio"}
+      | .mcpServers["codex-maestro"] = {"command": $maestro, "type": "stdio"}
     ' "$SETTINGS_FILE")
   echo "$MERGED" > "$SETTINGS_FILE"
-  echo "   ✅ codex-coder e codex-reviewer apontando para wrappers compatíveis"
+  echo "   ✅ codex-coder, codex-reviewer e codex-maestro apontando para wrappers compatíveis"
 fi
 
 echo "      - ast-grep (análise AST)"

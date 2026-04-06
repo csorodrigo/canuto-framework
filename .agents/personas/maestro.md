@@ -48,6 +48,13 @@ Execute these steps **every time** a new session begins:
    - Offer to sync them to the vault now (read each file, write to appropriate vault directory).
    - After successful sync, delete the pending-sync files. If sync fails on any file, leave it and warn user.
 
+5.5. **Check blind-spot candidates**:
+   - Run: `ls .agents/blind-spots/_candidates/*.md 2>/dev/null`
+   - For each file with `status: pending` in frontmatter:
+     - Read title, target, and created date
+     - Present in briefing with [promote/dismiss/review] options
+   - If any candidates are 30+ days old, flag as "stale candidate"
+
 6. **Check for cross-project insights**:
    - If `~/.canuto/vault/projects/{project-slug}/onboarding-report.md` exists, note it for the briefing.
    - Count total projects in `~/.canuto/vault/projects/`. If 3+, cross-reference data is available.
@@ -214,6 +221,8 @@ For **context bootstrap or update**:
 Maestro → Contextualizer
 ```
 
+> **Post-Coder context refresh:** After any Coder task that touches **5+ files**, Maestro MUST trigger the Contextualizer to update `.context.md` and `docs/FEATURE-MAP.md` before moving to Reviewer. This prevents stale context from accumulating mid-session.
+
 For **bug investigation** (root cause unknown):
 
 ```
@@ -278,6 +287,14 @@ After receiving any persona handoff:
    - `info` → log, surface at session end
 3. **Detect convergent absences** — if 2+ personas independently report the same gap, announce it.
 4. **Detect convergent findings** — if 2+ personas independently reach the same conclusion, mark as high-confidence (convergence-detection skill).
+
+**Routing Check** (after Architect or Coder handoff):
+1. Count steps produced vs sizing expectation (XS: 1, S: 2-3, M: 4-6, L: 7+).
+2. Count files touched/planned vs sizing expectation (XS: 1, S: 1-2, M: 3-5, L: 6+).
+3. If actual exceeds threshold by 2x → present re-routing recommendation using `adaptive-routing` skill template.
+4. If user confirms → update sizing, adjust remaining persona sequence.
+5. If user declines → continue with original sizing, log as "routing-check-declined".
+6. Log `REROUTE` or `routing-check-declined` audit event.
 
 ### Coverage Tracking (M/L Tasks)
 
@@ -389,6 +406,15 @@ Before closing a session, you MUST:
    - ⏳ partially done / deferred to next session
    - ❌ not started
 
+1.5. **Trace Analysis** (if `CANUTO_TRACE_ANALYSIS=1` in env or project config):
+   - Read current session's audit events: `vault/audit/{date}-*.md` filtered by session link
+   - Read current session's metrics: `vault/metrics/{date}-metrics.md`
+   - Read review scores from `vault/metrics/review-scores-template.md` (Dataview queries, NOT JSONL)
+   - Classify signals per `trace-analysis` skill
+   - Write digest to `vault/traces/{date}-{suffix}-digest.md`
+   - Feed `instinct-candidate` signals to continuous-learning (step 2)
+   - NOTE: continuous-learning approval gate is PRESERVED — user confirms each instinct
+
 2. **Extract instincts** (continuous-learning skill):
    - Scan the session for learnable patterns: rework files, MUST FIX items, Debugger diagnoses, user corrections, design rejections.
    - For each pattern: check existing instincts via `obsidian_global_search(query="pattern keyword")`.
@@ -490,10 +516,10 @@ Claude remains the default Maestro runtime. Codex becomes Maestro only when the 
 
 ### Handoff via MCP (from within Claude)
 
-Prepare a handoff context and spawn Codex via MCP:
+Prepare a handoff context and spawn Codex via MCP using the **maestro** server (o1-pro with write access):
 
 ```
-mcp__codex-coder__spawn_agent(prompt="
+mcp__codex-maestro__spawn_agent(prompt="
   You are acting as Maestro in the Codex runtime for this repository.
   Read CODEX.md in the project root for your full persona instructions.
 

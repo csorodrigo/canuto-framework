@@ -1,0 +1,121 @@
+<svg width="1600" height="1200" viewBox="0 0 1600 1200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg2" x1="90" y1="70" x2="1510" y2="1130" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F1F4EE"/>
+      <stop offset="1" stop-color="#E4E8DE"/>
+    </linearGradient>
+    <linearGradient id="proBlue" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#0E3A4C"/>
+      <stop offset="1" stop-color="#2C677C"/>
+    </linearGradient>
+    <linearGradient id="proOrange" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#D86340"/>
+      <stop offset="1" stop-color="#E3A24D"/>
+    </linearGradient>
+    <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#44545C" flood-opacity="0.14"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="1200" fill="url(#bg2)"/>
+  <circle cx="1320" cy="140" r="170" fill="#D7C7A8" fill-opacity="0.35"/>
+  <circle cx="170" cy="1080" r="220" fill="#D2DFDD" fill-opacity="0.55"/>
+  <rect x="56" y="52" width="1488" height="1096" rx="36" fill="#FFFEFB" stroke="#D0D6CB" stroke-width="2"/>
+
+  <text x="110" y="126" fill="#103749" font-size="46" font-weight="700" font-family="Avenir Next, SF Pro Display, Helvetica, Arial, sans-serif">
+    Your ChatGPT Pro Model Access
+  </text>
+  <text x="110" y="164" fill="#5A686D" font-size="22" font-family="Avenir Next, SF Pro Text, Helvetica, Arial, sans-serif">
+    Official plan access on the left. What your local Codex accepts today on this Mac is on the right.
+  </text>
+
+  <rect x="110" y="214" width="1380" height="70" rx="22" fill="#EEF2EA"/>
+  <text x="138" y="256" fill="#415760" font-size="22" font-weight="600" font-family="Avenir Next, SF Pro Text, Helvetica, Arial, sans-serif">
+    Validation date: 2026-04-01. Local Codex login status: "Logged in using ChatGPT".
+  </text>
+
+  <g filter="url(#cardShadow)">
+    <rect x="110" y="334" width="650" height="654" rx="30" fill="#F7FBFD"/>
+    <rect x="840" y="334" width="650" height="654" rx="30" fill="#FFF8F0"/>
+  </g>
+
+  <rect x="110" y="334" width="650" height="92" rx="30" fill="url(#proBlue)"/>
+  <rect x="840" y="334" width="650" height="92" rx="30" fill="url(#proOrange)"/>
+
+  <text x="146" y="392" fill="#F5FBFF" font-size="30" font-weight="700" font-family="Avenir Next, SF Pro Display, Helvetica, Arial, sans-serif">
+    ChatGPT Pro Plan
+  </text>
+  <text x="876" y="392" fill="#FFF8EF" font-size="27" font-weight="700" font-family="Avenir Next, SF Pro Display, Helvetica, Arial, sans-serif">
+    Local Codex (ChatGPT sign-in)
+  </text>
+
+  <g font-family="Avenir Next, SF Pro Text, Helvetica, Arial, sans-serif">
+    <text x="146" y="472" fill="#103749" font-size="22" font-weight="700">Officially available in ChatGPT Pro</text>
+
+    <rect x="146" y="504" width="578" height="74" rx="18" fill="#E8F2F6"/>
+    <text x="170" y="548" fill="#103749" font-size="24" font-weight="700">GPT-5.4 Thinking</text>
+    <text x="430" y="548" fill="#4D636E" font-size="18">Current main reasoning model</text>
+
+    <rect x="146" y="594" width="578" height="74" rx="18" fill="#E8F2F6"/>
+    <text x="170" y="638" fill="#103749" font-size="24" font-weight="700">GPT-5.4 Pro</text>
+    <text x="430" y="638" fill="#4D636E" font-size="18">Higher-tier Pro model in ChatGPT</text>
+
+    <rect x="146" y="684" width="578" height="74" rx="18" fill="#E8F2F6"/>
+    <text x="170" y="728" fill="#103749" font-size="24" font-weight="700">o3-pro</text>
+    <text x="430" y="728" fill="#4D636E" font-size="18">Longer-thinking o3, Pro model</text>
+
+    <rect x="146" y="774" width="578" height="74" rx="18" fill="#E8F2F6"/>
+    <text x="170" y="818" fill="#103749" font-size="24" font-weight="700">o3</text>
+    <text x="430" y="818" fill="#4D636E" font-size="18">General frontier reasoner</text>
+
+    <rect x="146" y="864" width="578" height="74" rx="18" fill="#E8F2F6"/>
+    <text x="170" y="908" fill="#103749" font-size="24" font-weight="700">o4-mini</text>
+    <text x="430" y="908" fill="#4D636E" font-size="18">Fast and cheaper reasoning option</text>
+
+    <text x="146" y="965" fill="#4D636E" font-size="19">
+      Also included: Codex access itself, with higher usage limits than lower plans.
+    </text>
+
+    <text x="876" y="472" fill="#103749" font-size="22" font-weight="700">What actually worked here</text>
+
+    <rect x="876" y="504" width="578" height="74" rx="18" fill="#FFF0E4"/>
+    <circle cx="912" cy="541" r="12" fill="#2E8A57"/>
+    <text x="938" y="548" fill="#103749" font-size="24" font-weight="700">gpt-5.4 + xhigh</text>
+    <text x="1232" y="548" fill="#4D636E" font-size="18">OK</text>
+
+    <rect x="876" y="594" width="578" height="74" rx="18" fill="#FFF0E4"/>
+    <circle cx="912" cy="631" r="12" fill="#2E8A57"/>
+    <text x="938" y="638" fill="#103749" font-size="24" font-weight="700">gpt-5-codex + high</text>
+    <text x="1232" y="638" fill="#4D636E" font-size="18">OK</text>
+
+    <rect x="876" y="684" width="578" height="74" rx="18" fill="#FFF0E4"/>
+    <circle cx="912" cy="721" r="12" fill="#B5483D"/>
+    <text x="938" y="728" fill="#103749" font-size="24" font-weight="700">gpt-5.4-pro</text>
+    <text x="1144" y="728" fill="#4D636E" font-size="18">Blocked in local Codex</text>
+
+    <rect x="876" y="774" width="578" height="74" rx="18" fill="#FFF0E4"/>
+    <circle cx="912" cy="811" r="12" fill="#B5483D"/>
+    <text x="938" y="818" fill="#103749" font-size="24" font-weight="700">o1-pro</text>
+    <text x="1144" y="818" fill="#4D636E" font-size="18">Blocked in local Codex</text>
+
+    <rect x="876" y="864" width="578" height="74" rx="18" fill="#FFF0E4"/>
+    <circle cx="912" cy="901" r="12" fill="#B5483D"/>
+    <text x="938" y="908" fill="#103749" font-size="24" font-weight="700">o3</text>
+    <text x="1144" y="908" fill="#4D636E" font-size="18">Blocked in local Codex</text>
+
+    <text x="876" y="965" fill="#4D636E" font-size="19">
+      Practical top-end setup right now: coder on GPT-5.4 high, reviewer and maestro on GPT-5.4 xhigh.
+    </text>
+  </g>
+
+  <rect x="110" y="1036" width="1380" height="78" rx="24" fill="#103749"/>
+  <text x="140" y="1081" fill="#F6FBFD" font-size="20" font-weight="700" font-family="Avenir Next, SF Pro Display, Helvetica, Arial, sans-serif">
+    Sources and local checks
+  </text>
+  <text x="140" y="1108" fill="#D8E8EF" font-size="17" font-family="Avenir Next, SF Pro Text, Helvetica, Arial, sans-serif">
+    OpenAI Help Center: Model Release Notes, Using Codex with your ChatGPT plan, GPT-5.4 launch page.
+  </text>
+  <text x="140" y="1132" fill="#D8E8EF" font-size="17" font-family="Avenir Next, SF Pro Text, Helvetica, Arial, sans-serif">
+    Local checks run on 2026-04-01 with codex-cli 0.117.0 on this machine.
+  </text>
+</svg>

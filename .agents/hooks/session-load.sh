@@ -23,6 +23,11 @@ MEMORY_LIB="$ROOT_DIR/.agents/tools/canuto-memory.sh"
 if [ -f "$MEMORY_LIB" ]; then
   # shellcheck source=/dev/null
   source "$MEMORY_LIB"
+else
+  canuto_project_dir()  { echo "${1:-.}"; }
+  canuto_project_slug() { basename "${1:-.}"; }
+  canuto_cache_dir()    { echo "${1:-.}/.agents/.cache"; }
+  canuto_resolve_memory_backend() { printf 'none\t'; }
 fi
 
 PROJECT_DIR=$(canuto_project_dir "$PROJECT_DIR")
@@ -235,13 +240,24 @@ mkdir -p "$CACHE_DIR"
   fi
 } > "$CACHE_DIR/last-briefing.txt" 2>/dev/null || true
 
-# ── Check for pending-sync from previous offline session ──────────────────
+# ── Auto-sync pending from previous offline session ──────────────────────
 if [ -d "$CACHE_DIR/pending-sync" ]; then
-  SYNC_COUNT=$(ls "$CACHE_DIR/pending-sync"/*.md 2>/dev/null | wc -l) || SYNC_COUNT=0
+  SYNC_COUNT=$(find "$CACHE_DIR/pending-sync" -maxdepth 1 -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ') || SYNC_COUNT=0
   if [ "$SYNC_COUNT" -gt 0 ]; then
-    echo "── ⚠ Pending Sync: $SYNC_COUNT notes from offline session ──"
-    echo "  Ask Maestro to run /vault-sync or bash .agents/tools/vault-sync.sh."
-    echo ""
+    VAULT_SYNC="$ROOT_DIR/.agents/tools/vault-sync.sh"
+    if [ "$VAULT_AVAILABLE" = true ] && [ -x "$VAULT_SYNC" ]; then
+      echo "── Auto-syncing $SYNC_COUNT pending notes... ──"
+      if bash "$VAULT_SYNC" 2>/dev/null; then
+        echo "  ✓ Pending sync completed."
+      else
+        echo "  ⚠ Auto-sync failed. Run /vault-sync manually."
+      fi
+      echo ""
+    else
+      echo "── ⚠ Pending Sync: $SYNC_COUNT notes from offline session ──"
+      echo "  Run /vault-sync when vault is available."
+      echo ""
+    fi
   fi
 fi
 

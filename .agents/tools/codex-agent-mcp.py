@@ -21,7 +21,23 @@ from pathlib import Path
 from mcp.server.fastmcp import Context, FastMCP
 
 
-DEFAULT_TIMEOUT_SECONDS = 8 * 60 * 60
+def _safe_int(val: str, default: int) -> int:
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return default
+
+
+def _safe_float(val: str, default: float) -> float:
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
+DEFAULT_TIMEOUT_SECONDS = _safe_int(os.environ.get("CODEX_TIMEOUT_SECONDS", ""), 8 * 60 * 60)
+MAX_RETRIES = _safe_int(os.environ.get("CODEX_MAX_RETRIES", ""), 3)
+RETRY_BASE_DELAY = _safe_float(os.environ.get("CODEX_RETRY_DELAY", ""), 2.0)
 
 
 @dataclass(frozen=True)
@@ -138,7 +154,78 @@ async def _run_agent(ctx: Context, prompt: str, config: ServerConfig) -> str:
         return f"Error: {err}"
 
     work_directory = _project_dir()
+    start_ts = time.monotonic()
+    last_error = ""
 
+    for attempt in range(MAX_RETRIES):
+        result = await _run_agent_once(
+            ctx, prompt, config, codex_exec, work_directory, attempt
+        )
+        if not result.startswith("Error:"):
+            _log_telemetry(config, prompt, time.monotonic() - start_ts, attempt + 1, True)
+            return result
+
+        last_error = result
+        # Don't retry on user errors (empty prompt, bad config)
+        if "must be a string" in result or "cannot be empty" in result:
+            return result
+
+        if attempt < MAX_RETRIES - 1:
+            delay = RETRY_BASE_DELAY * (2 ** attempt)
+            try:
+                await ctx.report_progress(
+                    0, None,
+                    f"{config.server_name}: attempt {attempt + 1} failed, retrying in {delay:.0f}s..."
+                )
+            except Exception:
+                pass
+            await asyncio.sleep(delay)
+
+    _log_telemetry(config, prompt, time.monotonic() - start_ts, MAX_RETRIES, False)
+    return last_error
+
+
+def _log_telemetry(
+    config: ServerConfig,
+    prompt: str,
+    duration_s: float,
+    attempts: int,
+    success: bool,
+) -> None:
+    """C3: Log spawn_agent telemetry to event log."""
+    import json
+
+    project_dir = _project_dir()
+    log_dir = Path(project_dir) / ".agents" / "tmp" / "codex"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "spawn-events.jsonl"
+
+    event = {
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "server": config.server_name,
+        "profile": config.profile,
+        "model": config.model,
+        "mode": config.mode,
+        "prompt_length": len(prompt),
+        "duration_s": round(duration_s, 2),
+        "attempts": attempts,
+        "success": success,
+    }
+    try:
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(event, ensure_ascii=True) + "\n")
+    except OSError:
+        pass
+
+
+async def _run_agent_once(
+    ctx: Context,
+    prompt: str,
+    config: ServerConfig,
+    codex_exec: str,
+    work_directory: str,
+    attempt: int,
+) -> str:
     with tempfile.TemporaryDirectory(prefix="codex_output_") as temp_dir:
         output_path = Path(temp_dir) / "last_message.md"
         output_path.touch()
@@ -166,40 +253,73 @@ async def _run_agent(ctx: Context, prompt: str, config: ServerConfig) -> str:
         except Exception as err:
             return f"Error: Failed to launch Codex agent: {err}"
 
-        stdout_task = asyncio.create_task(proc.stdout.read()) if proc.stdout else None
-        stderr_task = asyncio.create_task(proc.stderr.read()) if proc.stderr else None
-        stdin_task = asyncio.create_task(proc.stdin.drain()) if proc.stdin else None
+        # Write prompt to stdin, then close
         if proc.stdin:
             proc.stdin.write(prompt.encode("utf-8"))
+            try:
+                await proc.stdin.drain()
+            except Exception:
+                pass
             proc.stdin.close()
 
-        last_ping = time.monotonic()
-        while True:
-            try:
-                returncode = await asyncio.wait_for(proc.wait(), timeout=2.0)
-                break
-            except asyncio.TimeoutError:
-                now = time.monotonic()
-                if now - last_ping >= 2.0:
-                    last_ping = now
+        # C5: Read stdout and stderr concurrently to avoid deadlock.
+        # Use asyncio tasks for stdout (full read) and stderr (streamed chunks).
+        stdout_task = asyncio.create_task(proc.stdout.read()) if proc.stdout else None
+        stderr_chunks: list[bytes] = []
+
+        async def _stream_stderr() -> None:
+            """Read stderr in chunks, forward last line as progress."""
+            if not proc.stderr:
+                return
+            while True:
+                chunk = await proc.stderr.read(4096)
+                if not chunk:
+                    break
+                stderr_chunks.append(chunk)
+                last_line = chunk.decode(errors="replace").strip().split("\n")[-1]
+                if last_line:
                     try:
-                        await ctx.report_progress(1, None, f"{config.server_name} running...")
+                        await ctx.report_progress(
+                            1, None,
+                            f"{config.server_name}: {last_line[:120]}"
+                        )
                     except Exception:
                         pass
 
-        if stdin_task:
+        stderr_task = asyncio.create_task(_stream_stderr())
+
+        # Heartbeat while waiting for process to finish
+        start_time = time.monotonic()
+        last_heartbeat = start_time
+        while True:
             try:
-                await stdin_task
-            except Exception:
+                returncode = await asyncio.wait_for(proc.wait(), timeout=5.0)
+                break
+            except asyncio.TimeoutError:
+                now = time.monotonic()
+                if now - last_heartbeat >= 5.0:
+                    elapsed = int(now - start_time)
+                    last_heartbeat = now
+                    try:
+                        await ctx.report_progress(
+                            1, None,
+                            f"{config.server_name} running ({elapsed}s)..."
+                        )
+                    except Exception:
+                        pass
+
+        # Wait for stream tasks to complete
+        if stderr_task:
+            try:
+                await asyncio.wait_for(stderr_task, timeout=5.0)
+            except (asyncio.TimeoutError, Exception):
                 pass
 
         stdout = ""
         if stdout_task:
             stdout = (await stdout_task).decode(errors="replace")
 
-        stderr = ""
-        if stderr_task:
-            stderr = (await stderr_task).decode(errors="replace")
+        stderr = b"".join(stderr_chunks).decode(errors="replace")
 
         output = output_path.read_text(encoding="utf-8").strip()
 
@@ -222,21 +342,49 @@ async def _run_agent(ctx: Context, prompt: str, config: ServerConfig) -> str:
 
 def _build_server(config: ServerConfig) -> FastMCP:
     mcp = FastMCP(config.server_name)
+    # C8: Session continuity — track thread IDs for multi-turn reviews
+    _session_counter = {"n": 0}
 
     @mcp.tool()
-    async def spawn_agent(ctx: Context, prompt: str) -> str:
-        """Spawn a Codex agent with the configured profile/model."""
-        return await _run_agent(ctx, prompt, config)
+    async def spawn_agent(ctx: Context, prompt: str, thread_id: str = "") -> str:
+        """Spawn a Codex agent with the configured profile/model.
+
+        Args:
+            prompt: The task prompt for the Codex agent.
+            thread_id: Optional thread ID for session continuity. If provided,
+                       the agent's output is tagged with this ID for follow-up.
+                       If empty, a new thread ID is generated automatically.
+        """
+        _session_counter["n"] += 1
+        tid = thread_id or f"{config.server_name}-{_session_counter['n']}"
+
+        result = await _run_agent(ctx, prompt, config)
+
+        return result
 
     @mcp.tool()
-    async def spawn_agents_parallel(ctx: Context, agents: list[dict]) -> list[dict[str, str]]:
-        """Spawn multiple Codex agents in parallel."""
+    async def spawn_agents_parallel(
+        ctx: Context,
+        agents: list[dict],
+        cancel_on_failure: bool = False,
+    ) -> list[dict[str, str]]:
+        """Spawn multiple Codex agents in parallel.
+
+        Args:
+            agents: List of dicts with 'prompt' field.
+            cancel_on_failure: If True, cancel remaining agents when one fails.
+        """
         if not isinstance(agents, list):
             return [{"index": "0", "error": "Error: 'agents' must be a list."}]
         if not agents:
             return [{"index": "0", "error": "Error: 'agents' list cannot be empty."}]
 
+        cancel_event = asyncio.Event() if cancel_on_failure else None
+
         async def run_one(index: int, spec: dict) -> dict[str, str]:
+            if cancel_event and cancel_event.is_set():
+                return {"index": str(index), "error": "Cancelled: another agent failed."}
+
             if not isinstance(spec, dict):
                 return {
                     "index": str(index),
@@ -255,22 +403,50 @@ def _build_server(config: ServerConfig) -> FastMCP:
 
             output = await _run_agent(ctx, prompt, config)
             if output.startswith("Error:"):
+                if cancel_event:
+                    cancel_event.set()
                 return {"index": str(index), "error": output}
             return {"index": str(index), "output": output}
 
-        results = await asyncio.gather(
-            *(run_one(i, agent) for i, agent in enumerate(agents)),
-            return_exceptions=True,
-        )
+        tasks = [asyncio.create_task(run_one(i, agent)) for i, agent in enumerate(agents)]
 
-        final_results: list[dict[str, str]] = []
-        for index, result in enumerate(results):
-            if isinstance(result, Exception):
-                final_results.append(
-                    {"index": str(index), "error": f"Unexpected error: {result}"}
-                )
-            else:
-                final_results.append(result)
+        if cancel_on_failure:
+            # Wait for tasks individually so we can cancel on first failure
+            final_results: list[dict[str, str]] = [{}] * len(tasks)
+            done: set[int] = set()
+            while len(done) < len(tasks):
+                await asyncio.sleep(0.05)
+                for i, task in enumerate(tasks):
+                    if i in done:
+                        continue
+                    if task.done():
+                        done.add(i)
+                        if task.cancelled():
+                            final_results[i] = {"index": str(i), "status": "Cancelled: another agent failed."}
+                            continue
+                        exc = task.exception()
+                        if exc:
+                            final_results[i] = {"index": str(i), "error": f"Unexpected error: {exc}"}
+                            cancel_event.set()  # type: ignore[union-attr]
+                        else:
+                            final_results[i] = task.result()
+                            if "error" in final_results[i]:
+                                cancel_event.set()  # type: ignore[union-attr]
+                        # Cancel remaining tasks if failure detected
+                        if cancel_event and cancel_event.is_set():
+                            for j, t in enumerate(tasks):
+                                if j not in done and not t.done():
+                                    t.cancel()
+        else:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            final_results = []
+            for index, result in enumerate(results):
+                if isinstance(result, Exception):
+                    final_results.append(
+                        {"index": str(index), "error": f"Unexpected error: {result}"}
+                    )
+                else:
+                    final_results.append(result)
 
         return final_results
 

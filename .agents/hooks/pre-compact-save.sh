@@ -29,6 +29,10 @@ MEMORY_LIB="$ROOT_DIR/.agents/tools/canuto-memory.sh"
 if [ -f "$MEMORY_LIB" ]; then
   # shellcheck source=/dev/null
   source "$MEMORY_LIB"
+else
+  canuto_project_dir()  { echo "${1:-.}"; }
+  canuto_project_slug() { basename "${1:-.}"; }
+  canuto_resolve_memory_backend() { printf 'none\t'; }
 fi
 
 PROJECT_DIR=$(canuto_project_dir "$PROJECT_DIR")

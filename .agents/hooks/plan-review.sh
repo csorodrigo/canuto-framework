@@ -112,8 +112,9 @@ cat > "$SCHEMA_FILE" <<'EOF'
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["verdict", "summary", "score", "issues"],
+  "required": ["schema_version", "verdict", "summary", "score", "issues"],
   "properties": {
+    "schema_version": { "type": "string", "const": "1.0" },
     "verdict": { "type": "string", "enum": ["LGTM", "CONCERNS"] },
     "summary": { "type": "string" },
     "score": { "type": "number" },
@@ -146,9 +147,20 @@ EOF
   printf '%s\n' "$PLAN_CONTENT"
 } > "$PROMPT_FILE"
 
+HOOK_START_TS=$(date +%s)
+
 REVIEW_DIR=$(codex_review_exec_dir "$ROOT_DIR")
 if ! codex_run_reviewer "$REVIEW_DIR" "$SCHEMA_FILE" "$OUTPUT_FILE" "$PROMPT_FILE" "$USED_FILE" "$ERROR_FILE"; then
   write_degraded_report "Reviewer path unavailable. The plan gate ran in degraded mode without a valid Codex review."
+  HOOK_END_TS=$(date +%s)
+  HOOK_DURATION_S=$((HOOK_END_TS - HOOK_START_TS))
+  EVENT_JSON=$(jq -cn \
+    --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --arg review_id "$REVIEW_ID" \
+    --arg plan_file "$PLAN_FILE" \
+    --argjson hook_duration_s "$HOOK_DURATION_S" \
+    '{timestamp:$timestamp,review_id:$review_id,review_type:"plan-review",status:"degraded",hook_duration_s:$hook_duration_s,plan_file:$plan_file,summary:"Reviewer path unavailable"}')
+  codex_append_event "$ROOT_DIR" "$EVENT_JSON"
   exit 0
 fi
 
@@ -191,6 +203,9 @@ FALLBACK_OCCURRED=$(codex_candidate_fallback_occurred "$USED_CANDIDATE")
   jq -r '.issues[]? | "- [" + .severity + "] " + .issue + " -> " + .fix' "$OUTPUT_FILE"
 } > "$MARKDOWN_FILE"
 
+HOOK_END_TS=$(date +%s)
+HOOK_DURATION_S=$((HOOK_END_TS - HOOK_START_TS))
+
 EVENT_JSON=$(jq -cn \
   --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --arg review_id "$REVIEW_ID" \
@@ -204,7 +219,8 @@ EVENT_JSON=$(jq -cn \
   --argjson fallback_occurred "$FALLBACK_OCCURRED" \
   --argjson score "$SCORE" \
   --argjson issues "$ISSUES_COUNT" \
-  '{timestamp:$timestamp,review_id:$review_id,review_type:"plan-review",status:$verdict,provider:"codex",preferred_reviewer_path:$preferred_path,preferred_model:$preferred_model,reviewer_path:$reviewer_path,model:$model,fallback_occurred:$fallback_occurred,plan_file:$plan_file,score:$score,issues_count:$issues,summary:$summary}')
+  --argjson hook_duration_s "$HOOK_DURATION_S" \
+  '{timestamp:$timestamp,review_id:$review_id,review_type:"plan-review",status:$verdict,provider:"codex",preferred_reviewer_path:$preferred_path,preferred_model:$preferred_model,reviewer_path:$reviewer_path,model:$model,fallback_occurred:$fallback_occurred,plan_file:$plan_file,score:$score,issues_count:$issues,hook_duration_s:$hook_duration_s,summary:$summary}')
 codex_append_event "$ROOT_DIR" "$EVENT_JSON"
 
 echo ""

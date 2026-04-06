@@ -355,6 +355,7 @@ FRAMEWORK_FILES=(
   ".agents/tools/codex-reviewer.sh"
   ".agents/tools/canuto-consumer-smoke.sh"
   ".agents/tools/codex-maestro.sh"
+  ".agents/tools/codex-maestro-mcp.sh"
   ".agents/tools/vault-sync.sh"
   # Codex economy + integration skills (Fase 3)
   ".agents/skills/codex-context-loader.md"
@@ -1131,6 +1132,7 @@ setup_codex() {
   local claude_scripts_dir="$HOME/.claude/scripts"
   local coder_wrapper="$claude_scripts_dir/codex-coder.sh"
   local reviewer_wrapper="$claude_scripts_dir/codex-reviewer.sh"
+  local maestro_wrapper="$claude_scripts_dir/codex-maestro-mcp.sh"
 
   log "Setting up Codex CLI integration..."
 
@@ -1157,7 +1159,23 @@ setup_codex() {
       return
     fi
   else
-    ok "Codex CLI $(codex --version 2>/dev/null || echo 'installed')"
+    local current_version
+    current_version=$(codex --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown")
+    ok "Codex CLI $current_version"
+
+    # Auto-update on --update or --repair
+    if [[ "${MODE:-}" =~ ^(update|repair)$ ]] && command -v npm &>/dev/null; then
+      local latest_version
+      latest_version=$(npm show @openai/codex version 2>/dev/null || echo "")
+      if [ -n "$latest_version" ] && [ "$current_version" != "$latest_version" ]; then
+        log "Codex CLI $current_version → $latest_version"
+        npm i -g @openai/codex@latest 2>/dev/null \
+          && ok "Codex CLI updated to $latest_version" \
+          || warn "Failed to update Codex CLI"
+      else
+        ok "Codex CLI up to date ($current_version)"
+      fi
+    fi
   fi
 
   # ── Configure config.toml with profiles ──────────────────────────────────
@@ -1269,6 +1287,7 @@ TRUSTEOF2
   install_codex_wrapper ".agents/tools/codex-agent-mcp.py" || return
   install_codex_wrapper ".agents/tools/codex-coder.sh" || return
   install_codex_wrapper ".agents/tools/codex-reviewer.sh" || return
+  install_codex_wrapper ".agents/tools/codex-maestro-mcp.sh" || return
   install_codex_wrapper ".agents/tools/codex-common.sh" || return
   install_codex_wrapper ".agents/tools/codex-diff-context.sh" || return
 
@@ -1286,15 +1305,18 @@ TRUSTEOF2
   updated=$(jq \
     --arg coder "$coder_wrapper" \
     --arg reviewer "$reviewer_wrapper" \
+    --arg maestro "$maestro_wrapper" \
     '
       .mcpServers = (.mcpServers // {})
-      | .mcpServers["codex-coder"] = {"command": $coder, "type": "stdio"}
-      | .mcpServers["codex-reviewer"] = {"command": $reviewer, "type": "stdio"}
+      | .mcpServers["codex-coder"] = ((.mcpServers["codex-coder"] // {}) * {"command": $coder, "type": "stdio"})
+      | .mcpServers["codex-reviewer"] = ((.mcpServers["codex-reviewer"] // {}) * {"command": $reviewer, "type": "stdio"})
+      | .mcpServers["codex-maestro"] = ((.mcpServers["codex-maestro"] // {}) * {"command": $maestro, "type": "stdio"})
     ' "$settings")
   if [[ -n "$updated" ]]; then
     echo "$updated" > "$settings"
     ok "codex-coder MCP configured in settings.json via wrapper"
     ok "codex-reviewer MCP configured in settings.json via wrapper"
+    ok "codex-maestro MCP configured in settings.json via wrapper"
   fi
 }
 
@@ -2652,7 +2674,11 @@ if [ "$MODE" = "skill" ]; then
   INSTALLED=()
   for skill_name in "${SKILLS_TO_INSTALL[@]}"; do
     log "Installing skill: $skill_name..."
-    mapfile -t skill_files < <(skill_remote_files "$skill_name")
+    skill_files=()
+    while IFS= read -r skill_file; do
+      [ -n "$skill_file" ] || continue
+      skill_files+=("$skill_file")
+    done < <(skill_remote_files "$skill_name")
     installed_skill=true
     for skill_file in "${skill_files[@]}"; do
       if ! download "$skill_file" "$skill_file"; then

@@ -1,0 +1,186 @@
+<svg width="1600" height="1280" viewBox="0 0 1600 1280" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="120" y1="60" x2="1480" y2="1220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F6EFE4"/>
+      <stop offset="1" stop-color="#EAE3D6"/>
+    </linearGradient>
+    <linearGradient id="ink" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#123245"/>
+      <stop offset="1" stop-color="#2E5668"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#D96543"/>
+      <stop offset="1" stop-color="#E08B4B"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#EAB75E"/>
+      <stop offset="1" stop-color="#C48D35"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#53636D" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="1280" fill="url(#bg)"/>
+  <circle cx="1380" cy="180" r="170" fill="#F0D9B3" fill-opacity="0.45"/>
+  <circle cx="128" cy="1100" r="220" fill="#D8E2E0" fill-opacity="0.55"/>
+  <rect x="58" y="52" width="1484" height="1176" rx="36" fill="#FFFDF9" stroke="#D8D1C5" stroke-width="2"/>
+
+  <text x="110" y="126" fill="#143143" font-size="46" font-weight="700" font-family="Avenir Next, SF Pro Display, Helvetica, Arial, sans-serif">
+    OpenAI Models Map
+  </text>
+  <text x="110" y="164" fill="#51616B" font-size="22" font-family="Avenir Next, SF Pro Text, Helvetica, Arial, sans-serif">
+    Scope: the reasoning and coding models discussed in this thread, plus their direct successors
+  </text>
+
+  <rect x="110" y="210" width="1380" height="58" rx="18" fill="#F3EEE6"/>
+  <text x="138" y="247" fill="#3E5562" font-size="22" font-weight="600" font-family="Avenir Next, SF Pro Text, Helvetica, Arial, sans-serif">
+    Read this left to right: reasoning line on top, Codex and coding line below, official benchmark snapshots inside each card
+  </text>
+
+  <text x="110" y="332" fill="#17384A" font-size="30" font-weight="700" font-family="Avenir Next, SF Pro Display, Helvetica, Arial, sans-serif">
+    Reasoning Line
+  </text>
+  <rect x="110" y="352" width="1380" height="6" rx="3" fill="url(#accent)"/>
+
+  <line x1="170" y1="504" x2="1430" y2="504" stroke="#C7B9A6" stroke-width="8" stroke-linecap="round"/>
+
+  <circle cx="215" cy="504" r="16" fill="#D96543"/>
+  <circle cx="500" cy="504" r="16" fill="#D96543"/>
+  <circle cx="785" cy="504" r="16" fill="#D96543"/>
+  <circle cx="1070" cy="504" r="16" fill="#D96543"/>
+  <circle cx="1355" cy="504" r="16" fill="#D96543"/>
+
+  <g filter="url(#soft)">
+    <rect x="110" y="386" width="210" height="236" rx="24" fill="#FFF9F3"/>
+    <rect x="395" y="386" width="210" height="236" rx="24" fill="#FFF9F3"/>
+    <rect x="680" y="386" width="210" height="236" rx="24" fill="#FFF9F3"/>
+    <rect x="965" y="386" width="210" height="236" rx="24" fill="#FFF9F3"/>
+    <rect x="1250" y="386" width="210" height="236" rx="24" fill="#FFF9F3"/>
+  </g>
+
+  <g font-family="Avenir Next, SF Pro Text, Helvetica, Arial, sans-serif">
+    <text x="132" y="424" fill="#A05A31" font-size="16" font-weight="700">DEC 2024</text>
+    <text x="132" y="456" fill="#17384A" font-size="28" font-weight="700">o1 pro mode</text>
+    <text x="132" y="486" fill="#53616A" font-size="18">ChatGPT Pro launch model</text>
+    <text x="132" y="525" fill="#17384A" font-size="18" font-weight="600">AIME 2024: 86</text>
+    <text x="132" y="552" fill="#17384A" font-size="18" font-weight="600">Codeforces: 90</text>
+    <text x="132" y="579" fill="#17384A" font-size="18" font-weight="600">GPQA Diamond: 79</text>
+    <text x="132" y="607" fill="#A05A31" font-size="15">4/4 reliability was the headline:</text>
+    <text x="132" y="628" fill="#A05A31" font-size="15">AIME 80, Codeforces 75, GPQA 74</text>
+
+    <text x="417" y="424" fill="#A05A31" font-size="16" font-weight="700">APR 2025</text>
+    <text x="417" y="456" fill="#17384A" font-size="28" font-weight="700">o3</text>
+    <text x="417" y="486" fill="#53616A" font-size="18">Next flagship reasoner</text>
+    <text x="417" y="525" fill="#17384A" font-size="18" font-weight="600">20% fewer major errors</text>
+    <text x="417" y="552" fill="#17384A" font-size="18" font-weight="600">vs o1 on hard real tasks</text>
+    <text x="417" y="579" fill="#17384A" font-size="18" font-weight="600">SOTA on Codeforces</text>
+    <text x="417" y="606" fill="#17384A" font-size="18" font-weight="600">SWE-bench and MMMU</text>
+    <text x="417" y="634" fill="#A05A31" font-size="15">With Python on AIME 2025:</text>
+    <text x="417" y="655" fill="#A05A31" font-size="15">98.4% pass@1</text>
+
+    <text x="702" y="424" fill="#A05A31" font-size="16" font-weight="700">JUN 2025</text>
+    <text x="702" y="456" fill="#17384A" font-size="28" font-weight="700">o3-pro</text>
+    <text x="702" y="486" fill="#53616A" font-size="18">Longer-thinking o3</text>
+    <text x="702" y="525" fill="#17384A" font-size="18" font-weight="600">Official successor to</text>
+    <text x="702" y="552" fill="#17384A" font-size="18" font-weight="600">o1-pro in ChatGPT Pro</text>
+    <text x="702" y="579" fill="#17384A" font-size="18" font-weight="600">OpenAI says it</text>
+    <text x="702" y="606" fill="#17384A" font-size="18" font-weight="600">outperforms both</text>
+    <text x="702" y="633" fill="#17384A" font-size="18" font-weight="600">o1-pro and o3</text>
+
+    <text x="987" y="424" fill="#A05A31" font-size="16" font-weight="700">AUG 2025</text>
+    <text x="987" y="456" fill="#17384A" font-size="28" font-weight="700">GPT-5 Pro</text>
+    <text x="987" y="486" fill="#53616A" font-size="18">New Pro frontier tier</text>
+    <text x="987" y="525" fill="#17384A" font-size="18" font-weight="600">Experts preferred it</text>
+    <text x="987" y="552" fill="#17384A" font-size="18" font-weight="600">67.8% of the time</text>
+    <text x="987" y="579" fill="#17384A" font-size="18" font-weight="600">22% fewer major errors</text>
+    <text x="987" y="606" fill="#17384A" font-size="18" font-weight="600">vs GPT-5 Thinking</text>
+    <text x="987" y="633" fill="#A05A31" font-size="15">Positioned above o3-pro</text>
+
+    <text x="1272" y="424" fill="#A05A31" font-size="16" font-weight="700">MAR 2026</text>
+    <text x="1272" y="456" fill="#17384A" font-size="28" font-weight="700">GPT-5.4 Pro</text>
+    <text x="1272" y="486" fill="#53616A" font-size="18">Current Pro flagship</text>
+    <text x="1272" y="525" fill="#17384A" font-size="18" font-weight="600">BrowseComp: 89.3%</text>
+    <text x="1272" y="552" fill="#17384A" font-size="18" font-weight="600">GPQA Diamond: 94.4%</text>
+    <text x="1272" y="579" fill="#17384A" font-size="18" font-weight="600">FrontierMath T4: 38.0%</text>
+    <text x="1272" y="606" fill="#17384A" font-size="18" font-weight="600">ARC-AGI-2: 83.3%</text>
+    <text x="1272" y="633" fill="#A05A31" font-size="15">Separate model, not just</text>
+    <text x="1272" y="654" fill="#A05A31" font-size="15">GPT-5.4 with more effort</text>
+  </g>
+
+  <text x="110" y="732" fill="#17384A" font-size="30" font-weight="700" font-family="Avenir Next, SF Pro Display, Helvetica, Arial, sans-serif">
+    Codex and Coding Line
+  </text>
+  <rect x="110" y="752" width="1380" height="6" rx="3" fill="url(#ink)"/>
+
+  <line x1="170" y1="904" x2="1430" y2="904" stroke="#B8C7CF" stroke-width="8" stroke-linecap="round"/>
+
+  <circle cx="215" cy="904" r="16" fill="#1B5061"/>
+  <circle cx="530" cy="904" r="16" fill="#1B5061"/>
+  <circle cx="845" cy="904" r="16" fill="#1B5061"/>
+  <circle cx="1160" cy="904" r="16" fill="#1B5061"/>
+  <circle cx="1355" cy="904" r="16" fill="#C48D35"/>
+
+  <g filter="url(#soft)">
+    <rect x="110" y="786" width="240" height="242" rx="24" fill="#F5FBFD"/>
+    <rect x="425" y="786" width="240" height="242" rx="24" fill="#F5FBFD"/>
+    <rect x="740" y="786" width="240" height="242" rx="24" fill="#F5FBFD"/>
+    <rect x="1055" y="786" width="240" height="242" rx="24" fill="#F5FBFD"/>
+    <rect x="1280" y="786" width="180" height="242" rx="24" fill="#FFF8EA"/>
+  </g>
+
+  <g font-family="Avenir Next, SF Pro Text, Helvetica, Arial, sans-serif">
+    <text x="132" y="824" fill="#1B5061" font-size="16" font-weight="700">NOV 2025</text>
+    <text x="132" y="856" fill="#17384A" font-size="26" font-weight="700">GPT-5.1-</text>
+    <text x="132" y="886" fill="#17384A" font-size="26" font-weight="700">Codex-Max</text>
+    <text x="132" y="918" fill="#53616A" font-size="18">Long-horizon coding frontier</text>
+    <text x="132" y="954" fill="#17384A" font-size="18" font-weight="600">SWE Verified: 77.9%</text>
+    <text x="132" y="980" fill="#17384A" font-size="18" font-weight="600">SWE-Lancer: 79.9%</text>
+    <text x="132" y="1006" fill="#17384A" font-size="18" font-weight="600">Terminal-Bench: 58.1%</text>
+
+    <text x="447" y="824" fill="#1B5061" font-size="16" font-weight="700">DEC 2025</text>
+    <text x="447" y="856" fill="#17384A" font-size="26" font-weight="700">GPT-5.2-</text>
+    <text x="447" y="886" fill="#17384A" font-size="26" font-weight="700">Codex</text>
+    <text x="447" y="918" fill="#53616A" font-size="18">Agentic coding plus stronger cyber</text>
+    <text x="447" y="954" fill="#17384A" font-size="18" font-weight="600">SWE-Bench Pro: 56.4%</text>
+    <text x="447" y="980" fill="#17384A" font-size="18" font-weight="600">Terminal-Bench: 64.0%</text>
+    <text x="447" y="1006" fill="#17384A" font-size="18" font-weight="600">OSWorld: 38.2%</text>
+
+    <text x="762" y="824" fill="#1B5061" font-size="16" font-weight="700">FEB 2026</text>
+    <text x="762" y="856" fill="#17384A" font-size="26" font-weight="700">GPT-5.3-</text>
+    <text x="762" y="886" fill="#17384A" font-size="26" font-weight="700">Codex</text>
+    <text x="762" y="918" fill="#53616A" font-size="18">Unified coding and knowledge work</text>
+    <text x="762" y="954" fill="#17384A" font-size="18" font-weight="600">SWE-Bench Pro: 56.8%</text>
+    <text x="762" y="980" fill="#17384A" font-size="18" font-weight="600">Terminal-Bench: 77.3%</text>
+    <text x="762" y="1006" fill="#17384A" font-size="18" font-weight="600">GDPval: 70.9%</text>
+
+    <text x="1077" y="824" fill="#1B5061" font-size="16" font-weight="700">MAR 2026</text>
+    <text x="1077" y="856" fill="#17384A" font-size="26" font-weight="700">GPT-5.4</text>
+    <text x="1077" y="886" fill="#17384A" font-size="26" font-weight="700">Thinking</text>
+    <text x="1077" y="918" fill="#53616A" font-size="18">Mainline reasoner with Codex-grade</text>
+    <text x="1077" y="942" fill="#53616A" font-size="18">coding and computer use</text>
+    <text x="1077" y="974" fill="#17384A" font-size="18" font-weight="600">SWE-Bench Pro: 57.7%</text>
+    <text x="1077" y="1000" fill="#17384A" font-size="18" font-weight="600">OSWorld: 75.0%</text>
+    <text x="1077" y="1026" fill="#17384A" font-size="18" font-weight="600">GDPval: 83.0%</text>
+
+    <text x="1302" y="824" fill="#8A622A" font-size="16" font-weight="700">TAKEAWAY</text>
+    <text x="1302" y="856" fill="#17384A" font-size="22" font-weight="700">The newest</text>
+    <text x="1302" y="884" fill="#17384A" font-size="22" font-weight="700">top-end path</text>
+    <text x="1302" y="920" fill="#17384A" font-size="18" font-weight="600">is not o1-pro.</text>
+    <text x="1302" y="949" fill="#17384A" font-size="18" font-weight="600">It is the GPT-5</text>
+    <text x="1302" y="978" fill="#17384A" font-size="18" font-weight="600">Pro / GPT-5.4</text>
+    <text x="1302" y="1007" fill="#17384A" font-size="18" font-weight="600">Pro generation.</text>
+  </g>
+
+  <rect x="110" y="1080" width="1380" height="96" rx="24" fill="#17384A"/>
+  <text x="140" y="1118" fill="#FFF8EF" font-size="20" font-weight="700" font-family="Avenir Next, SF Pro Display, Helvetica, Arial, sans-serif">
+    Sources used
+  </text>
+  <text x="140" y="1148" fill="#D7E7EF" font-size="17" font-family="Avenir Next, SF Pro Text, Helvetica, Arial, sans-serif">
+    OpenAI: Introducing ChatGPT Pro (2024-12-05), Introducing o3 and o4-mini (2025-04-16),
+  </text>
+  <text x="140" y="1172" fill="#D7E7EF" font-size="17" font-family="Avenir Next, SF Pro Text, Helvetica, Arial, sans-serif">
+    Model Release Notes (o3-pro, 2025-06-10), Introducing GPT-5 (2025-08-07),
+    GPT-5.1-Codex-Max (2025-11-19), GPT-5.3-Codex (2026-02-05), GPT-5.4 (2026-03-05)
+  </text>
+</svg>

@@ -119,7 +119,7 @@ echo ""
 # ═══════════════════════════════════════════════════════════════════════════
 echo "── Test 3: Hook Scripts ──"
 
-HOOKS=(session-load session-save pre-compact-save check-references check-orphans plan-review codex-pretool-guard)
+HOOKS=(session-load session-save pre-compact-save check-references check-orphans plan-review codex-pretool-guard protect-files require-tests-for-pr log-commands)
 for hook in "${HOOKS[@]}"; do
   HFILE="$AGENTS_DIR/hooks/$hook.sh"
   if [ ! -f "$HFILE" ]; then
@@ -244,6 +244,48 @@ else
   fail ".agents/hooks/install.sh merge regression test failed"
 fi
 rm -rf "$HOOKS_HOME"
+
+if bash -c "cd '$FRAMEWORK_DIR/docs' && source '$AGENTS_DIR/tools/canuto-memory.sh' && [ \"\$(canuto_project_dir)\" = '$FRAMEWORK_DIR' ] && [ \"\$(canuto_project_slug)\" = 'canuto-framework-v1' ]" >/dev/null 2>&1; then
+  pass "canuto-memory root resolution works from subdirectories"
+else
+  fail "canuto-memory root resolution failed from subdirectories"
+fi
+
+if bash -c "source '$AGENTS_DIR/tools/codex-common.sh' && codex_run_with_timeout 2 bash -lc 'exit 0'" >/dev/null 2>&1; then
+  pass "codex-common timeout wrapper works"
+else
+  fail "codex-common timeout wrapper failed"
+fi
+
+PORTABILITY_HOME="$(mktemp -d)"
+mkdir -p "$PORTABILITY_HOME/.canuto/vault"
+cat > "$PORTABILITY_HOME/.canuto/vault/A.md" <<'EOF'
+[[B]]
+[Local](B.md)
+EOF
+cat > "$PORTABILITY_HOME/.canuto/vault/B.md" <<'EOF'
+[[A]]
+EOF
+
+if HOME="$PORTABILITY_HOME" CLAUDE_PROJECT_DIR="$FRAMEWORK_DIR" bash "$AGENTS_DIR/hooks/check-references.sh" >/dev/null 2>&1; then
+  pass "check-references.sh portable runtime"
+else
+  fail "check-references.sh portable runtime failed"
+fi
+
+if HOME="$PORTABILITY_HOME" CLAUDE_PROJECT_DIR="$FRAMEWORK_DIR" bash "$AGENTS_DIR/hooks/check-orphans.sh" >/dev/null 2>&1; then
+  pass "check-orphans.sh portable runtime"
+else
+  fail "check-orphans.sh portable runtime failed"
+fi
+
+rm -rf "$PORTABILITY_HOME"
+
+if CLAUDE_PROJECT_DIR="$FRAMEWORK_DIR" bash "$AGENTS_DIR/tools/vault-sync.sh" >/dev/null 2>&1; then
+  pass "vault-sync.sh no-op path"
+else
+  fail "vault-sync.sh no-op path failed"
+fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════

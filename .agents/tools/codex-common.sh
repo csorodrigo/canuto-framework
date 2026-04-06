@@ -104,7 +104,7 @@ codex_review_markdown_path() {
 
 codex_context_package_valid() {
   local package_path="${1:-}"
-  local max_age_seconds="${2:-14400}"
+  local max_age_seconds="${2:-${CODEX_CONTEXT_MAX_AGE:-14400}}"
 
   [ -n "$package_path" ] || return 1
   [ -f "$package_path" ] || return 1
@@ -114,10 +114,51 @@ codex_context_package_valid() {
   local now_ts
   local file_ts
   now_ts=$(date +%s)
-  file_ts=$(stat -f %m "$package_path" 2>/dev/null || echo 0)
+  if [[ "$(uname)" == "Darwin" ]]; then
+    file_ts=$(stat -f %m "$package_path" 2>/dev/null || echo 0)
+  else
+    file_ts=$(stat -c %Y "$package_path" 2>/dev/null || echo 0)
+  fi
 
   [ "$file_ts" -gt 0 ] || return 1
   [ $((now_ts - file_ts)) -le "$max_age_seconds" ] || return 1
+}
+
+codex_run_with_timeout() {
+  local timeout_seconds="${1:-0}"
+  shift
+
+  if [ "${timeout_seconds:-0}" -le 0 ] 2>/dev/null; then
+    "$@"
+    return $?
+  fi
+
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$timeout_seconds" "$@"
+    return $?
+  fi
+
+  python3 -c '
+import subprocess
+import sys
+
+timeout_seconds = float(sys.argv[1])
+cmd = sys.argv[2:]
+
+try:
+    completed = subprocess.run(
+        cmd,
+        stdin=sys.stdin,
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+        timeout=timeout_seconds,
+        check=False,
+    )
+except subprocess.TimeoutExpired:
+    raise SystemExit(124)
+
+raise SystemExit(completed.returncode)
+' "$timeout_seconds" "$@"
 }
 
 codex_reviewer_args() {
@@ -155,6 +196,7 @@ codex_reviewer_candidates() {
   else
     printf '%s\n' "model:o1-pro"
   fi
+  printf '%s\n' "profile:maestro"
   printf '%s\n' "model:o3"
   printf '%s\n' "model:gpt-5-codex"
 }
@@ -227,6 +269,7 @@ codex_run_reviewer() {
   while IFS= read -r candidate; do
     [ -n "$candidate" ] || continue
     candidate_error_file=$(mktemp)
+    local reviewer_timeout="${CODEX_REVIEWER_TIMEOUT:-120}"
     cmd=(codex exec -C "$exec_dir" -s read-only --skip-git-repo-check --ephemeral -c 'model_reasoning_effort="high"')
     case "$candidate" in
       profile:*)
@@ -238,12 +281,18 @@ codex_run_reviewer() {
     esac
     cmd+=(--output-schema "$schema_file" -o "$output_file" -)
 
-    if "${cmd[@]}" < "$prompt_file" >/dev/null 2>"$candidate_error_file"; then
+    if codex_run_with_timeout "$reviewer_timeout" "${cmd[@]}" < "$prompt_file" >/dev/null 2>"$candidate_error_file"; then
       printf '%s\n' "$candidate" > "$used_file"
       if [ -s "$candidate_error_file" ]; then
         cat "$candidate_error_file" > "$error_file"
       else
         : > "$error_file"
+      fi
+      # C9: notify user when fallback occurred
+      local preferred
+      preferred=$(codex_reviewer_preferred_candidate 2>/dev/null || true)
+      if [ -n "$preferred" ] && [ "$candidate" != "$preferred" ]; then
+        printf '[codex-reviewer] FALLBACK: preferred %s unavailable, used %s instead\n' "$preferred" "$candidate" >&2
       fi
       rm -f "$candidate_error_file"
       [ -n "$local_error_file" ] && rm -f "$local_error_file"
