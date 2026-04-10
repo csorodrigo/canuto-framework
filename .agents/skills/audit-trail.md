@@ -13,6 +13,7 @@ inspiration: Paperclip — immutable audit logging with complete mutation histor
 - Every rework event (log the re-implementation trigger)
 - Every escalation (log the issue and resolution)
 - Session start and end (log lifecycle events)
+- Every monitor lifecycle event (log start, alerts, and stop)
 
 **Not for:**
 - Individual code changes (that's git history)
@@ -43,6 +44,9 @@ This creates a forensic timeline of the session, enabling post-mortem analysis a
 | Flag | `FLAG` | Cross-persona flag emitted |
 | Budget warning | `BUDGET` | Token budget threshold reached |
 | Instinct | `INSTINCT` | New instinct extracted or reinforced |
+| Monitor start | `MONITOR_START` | Background process monitoring begins |
+| Monitor alert | `MONITOR_ALERT` | Pattern-matched alert during monitoring |
+| Monitor stop | `MONITOR_STOP` | Background process monitoring ends |
 
 ### Audit Entry Format
 

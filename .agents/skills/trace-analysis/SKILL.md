@@ -37,16 +37,17 @@ Only run when `CANUTO_TRACE_ANALYSIS=1` is set (environment or project config). 
 | Metrics snapshot | `vault/metrics/{session-date}-metrics.md` | Contains action counts, rework, file lists. |
 | Session note | `vault/sessions/{session-date}.md` | Use "What Was Done", "Rework", "Issues" for context. |
 | Review scores template | `vault/metrics/review-scores-template.md` | Dataview queries show scores and trends; do **not** expect JSON. |
+| Monitor alerts | `vault/audit/{session-date}-MONITOR_ALERT-*.md` | Only present when monitoring was active during the session. |
 
 If any file is missing, note it and continue. Missing all inputs ⇒ emit digest with `signals-found: 0` (graceful degradation).
 
 ## Signal Categories
 
-1. **playbook-gap** — Process or instruction missing/ambiguous (e.g., repeated clarification requests, plan mismatch). Use `references/improvement-patterns.md` for triggers.
-2. **blind-spot-gap** — Domain pitfalls observed (bugs repeated, reviewer flags). Use `references/blind-spot-generator.md` to create candidates without duplicates.
+1. **playbook-gap** — Process or instruction missing/ambiguous (e.g., repeated clarification requests, plan mismatch). Use `references/improvement-patterns.md` for triggers. Repeated build errors surfaced by monitor alerts suggest missing build configuration documentation → treat as playbook-gap evidence.
+2. **blind-spot-gap** — Domain pitfalls observed (bugs repeated, reviewer flags). Use `references/blind-spot-generator.md` to create candidates without duplicates. Monitor-detected crashes or memory warnings imply undocumented runtime constraints, so tag them here.
 3. **instinct-candidate** — Rework loops on same files, repeated debugging journeys, patterns suitable for instincts.
-4. **routing-misfire** — Task sizing or persona ordering off (e.g., reroutes, 2+ re-plans, diff touches 5+ files for S scope).
-5. **skill-gap** — Manual multi-step workflows repeated 3+ times or identical commands across sessions (see `references/skill-proposer.md`).
+4. **routing-misfire** — Task sizing or persona ordering off (e.g., reroutes, 2+ re-plans, diff touches 5+ files for S scope). Monitor test failure alerts on S-sized tasks indicate undersized planning → classify as routing-misfire.
+5. **skill-gap** — Manual multi-step workflows repeated 3+ times or identical commands across sessions (see `references/skill-proposer.md`). If users keep requesting manual monitoring for the same process type, propose automation as a new skill-gap.
 
 For each signal, capture: evidence (quote/link), severity, suggested improvement.
 

@@ -95,6 +95,24 @@ Tracked per file per session:
 
 ---
 
+### 5. Monitor Metrics
+
+Tracked per session when monitoring is active:
+
+| Metric | How It's Measured | Collected By |
+|--------|-------------------|---------------|
+| Monitor sessions | Count of monitor sessions started | Maestro |
+| Alerts by severity | Count per severity level (info/warn/error/critical) | Maestro |
+| Token budget consumed | Tokens used by monitoring vs budget | Maestro |
+| Monitor-triggered activations | Times a monitor alert led to persona activation | Maestro |
+
+**Healthy signals:**
+- Alerts per session < 10 (too many = noisy profiles).
+- Token budget utilization < 80%.
+- Critical alerts = 0 in stable development.
+
+---
+
 ## Storage
 
 ### Vault: `~/.canuto/vault/projects/{project-slug}/metrics/`
@@ -116,6 +134,13 @@ persona-transitions: 8
 escalations: 0
 format-compliance: 100
 scope-violations: 0
+monitor-sessions: 1
+monitor-alerts-info: 2
+monitor-alerts-warn: 1
+monitor-alerts-error: 0
+monitor-alerts-critical: 0
+monitor-token-budget-used: 2400
+monitor-triggered-activations: 0
 tags:
   - metric
 ---
@@ -139,6 +164,12 @@ tags:
 ## Compliance
 - Format compliance: 4/4 personas compliant
 - Scope violations: 0
+
+## Monitor
+- Sessions: 1 (build-monitor, 45 min)
+- Alerts: 2 info, 1 warn, 0 error, 0 critical
+- Token budget: 2,400/5,000 (48%)
+- Triggered activations: 0
 ```
 
 Naming convention: `metrics/YYYY-MM-DD-metrics.md`
@@ -151,7 +182,7 @@ Query metrics via `bases/metrics-dashboard.base` for aggregated summaries (Sum, 
 
 ### Collecting Metrics
 
-1. **During the session**: Maestro keeps a running tally of transitions, escalations, file modifications, and provider usage.
+1. **During the session**: Maestro keeps a running tally of transitions, escalations, file modifications, provider usage, and — when monitoring is active — monitor session counts, alert tallies by severity, and token budget consumption.
 2. **After Reviewer's verdict**: Maestro records quality metrics.
 3. **After Tester's report**: Maestro records test metrics.
 4. **At session end**: Maestro creates a metric note in `vault/metrics/YYYY-MM-DD-metrics.md` and marks goals.
