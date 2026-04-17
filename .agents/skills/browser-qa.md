@@ -183,3 +183,31 @@ The `--connect` flag reuses the session you already have open instead of launchi
 - **gstack /careful** → ative antes do /qa em ambientes de staging (proteção contra deleção acidental)
 - **knowledge-ingest** → dados extraídos via Chrome DevTools MCP podem ser ingeridos como vault notes
 - **defuddle** → para páginas públicas, prefira `defuddle` (mais simples, sem browser necessário)
+
+---
+
+## Gemini multimodal integration
+
+Este skill analisa screenshots ou consome mídia visual. Use **Gemini 3.1-pro-preview**
+como analisador visual primário — OCR + layout understanding são superiores ao que
+Claude isolado faz com imagens (POC 2026-04-17 validou coerência).
+
+```
+# 1. Capture via /browse, /gstack ou Playwright (Codex) — nunca screencapture
+#    automático sem mask (risco PII — ver gemini-routing.md)
+# 2. Copie a imagem pra dentro do workspace (gemini-cli bloqueia /tmp)
+cp /path/to/shot.png .context/shot.png
+
+# 3. Analise via Gemini multimodal
+mcp__gemini__ask-gemini({
+  prompt: "@.context/shot.png [análise específica — a11y, spacing, hierarquia,
+           overflow, etc.]. Output em markdown estruturado.",
+  model: "gemini-3.1-pro-preview"
+})
+
+# 4. Delete imediatamente
+rm .context/shot.png
+```
+
+Gemini faz **ver** (OCR objetivo). Claude Opus faz **julgar** (taste).
+Ver `.agents/skills/gemini-routing.md` pros gotchas.
