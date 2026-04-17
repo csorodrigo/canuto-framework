@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const {
   buildProjectSummary,
   buildInventory,
+  detectSkillBreakages,
   generateReport,
   parseCodexLogMeta,
   parseCodexLogRecord,
@@ -244,6 +245,152 @@ test('parseCodexLogRecord ignores injected skill list and only counts real skill
 
   assert.deepEqual(session.skill_reads, ['monitor']);
   assert.equal(session.skill_reads.length, 1);
+});
+
+test('detectSkillBreakages recognizes concrete skill error evidence', () => {
+  const cases = [
+    {
+      text: 'ENOENT: .agents/skills/co-review/SKILL.md: No such file or directory',
+      expected: 'skill-file-missing',
+    },
+    {
+      text: 'Failed to parse YAML at /root/.agents/skills/health-check/SKILL.md',
+      expected: 'skill-parse-failure',
+    },
+    {
+      text: 'Error: Skill not found: co-review',
+      expected: 'skill-not-found',
+    },
+    {
+      text: 'Unable to read /home/user/.agents/skills/vault-sync/SKILL.md: permission denied',
+      expected: 'skill-read-failure',
+    },
+  ];
+
+  for (const item of cases) {
+    assert.deepEqual(detectSkillBreakages(item.text), [item.expected]);
+  }
+});
+
+test('detectSkillBreakages recognizes flat missing skill path after ENOENT', () => {
+  assert.deepEqual(
+    detectSkillBreakages('ENOENT: .agents/skills/health-check.md: No such file or directory'),
+    ['skill-file-missing'],
+  );
+});
+
+test('detectSkillBreakages recognizes flat missing skill path after open failure', () => {
+  assert.deepEqual(
+    detectSkillBreakages("Error: ENOENT: no such file or directory, open '/repo/.agents/skills/codex-pr-writer.md'"),
+    ['skill-file-missing'],
+  );
+});
+
+test('detectSkillBreakages recognizes reverse-order directory parse failure', () => {
+  assert.deepEqual(
+    detectSkillBreakages('/repo/.agents/skills/co-review/SKILL.md: YAMLException: bad indentation'),
+    ['skill-parse-failure'],
+  );
+});
+
+test('detectSkillBreakages recognizes reverse-order flat parse failure', () => {
+  assert.deepEqual(
+    detectSkillBreakages('/repo/.agents/skills/health-check.md: SyntaxError: Unexpected token'),
+    ['skill-parse-failure'],
+  );
+});
+
+test('detectSkillBreakages ignores ambient skill mentions', () => {
+  const cases = [
+    'I will check if skills are missing the latest co-review update',
+    'The skill parse tree was rebuilt',
+    'Skill not found in the cached index, but will re-fetch on next run',
+    '## Skills\n- co-review\n- codex-pr-writer',
+  ];
+
+  for (const text of cases) {
+    assert.deepEqual(detectSkillBreakages(text), []);
+  }
+});
+
+test('detectProbableSkillMatches requires score four or higher', () => {
+  const { detectProbableSkillMatches } = require('./framework-session-audit-lib');
+  const scoreThreeCatalog = [
+    {
+      id: 'score-three',
+      trigger_phrases: ['alpha beta gamma'],
+    },
+  ];
+  const scoreFourCatalog = [
+    {
+      id: 'score-four',
+      trigger_phrases: ['alpha beta gamma delta'],
+    },
+  ];
+
+  assert.deepEqual(
+    detectProbableSkillMatches(scoreThreeCatalog, ['alpha gamma beta']).map((match) => match.skill_id),
+    [],
+  );
+  assert.deepEqual(
+    detectProbableSkillMatches(scoreFourCatalog, ['alpha delta gamma beta']).map((match) => match.skill_id),
+    ['score-four'],
+  );
+});
+
+test('buildProjectSummary excludes project-level skill matches that were read in another session', () => {
+  const tempDir = makeTempDir();
+  const project = makeBucketProject(tempDir, 'project-read-skill', {
+    sessionCapturePresent: true,
+    obsidianHealthcheckPresent: true,
+  });
+  project.skill_catalog = [{ id: 'co-review', trigger_phrases: ['co review'] }];
+
+  const summary = buildProjectSummary(
+    project,
+    [
+      makeBucketSession({
+        session_id: 'match-only',
+        captured_to_vault: true,
+        probable_skill_matches: [{ skill_id: 'co-review', score: 4, matched_phrase: 'co review' }],
+      }),
+      makeBucketSession({
+        session_id: 'read-skill',
+        captured_to_vault: true,
+        skill_reads: ['co-review'],
+      }),
+    ],
+    200,
+    '2026-04-17T00:00:00.000Z',
+  );
+
+  assert.deepEqual(summary.top_skills_missed, []);
+  assert.equal(summary.skill_status, 'healthy');
+});
+
+test('buildProjectSummary counts project-level skill matches that were never read', () => {
+  const tempDir = makeTempDir();
+  const project = makeBucketProject(tempDir, 'project-missed-skill', {
+    sessionCapturePresent: true,
+    obsidianHealthcheckPresent: true,
+  });
+  project.skill_catalog = [{ id: 'co-review', trigger_phrases: ['co review'] }];
+
+  const summary = buildProjectSummary(
+    project,
+    [
+      makeBucketSession({
+        session_id: 'match-only',
+        captured_to_vault: true,
+        probable_skill_matches: [{ skill_id: 'co-review', score: 4, matched_phrase: 'co review' }],
+      }),
+    ],
+    200,
+    '2026-04-17T00:00:00.000Z',
+  );
+
+  assert.deepEqual(summary.top_skills_missed.map((item) => item.skill_id), ['co-review']);
+  assert.equal(summary.top_skills_missed[0].count, 1);
 });
 
 test('buildInventory marks slug collisions explicitly', () => {
@@ -669,6 +816,7 @@ test('writeAuditOutputs keeps Project buckets report table in stable taxonomy or
     bucketRows.map((line) => line.split('|')[1].trim()),
     ['never-installed', 'dormant', 'pre-v1.8', 'v1.8-failing', 'healthy'],
   );
+  assert.ok(firstReport.includes('Breakage and probable-match signals are heuristic; verify specific counts against source logs before acting.'));
   assert.equal(firstReport, secondReport);
 });
 

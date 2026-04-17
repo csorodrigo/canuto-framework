@@ -904,7 +904,7 @@ function detectProbableSkillMatches(skillCatalog, corpusParts) {
       skill_id: skill.id,
       ...scoreSkillMatch(skill, corpusText, corpusTokens),
     }))
-    .filter((match) => match.score >= 2)
+    .filter((match) => match.score >= 4)
     .sort((left, right) => right.score - left.score || left.skill_id.localeCompare(right.skill_id))
     .slice(0, 5);
 }
@@ -932,27 +932,39 @@ function extractSkillReadsFromCommand(command, catalogByPath) {
 }
 
 function detectSkillBreakages(text) {
-  const normalized = normalizeText(text);
-  const messages = [];
-  if (normalized.includes('skill') && normalized.includes('missing')) {
-    messages.push('skill-missing');
+  const breakages = new Set();
+  const patterns = [
+    {
+      type: 'skill-file-missing',
+      regex:
+        /(?:\.agents\/skills\/[\w-]+(?:\/(?:SKILL\.md|[\w-]+\.md)|\.md).*(?:ENOENT|No such file or directory)|(?:ENOENT|No such file or directory).*\.agents\/skills\/[\w-]+(?:\/(?:SKILL\.md|[\w-]+\.md)|\.md))/i,
+    },
+    {
+      type: 'skill-parse-failure',
+      regex:
+        /(?:(?:Failed to parse|YAMLException|Unexpected token|SyntaxError).*\.agents\/skills\/|\.agents\/skills\/.*(?:YAMLException|SyntaxError|Unexpected token|Failed to parse))/i,
+    },
+    {
+      type: 'skill-not-found',
+      regex:
+        /(?:Skill not found:\s*['"]?[\w-]+|Unknown skill:?\s*['"]?[\w-]+|Could not resolve skill:?\s*['"]?[\w-]+|Skill ['"]?[\w-]+['"]? does not exist)/i,
+    },
+    {
+      type: 'skill-read-failure',
+      regex:
+        /(?:(?:cannot read|unable to read|permission denied).*\.agents\/skills\/[\w-]+|\.agents\/skills\/[\w-]+.*(?:cannot read|unable to read|permission denied))/i,
+    },
+  ];
+
+  for (const line of String(text || '').split(/\r?\n/)) {
+    for (const pattern of patterns) {
+      if (pattern.regex.test(line)) {
+        breakages.add(pattern.type);
+      }
+    }
   }
-  if (normalized.includes('skill') && normalized.includes('not found')) {
-    messages.push('skill-not-found');
-  }
-  if (normalized.includes('skill') && normalized.includes('cannot be read')) {
-    messages.push('skill-read-failure');
-  }
-  if (normalized.includes('skill') && normalized.includes('parse')) {
-    messages.push('skill-parse-failure');
-  }
-  if (normalized.includes('no such file or directory') && normalized.includes('skill')) {
-    messages.push('skill-file-missing');
-  }
-  if (normalized.includes('skill.md') && normalized.includes('no such file or directory')) {
-    messages.push('skill-file-missing');
-  }
-  return unique(messages);
+
+  return [...breakages];
 }
 
 function cleanUserMessage(text) {
@@ -2190,11 +2202,11 @@ function buildProjectSummary(project, allSessions, sessionLimit, generatedAt = n
     pendingSyncOrphanRatio,
   });
   const missEntries = [];
-  const readSetBySession = analyzedSessions.map((session) => new Set(session.skill_reads || []));
+  const projectSkillReadSet = new Set(analyzedSessions.flatMap((session) => session.skill_reads || []));
 
-  analyzedSessions.forEach((session, index) => {
+  analyzedSessions.forEach((session) => {
     for (const match of session.probable_skill_matches || []) {
-      if (!readSetBySession[index].has(match.skill_id)) {
+      if (match.score >= 4 && !projectSkillReadSet.has(match.skill_id)) {
         missEntries.push({
           skill_id: match.skill_id,
           score: match.score,
@@ -2913,6 +2925,7 @@ function generateReport({ generatedAt, inventory, projectSummaries, rankings, op
     `- Codex log roots: ${options.codexLogRoots.map((root) => `\`${root}\``).join(', ')}`,
     `- Session limit per project: ${options.sessionLimit}`,
     `- Analysis mode: ${options.analysisMode}`,
+    '- Note: Breakage and probable-match signals are heuristic; verify specific counts against source logs before acting.',
     '',
     '## Project buckets',
     '',
@@ -3476,6 +3489,7 @@ module.exports = {
   collectClaudeTelemetry,
   collectCodexLogMetas,
   collectProjectSessions,
+  detectSkillBreakages,
   detectProbableSkillMatches,
   generateCostDashboardReport,
   generateReport,
