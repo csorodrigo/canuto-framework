@@ -31,6 +31,27 @@ Generates a `project-index.json` (deep scan of the current project) and an `onbo
 
 ## What It Does
 
+### Phase 0 (NEW): Gemini pré-digest of repo
+
+Before the Opus-driven phases below, route the raw "read the whole repo" step to Gemini
+to save ~70-90% of Opus tokens (see `gemini-routing.md`):
+
+```
+mcp__gemini__ask-gemini({
+  prompt: "@./ Summarize repo structure, stack, entry points, module boundaries in a
+           dense ~100-line digest. Highlight anything unusual (monorepo layout,
+           multi-runtime, custom build). Output markdown.",
+  model: "gemini-3.1-pro-preview"
+})
+→ write to .agents/tmp/gemini-digest-YYYY-MM-DD.md
+```
+
+Then phases 1-2 consume the digest. Claude Opus only reads the digest + the specific
+files Gemini flagged as "unusual" — never the whole tree.
+
+Gemini gotchas still apply: serialize calls, copy `@file` into workspace first if
+you need multimodal. See `.agents/skills/gemini-routing.md`.
+
 ### Phase 1: Deep Project Scan → `project-index.json`
 
 Scans the current project directory and generates a rich index at `~/.canuto/vault/projects/{slug}/project-index.json`:

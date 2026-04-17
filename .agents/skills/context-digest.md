@@ -25,6 +25,31 @@ Opus plans from digests. Codex receives digests in context packages.
 
 **10x token savings per file read.**
 
+## Who generates the digest?
+
+**Primary: Gemini** (`gemini-3.1-pro-preview`) — long-context `@folder` makes this
+the cheapest path. Flow:
+
+```
+mcp__gemini__ask-gemini({
+  prompt: "@src/auth/ Produce a digest in the format specified at
+           .agents/skills/context-digest.md (Public API, Key Types, Dependencies,
+           Invariants, Gotchas, 5-line summary). Output markdown only.",
+  model: "gemini-3.1-pro-preview"
+})
+→ write the returned markdown to .agents/vault/digests/{slug}.md
+```
+
+**Fallback: Codex** via `mcp__codex-coder__spawn_agent` with a context-preload pointing
+at the target directory. Use when Gemini quota is exhausted or the repo has auth-sensitive
+files that should not cross provider boundaries.
+
+**Never use Opus** to generate digests — that defeats the economy.
+
+Gemini gotchas: serialize calls (stdio single-connection), copy files into the workspace
+before `@` (sandbox blocks `/tmp`), and avoid `gemini-2.5-pro` (banned per POC).
+See `.agents/skills/gemini-routing.md`.
+
 ---
 
 ## Digest Format
