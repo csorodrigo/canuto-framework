@@ -118,3 +118,34 @@ This is bad because: the secret is committed to git history permanently. Even re
 - If you find a secret in committed code, flag it immediately. Do not just remove it — the git history still has it.
 - Never generate or suggest real API keys or passwords, even as examples. Use obvious placeholders like `your-api-key-here`.
 - When in doubt about whether something is sensitive, treat it as sensitive.
+
+---
+
+## Gemini integration — Triple security review (FASE 2a+)
+
+Pra diffs tocando auth, crypto, payment, session tokens, RLS policies, secrets
+handling → **triple review obrigatório** (cross-model catches diferentes vulns):
+
+```
+Stream 1 — Codex reviewer (adversarial, execution-level vulns):
+  mcp__codex-reviewer__spawn_agent({
+    prompt: "Security review. Focus: injection, auth bypass, race conditions,
+             timing attacks. [DIFF INLINE]"
+  })
+
+Stream 2 — Gemini 3.1-pro-preview (cross-model + long-context flow tracing):
+  mcp__gemini__ask-gemini({
+    prompt: "@./ Trace the full end-to-end data flow for this change. Quem
+             toca esse dado antes/depois? Há boundary confuso? [DIFF INLINE]",
+    model: "gemini-3.1-pro-preview"
+  })
+
+Stream 3 — Opus (severity judgment, what ships):
+  Claude avalia severidade e decide qual bloqueia ship vs. qual vira backlog.
+```
+
+**Gate de aprovação:** overall >= 7.0 AND no single dimension <= 3 em cada
+stream. Se 2+ streams flagam o mesmo issue → mandatory fix. Se apenas 1 flaga
+→ evaluate (pode ser insight genuíno ou ruído).
+
+Ver `.agents/skills/gemini-routing.md` pros gotchas.

@@ -187,3 +187,20 @@ Instincts with `low` confidence not seen in 5+ sessions:
 - **Instinct IDs are never reused.** If I-005 is pruned, the next instinct is still I-031 (or whatever comes next).
 
 → **Examples** (good/bad instinct extraction, reinforcement): read `references/examples.md`
+
+---
+
+## Gemini integration — Bulk classify (FASE 2a+)
+
+Quando este skill precisa classificar/triaga um volume de itens (instincts,
+notas, audits), delegue ao slot `bulk-classify` via Gemini flash-lite:
+
+```
+mcp__gemini__ask-gemini({
+  prompt: "Classifique cada linha em uma label do conjunto {X, Y, Z}:\n<itens>",
+  model: "gemini-3.1-flash-lite-preview"
+})
+```
+
+Flash-lite tem quota separada (bar Flash-Lite no TUI) — efetivamente grátis até
+1k/dia. Ver `.agents/skills/bulk-classify.md` pro padrão completo.
