@@ -29,9 +29,9 @@ Enable the Maestro to orchestrate multiple AI providers for different personas, 
 | Tier | Role | Default Provider | Model | MCP Tool | Can Delegate? |
 |------|------|-----------------|-------|----------|---------------|
 | tier-1 | Strategic (Maestro, Architect, Contextualizer) | Active runtime (`claude` by default, `codex` in direct Codex sessions) | opus / reviewer profile | — | No — stays on the active runtime |
-| tier-2 | Coder | Codex | gpt-5-codex | `mcp__codex-coder__spawn_agent` | Yes — writes code in filesystem |
-| tier-2 | Reviewer | Codex | reviewer profile (`o1-pro` when supported) | `mcp__codex-reviewer__spawn_agent` | Yes — deep self-review (cross-model) |
-| tier-2 | Tester, Debugger | Codex | gpt-5-codex | `mcp__codex-coder__spawn_agent` | Yes — can use Codex or Claude |
+| tier-2 | Coder | Codex | gpt-5.4 (reasoning: high) | `mcp__codex-coder__spawn_agent` | Yes — writes code in filesystem |
+| tier-2 | Reviewer | Codex | reviewer profile (`gpt-5.4`, reasoning: high) | `mcp__codex-reviewer__spawn_agent` | Yes — deep self-review (cross-model) |
+| tier-2 | Tester, Debugger | Codex | gpt-5.4 (reasoning: high) | `mcp__codex-coder__spawn_agent` | Yes — can use Codex or Claude |
 
 ---
 
@@ -74,7 +74,7 @@ When Maestro delegates to a tier-2 persona:
    })
    ```
 
-4. **Codex writes code directly in filesystem** (gpt-5-codex).
+4. **Codex writes code directly in filesystem** (gpt-5.4 (reasoning: high)).
 
 5. **Post-code**: Opus reads `git diff`, then triggers Code Review via `mcp__codex-reviewer__spawn_agent` (reviewer profile self-review).
 
@@ -105,22 +105,22 @@ When Maestro delegates to a tier-2 persona:
    - If the output is malformed, retry once with a clarification prompt.
    - If still malformed, fall back to Claude for that task.
 
-### 3. Auto-Escalation: gpt-5-codex → reviewer profile
+### 3. Auto-Escalation: gpt-5.4 (reasoning: high) → reviewer profile
 
-When `codex-coder` (gpt-5-codex) fails a task:
+When `codex-coder` (gpt-5.4 (reasoning: high)) fails a task:
 
 | Failure Type | Detection | Action |
 |-------------|-----------|--------|
 | Tests fail after code | Test runner reports failures | Re-attempt with `/test-fix` loop (3 iterations) |
 | Malformed output | Output doesn't match expected format | Retry once with clarified prompt |
-| Timeout | No response in 120s | Escalate to o1-pro |
-| Logic error | Review catches fundamental flaw | Escalate to o1-pro with error context |
+| Timeout | No response in 120s | Escalate to reasoning: xhigh (architect profile) |
+| Logic error | Review catches fundamental flaw | Escalate to reasoning: xhigh (architect profile) with error context |
 
 **Escalation procedure:**
-1. Collect: original prompt + gpt-5-codex's output + error/failure details
+1. Collect: original prompt + gpt-5.4 (reasoning: high)'s output + error/failure details
 2. Send to `mcp__codex-reviewer__spawn_agent` (reviewer profile) with escalation tag:
    ```
-   [ESCALATION: gpt-5-codex -> reviewer profile]
+   [ESCALATION: gpt-5.4 (reasoning: high) -> reviewer profile]
    The fast model failed this task. Use deeper reasoning than the coding pass.
 
    ## Original Task
@@ -129,7 +129,7 @@ When `codex-coder` (gpt-5-codex) fails a task:
    ## What Failed
    {failure_details}
 
-   ## gpt-5-codex's Attempt
+   ## gpt-5.4 (reasoning: high)'s Attempt
    {codex_output_or_diff}
 
    Please provide the correct implementation.
@@ -137,12 +137,12 @@ When `codex-coder` (gpt-5-codex) fails a task:
 3. Apply the reviewer guidance
 4. Log escalation in session metrics
 
-**Cost note:** reviewer-grade paths are more expensive. Only escalate after gpt-5-codex genuinely fails.
+**Cost note:** reviewer-grade paths are more expensive. Only escalate after gpt-5.4 (reasoning: high) genuinely fails.
 
 ### 4. Fallback Strategy
 
 ```
-codex-coder MCP (gpt-5-codex) -> escalate to codex-reviewer MCP (reviewer profile) -> CCB ask with active Codex session -> Claude-only
+codex-coder MCP (gpt-5.4 (reasoning: high)) -> escalate to codex-reviewer MCP (reviewer profile) -> CCB ask with active Codex session -> Claude-only
 ```
 
 Maestro logs every fallback and escalation in the session summary.

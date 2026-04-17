@@ -94,7 +94,7 @@ Maestro → Architect → Coder → Tester → Reviewer
 ## Runtime Maestro
 
 - Claude session: Claude Opus remains the Maestro and keeps the existing orchestration flow.
-- Direct Codex session: launch `bash .agents/tools/codex-maestro.sh` and Codex becomes the Maestro using `~/.codex/config.toml` profile `maestro` (default target `o1-pro` when supported).
+- Direct Codex session: launch `bash .agents/tools/codex-maestro.sh` and Codex becomes the Maestro using `~/.codex/config.toml` profile `maestro` (target `gpt-5.4` with reasoning: xhigh).
 - Cross-runtime handoff: `context-package.md` now carries a persisted handoff envelope (`task_id`, `goal`, `constraints`, `done_definition`, `thread_id`) into the vault so Claude and Codex resume with less reread.
 
 ## Quick Start

@@ -277,7 +277,7 @@ EOF
 
   local review_ok=false
   if [ "$review_tier" = "fast" ]; then
-    # Fast review: use gpt-5-codex with low reasoning instead of o1-pro
+    # Fast review: use gpt-5.4 with low reasoning instead of reviewer profile
     local fast_cmd=(codex exec -C "$ROOT_DIR" -s read-only --skip-git-repo-check --ephemeral --profile fast -c 'model_reasoning_effort="low"' --output-schema "$schema_file" -o "$output_file" -)
     if "${fast_cmd[@]}" < "$prompt_file" >/dev/null 2>&1; then
       review_ok=true

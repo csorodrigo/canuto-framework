@@ -1,6 +1,6 @@
 ---
 name: co-plan
-description: Official plan-review gate through the Codex reviewer path (reviewer profile; defaults to o1-pro when supported).
+description: Official plan-review gate through the Codex reviewer path (reviewer profile — `gpt-5.4` with reasoning: high).
 ---
 
 # Co-Plan
@@ -39,8 +39,8 @@ THE PLAN:
    - `codex exec --profile reviewer`
    - `/ask codex` only when an active CCB Codex session exists for this workspace
    - Claude-only review last
-6. Never claim `o1-pro` ran unless the official reviewer MCP or `--profile reviewer`
-   path actually ran with that model.
+6. Never claim the reviewer profile ran unless the official reviewer MCP or `--profile reviewer`
+   path actually ran.
 
 ## Required Output
 

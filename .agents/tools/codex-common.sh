@@ -166,7 +166,7 @@ codex_reviewer_args() {
   if [ -f "$config_toml" ] && grep -q '\[profiles\.reviewer\]' "$config_toml" 2>/dev/null; then
     printf '%s\n' "--profile" "reviewer"
   else
-    printf '%s\n' "-m" "o1-pro"
+    printf '%s\n' "-m" "gpt-5.4"
   fi
 }
 
@@ -194,11 +194,10 @@ codex_reviewer_candidates() {
   if [ -f "$config_toml" ] && grep -q '\[profiles\.reviewer\]' "$config_toml" 2>/dev/null; then
     printf '%s\n' "profile:reviewer"
   else
-    printf '%s\n' "model:o1-pro"
+    printf '%s\n' "model:gpt-5.4"
   fi
   printf '%s\n' "profile:maestro"
-  printf '%s\n' "model:o3"
-  printf '%s\n' "model:gpt-5-codex"
+  printf '%s\n' "profile:architect"
 }
 
 codex_reviewer_preferred_candidate() {

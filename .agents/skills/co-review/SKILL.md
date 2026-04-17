@@ -59,15 +59,15 @@ Verify: `claude mcp list` → both should show `✓ Connected`.
 
 | Mode | MCP Server | Tool | Model |
 |------|-----------|------|-------|
-| co-brainstorm | codex-coder | `spawn_agents_parallel` | gpt-5-codex |
-| co-plan | codex-reviewer | `spawn_agent` | `reviewer` profile (defaults to `o1-pro` when supported) |
-| co-validate | codex-reviewer | `spawn_agent` | `reviewer` profile (defaults to `o1-pro` when supported) |
+| co-brainstorm | codex-coder | `spawn_agents_parallel` | gpt-5.4 (high) |
+| co-plan | codex-reviewer | `spawn_agent` | `reviewer` profile (`gpt-5.4`, reasoning: high) |
+| co-validate | codex-reviewer | `spawn_agent` | `reviewer` profile (`gpt-5.4`, reasoning: high) |
 
 ### Backend Preference (fallback chain)
 
 ```
 1. codex-reviewer MCP (`spawn_agent`, one-shot) — REVIEWS / CO-PLAN / CO-VALIDATE
-2. codex-coder MCP (gpt-5-codex, parallel) — CO-BRAINSTORM
+2. codex-coder MCP (gpt-5.4 (high), parallel) — CO-BRAINSTORM
 3. CCB `ask codex` (only with active Codex session, visible panes, anchoring risk) — FALLBACK
 4. Claude-only review — LAST RESORT
 ```
@@ -105,7 +105,7 @@ TN+2: Compare perspectives, synthesize best of both
 For detailed prompts, output formats, and examples, read `references/modes.md`.
 
 ### Mode 1: /co-brainstorm
-1. `mcp__codex-coder__spawn_agents_parallel` → 3 Codex agents brainstorm independently (gpt-5-codex)
+1. `mcp__codex-coder__spawn_agents_parallel` → 3 Codex agents brainstorm independently (gpt-5.4 (high))
 2. Main agent brainstorms independently (3-5 approaches)
 3. After all complete → collect Codex ideas
 4. Compare: convergent ideas (high confidence), unique ideas from each, recommend best
@@ -258,4 +258,4 @@ Persist instead:
 - DO NOT run co-review on XS/S tasks — overhead not justified.
 - DO NOT block the workflow if Codex is unavailable — degrade gracefully.
 - DO NOT send full files to reviewer — use diff compression to reduce tokens.
-- DO NOT claim `o1-pro` ran unless the reviewer path actually used it.
+- DO NOT claim the reviewer profile ran unless the reviewer path actually used it.

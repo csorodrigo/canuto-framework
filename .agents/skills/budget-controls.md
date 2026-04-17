@@ -174,8 +174,8 @@ See `.agents/skills/cost-routing.md` for the full decision matrix.
 
 | Route | Savings |
 |-------|---------|
-| M/L coding → Codex gpt-5-codex | 60-70% |
-| Reviews → Codex o1-pro | 40-50% |
+| M/L coding → Codex gpt-5.4 (high) | 60-70% |
+| Reviews → Codex gpt-5.4 (high, reviewer profile) | 40-50% |
 | Test-fix → Codex loop | 80% |
 | Context → Codex vault MCP | 90% |
 | Browser QA → Codex Playwright | 70% |
@@ -194,7 +194,7 @@ estimated_cost:
   codex: ${input_tokens * 0.003 / 1000}
 savings_pct: {1 - (actual_cost / all_opus_baseline_cost) * 100}
 tasks_delegated: {count of tasks sent to codex}
-escalations: {count of gpt-5-codex → o1-pro escalations}
+escalations: {count of reasoning:high → xhigh (architect profile) escalations}
 ```
 
 **Dashboard**: `.agents/vault/bases/cost-dashboard.base` visualizes trends.

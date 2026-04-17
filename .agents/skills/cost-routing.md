@@ -28,11 +28,11 @@ which provider should handle it. The goal: **minimize Anthropic spend without lo
 
 | Task Type | Size | Provider | Tool | Est. Savings vs Opus |
 |-----------|------|----------|------|---------------------|
-| **Code generation** | M/L | Codex (gpt-5-codex) | `mcp__codex-coder__spawn_agent` | 60-70% |
+| **Code generation** | M/L | Codex (gpt-5.4 (high)) | `mcp__codex-coder__spawn_agent` | 60-70% |
 | **Code generation** | XS/S | Claude (direct) | — | 0% (MCP overhead exceeds benefit) |
 | **Code review** | M/L | Codex (reviewer profile) | `mcp__codex-reviewer__spawn_agent` | 40-50% |
 | **Code review** | XS/S | Claude (direct) | — | 0% |
-| **Test-fix loop** | Any | Codex (gpt-5-codex) | `mcp__codex-coder__spawn_agent` | 80% |
+| **Test-fix loop** | Any | Codex (gpt-5.4 (high)) | `mcp__codex-coder__spawn_agent` | 80% |
 | **Context reading** | Any | Codex (vault MCP) | Codex reads via obsidian-vault MCP | 90% |
 | **Browser QA** | Any | Codex (Playwright) | `mcp__codex-coder__spawn_agent` | 70% |
 | **Planning** | Any | Claude Opus | — | N/A (needs best reasoning) |
@@ -40,7 +40,7 @@ which provider should handle it. The goal: **minimize Anthropic spend without lo
 | **User interview** | Any | Claude Opus | — | N/A (needs AskUserQuestion) |
 | **Brainstorm** | Any | Codex (parallel) | `spawn_agents_parallel` | 60% |
 | **Security scan** | Any | Codex (reviewer profile) | `mcp__codex-reviewer__spawn_agent` | 40% |
-| **Documentation** | Any | Codex (gpt-5-codex) | `mcp__codex-coder__spawn_agent` | 70% |
+| **Documentation** | Any | Codex (gpt-5.4 (high)) | `mcp__codex-coder__spawn_agent` | 70% |
 | **Context loading** | Any | Codex (context-loader) | `mcp__codex-coder__spawn_agent` | 90% |
 | **Session notes** | Any | Codex (session-writer) | `mcp__codex-coder__spawn_agent` | 80% |
 | **PR description** | Any | Codex (pr-writer) | `mcp__codex-coder__spawn_agent` | 70% |
