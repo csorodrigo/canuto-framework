@@ -63,6 +63,16 @@ const GENERIC_SKILL_PHRASES = new Set([
   'research',
 ]);
 
+const PENDING_SYNC_CONTEXT_RE =
+  /(?:(?:pending-sync|pending_sync)[\s:_—–\-#]*(?:queue|error|failed|backlog|items|count|fired|triggered)|(?:queue|error|failed|backlog|items|count|fired|triggered)[\s:_—–\-#]*(?:pending-sync|pending_sync))/i;
+const PENDING_SYNC_MARKER_RE = /(?:pending-sync|pending_sync)/i;
+const OFFLINE_SYNC_CONTEXT_RE =
+  /(?:(?:OFFLINE[-_]SYNC|offline[-_]sync)[\s:_—–\-#]*(?:event|marker|triggered|detected|queued|fired|flag|required|fallback)|(?:event|marker|triggered|detected|queued|fired|flag|required|fallback)[\s:_—–\-#]*(?:OFFLINE[-_]SYNC|offline[-_]sync))/i;
+const OFFLINE_SYNC_MARKER_RE = /(?:OFFLINE[-_]SYNC|offline[-_]sync)/i;
+const OFFLINE_SYNC_HEADING_RE = /^\s*#+\s*(?:OFFLINE[-_]SYNC|offline[-_]sync)[\s:_—–\-#]+[^\s].*/i;
+const SYNC_MARKDOWN_FILE_RE = /[^\s`'"]*(?:pending-sync|pending_sync|OFFLINE[-_]SYNC|offline[-_]sync)[^\s`'"]*\.md\b/gi;
+const SYNC_TEST_REFERENCE_RE = /\b(?:test|tests|testing|fixture|fixtures|spec|specs)\b/i;
+
 const OBSIDIAN_PRIORITY = {
   compliant: 0,
   non_compliant_local: 1,
@@ -967,6 +977,56 @@ function detectSkillBreakages(text) {
   return [...breakages];
 }
 
+function lineHasSyncSignal(line, markerRe, contextRe) {
+  const text = String(line || '').replace(SYNC_MARKDOWN_FILE_RE, '');
+  if (!markerRe.test(text)) return false;
+  if (SYNC_TEST_REFERENCE_RE.test(text)) return false;
+  return contextRe.test(text);
+}
+
+function textHasPendingSyncSignal(text) {
+  return String(text || '')
+    .split(/\r?\n/)
+    .some((line) => lineHasSyncSignal(line, PENDING_SYNC_MARKER_RE, PENDING_SYNC_CONTEXT_RE));
+}
+
+function textHasOfflineSyncSignal(text) {
+  return String(text || '')
+    .split(/\r?\n/)
+    .some((line) => {
+      const text = String(line || '').replace(SYNC_MARKDOWN_FILE_RE, '');
+      if (SYNC_TEST_REFERENCE_RE.test(text)) return false;
+      return OFFLINE_SYNC_HEADING_RE.test(text) || lineHasSyncSignal(text, OFFLINE_SYNC_MARKER_RE, OFFLINE_SYNC_CONTEXT_RE);
+    });
+}
+
+function frontmatterHasOfflineSyncSignal(data) {
+  const frontmatterEvent = String(data.event || data.type || '').toUpperCase();
+  const frontmatterTags = Array.isArray(data.tags) ? data.tags : data.tags ? [data.tags] : [];
+
+  return (
+    frontmatterEvent === 'OFFLINE_SYNC' ||
+    frontmatterEvent === 'OFFLINE-SYNC' ||
+    frontmatterTags.some((tag) => {
+      const normalizedTag = String(tag || '').toLowerCase();
+      return normalizedTag === 'offline-sync' || normalizedTag === 'offline_sync';
+    })
+  );
+}
+
+function auditFilenameHasOfflineSyncSignal(filePath, data) {
+  if (String(data.type || '').toLowerCase() !== 'audit-event') return false;
+  return /offline[-_]sync/i.test(path.basename(filePath));
+}
+
+function auditFileHasOfflineSyncSignal(filePath, data, body) {
+  return (
+    frontmatterHasOfflineSyncSignal(data) ||
+    auditFilenameHasOfflineSyncSignal(filePath, data) ||
+    textHasOfflineSyncSignal(body)
+  );
+}
+
 function cleanUserMessage(text) {
   const raw = String(text || '');
   if (
@@ -1108,8 +1168,8 @@ function parseCodexLogRecord(meta, projectKey, skillCatalog, pricingIndex = null
           for (const message of detectSkillBreakages(output)) {
             skillBreakages.add(message);
           }
-          if (normalizeText(output).includes('pending-sync')) pendingSync = true;
-          if (normalizeText(output).includes('offline-sync')) offlineSync = true;
+          if (textHasPendingSyncSignal(output)) pendingSync = true;
+          if (textHasOfflineSyncSignal(output)) offlineSync = true;
         }
       }
     }
@@ -1156,8 +1216,8 @@ function parseCodexLogRecord(meta, projectKey, skillCatalog, pricingIndex = null
         for (const message of detectSkillBreakages(aggregatedOutput)) {
           skillBreakages.add(message);
         }
-        if (normalizeText(aggregatedOutput).includes('pending-sync')) pendingSync = true;
-        if (normalizeText(aggregatedOutput).includes('offline-sync')) offlineSync = true;
+        if (textHasPendingSyncSignal(aggregatedOutput)) pendingSync = true;
+        if (textHasOfflineSyncSignal(aggregatedOutput)) offlineSync = true;
       }
     }
   }
@@ -1256,9 +1316,8 @@ function parseVaultSessionFile(filePath, projectKey, vaultScope) {
     captured_to_vault: true,
     fallback_used: toBoolean(data.fallback_used, toBoolean(extractFieldFromBody(body, 'fallback_used'), false)),
     health_reason: String(data.health_reason || extractFieldFromBody(body, 'health_reason') || 'healthy'),
-    offline_sync:
-      normalizeText(filePath).includes('offline-sync') || normalizeText(body).includes('offline-sync'),
-    pending_sync: normalizeText(body).includes('pending-sync'),
+    offline_sync: textHasOfflineSyncSignal(body),
+    pending_sync: pending.length > 0,
     review_fix_cycles: toNumber(data.review_fix_cycles, toNumber(extractFieldFromBody(body, 'review_fix_cycles'), 0)),
     tasks_completed: sections.whatWasDone.length,
     tests_run: sections.validation.length,
@@ -1278,6 +1337,7 @@ function parseVaultMetricsFile(filePath, projectKey, vaultScope) {
   const markdown = readTextIfExists(filePath);
   if (!markdown) return null;
   const { data, body } = parseFrontmatter(markdown);
+  const pendingCount = toNumber(data.pending_count, toNumber(extractFieldFromBody(body, 'pending_count'), 0));
   const timestamp =
     extractIsoLikeTimestamp(data.date || '') ||
     extractIsoLikeTimestamp(path.basename(filePath)) ||
@@ -1297,12 +1357,12 @@ function parseVaultMetricsFile(filePath, projectKey, vaultScope) {
     captured_to_vault: true,
     fallback_used: toBoolean(data.fallback_used, false),
     health_reason: String(data.health_reason || 'healthy'),
-    offline_sync: normalizeText(filePath).includes('offline-sync') || normalizeText(body).includes('offline-sync'),
-    pending_sync: normalizeText(body).includes('pending-sync'),
+    offline_sync: textHasOfflineSyncSignal(body),
+    pending_sync: pendingCount > 0,
     review_fix_cycles: toNumber(data.reviews_count, 0),
     tasks_completed: toNumber(data.tasks_completed, toNumber(extractFieldFromBody(body, 'tasks_completed'), 0)),
     tests_run: toNumber(data.tests_run, toNumber(extractFieldFromBody(body, 'tests_run'), 0)),
-    pending_count: toNumber(data.pending_count, toNumber(extractFieldFromBody(body, 'pending_count'), 0)),
+    pending_count: pendingCount,
     summary: [],
     what_was_done: [],
     validation: [],
@@ -1339,8 +1399,8 @@ function parseVaultAuditFile(filePath, projectKey, vaultScope) {
     captured_to_vault: true,
     fallback_used: toBoolean(extractFieldFromBody(body, 'fallback_used'), false),
     health_reason: healthReason || 'healthy',
-    offline_sync: normalizeText(filePath).includes('offline-sync') || normalizeText(body).includes('offline-sync'),
-    pending_sync: normalizeText(body).includes('pending-sync'),
+    offline_sync: auditFileHasOfflineSyncSignal(filePath, data, body),
+    pending_sync: false,
     review_fix_cycles: toNumber(extractFieldFromBody(body, 'review_fix_cycles'), 0),
     tasks_completed: 0,
     tests_run: 0,

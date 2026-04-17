@@ -163,6 +163,66 @@ function writePricing(filePath) {
   );
 }
 
+function parseCodexOutput(output, options = {}) {
+  const tempDir = makeTempDir();
+  const logPath = path.join(tempDir, 'session.jsonl');
+  const outputRecord =
+    options.outputSource === 'exec_command_end'
+      ? {
+          type: 'event_msg',
+          payload: {
+            type: 'exec_command_end',
+            command: ['bash', '-lc', 'printf output'],
+            exit_code: 0,
+            aggregated_output: output,
+          },
+        }
+      : {
+          type: 'response_item',
+          payload: {
+            type: 'function_call_output',
+            output,
+          },
+        };
+  const records = [
+    {
+      type: 'session_meta',
+      payload: {
+        id: options.sessionId || 'session-1',
+        timestamp: '2026-04-15T13:23:35.050Z',
+        cwd: tempDir,
+      },
+    },
+    outputRecord,
+  ];
+  writeFile(logPath, records.map((record) => JSON.stringify(record)).join('\n'));
+
+  return parseCodexLogRecord(parseCodexLogMeta(logPath), 'project-key', []);
+}
+
+async function runAuditForVaultFiles(filesByRelativePath) {
+  const tempDir = makeTempDir();
+  const workspacesRoot = path.join(tempDir, 'workspaces');
+  const vaultRoot = path.join(tempDir, 'vault');
+  const { vaultPath } = writeCanutoProject({ workspacesRoot, vaultRoot });
+
+  for (const [relativePath, content] of Object.entries(filesByRelativePath)) {
+    writeFile(path.join(vaultPath, relativePath), content);
+  }
+
+  const result = await runAudit({
+    workspacesRoot,
+    vaultRoot,
+    codexLogRoots: [],
+    sessionLimit: 200,
+    parallelism: 1,
+    analysisMode: 'deterministic',
+    outputDir: path.join(tempDir, 'out'),
+  });
+
+  return result.project_summaries.flatMap((summary) => summary.sessions);
+}
+
 test('parseFrontmatter and parseSessionSections keep session body structured', () => {
   const markdown = `---
 type: "session"
@@ -245,6 +305,216 @@ test('parseCodexLogRecord ignores injected skill list and only counts real skill
 
   assert.deepEqual(session.skill_reads, ['monitor']);
   assert.equal(session.skill_reads.length, 1);
+});
+
+test('parseCodexLogRecord detects sync flags only from contextual output lines', () => {
+  assert.equal(parseCodexOutput('pending-sync queue has 3 items').pending_sync, true);
+  assert.equal(parseCodexOutput('pending-sync: queue has 3 items').pending_sync, true);
+  assert.equal(parseCodexOutput('pending_sync error: flush failed').pending_sync, true);
+  assert.equal(parseCodexOutput('Running test for pending-sync queue behavior').pending_sync, false);
+  assert.equal(parseCodexOutput('triggered OFFLINE-SYNC fallback because vault unreachable').offline_sync, true);
+  assert.equal(parseCodexOutput('OFFLINE-SYNC marker: 2026-03-22 session flagged').offline_sync, true);
+  assert.equal(parseCodexOutput('# offline-sync').offline_sync, false);
+});
+
+test('parseCodexLogRecord applies sync detection to aggregated exec output', () => {
+  const session = parseCodexOutput('pending-sync queue has 3 items\ntriggered OFFLINE-SYNC fallback', {
+    outputSource: 'exec_command_end',
+  });
+
+  assert.equal(session.pending_sync, true);
+  assert.equal(session.offline_sync, true);
+});
+
+test('runAudit derives vault session pending_sync from pending items and ignores path-only offline markers', async () => {
+  const sessions = await runAuditForVaultFiles({
+    'sessions/2026-04-15T132335Z-session-marker-OFFLINE-SYNC.md': `---
+type: "session"
+session_id: "vault-session-1"
+date: "2026-04-15T13:23:35.050Z"
+project: "acme"
+runtime: "claude"
+pending_count: 3
+---
+
+# Session
+
+## Summary
+- Read session-marker-OFFLINE-SYNC.md for context only
+
+## Pending
+- Review one
+- Review two
+- Review three
+`,
+  });
+  const session = sessions.find((item) => item.session_id === 'vault-session-1');
+
+  assert.equal(session.pending_count, 3);
+  assert.equal(session.pending_sync, true);
+  assert.equal(session.offline_sync, false);
+});
+
+test('runAudit derives vault metrics pending_sync from pending_count frontmatter field', async () => {
+  const sessions = await runAuditForVaultFiles({
+    'metrics/2026-04-15T132335Z-metrics.md': `---
+type: "session-metrics"
+session_id: "metrics-session-1"
+date: "2026-04-15T13:23:35.050Z"
+project: "acme"
+runtime: "codex"
+pending_count: 5
+---
+`,
+  });
+  const session = sessions.find((item) => item.session_id === 'metrics-session-1');
+
+  assert.equal(session.pending_count, 5);
+  assert.equal(session.pending_sync, true);
+});
+
+test('runAudit keeps vault metrics pending_sync false when pending_count is zero', async () => {
+  const sessions = await runAuditForVaultFiles({
+    'metrics/2026-04-15T132335Z-zero-metrics.md': `---
+type: "session-metrics"
+session_id: "metrics-session-zero"
+date: "2026-04-15T13:23:35.050Z"
+project: "acme"
+runtime: "codex"
+pending_count: 0
+---
+
+pending-sync queue has 3 items
+`,
+  });
+  const session = sessions.find((item) => item.session_id === 'metrics-session-zero');
+
+  assert.equal(session.pending_count, 0);
+  assert.equal(session.pending_sync, false);
+});
+
+test('runAudit detects contextual offline_sync in vault session bodies', async () => {
+  const sessions = await runAuditForVaultFiles({
+    'sessions/2026-04-15T132335Z-offline-context.md': `---
+type: "session"
+session_id: "vault-offline-context"
+date: "2026-04-15T13:23:35.050Z"
+project: "acme"
+runtime: "claude"
+---
+
+# Session
+
+## Summary
+- OFFLINE-SYNC marker: 2026-03-22 session flagged
+`,
+  });
+  const session = sessions.find((item) => item.session_id === 'vault-offline-context');
+
+  assert.equal(session.offline_sync, true);
+});
+
+test('runAudit ignores standalone offline-sync headings in vault bodies', async () => {
+  const sessions = await runAuditForVaultFiles({
+    'sessions/2026-04-15T132335Z-offline-heading.md': `---
+type: "session"
+session_id: "vault-offline-heading"
+date: "2026-04-15T13:23:35.050Z"
+project: "acme"
+runtime: "claude"
+---
+
+# offline-sync
+
+## Summary
+- Informational note only
+`,
+  });
+  const session = sessions.find((item) => item.session_id === 'vault-offline-heading');
+
+  assert.equal(session.offline_sync, false);
+});
+
+test('runAudit keeps audit marker pending_sync false regardless of body mentions', async () => {
+  const sessions = await runAuditForVaultFiles({
+    'audit/2026-04-15_session-marker-OFFLINE-SYNC.md': `---
+type: "audit"
+session: "audit-session-1"
+date: "2026-04-15T13:23:35.050Z"
+project: "acme"
+runtime: "codex"
+---
+
+# Audit
+
+pending-sync queue has 3 items
+`,
+  });
+  const session = sessions.find((item) => item.session_id === 'audit-session-1');
+
+  assert.equal(session.pending_count, 0);
+  assert.equal(session.pending_sync, false);
+  assert.equal(session.offline_sync, false);
+});
+
+test('runAudit detects offline_sync from audit-event frontmatter marker files', async () => {
+  const sessions = await runAuditForVaultFiles({
+    'audit/2026-03-29_200757-session-marker-OFFLINE-SYNC.md': `---
+type: audit-event
+event: OFFLINE_SYNC
+date: 2026-04-15T12:43:09Z
+project: acme
+runtime: codex
+---
+
+# OFFLINE_SYNC — acme
+
+Synced from:
+\`/Users/rodrigooliveira/conductor/workspaces/acme/recife/.agents/.cache/pending-sync/2026-03-29_200757-session-marker.md\`
+
+## Original Payload
+
+Session saved offline at 2026-03-29_200757
+`,
+  });
+  const session = sessions.find((item) => item.session_id === 'global-audit-2026-03-29_200757-session-marker-OFFLINE-SYNC');
+
+  assert.equal(session.offline_sync, true);
+  assert.equal(session.pending_sync, false);
+});
+
+test('parseCodexLogRecord accepts offline_sync body separators without matching bare filenames', () => {
+  assert.equal(parseCodexOutput('Marker: OFFLINE-SYNC').offline_sync, true);
+  assert.equal(parseCodexOutput('# OFFLINE_SYNC — project').offline_sync, true);
+  assert.equal(parseCodexOutput('triggered OFFLINE-SYNC fallback').offline_sync, true);
+  assert.equal(parseCodexOutput('# Off-line sync discussion').offline_sync, false);
+  assert.equal(parseCodexOutput('session-marker-OFFLINE-SYNC.md').offline_sync, false);
+});
+
+test('sync marker body detection is consistent between codex logs and vault sessions', async () => {
+  const codexSession = parseCodexOutput('pending-sync queue has 3 items\ntriggered OFFLINE-SYNC fallback');
+  const vaultSessions = await runAuditForVaultFiles({
+    'sessions/2026-04-15T132335Z-session.md': `---
+type: "session"
+session_id: "vault-session-consistency"
+date: "2026-04-15T13:23:35.050Z"
+project: "acme"
+runtime: "claude"
+---
+
+# Session
+
+## Summary
+- triggered OFFLINE-SYNC fallback
+
+## Pending
+- pending-sync queue has 3 items
+`,
+  });
+  const vaultSession = vaultSessions.find((item) => item.session_id === 'vault-session-consistency');
+
+  assert.equal(codexSession.pending_sync, vaultSession.pending_sync);
+  assert.equal(codexSession.offline_sync, vaultSession.offline_sync);
 });
 
 test('detectSkillBreakages recognizes concrete skill error evidence', () => {
