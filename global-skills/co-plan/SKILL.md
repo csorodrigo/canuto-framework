@@ -50,3 +50,51 @@ Every `/co-plan` result must state:
 - `fallbackOccurred`
 - `verdict`
 - `issues` or `clean`
+
+---
+
+## `/co-plan --triple` (tri-plan variant, FASE 2a+)
+
+Para planos estratégicos onde o custo de uma decisão errada > custo do triple review,
+use a variante triple: Opus + Codex reviewer + Gemini 3.1-pro-preview em paralelo.
+
+### Quando usar
+- Planos que afetam arquitetura (novos módulos, microserviços, schema changes)
+- Planos com dependências externas (APIs pagas, integrações críticas)
+- Planos de segurança ou compliance
+- Quando o usuário explicitamente pede `--triple` ou "tri-plan"
+
+### Fluxo (3 streams paralelos)
+```
+Stream A — Opus (self-review):
+  Claude consolida o plano próprio com análise de premissas.
+
+Stream B — Codex reviewer (engineering adversarial):
+  mcp__codex-reviewer__spawn_agent({
+    prompt: "Review this plan for engineering gaps, edge cases, test strategy,
+             rollback paths. [PLAN INLINE]"
+  })
+
+Stream C — Gemini 3.1-pro-preview (cross-model + long-context premise check):
+  mcp__gemini__ask-gemini({
+    prompt: "@./ Review this plan against the actual repo. Que premissas desse
+             plano o código existente contradiz? Que padrões já estabelecidos
+             o plano viola silenciosamente? [PLAN INLINE]",
+    model: "gemini-3.1-pro-preview"
+  })
+```
+
+### Síntese
+Claude consolida os 3 streams:
+- **Convergência** (os 3 concordam) → high-confidence issue, fix mandatório
+- **2/3 concordam** → medium, worth fixing
+- **1/3 flagou algo único** → evaluate — pode ser insight genuíno ou ruído
+
+### Output
+Mesmo formato do `/co-plan` normal, mas com seção "## Triple review matrix"
+mostrando quem levantou cada issue.
+
+### Não usar `/co-plan --triple` se:
+- XS/S task (triple overhead > benefit)
+- Plan muda só 1 arquivo
+- User está em modo de iteração rápida (trade-off de latência)
