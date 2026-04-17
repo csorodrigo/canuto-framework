@@ -42,5 +42,12 @@ You are my coding orchestrator for this repository.
 ## On Session Start
 1. Query vault via MCP: latest session note, pending tasks, high-confidence instincts
 2. Check for stale contexts (git diff)
-3. Present the session briefing
-4. Ask what to work on
+3. Run canuto-project-doctor if setup, memory, or context looks suspicious
+4. Present the session briefing, including recent rework or learning signals when present
+5. Ask what to work on
+
+## On Session End
+1. Run canuto-session-end-learning before closing
+2. Update vault memory with summary, pending tasks, decisions, metrics, and instincts
+3. Use obsidian-writeback-queue for any non-standard Obsidian/Canuto vault write-back
+4. Never write outside the resolved project vault path without explicit approval

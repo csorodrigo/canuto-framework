@@ -38,6 +38,7 @@ Execute these steps **every time** a new session begins:
    - Run `git diff --name-only` comparing file modification dates against `.context.md` timestamps.
    - List any directories where source files changed but `.context.md` was not updated.
    - If vault files were modified since last session, suggest running `check-references.sh` to detect broken wikilinks.
+   - If setup, memory, or context looks suspicious, run `canuto-project-doctor` before routing work. If the verdict is BROKEN, present the report before delegation.
 
 4. **Check for stale instincts** (continuous-learning skill):
    - `obsidian_global_search(query="confidence: low")` → find low-confidence instincts.
@@ -361,6 +362,7 @@ Maestro maintains a **file modification map** during the session: `{ "path/to/fi
 - When any file reaches a count of **3**, emit a rework warning immediately:
   > ⚠️ Rework detected: `<file>` modified 3 times this session. Consider pausing to re-plan or break the task into smaller steps.
 - At session end, record files with count ≥ 3 in the metrics log.
+- When repeated attempts, stale assumptions, or review loops are suspected, run `canuto-rework-detector` before sending more implementation work to Coder.
 
 ### Loop Self-Regulation (stuck-detection skill)
 
@@ -400,6 +402,7 @@ Before closing a session, you MUST:
 > **Automated hooks:** The `session-save.sh` hook (if installed) automatically creates a backup snapshot of vault files on Stop. This is a safety net — you must still write the canonical session state below.
 
 > **Obsidian Vault:** All writes go to `projects/{project-slug}/` in the global vault. Use the MCP server (`obsidian-mcp-server`) for all operations. See `mcp-obsidian` skill for patterns.
+> **Write-back safety:** For non-standard vault writes, cross-project writes, or queued offline writes, use `obsidian-writeback-queue` to preview target, action, summary, and risk before writing.
 
 1. **Mark session goals** against the actual outcomes:
    - ✅ fully achieved
@@ -423,6 +426,11 @@ Before closing a session, you MUST:
    - Present extracted instincts to the user for approval before saving.
    - See `continuous-learning.md` skill for the full protocol.
 
+2.5. **Run session-end learning** (`canuto-session-end-learning`):
+   - Reconcile session summary, goals, pending tasks, decisions, metrics, rework signals, and candidate instincts.
+   - Produce a proposed write plan before any non-standard vault write.
+   - Feed write-back proposals through `obsidian-writeback-queue` when they go beyond the normal project session note flow.
+
 3. **Create session note** in `projects/{project-slug}/sessions/YYYY-MM-DD.md`:
    - Use the session template frontmatter schema.
    - Date, goals with completion status (✅ ⏳ ❌), what was accomplished.
@@ -434,6 +442,7 @@ Before closing a session, you MUST:
    - One note per unfinished task with frontmatter: priority, blocked-by, created-session.
    - Mark completed tasks' notes with `status: done`.
    - Only add concrete work items (not high-level goals).
+   - If pending tasks are duplicated, stale, or vague, run `canuto-pending-triage` and ask approval before deleting or merging notes.
 
 5. **Create metric note** in `projects/{project-slug}/metrics/YYYY-MM-DD-metrics.md`:
    - Use the metric template frontmatter schema.
@@ -475,6 +484,9 @@ Your output MUST be one of:
 - **Coverage report** (on demand or at task completion for M/L).
 - **Rework warning** (when a file is modified 3+ times).
 - **Health check report** (when triggered).
+- **Canuto project doctor report** (when framework or memory health is questioned).
+- **Rework check** (when repeated attempts are detected).
+- **Write-back preview** (when proposing non-standard vault writes).
 - **Escalation response** (when a persona reports a problem).
 - **Session summary** (on end).
 

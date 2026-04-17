@@ -19,7 +19,8 @@
 
 set -euo pipefail
 
-REPO_URL="https://raw.githubusercontent.com/csorodrigo/canuto-framework/main"
+REPO_URL="${CANUTO_REPO_URL:-https://raw.githubusercontent.com/csorodrigo/canuto-framework/main}"
+SOURCE_DIR="${CANUTO_SOURCE_DIR:-}"
 AGENTS_DIR=".agents"
 CLAUDE_MD="CLAUDE.md"
 TMP_DIR=$(mktemp -d)
@@ -175,6 +176,12 @@ download() {
   local dir
   dir=$(dirname "$local_path")
   mkdir -p "$dir"
+
+  if [ -n "$SOURCE_DIR" ] && [ -f "$SOURCE_DIR/$remote_path" ]; then
+    cp "$SOURCE_DIR/$remote_path" "$local_path"
+    return 0
+  fi
+
   if command -v curl > /dev/null 2>&1; then
     curl -fsSL "$REPO_URL/$remote_path" -o "$local_path"
   elif command -v wget > /dev/null 2>&1; then
@@ -187,6 +194,11 @@ download() {
 # Fetch helper (returns content, no write)
 fetch_content() {
   local remote_path="$1"
+  if [ -n "$SOURCE_DIR" ] && [ -f "$SOURCE_DIR/$remote_path" ]; then
+    cat "$SOURCE_DIR/$remote_path"
+    return 0
+  fi
+
   if command -v curl > /dev/null 2>&1; then
     curl -fsSL "$REPO_URL/$remote_path" 2>/dev/null
   elif command -v wget > /dev/null 2>&1; then
@@ -293,6 +305,11 @@ FRAMEWORK_FILES=(
   ".agents/skills/squads.md"
   ".agents/skills/pr-description.md"
   ".agents/skills/health-check.md"
+  ".agents/skills/canuto-project-doctor.md"
+  ".agents/skills/canuto-session-end-learning.md"
+  ".agents/skills/canuto-rework-detector.md"
+  ".agents/skills/canuto-pending-triage.md"
+  ".agents/skills/obsidian-writeback-queue.md"
   ".agents/skills/stack-lock.md"
   ".agents/skills/plan-second-opinion.md"
   ".agents/hooks/plan-review.sh"
@@ -2634,8 +2651,8 @@ if [ "$MODE" = "check" ]; then
       echo -e "  ${RED}\u2717 MISSING${RESET}    $file"
       MISSING=$((MISSING + 1))
     else
-      LOCAL_VER=$(grep "^version:" "$file" 2>/dev/null | head -1 | awk '{print $2}')
-      REMOTE_VER=$(fetch_content "$file" | grep "^version:" | head -1 | awk '{print $2}')
+      LOCAL_VER=$(grep "^version:" "$file" 2>/dev/null | head -1 | awk '{print $2}' || true)
+      REMOTE_VER=$(fetch_content "$file" | grep "^version:" | head -1 | awk '{print $2}' || true)
 
       if [ -z "$LOCAL_VER" ] || [ -z "$REMOTE_VER" ]; then
         echo -e "  ${YELLOW}? UNKNOWN${RESET}    $file (no version field)"

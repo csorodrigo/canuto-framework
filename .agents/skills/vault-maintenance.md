@@ -1,5 +1,6 @@
 ---
 skill: vault-maintenance
+shortDescription: Periodic Obsidian vault cleanup and aggregation to keep memory searchable, compact, and useful.
 trigger: /vault-maintenance
 persona: maestro
 version: 1.0.0
