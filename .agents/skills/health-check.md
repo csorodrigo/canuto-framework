@@ -55,6 +55,11 @@ Detect broken or missing framework components before they silently degrade sessi
 - [ ] `context-maintenance.md` present, or `.agents/skills/context-maintenance/SKILL.md` present.
 - [ ] `api-design.md` present.
 - [ ] `metrics.md` present.
+- [ ] `canuto-project-doctor.md` present.
+- [ ] `canuto-session-end-learning.md` present.
+- [ ] `canuto-rework-detector.md` present.
+- [ ] `canuto-pending-triage.md` present.
+- [ ] `obsidian-writeback-queue.md` present.
 
 ### Global Vault (Obsidian Memory)
 - [ ] `~/.canuto/vault/` directory exists.
@@ -130,6 +135,13 @@ Detect broken or missing framework components before they silently degrade sessi
 ### SPEC
 - [ ] `.agents/SPEC.md` exists.
 
+### Learning Loop
+- [ ] Session start can diagnose setup/memory/context drift via `canuto-project-doctor`.
+- [ ] Rework/retry loops can be detected via `canuto-rework-detector`.
+- [ ] Session end proposes decisions, pending tasks, metrics, and candidate instincts.
+- [ ] Vault write-back is previewed or queued, not silent.
+- [ ] Pending tasks remain concrete enough to act on.
+
 ---
 
 ## Output Format
@@ -175,6 +187,7 @@ Detect broken or missing framework components before they silently degrade sessi
 | Old memory/ exists | `bash install.sh --migrate` |
 | Old skill SKILL.md in subdir | `bash install.sh --update` |
 | SPEC.md missing | `bash install.sh --update` |
+| Learning-loop skills missing | `bash install.sh --update` |
 | Hooks missing | `bash install.sh --update` (reinstalls hooks) |
 | Codex hooks/config degraded | `bash .agents/tools/codex-health-check.sh` |
 | python3 missing | Install: `brew install python3` or `apt install python3` |

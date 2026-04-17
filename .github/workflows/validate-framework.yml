@@ -42,8 +42,12 @@ jobs:
           for skill in .agents/skills/*.md; do
             [ -f "$skill" ] || continue
             name=$(basename "$skill")
-            if ! head -1 "$skill" | grep -q "^shortDescription:"; then
-              echo "  ✗ $name missing shortDescription"
+            if [ "$name" = "CLAUDE.md" ]; then
+              echo "  - $name skipped (skill directory instructions)"
+              continue
+            fi
+            if ! head -40 "$skill" | grep -Eq "^(shortDescription|description):"; then
+              echo "  ✗ $name missing shortDescription/description"
               ERRORS=$((ERRORS + 1))
             else
               echo "  ✓ $name"
@@ -59,7 +63,7 @@ jobs:
         run: bash test-framework.sh --verbose
 
       - name: Install check
-        run: bash install.sh --check
+        run: CANUTO_SOURCE_DIR="$PWD" bash install.sh --check
 
       - name: Check vault references
         continue-on-error: true
