@@ -667,7 +667,7 @@ function detectRuntime(frontmatter, body, fallback = 'claude') {
 function buildCommandValidationList(commandCalls = [], validationLines = []) {
   const results = new Set();
   const matcher =
-    /\b(?:npm\s+run\s+(?:test(?::\w+)?|type-check|build)|npm\s+test|pnpm\s+test|yarn\s+test|node\s+--test|bash\s+.+obsidian-healthcheck\.sh|bash\s+.+session-capture\.sh|bash\s+.+vault-sync\.sh)\b/i;
+    /\b(?:npm\s+run\s+(?:test(?::\w+)?|type-check|build)|npm\s+test|pnpm\s+test|yarn\s+test|node\s+--test|bash\s+.+codex-health-check\.sh|bash\s+.+session-save\.sh|bash\s+.+vault-sync\.sh)\b/i;
 
   for (const command of commandCalls) {
     if (matcher.test(command)) {
@@ -1919,6 +1919,9 @@ function buildInventory({ workspacesRoot, vaultRoot }) {
       }
     }
 
+    const hasSessionSave = fs.existsSync(path.join(repo.workspace_path, '.agents', 'hooks', 'session-save.sh'));
+    const hasHealthCheck = fs.existsSync(path.join(repo.workspace_path, '.agents', 'tools', 'codex-health-check.sh'));
+
     return {
       project_slug: resolved.project_slug,
       slug_source: resolved.slug_source,
@@ -1926,8 +1929,11 @@ function buildInventory({ workspacesRoot, vaultRoot }) {
       workspace_root: repo.workspace_root,
       repo_name: path.basename(repo.workspace_path),
       memory_script_present: fs.existsSync(memoryScriptPath),
-      session_capture_present: fs.existsSync(path.join(repo.workspace_path, '.agents', 'tools', 'session-capture.sh')),
-      obsidian_healthcheck_present: fs.existsSync(path.join(repo.workspace_path, '.agents', 'tools', 'obsidian-healthcheck.sh')),
+      session_save_hook_present: hasSessionSave,
+      health_check_tool_present: hasHealthCheck,
+      // Deprecated aliases retained for one release; remove in the next major version.
+      session_capture_present: hasSessionSave,
+      obsidian_healthcheck_present: hasHealthCheck,
       backend_kind: backendKind,
       backend_path: backendPath,
       global_vault_path: globalVaultPathCandidate,
@@ -1972,6 +1978,9 @@ function buildInventory({ workspacesRoot, vaultRoot }) {
       global_vault_path: canAttachGlobalVault ? entry.global_vault_path : '',
       local_vault_path: entry.local_vault_path,
       memory_script_present: entry.memory_script_present,
+      session_save_hook_present: entry.session_save_hook_present,
+      health_check_tool_present: entry.health_check_tool_present,
+      // Deprecated aliases retained for one release; remove in the next major version.
       session_capture_present: entry.session_capture_present,
       obsidian_healthcheck_present: entry.obsidian_healthcheck_present,
       framework_version_signals: entry.framework_version_signals,
@@ -1993,6 +2002,9 @@ function buildInventory({ workspacesRoot, vaultRoot }) {
       global_vault_path: vaultProject.vault_path,
       local_vault_path: '',
       memory_script_present: false,
+      session_save_hook_present: false,
+      health_check_tool_present: false,
+      // Deprecated aliases retained for one release; remove in the next major version.
       session_capture_present: false,
       obsidian_healthcheck_present: false,
       framework_version_signals: {
@@ -2194,11 +2206,20 @@ function hasWorkspaceClaudeFile(project) {
   return Boolean(project.workspace_path && fs.existsSync(path.join(project.workspace_path, 'CLAUDE.md')));
 }
 
+function resolveProjectToolFlags(project) {
+  const sessionSaveHookPresent =
+    project.session_save_hook_present === undefined ? Boolean(project.session_capture_present) : Boolean(project.session_save_hook_present);
+  const healthCheckToolPresent =
+    project.health_check_tool_present === undefined ? Boolean(project.obsidian_healthcheck_present) : Boolean(project.health_check_tool_present);
+  return { sessionSaveHookPresent, healthCheckToolPresent };
+}
+
 function classifyProjectBucket({ project, sessionsAvailable, lastSessionAgeDays, captureRatio, pendingSyncOrphanRatio }) {
   const hasWorkspace = Boolean(project.workspace_path);
   const hasRecentSession = lastSessionAgeDays !== null && lastSessionAgeDays <= 30;
   const workspaceMissingCanFallThrough = !hasWorkspace && hasRecentSession && Boolean(project.global_vault_path);
   const memoryInstallSignal = project.memory_script_present || workspaceMissingCanFallThrough;
+  const { sessionSaveHookPresent, healthCheckToolPresent } = resolveProjectToolFlags(project);
 
   if (
     !workspaceMissingCanFallThrough &&
@@ -2211,14 +2232,14 @@ function classifyProjectBucket({ project, sessionsAvailable, lastSessionAgeDays,
     return 'dormant';
   }
 
-  if (memoryInstallSignal && (!project.session_capture_present || !project.obsidian_healthcheck_present)) {
+  if (memoryInstallSignal && (!sessionSaveHookPresent || !healthCheckToolPresent)) {
     return 'pre-v1.8';
   }
 
   if (
     memoryInstallSignal &&
-    project.session_capture_present &&
-    project.obsidian_healthcheck_present &&
+    sessionSaveHookPresent &&
+    healthCheckToolPresent &&
     (captureRatio < 0.4 || pendingSyncOrphanRatio > 0.2)
   ) {
     return 'v1.8-failing';
@@ -2226,8 +2247,8 @@ function classifyProjectBucket({ project, sessionsAvailable, lastSessionAgeDays,
 
   if (
     memoryInstallSignal &&
-    project.session_capture_present &&
-    project.obsidian_healthcheck_present &&
+    sessionSaveHookPresent &&
+    healthCheckToolPresent &&
     captureRatio >= 0.4 &&
     pendingSyncOrphanRatio <= 0.2
   ) {
@@ -2239,6 +2260,7 @@ function classifyProjectBucket({ project, sessionsAvailable, lastSessionAgeDays,
 
 function buildProjectSummary(project, allSessions, sessionLimit, generatedAt = new Date().toISOString()) {
   const skillCatalog = project.skill_catalog || [];
+  const { sessionSaveHookPresent, healthCheckToolPresent } = resolveProjectToolFlags(project);
   const sessionsAvailable = allSessions.length;
   const analyzedSessions = sortSessionsByTimestampDesc(allSessions).slice(0, sessionLimit);
   const runtimeMix = analyzedSessions.reduce((accumulator, session) => {
@@ -2249,7 +2271,7 @@ function buildProjectSummary(project, allSessions, sessionLimit, generatedAt = n
   const captureEvidenceCount = analyzedSessions.filter((session) => session.captured_to_vault).length;
   const pendingSyncOrphanCount = analyzedSessions.filter((session) => session.pending_sync).length;
   const healthcheckEvidenceCount = analyzedSessions.filter((session) =>
-    session.validation.some((line) => normalizeText(line).includes('obsidian-healthcheck')),
+    session.validation.some((line) => normalizeText(line).includes('codex-health-check')),
   ).length;
   const captureRatio = analyzedSessions.length === 0 ? 0 : captureEvidenceCount / analyzedSessions.length;
   const pendingSyncOrphanRatio = analyzedSessions.length === 0 ? 0 : roundedMetric(pendingSyncOrphanCount / analyzedSessions.length);
@@ -2313,8 +2335,8 @@ function buildProjectSummary(project, allSessions, sessionLimit, generatedAt = n
   if (project.workspace_path) {
     const missingCoreScripts = [];
     if (!project.memory_script_present) missingCoreScripts.push('canuto-memory.sh');
-    if (!project.session_capture_present) missingCoreScripts.push('session-capture.sh');
-    if (!project.obsidian_healthcheck_present) missingCoreScripts.push('obsidian-healthcheck.sh');
+    if (!sessionSaveHookPresent) missingCoreScripts.push('session-save.sh');
+    if (!healthCheckToolPresent) missingCoreScripts.push('codex-health-check.sh');
 
     if (project.slug_collision || missingCoreScripts.length >= 2) {
       frameworkHealth = 'failing';
@@ -2383,7 +2405,7 @@ function buildProjectSummary(project, allSessions, sessionLimit, generatedAt = n
     });
     recommendedActions.push({
       priority: captureHealth === 'failing' ? 'P0' : 'P1',
-      message: 'Reinstate session-capture/session-save flow and verify capture artifacts land in the vault every run.',
+      message: 'Reinstate the session-save hook flow and verify capture artifacts land in the vault every run.',
       evidence_refs: unique(analyzedSessions.slice(0, 5).map((session) => session.source_path)),
     });
   }
@@ -2415,8 +2437,8 @@ function buildProjectSummary(project, allSessions, sessionLimit, generatedAt = n
   if (frameworkHealth === 'partial' || frameworkHealth === 'failing') {
     const missingTools = [
       !project.memory_script_present ? 'canuto-memory.sh' : null,
-      project.workspace_path && !project.session_capture_present ? 'session-capture.sh' : null,
-      project.workspace_path && !project.obsidian_healthcheck_present ? 'obsidian-healthcheck.sh' : null,
+      project.workspace_path && !sessionSaveHookPresent ? 'session-save.sh' : null,
+      project.workspace_path && !healthCheckToolPresent ? 'codex-health-check.sh' : null,
     ].filter(Boolean);
 
     if (missingTools.length > 0) {
@@ -2522,6 +2544,11 @@ function buildProjectSummary(project, allSessions, sessionLimit, generatedAt = n
     project_slug: project.project_slug,
     sessions_available: sessionsAvailable,
     sessions_analyzed: analyzedSessions.length,
+    session_save_hook_present: sessionSaveHookPresent,
+    health_check_tool_present: healthCheckToolPresent,
+    // Deprecated aliases retained for one release; remove in the next major version.
+    session_capture_present: sessionSaveHookPresent,
+    obsidian_healthcheck_present: healthCheckToolPresent,
     bucket,
     last_session_age_days: lastSessionAgeDays,
     pending_sync_orphan_ratio: pendingSyncOrphanRatio,
@@ -3262,7 +3289,9 @@ async function runAudit(options) {
           global_vault_path: project.global_vault_path,
           local_vault_path: project.local_vault_path,
           memory_script_present: project.memory_script_present,
+          session_save_hook_present: project.session_save_hook_present,
           session_capture_present: project.session_capture_present,
+          health_check_tool_present: project.health_check_tool_present,
           obsidian_healthcheck_present: project.obsidian_healthcheck_present,
           framework_version_signals: project.framework_version_signals,
           slug_collision: project.slug_collision,
@@ -3276,6 +3305,10 @@ async function runAudit(options) {
           bucket: summary.bucket,
           last_session_age_days: summary.last_session_age_days,
           pending_sync_orphan_ratio: summary.pending_sync_orphan_ratio,
+          session_save_hook_present: summary.session_save_hook_present,
+          session_capture_present: summary.session_capture_present,
+          health_check_tool_present: summary.health_check_tool_present,
+          obsidian_healthcheck_present: summary.obsidian_healthcheck_present,
           cost_summary: summary.cost_summary,
           token_totals: summary.token_totals,
           top_tools: summary.top_tools,
@@ -3439,7 +3472,9 @@ function writeAuditOutputs(outputDir, result) {
       global_vault_path: project.global_vault_path,
       local_vault_path: project.local_vault_path,
       memory_script_present: project.memory_script_present,
+      session_save_hook_present: project.session_save_hook_present,
       session_capture_present: project.session_capture_present,
+      health_check_tool_present: project.health_check_tool_present,
       obsidian_healthcheck_present: project.obsidian_healthcheck_present,
       framework_version_signals: project.framework_version_signals,
       excluded_reason: project.excluded_reason,
@@ -3506,6 +3541,10 @@ function writeAuditOutputs(outputDir, result) {
       project_slug: summary.project_slug,
       sessions_available: summary.sessions_available,
       sessions_analyzed: summary.sessions_analyzed,
+      session_save_hook_present: summary.session_save_hook_present,
+      session_capture_present: summary.session_capture_present,
+      health_check_tool_present: summary.health_check_tool_present,
+      obsidian_healthcheck_present: summary.obsidian_healthcheck_present,
       bucket: summary.bucket,
       last_session_age_days: summary.last_session_age_days,
       pending_sync_orphan_ratio: summary.pending_sync_orphan_ratio,

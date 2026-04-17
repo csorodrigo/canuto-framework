@@ -44,8 +44,8 @@ canuto_resolve_memory_backend(){ printf "global\\t${vaultPath}\\n"; }
 `,
     0o755,
   );
-  writeFile(path.join(repoPath, '.agents', 'tools', 'session-capture.sh'), '#!/usr/bin/env bash\n', 0o755);
-  writeFile(path.join(repoPath, '.agents', 'tools', 'obsidian-healthcheck.sh'), '#!/usr/bin/env bash\n', 0o755);
+  writeFile(path.join(repoPath, '.agents', 'hooks', 'session-save.sh'), '#!/usr/bin/env bash\n', 0o755);
+  writeFile(path.join(repoPath, '.agents', 'tools', 'codex-health-check.sh'), '#!/usr/bin/env bash\n', 0o755);
   writeFile(path.join(repoPath, '.context.md'), `- project: ${slug}\n`);
   ensureDir(path.join(vaultPath, 'sessions'));
   ensureDir(path.join(vaultPath, 'metrics'));
@@ -79,8 +79,10 @@ function makeBucketProject(tempDir, slug, options = {}) {
     global_vault_path: options.globalVaultPath || path.join(tempDir, 'vault', slug),
     local_vault_path: '',
     memory_script_present: options.memoryScriptPresent !== false,
-    session_capture_present: Boolean(options.sessionCapturePresent),
-    obsidian_healthcheck_present: Boolean(options.obsidianHealthcheckPresent),
+    session_save_hook_present: Boolean(options.sessionSaveHookPresent),
+    session_capture_present: Boolean(options.sessionSaveHookPresent),
+    health_check_tool_present: Boolean(options.healthCheckToolPresent),
+    obsidian_healthcheck_present: Boolean(options.healthCheckToolPresent),
     framework_version_signals: {},
     excluded_reason: '',
     slug_collision: false,
@@ -611,8 +613,8 @@ test('detectProbableSkillMatches requires score four or higher', () => {
 test('buildProjectSummary excludes project-level skill matches that were read in another session', () => {
   const tempDir = makeTempDir();
   const project = makeBucketProject(tempDir, 'project-read-skill', {
-    sessionCapturePresent: true,
-    obsidianHealthcheckPresent: true,
+    sessionSaveHookPresent: true,
+    healthCheckToolPresent: true,
   });
   project.skill_catalog = [{ id: 'co-review', trigger_phrases: ['co review'] }];
 
@@ -641,8 +643,8 @@ test('buildProjectSummary excludes project-level skill matches that were read in
 test('buildProjectSummary counts project-level skill matches that were never read', () => {
   const tempDir = makeTempDir();
   const project = makeBucketProject(tempDir, 'project-missed-skill', {
-    sessionCapturePresent: true,
-    obsidianHealthcheckPresent: true,
+    sessionSaveHookPresent: true,
+    healthCheckToolPresent: true,
   });
   project.skill_catalog = [{ id: 'co-review', trigger_phrases: ['co review'] }];
 
@@ -684,6 +686,21 @@ test('buildInventory marks slug collisions explicitly', () => {
   assert.equal(new Set(workspaceProjects.map((project) => project.project_key)).size, 2);
 });
 
+test('buildInventory detects real v1.8 tool flags and deprecated aliases', () => {
+  const tempDir = makeTempDir();
+  const workspacesRoot = path.join(tempDir, 'workspaces');
+  const vaultRoot = path.join(tempDir, 'vault');
+  writeCanutoProject({ workspacesRoot, vaultRoot, slug: 'acme', workspace: 'recife' });
+
+  const inventory = buildInventory({ workspacesRoot, vaultRoot });
+  const project = inventory.projects.find((item) => item.project_slug === 'acme');
+
+  assert.equal(project.session_save_hook_present, true);
+  assert.equal(project.session_capture_present, true);
+  assert.equal(project.health_check_tool_present, true);
+  assert.equal(project.obsidian_healthcheck_present, true);
+});
+
 test('runAudit produces compliant summary and merged codex+vault session', async () => {
   const tempDir = makeTempDir();
   const workspacesRoot = path.join(tempDir, 'workspaces');
@@ -703,8 +720,8 @@ canuto_resolve_memory_backend(){ printf "global\\t${vaultPath}\\n"; }
 `,
     0o755,
   );
-  writeFile(path.join(repoPath, '.agents', 'tools', 'session-capture.sh'), '#!/usr/bin/env bash\n', 0o755);
-  writeFile(path.join(repoPath, '.agents', 'tools', 'obsidian-healthcheck.sh'), '#!/usr/bin/env bash\n', 0o755);
+  writeFile(path.join(repoPath, '.agents', 'hooks', 'session-save.sh'), '#!/usr/bin/env bash\n', 0o755);
+  writeFile(path.join(repoPath, '.agents', 'tools', 'codex-health-check.sh'), '#!/usr/bin/env bash\n', 0o755);
   writeFile(path.join(repoPath, '.context.md'), '- project: acme\n');
   writeFile(skillPath, '---\nname: monitor\ntrigger: monitor\n---\n');
 
@@ -729,8 +746,8 @@ fallback_used: false
 - Implemented monitor flow
 
 ## Validation
-- bash .agents/tools/obsidian-healthcheck.sh --json
-- bash .agents/tools/session-capture.sh
+- bash .agents/tools/codex-health-check.sh --json
+- bash .agents/hooks/session-save.sh
 
 ## Learnings
 - Monitor is mandatory here
@@ -820,24 +837,24 @@ test('buildProjectSummary assigns expected five-bucket taxonomy', () => {
     {
       name: 'dormant',
       project: makeBucketProject(tempDir, 'dormant', {
-        sessionCapturePresent: true,
-        obsidianHealthcheckPresent: true,
+        sessionSaveHookPresent: true,
+        healthCheckToolPresent: true,
       }),
       sessions: [makeBucketSession({ timestamp: '2026-03-01T00:00:00.000Z', captured_to_vault: true })],
     },
     {
       name: 'pre-v1.8',
       project: makeBucketProject(tempDir, 'pre-v1.8', {
-        sessionCapturePresent: false,
-        obsidianHealthcheckPresent: true,
+        sessionSaveHookPresent: false,
+        healthCheckToolPresent: true,
       }),
       sessions: [makeBucketSession({ captured_to_vault: true })],
     },
     {
       name: 'v1.8-failing',
       project: makeBucketProject(tempDir, 'v1.8-failing', {
-        sessionCapturePresent: true,
-        obsidianHealthcheckPresent: true,
+        sessionSaveHookPresent: true,
+        healthCheckToolPresent: true,
       }),
       sessions: [
         makeBucketSession({ session_id: 'one', captured_to_vault: true }),
@@ -849,8 +866,8 @@ test('buildProjectSummary assigns expected five-bucket taxonomy', () => {
     {
       name: 'healthy',
       project: makeBucketProject(tempDir, 'healthy', {
-        sessionCapturePresent: true,
-        obsidianHealthcheckPresent: true,
+        sessionSaveHookPresent: true,
+        healthCheckToolPresent: true,
       }),
       sessions: [makeBucketSession({ captured_to_vault: true })],
     },
@@ -868,8 +885,8 @@ test('buildProjectSummary assigns expected five-bucket taxonomy', () => {
 test('buildProjectSummary computes last session age and null for empty projects', () => {
   const tempDir = makeTempDir();
   const project = makeBucketProject(tempDir, 'age-check', {
-    sessionCapturePresent: true,
-    obsidianHealthcheckPresent: true,
+    sessionSaveHookPresent: true,
+    healthCheckToolPresent: true,
   });
 
   const recent = buildProjectSummary(
@@ -887,8 +904,8 @@ test('buildProjectSummary computes last session age and null for empty projects'
 test('buildProjectSummary applies bucket priority before tool-version checks', () => {
   const tempDir = makeTempDir();
   const project = makeBucketProject(tempDir, 'dormant-pre18', {
-    sessionCapturePresent: false,
-    obsidianHealthcheckPresent: false,
+    sessionSaveHookPresent: false,
+    healthCheckToolPresent: false,
   });
   const summary = buildProjectSummary(
     project,
@@ -904,8 +921,8 @@ test('buildProjectSummary classifies zero-session projects without memory dir as
   const tempDir = makeTempDir();
   const project = makeBucketProject(tempDir, 'zero-sessions', {
     memoryDir: false,
-    sessionCapturePresent: true,
-    obsidianHealthcheckPresent: true,
+    sessionSaveHookPresent: true,
+    healthCheckToolPresent: true,
   });
   const summary = buildProjectSummary(project, [], 200, '2026-04-17T00:00:00.000Z');
 
@@ -916,8 +933,8 @@ test('buildProjectSummary treats recent global-vault projects without workspace 
   const tempDir = makeTempDir();
   const project = makeBucketProject(tempDir, 'global-only', {
     memoryScriptPresent: false,
-    sessionCapturePresent: true,
-    obsidianHealthcheckPresent: true,
+    sessionSaveHookPresent: true,
+    healthCheckToolPresent: true,
   });
   project.workspace_path = null;
   project.global_vault_path = path.join(tempDir, 'vault', 'global-only');
@@ -936,8 +953,8 @@ test('buildProjectSummary treats recent global-vault projects without workspace 
 test('buildProjectSummary clamps future session age to zero', () => {
   const tempDir = makeTempDir();
   const project = makeBucketProject(tempDir, 'future-age', {
-    sessionCapturePresent: true,
-    obsidianHealthcheckPresent: true,
+    sessionSaveHookPresent: true,
+    healthCheckToolPresent: true,
   });
   const summary = buildProjectSummary(
     project,
@@ -952,8 +969,8 @@ test('buildProjectSummary clamps future session age to zero', () => {
 test('buildProjectSummary classifies low capture ratio with full v1.8 tool set as v1.8-failing', () => {
   const tempDir = makeTempDir();
   const project = makeBucketProject(tempDir, 'low-capture', {
-    sessionCapturePresent: true,
-    obsidianHealthcheckPresent: true,
+    sessionSaveHookPresent: true,
+    healthCheckToolPresent: true,
   });
   const summary = buildProjectSummary(project, makeBucketSessions(10, 3), 200, '2026-04-17T00:00:00.000Z');
 
@@ -964,8 +981,8 @@ test('buildProjectSummary does not classify missing memory script projects as v1
   const tempDir = makeTempDir();
   const project = makeBucketProject(tempDir, 'missing-memory-script', {
     memoryScriptPresent: false,
-    sessionCapturePresent: true,
-    obsidianHealthcheckPresent: true,
+    sessionSaveHookPresent: true,
+    healthCheckToolPresent: true,
   });
   const summary = buildProjectSummary(project, makeBucketSessions(10, 3), 200, '2026-04-17T00:00:00.000Z');
 
@@ -976,8 +993,8 @@ test('buildProjectSummary does not classify missing memory script projects as v1
 test('buildProjectSummary tolerates undefined skill catalog', () => {
   const tempDir = makeTempDir();
   const project = makeBucketProject(tempDir, 'missing-skill-catalog', {
-    sessionCapturePresent: true,
-    obsidianHealthcheckPresent: true,
+    sessionSaveHookPresent: true,
+    healthCheckToolPresent: true,
   });
   delete project.skill_catalog;
 
@@ -991,14 +1008,59 @@ test('buildProjectSummary tolerates undefined skill catalog', () => {
   assert.equal(summary.skill_catalog_count, 0);
 });
 
+test('buildProjectSummary exposes deprecated tool-flag aliases for one release', () => {
+  const tempDir = makeTempDir();
+  const project = makeBucketProject(tempDir, 'summary-tool-aliases', {
+    sessionSaveHookPresent: false,
+    healthCheckToolPresent: false,
+  });
+  project.session_save_hook_present = true;
+  project.health_check_tool_present = false;
+
+  const summary = buildProjectSummary(
+    project,
+    [makeBucketSession({ captured_to_vault: true })],
+    200,
+    '2026-04-17T00:00:00.000Z',
+  );
+
+  assert.equal(summary.session_save_hook_present, true);
+  assert.equal(summary.session_capture_present, true);
+  assert.equal(summary.health_check_tool_present, false);
+  assert.equal(summary.obsidian_healthcheck_present, false);
+});
+
+test('buildProjectSummary accepts deprecated tool-flag aliases from legacy inventory', () => {
+  const tempDir = makeTempDir();
+  const project = makeBucketProject(tempDir, 'legacy-tool-aliases', {
+    sessionSaveHookPresent: false,
+    healthCheckToolPresent: false,
+  });
+  delete project.session_save_hook_present;
+  delete project.health_check_tool_present;
+  project.session_capture_present = true;
+  project.obsidian_healthcheck_present = true;
+
+  const summary = buildProjectSummary(
+    project,
+    [makeBucketSession({ captured_to_vault: true })],
+    200,
+    '2026-04-17T00:00:00.000Z',
+  );
+
+  assert.equal(summary.bucket, 'healthy');
+  assert.equal(summary.session_save_hook_present, true);
+  assert.equal(summary.health_check_tool_present, true);
+});
+
 test('writeAuditOutputs keeps Project buckets report table in stable taxonomy order', () => {
   const tempDir = makeTempDir();
   const generatedAt = '2026-04-17T00:00:00.000Z';
   const summaries = [
     buildProjectSummary(
       makeBucketProject(tempDir, 'healthy-project', {
-        sessionCapturePresent: true,
-        obsidianHealthcheckPresent: true,
+        sessionSaveHookPresent: true,
+        healthCheckToolPresent: true,
       }),
       [makeBucketSession({ captured_to_vault: true })],
       200,
@@ -1006,8 +1068,8 @@ test('writeAuditOutputs keeps Project buckets report table in stable taxonomy or
     ),
     buildProjectSummary(
       makeBucketProject(tempDir, 'failing-project', {
-        sessionCapturePresent: true,
-        obsidianHealthcheckPresent: true,
+        sessionSaveHookPresent: true,
+        healthCheckToolPresent: true,
       }),
       makeBucketSessions(10, 3),
       200,
@@ -1015,8 +1077,8 @@ test('writeAuditOutputs keeps Project buckets report table in stable taxonomy or
     ),
     buildProjectSummary(
       makeBucketProject(tempDir, 'pre18-project', {
-        sessionCapturePresent: false,
-        obsidianHealthcheckPresent: true,
+        sessionSaveHookPresent: false,
+        healthCheckToolPresent: true,
       }),
       [makeBucketSession({ captured_to_vault: true })],
       200,
@@ -1024,8 +1086,8 @@ test('writeAuditOutputs keeps Project buckets report table in stable taxonomy or
     ),
     buildProjectSummary(
       makeBucketProject(tempDir, 'dormant-project', {
-        sessionCapturePresent: true,
-        obsidianHealthcheckPresent: true,
+        sessionSaveHookPresent: true,
+        healthCheckToolPresent: true,
       }),
       [makeBucketSession({ timestamp: '2026-03-01T00:00:00.000Z', captured_to_vault: true })],
       200,
@@ -1034,8 +1096,8 @@ test('writeAuditOutputs keeps Project buckets report table in stable taxonomy or
     buildProjectSummary(
       makeBucketProject(tempDir, 'never-project', {
         memoryDir: false,
-        sessionCapturePresent: true,
-        obsidianHealthcheckPresent: true,
+        sessionSaveHookPresent: true,
+        healthCheckToolPresent: true,
       }),
       [makeBucketSession({ captured_to_vault: true })],
       200,
