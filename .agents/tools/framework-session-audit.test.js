@@ -5,7 +5,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  buildProjectSummary,
   buildInventory,
+  generateReport,
   parseCodexLogMeta,
   parseCodexLogRecord,
   parseFrontmatter,
@@ -47,6 +49,94 @@ canuto_resolve_memory_backend(){ printf "global\\t${vaultPath}\\n"; }
   ensureDir(path.join(vaultPath, 'sessions'));
   ensureDir(path.join(vaultPath, 'metrics'));
   return { repoPath, vaultPath };
+}
+
+function writeBucketProject(tempDir, slug, options = {}) {
+  const repoPath = path.join(tempDir, 'workspaces', slug);
+  if (options.workspacePath === '') {
+    return '';
+  }
+
+  ensureDir(path.join(repoPath, '.agents', 'tools'));
+  if (options.memoryDir !== false) {
+    ensureDir(path.join(repoPath, '.agents', 'memory'));
+  }
+  if (options.claude !== false) {
+    writeFile(path.join(repoPath, 'CLAUDE.md'), `project-slug: ${slug}\n`);
+  }
+  return repoPath;
+}
+
+function makeBucketProject(tempDir, slug, options = {}) {
+  const repoPath = writeBucketProject(tempDir, slug, options);
+  return {
+    project_key: slug,
+    project_slug: slug,
+    workspace_path: repoPath,
+    workspace_root: slug,
+    backend_kind: 'global',
+    global_vault_path: options.globalVaultPath || path.join(tempDir, 'vault', slug),
+    local_vault_path: '',
+    memory_script_present: options.memoryScriptPresent !== false,
+    session_capture_present: Boolean(options.sessionCapturePresent),
+    obsidian_healthcheck_present: Boolean(options.obsidianHealthcheckPresent),
+    framework_version_signals: {},
+    excluded_reason: '',
+    slug_collision: false,
+    collision_group: [],
+    skill_catalog: [],
+  };
+}
+
+function makeBucketSession(overrides = {}) {
+  return {
+    project_key: 'acme',
+    session_id: overrides.session_id || 'session-1',
+    runtime: 'codex',
+    timestamp: overrides.timestamp || '2026-04-16T00:00:00.000Z',
+    source_kind: 'codex_log',
+    source_path: overrides.source_path || '/tmp/session.jsonl',
+    source_log_path: overrides.source_log_path || '/tmp/session.jsonl',
+    vault_scope: 'none',
+    captured_to_vault: Boolean(overrides.captured_to_vault),
+    fallback_used: false,
+    health_reason: 'unknown',
+    offline_sync: false,
+    pending_sync: Boolean(overrides.pending_sync),
+    review_fix_cycles: 0,
+    tasks_completed: 0,
+    tests_run: 0,
+    pending_count: 0,
+    summary: [],
+    what_was_done: [],
+    validation: overrides.validation || [],
+    learnings: [],
+    skill_reads: [],
+    skill_breakages: [],
+    probable_skill_matches: [],
+    evidence_refs: [],
+    provider: '',
+    model: '',
+    token_usage: {},
+    estimated_cost_usd: null,
+    cost_source: '',
+    missing_pricing: [],
+    tool_calls: [],
+    shell_commands: [],
+    mcp_calls: [],
+    activity_breakdown: {},
+    ...overrides,
+  };
+}
+
+function makeBucketSessions(total, capturedCount, overrides = {}) {
+  return Array.from({ length: total }, (_, index) =>
+    makeBucketSession({
+      session_id: `session-${index + 1}`,
+      captured_to_vault: index < capturedCount,
+      ...overrides,
+    }),
+  );
 }
 
 function writePricing(filePath) {
@@ -299,6 +389,287 @@ pending_count: 0
   assert.equal(summary.sessions_analyzed, 1);
   assert.deepEqual(summary.sessions[0].skill_reads, ['monitor']);
   assert.equal(summary.sessions[0].captured_to_vault, true);
+});
+
+test('buildProjectSummary assigns expected five-bucket taxonomy', () => {
+  const tempDir = makeTempDir();
+  const generatedAt = '2026-04-17T00:00:00.000Z';
+  const cases = [
+    {
+      name: 'never-installed',
+      project: makeBucketProject(tempDir, 'never-installed', { memoryDir: false }),
+      sessions: [makeBucketSession({ captured_to_vault: true })],
+    },
+    {
+      name: 'dormant',
+      project: makeBucketProject(tempDir, 'dormant', {
+        sessionCapturePresent: true,
+        obsidianHealthcheckPresent: true,
+      }),
+      sessions: [makeBucketSession({ timestamp: '2026-03-01T00:00:00.000Z', captured_to_vault: true })],
+    },
+    {
+      name: 'pre-v1.8',
+      project: makeBucketProject(tempDir, 'pre-v1.8', {
+        sessionCapturePresent: false,
+        obsidianHealthcheckPresent: true,
+      }),
+      sessions: [makeBucketSession({ captured_to_vault: true })],
+    },
+    {
+      name: 'v1.8-failing',
+      project: makeBucketProject(tempDir, 'v1.8-failing', {
+        sessionCapturePresent: true,
+        obsidianHealthcheckPresent: true,
+      }),
+      sessions: [
+        makeBucketSession({ session_id: 'one', captured_to_vault: true }),
+        makeBucketSession({ session_id: 'two', captured_to_vault: true, pending_sync: true }),
+        makeBucketSession({ session_id: 'three', captured_to_vault: true }),
+      ],
+      pendingSyncOrphanRatio: 0.3333,
+    },
+    {
+      name: 'healthy',
+      project: makeBucketProject(tempDir, 'healthy', {
+        sessionCapturePresent: true,
+        obsidianHealthcheckPresent: true,
+      }),
+      sessions: [makeBucketSession({ captured_to_vault: true })],
+    },
+  ];
+
+  for (const item of cases) {
+    const summary = buildProjectSummary(item.project, item.sessions, 200, generatedAt);
+    assert.equal(summary.bucket, item.name);
+    if (item.pendingSyncOrphanRatio !== undefined) {
+      assert.equal(summary.pending_sync_orphan_ratio, item.pendingSyncOrphanRatio);
+    }
+  }
+});
+
+test('buildProjectSummary computes last session age and null for empty projects', () => {
+  const tempDir = makeTempDir();
+  const project = makeBucketProject(tempDir, 'age-check', {
+    sessionCapturePresent: true,
+    obsidianHealthcheckPresent: true,
+  });
+
+  const recent = buildProjectSummary(
+    project,
+    [makeBucketSession({ timestamp: '2026-04-15T12:00:00.000Z', captured_to_vault: true })],
+    200,
+    '2026-04-17T00:00:00.000Z',
+  );
+  const empty = buildProjectSummary(project, [], 200, '2026-04-17T00:00:00.000Z');
+
+  assert.equal(recent.last_session_age_days, 1.5);
+  assert.equal(empty.last_session_age_days, null);
+});
+
+test('buildProjectSummary applies bucket priority before tool-version checks', () => {
+  const tempDir = makeTempDir();
+  const project = makeBucketProject(tempDir, 'dormant-pre18', {
+    sessionCapturePresent: false,
+    obsidianHealthcheckPresent: false,
+  });
+  const summary = buildProjectSummary(
+    project,
+    [makeBucketSession({ timestamp: '2026-03-01T00:00:00.000Z', captured_to_vault: true })],
+    200,
+    '2026-04-17T00:00:00.000Z',
+  );
+
+  assert.equal(summary.bucket, 'dormant');
+});
+
+test('buildProjectSummary classifies zero-session projects without memory dir as never-installed', () => {
+  const tempDir = makeTempDir();
+  const project = makeBucketProject(tempDir, 'zero-sessions', {
+    memoryDir: false,
+    sessionCapturePresent: true,
+    obsidianHealthcheckPresent: true,
+  });
+  const summary = buildProjectSummary(project, [], 200, '2026-04-17T00:00:00.000Z');
+
+  assert.equal(summary.bucket, 'never-installed');
+});
+
+test('buildProjectSummary treats recent global-vault projects without workspace as installed signal', () => {
+  const tempDir = makeTempDir();
+  const project = makeBucketProject(tempDir, 'global-only', {
+    memoryScriptPresent: false,
+    sessionCapturePresent: true,
+    obsidianHealthcheckPresent: true,
+  });
+  project.workspace_path = null;
+  project.global_vault_path = path.join(tempDir, 'vault', 'global-only');
+
+  const summary = buildProjectSummary(
+    project,
+    [makeBucketSession({ captured_to_vault: true })],
+    200,
+    '2026-04-17T00:00:00.000Z',
+  );
+
+  assert.notEqual(summary.bucket, 'never-installed');
+  assert.equal(summary.bucket, 'healthy');
+});
+
+test('buildProjectSummary clamps future session age to zero', () => {
+  const tempDir = makeTempDir();
+  const project = makeBucketProject(tempDir, 'future-age', {
+    sessionCapturePresent: true,
+    obsidianHealthcheckPresent: true,
+  });
+  const summary = buildProjectSummary(
+    project,
+    [makeBucketSession({ timestamp: '2026-04-18T00:00:00.000Z', captured_to_vault: true })],
+    200,
+    '2026-04-17T00:00:00.000Z',
+  );
+
+  assert.equal(summary.last_session_age_days, 0);
+});
+
+test('buildProjectSummary classifies low capture ratio with full v1.8 tool set as v1.8-failing', () => {
+  const tempDir = makeTempDir();
+  const project = makeBucketProject(tempDir, 'low-capture', {
+    sessionCapturePresent: true,
+    obsidianHealthcheckPresent: true,
+  });
+  const summary = buildProjectSummary(project, makeBucketSessions(10, 3), 200, '2026-04-17T00:00:00.000Z');
+
+  assert.equal(summary.bucket, 'v1.8-failing');
+});
+
+test('buildProjectSummary does not classify missing memory script projects as v1.8-failing', () => {
+  const tempDir = makeTempDir();
+  const project = makeBucketProject(tempDir, 'missing-memory-script', {
+    memoryScriptPresent: false,
+    sessionCapturePresent: true,
+    obsidianHealthcheckPresent: true,
+  });
+  const summary = buildProjectSummary(project, makeBucketSessions(10, 3), 200, '2026-04-17T00:00:00.000Z');
+
+  assert.equal(summary.bucket, 'never-installed');
+  assert.notEqual(summary.bucket, 'v1.8-failing');
+});
+
+test('buildProjectSummary tolerates undefined skill catalog', () => {
+  const tempDir = makeTempDir();
+  const project = makeBucketProject(tempDir, 'missing-skill-catalog', {
+    sessionCapturePresent: true,
+    obsidianHealthcheckPresent: true,
+  });
+  delete project.skill_catalog;
+
+  const summary = buildProjectSummary(
+    project,
+    [makeBucketSession({ captured_to_vault: true })],
+    200,
+    '2026-04-17T00:00:00.000Z',
+  );
+
+  assert.equal(summary.skill_catalog_count, 0);
+});
+
+test('writeAuditOutputs keeps Project buckets report table in stable taxonomy order', () => {
+  const tempDir = makeTempDir();
+  const generatedAt = '2026-04-17T00:00:00.000Z';
+  const summaries = [
+    buildProjectSummary(
+      makeBucketProject(tempDir, 'healthy-project', {
+        sessionCapturePresent: true,
+        obsidianHealthcheckPresent: true,
+      }),
+      [makeBucketSession({ captured_to_vault: true })],
+      200,
+      generatedAt,
+    ),
+    buildProjectSummary(
+      makeBucketProject(tempDir, 'failing-project', {
+        sessionCapturePresent: true,
+        obsidianHealthcheckPresent: true,
+      }),
+      makeBucketSessions(10, 3),
+      200,
+      generatedAt,
+    ),
+    buildProjectSummary(
+      makeBucketProject(tempDir, 'pre18-project', {
+        sessionCapturePresent: false,
+        obsidianHealthcheckPresent: true,
+      }),
+      [makeBucketSession({ captured_to_vault: true })],
+      200,
+      generatedAt,
+    ),
+    buildProjectSummary(
+      makeBucketProject(tempDir, 'dormant-project', {
+        sessionCapturePresent: true,
+        obsidianHealthcheckPresent: true,
+      }),
+      [makeBucketSession({ timestamp: '2026-03-01T00:00:00.000Z', captured_to_vault: true })],
+      200,
+      generatedAt,
+    ),
+    buildProjectSummary(
+      makeBucketProject(tempDir, 'never-project', {
+        memoryDir: false,
+        sessionCapturePresent: true,
+        obsidianHealthcheckPresent: true,
+      }),
+      [makeBucketSession({ captured_to_vault: true })],
+      200,
+      generatedAt,
+    ),
+  ];
+  const rankings = {
+    obsidian_noncompliance: [],
+    low_skill_adoption: [],
+    operational_breakage: [],
+  };
+  const options = {
+    workspacesRoot: path.join(tempDir, 'workspaces'),
+    vaultRoot: path.join(tempDir, 'vault'),
+    codexLogRoots: [path.join(tempDir, 'codex')],
+    sessionLimit: 200,
+    analysisMode: 'deterministic',
+  };
+  const report = generateReport({
+    generatedAt,
+    inventory: { projects: [], excluded: [] },
+    projectSummaries: summaries,
+    rankings,
+    options,
+  });
+  const result = {
+    generated_at: generatedAt,
+    inventory: { projects: [], excluded: [] },
+    project_summaries: summaries,
+    rankings,
+    report,
+    cost_dashboard: {},
+    cost_dashboard_report: '',
+  };
+  const firstOutputDir = path.join(tempDir, 'out-one');
+  const secondOutputDir = path.join(tempDir, 'out-two');
+  writeAuditOutputs(firstOutputDir, result);
+  writeAuditOutputs(secondOutputDir, result);
+
+  const firstReport = fs.readFileSync(path.join(firstOutputDir, '03-report.md'), 'utf8');
+  const secondReport = fs.readFileSync(path.join(secondOutputDir, '03-report.md'), 'utf8');
+  const bucketRows = firstReport
+    .slice(firstReport.indexOf('## Project buckets'), firstReport.indexOf('## Overview'))
+    .split('\n')
+    .filter((line) => line.startsWith('| ') && !line.startsWith('| Bucket') && !line.startsWith('|---'));
+
+  assert.deepEqual(
+    bucketRows.map((line) => line.split('|')[1].trim()),
+    ['never-installed', 'dormant', 'pre-v1.8', 'v1.8-failing', 'healthy'],
+  );
+  assert.equal(firstReport, secondReport);
 });
 
 test('runAudit builds Codex cost dashboard fields from token_count and tool calls', async () => {

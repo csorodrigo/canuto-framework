@@ -37,6 +37,17 @@ const STATUS_PRIORITY = {
   failing: 3,
 };
 
+// Keep bucket counts in lifecycle order so report diffs stay readable.
+const BUCKET_TAXONOMY_ORDER = ['never-installed', 'dormant', 'pre-v1.8', 'v1.8-failing', 'healthy'];
+// Surface broken v1.8 projects first where operators need triage.
+const BUCKET_TRIAGE_ORDER = {
+  'v1.8-failing': 0,
+  'pre-v1.8': 1,
+  dormant: 2,
+  'never-installed': 3,
+  healthy: 4,
+};
+
 const GENERIC_SKILL_PHRASES = new Set([
   'skill',
   'skills',
@@ -2084,7 +2095,78 @@ function summarizeProjectCost(sessions) {
   };
 }
 
-function buildProjectSummary(project, allSessions, sessionLimit) {
+function roundedMetric(value, digits = 4) {
+  return typeof value === 'number' && Number.isFinite(value) ? Number(value.toFixed(digits)) : null;
+}
+
+function computeLastSessionAgeDays(sessions, generatedAt) {
+  const runTime = Date.parse(generatedAt || '');
+  if (!Number.isFinite(runTime)) return null;
+
+  const timestamps = sessions
+    .map((session) => Date.parse(session.timestamp || ''))
+    .filter((timestamp) => Number.isFinite(timestamp));
+  if (timestamps.length === 0) return null;
+
+  const latest = Math.max(...timestamps);
+  return roundedMetric(Math.max(0, runTime - latest) / (24 * 60 * 60 * 1000));
+}
+
+function hasWorkspaceMemoryDir(project) {
+  if (!project.workspace_path) return false;
+  const memoryDir = path.join(project.workspace_path, '.agents', 'memory');
+  return fs.existsSync(memoryDir) && fs.statSync(memoryDir).isDirectory();
+}
+
+function hasWorkspaceClaudeFile(project) {
+  return Boolean(project.workspace_path && fs.existsSync(path.join(project.workspace_path, 'CLAUDE.md')));
+}
+
+function classifyProjectBucket({ project, sessionsAvailable, lastSessionAgeDays, captureRatio, pendingSyncOrphanRatio }) {
+  const hasWorkspace = Boolean(project.workspace_path);
+  const hasRecentSession = lastSessionAgeDays !== null && lastSessionAgeDays <= 30;
+  const workspaceMissingCanFallThrough = !hasWorkspace && hasRecentSession && Boolean(project.global_vault_path);
+  const memoryInstallSignal = project.memory_script_present || workspaceMissingCanFallThrough;
+
+  if (
+    !workspaceMissingCanFallThrough &&
+    (!hasWorkspace || !hasWorkspaceMemoryDir(project) || !hasWorkspaceClaudeFile(project) || sessionsAvailable === 0)
+  ) {
+    return 'never-installed';
+  }
+
+  if (lastSessionAgeDays !== null && lastSessionAgeDays > 30) {
+    return 'dormant';
+  }
+
+  if (memoryInstallSignal && (!project.session_capture_present || !project.obsidian_healthcheck_present)) {
+    return 'pre-v1.8';
+  }
+
+  if (
+    memoryInstallSignal &&
+    project.session_capture_present &&
+    project.obsidian_healthcheck_present &&
+    (captureRatio < 0.4 || pendingSyncOrphanRatio > 0.2)
+  ) {
+    return 'v1.8-failing';
+  }
+
+  if (
+    memoryInstallSignal &&
+    project.session_capture_present &&
+    project.obsidian_healthcheck_present &&
+    captureRatio >= 0.4 &&
+    pendingSyncOrphanRatio <= 0.2
+  ) {
+    return 'healthy';
+  }
+
+  return 'never-installed';
+}
+
+function buildProjectSummary(project, allSessions, sessionLimit, generatedAt = new Date().toISOString()) {
+  const skillCatalog = project.skill_catalog || [];
   const sessionsAvailable = allSessions.length;
   const analyzedSessions = sortSessionsByTimestampDesc(allSessions).slice(0, sessionLimit);
   const runtimeMix = analyzedSessions.reduce((accumulator, session) => {
@@ -2093,10 +2175,20 @@ function buildProjectSummary(project, allSessions, sessionLimit) {
   }, {});
 
   const captureEvidenceCount = analyzedSessions.filter((session) => session.captured_to_vault).length;
+  const pendingSyncOrphanCount = analyzedSessions.filter((session) => session.pending_sync).length;
   const healthcheckEvidenceCount = analyzedSessions.filter((session) =>
     session.validation.some((line) => normalizeText(line).includes('obsidian-healthcheck')),
   ).length;
   const captureRatio = analyzedSessions.length === 0 ? 0 : captureEvidenceCount / analyzedSessions.length;
+  const pendingSyncOrphanRatio = analyzedSessions.length === 0 ? 0 : roundedMetric(pendingSyncOrphanCount / analyzedSessions.length);
+  const lastSessionAgeDays = sessionsAvailable === 0 ? null : computeLastSessionAgeDays(analyzedSessions, generatedAt);
+  const bucket = classifyProjectBucket({
+    project,
+    sessionsAvailable,
+    lastSessionAgeDays,
+    captureRatio,
+    pendingSyncOrphanRatio,
+  });
   const missEntries = [];
   const readSetBySession = analyzedSessions.map((session) => new Set(session.skill_reads || []));
 
@@ -2138,7 +2230,7 @@ function buildProjectSummary(project, allSessions, sessionLimit) {
   }
 
   let skillStatus = 'unknown';
-  if (project.skill_catalog.length > 0 || analyzedSessions.some((session) => (session.probable_skill_matches || []).length > 0)) {
+  if (skillCatalog.length > 0 || analyzedSessions.some((session) => (session.probable_skill_matches || []).length > 0)) {
     const missRatio = analyzedSessions.length === 0 ? 0 : missEntries.length / analyzedSessions.length;
     if (skillBreakageEntries.length > 0 || missRatio >= 0.5) skillStatus = 'failing';
     else if (missEntries.length > 0) skillStatus = 'partial';
@@ -2358,6 +2450,9 @@ function buildProjectSummary(project, allSessions, sessionLimit) {
     project_slug: project.project_slug,
     sessions_available: sessionsAvailable,
     sessions_analyzed: analyzedSessions.length,
+    bucket,
+    last_session_age_days: lastSessionAgeDays,
+    pending_sync_orphan_ratio: pendingSyncOrphanRatio,
     runtime_mix: runtimeMix,
     obsidian_status: obsidianStatus,
     capture_health: captureHealth,
@@ -2368,7 +2463,7 @@ function buildProjectSummary(project, allSessions, sessionLimit) {
     top_breakages: topBreakages,
     recommended_actions: recommendedActions,
     evidence_refs: evidenceRefs,
-    skill_catalog_count: project.skill_catalog.length,
+    skill_catalog_count: skillCatalog.length,
     cost_summary: costSummary.cost_summary,
     token_totals: costSummary.token_totals,
     top_tools: costSummary.top_tools,
@@ -2380,8 +2475,36 @@ function buildProjectSummary(project, allSessions, sessionLimit) {
   };
 }
 
+function sortProjectSummariesByBucket(projectSummaries) {
+  return [...projectSummaries].sort((left, right) => {
+    const bucketDiff = (BUCKET_TRIAGE_ORDER[left.bucket] ?? 99) - (BUCKET_TRIAGE_ORDER[right.bucket] ?? 99);
+    if (bucketDiff !== 0) return bucketDiff;
+    return left.project_key.localeCompare(right.project_key);
+  });
+}
+
+function groupProjectsByBucket(projectSummaries) {
+  return BUCKET_TAXONOMY_ORDER.map((bucket) => ({
+    bucket,
+    count: projectSummaries.filter((summary) => summary.bucket === bucket).length,
+    projects: projectSummaries
+      .filter((summary) => summary.bucket === bucket)
+      .map((summary) => summary.project_key)
+      .sort((left, right) => left.localeCompare(right)),
+  }));
+}
+
 function rankProjects(projectSummaries) {
   return {
+    projects_by_bucket: sortProjectSummariesByBucket(projectSummaries).map((summary) => ({
+      project_key: summary.project_key,
+      bucket: summary.bucket,
+      last_session_age_days: summary.last_session_age_days,
+      pending_sync_orphan_ratio: summary.pending_sync_orphan_ratio,
+      capture_health: summary.capture_health,
+      framework_health: summary.framework_health,
+    })),
+    bucket_counts: groupProjectsByBucket(projectSummaries),
     obsidian_noncompliance: [...projectSummaries]
       .filter((summary) => summary.obsidian_status !== 'compliant')
       .sort((left, right) => {
@@ -2778,6 +2901,8 @@ function generateReport({ generatedAt, inventory, projectSummaries, rankings, op
   const compliantCount = projectSummaries.filter((summary) => summary.obsidian_status === 'compliant').length;
   const localCount = projectSummaries.filter((summary) => summary.obsidian_status === 'non_compliant_local').length;
   const missingCount = projectSummaries.filter((summary) => summary.obsidian_status === 'non_compliant_missing').length;
+  const bucketCounts = rankings.bucket_counts || groupProjectsByBucket(projectSummaries);
+  const bucketSortedSummaries = sortProjectSummariesByBucket(projectSummaries);
 
   const lines = [
     '# Canuto Cross-Project Session Audit',
@@ -2788,6 +2913,18 @@ function generateReport({ generatedAt, inventory, projectSummaries, rankings, op
     `- Codex log roots: ${options.codexLogRoots.map((root) => `\`${root}\``).join(', ')}`,
     `- Session limit per project: ${options.sessionLimit}`,
     `- Analysis mode: ${options.analysisMode}`,
+    '',
+    '## Project buckets',
+    '',
+    '| Bucket | Count | Projects |',
+    '|---|---:|---|',
+  ];
+
+  for (const item of bucketCounts) {
+    lines.push(`| ${item.bucket} | ${item.count} | ${item.projects.join(', ') || 'n/a'} |`);
+  }
+
+  lines.push(
     '',
     '## Overview',
     '',
@@ -2801,7 +2938,7 @@ function generateReport({ generatedAt, inventory, projectSummaries, rankings, op
     '',
     '### Obsidian noncompliance',
     '',
-  ];
+  );
 
   if (rankings.obsidian_noncompliance.length === 0) {
     lines.push('- No non-compliant projects detected.');
@@ -2830,20 +2967,23 @@ function generateReport({ generatedAt, inventory, projectSummaries, rankings, op
     }
   }
 
-  lines.push('', '## Project Matrix', '', '| Project | Sessions | Runtime | Obsidian | Capture | Skills | Framework |', '| --- | ---: | --- | --- | --- | --- | --- |');
-  for (const summary of projectSummaries) {
+  lines.push('', '## Project Matrix', '', '| Project | Bucket | Sessions | Runtime | Obsidian | Capture | Skills | Framework |', '| --- | --- | ---: | --- | --- | --- | --- | --- |');
+  for (const summary of bucketSortedSummaries) {
     const runtime = Object.entries(summary.runtime_mix)
       .map(([key, count]) => `${key}:${count}`)
       .join(', ');
     lines.push(
-      `| \`${summary.project_key}\` | ${summary.sessions_analyzed}/${summary.sessions_available} | ${runtime || 'n/a'} | ${summary.obsidian_status} | ${summary.capture_health} | ${summary.skill_status} | ${summary.framework_health} |`,
+      `| \`${summary.project_key}\` | ${summary.bucket} | ${summary.sessions_analyzed}/${summary.sessions_available} | ${runtime || 'n/a'} | ${summary.obsidian_status} | ${summary.capture_health} | ${summary.skill_status} | ${summary.framework_health} |`,
     );
   }
 
   lines.push('', '## Project Details', '');
 
-  for (const summary of projectSummaries) {
+  for (const summary of bucketSortedSummaries) {
     lines.push(`### ${summary.project_key}`, '');
+    lines.push(`- Bucket: ${summary.bucket}`);
+    lines.push(`- Last session age days: ${summary.last_session_age_days === null ? 'n/a' : summary.last_session_age_days}`);
+    lines.push(`- Pending-sync orphan ratio: ${summary.pending_sync_orphan_ratio}`);
     lines.push(`- Sessions available/analyzed: ${summary.sessions_available}/${summary.sessions_analyzed}`);
     lines.push(`- Runtime mix: ${Object.entries(summary.runtime_mix).map(([key, count]) => `${key}:${count}`).join(', ') || 'n/a'}`);
     lines.push(`- Obsidian: ${summary.obsidian_status}`);
@@ -2906,6 +3046,9 @@ function validateProjectSummary(summary) {
     'project_key',
     'sessions_available',
     'sessions_analyzed',
+    'bucket',
+    'last_session_age_days',
+    'pending_sync_orphan_ratio',
     'runtime_mix',
     'obsidian_status',
     'capture_health',
@@ -2936,6 +3079,9 @@ function runCodexReviewerAnalysis(packet, options) {
       project_key: 'string',
       sessions_available: 0,
       sessions_analyzed: 0,
+      bucket: 'never-installed|dormant|pre-v1.8|v1.8-failing|healthy',
+      last_session_age_days: 0,
+      pending_sync_orphan_ratio: 0,
       runtime_mix: {},
       obsidian_status: 'compliant|non_compliant_local|non_compliant_missing',
       capture_health: 'healthy|partial|failing|unknown',
@@ -3002,6 +3148,7 @@ async function mapWithConcurrency(items, concurrency, worker) {
 }
 
 async function runAudit(options) {
+  const generatedAt = new Date().toISOString();
   const inventory = buildInventory({
     workspacesRoot: options.workspacesRoot,
     vaultRoot: options.vaultRoot,
@@ -3029,7 +3176,7 @@ async function runAudit(options) {
       pricingIndex,
       claudeRecords: claudeProjectLogs.records,
     });
-    const summary = buildProjectSummary(project, sessions, options.sessionLimit);
+    const summary = buildProjectSummary(project, sessions, options.sessionLimit, generatedAt);
 
     if (options.analysisMode === 'codex-reviewer') {
       const packet = {
@@ -3053,6 +3200,9 @@ async function runAudit(options) {
       if (reviewed && validateProjectSummary(reviewed)) {
         return {
           ...reviewed,
+          bucket: summary.bucket,
+          last_session_age_days: summary.last_session_age_days,
+          pending_sync_orphan_ratio: summary.pending_sync_orphan_ratio,
           cost_summary: summary.cost_summary,
           token_totals: summary.token_totals,
           top_tools: summary.top_tools,
@@ -3072,7 +3222,6 @@ async function runAudit(options) {
     .filter((summary) => validateProjectSummary(summary))
     .sort((left, right) => left.project_key.localeCompare(right.project_key));
   const rankings = rankProjects(projectSummaries);
-  const generatedAt = new Date().toISOString();
   const report = generateReport({
     generatedAt,
     inventory,
@@ -3232,6 +3381,9 @@ function writeAuditOutputs(outputDir, result) {
       summary.sessions.map((session) =>
         JSON.stringify({
           project_key: session.project_key,
+          bucket: summary.bucket,
+          last_session_age_days: summary.last_session_age_days,
+          pending_sync_orphan_ratio: summary.pending_sync_orphan_ratio,
           session_id: session.session_id,
           runtime: session.runtime,
           timestamp: session.timestamp,
@@ -3281,6 +3433,9 @@ function writeAuditOutputs(outputDir, result) {
       project_slug: summary.project_slug,
       sessions_available: summary.sessions_available,
       sessions_analyzed: summary.sessions_analyzed,
+      bucket: summary.bucket,
+      last_session_age_days: summary.last_session_age_days,
+      pending_sync_orphan_ratio: summary.pending_sync_orphan_ratio,
       runtime_mix: summary.runtime_mix,
       obsidian_status: summary.obsidian_status,
       capture_health: summary.capture_health,
