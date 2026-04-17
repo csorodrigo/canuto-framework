@@ -1,19 +1,29 @@
 ---
 skill: codex-github-ops
-trigger: /codex-gh, or when GitHub operations needed and Codex has GitHub MCP
+trigger: /codex-gh, or any GitHub operation — keywords "issue triage", "PR comment", "release notes", "open PR", "merge PR", "label issues", "close issue", "github action", "branch cleanup", "code search on github", "gh cli"
 persona: maestro
-version: 1.0.0
-lastUpdated: 2026-03-30
+version: 1.1.0
+lastUpdated: 2026-04-17
 shortDescription: >
   Codex handles GitHub operations via GitHub MCP — issue triage, PR creation,
-  branch management, code search. Opus only orchestrates.
+  PR comments, release notes, branch management, code search. Opus only orchestrates.
 usedBy: [maestro]
 evals:
   - prompt: "triage the open issues"
     should_trigger: true
   - prompt: "create a PR for this branch"
     should_trigger: true
+  - prompt: "comment on PR #42 with the test results"
+    should_trigger: true
+  - prompt: "draft release notes for v0.3"
+    should_trigger: true
+  - prompt: "close all stale PRs older than 90 days"
+    should_trigger: true
+  - prompt: "search the repo on github for all TODOs with my name"
+    should_trigger: true
   - prompt: "review the code"
+    should_trigger: false
+  - prompt: "run the tests"
     should_trigger: false
 ---
 

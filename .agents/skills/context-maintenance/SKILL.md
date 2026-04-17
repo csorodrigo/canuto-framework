@@ -2,16 +2,24 @@
 name: context-maintenance
 description: Maintain .context.md files, the feature map, and the evaluate-repo indexing pipeline as the codebase evolves.
 skill: context-maintenance
-trigger: automatic when context files are stale or after structural changes
-shortDescription: How to maintain .context.md, FEATURE-MAP.md, and the Repo Index (evaluate-repo pipeline) as the project evolves.
+trigger: automatic when context files are stale or after structural changes; keywords "context update", "docs out of date", "refresh snapshot", "feature map stale", "update .context.md", "directory moved", "feature added", "new module", "rename folder"
+shortDescription: How to maintain .context.md, FEATURE-MAP.md, and the Repo Index (evaluate-repo pipeline) as the project evolves — fires after any structural change, rename, or feature ship.
 usedBy: [contextualizer, coder, architect, maestro]
-version: 2.2.0
-lastUpdated: 2026-03-23
+version: 2.3.0
+lastUpdated: 2026-04-17
 copyright: Rodrigo Canuto © 2026.
 evals:
   - prompt: "we moved auth logic to a new /lib/auth directory, update the context files"
     should_trigger: true
   - prompt: "added 3 new features this week, the FEATURE-MAP is outdated"
+    should_trigger: true
+  - prompt: "refresh the context snapshot for the payments module"
+    should_trigger: true
+  - prompt: "the .context.md files are probably stale, can you check"
+    should_trigger: true
+  - prompt: "we shipped checkout v2, update the feature map"
+    should_trigger: true
+  - prompt: "renamed lib/billing → lib/payments, fix references"
     should_trigger: true
   - prompt: "create a new context.md file for this new project from scratch"
     should_trigger: false
