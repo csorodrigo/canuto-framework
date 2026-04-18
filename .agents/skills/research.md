@@ -130,3 +130,38 @@ After presenting the research report:
 - If the user approves → Maestro routes to Architect (or directly to Coder for XS/S tasks).
 - If the user wants changes → iterate on the plan inline.
 - If the user defers → save as pending task in vault.
+
+---
+
+## Phase 0 — Trio paralelo (FASE 2a+)
+
+Antes de qualquer research propriamente dito, rode 3 streams em paralelo:
+
+```
+Stream A — Gemini brainstorm (SCAMPER / lateral):
+  mcp__gemini__brainstorm({
+    prompt: "<tópico>",
+    methodology: "scamper",  // ou "lateral", "design-thinking"
+    domain: "engineering",
+    ideaCount: 5
+  })
+
+Stream B — Codex parallel research (competitor / benchmark intel):
+  mcp__codex-coder__spawn_agents_parallel({
+    agents: [
+      { prompt: "Search Reddit/HN/X last 30 days for <tópico>. Cite sources." },
+      { prompt: "Find 3 open-source competitors. Compare approach + trade-offs." },
+      { prompt: "Summarize recent papers (ArXiv) related to <tópico>." }
+    ]
+  })
+
+Stream C — Opus (premise interview):
+  Opus pergunta ao user qual premissa é negociável, qual é fixa.
+```
+
+Opus então **consolida os 3 streams** em uma recomendação final com:
+- Convergência (ideias que 2+ streams levantaram) → sinais fortes
+- Ideias únicas por stream → avaliar caso a caso
+- Premises verificadas vs assumidas
+
+Gemini é free via OAuth; Codex parallel é ~60% cheaper que Opus solo.

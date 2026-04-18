@@ -311,3 +311,20 @@ This is bad because: no structured extraction, not searchable, not actionable.
 - **Reuse existing skills.** Use `defuddle` for web articles, don't reinvent web scraping.
 - **Tag appropriately.** Add topic-specific tags so the note is discoverable via vault search.
 - **Link to related notes.** If the ingested content relates to existing vault notes (decisions, instincts, projects), add wikilinks.
+
+---
+
+## Gemini integration — Bulk classify (FASE 2a+)
+
+Quando este skill precisa classificar/triaga um volume de itens (instincts,
+notas, audits), delegue ao slot `bulk-classify` via Gemini flash-lite:
+
+```
+mcp__gemini__ask-gemini({
+  prompt: "Classifique cada linha em uma label do conjunto {X, Y, Z}:\n<itens>",
+  model: "gemini-3.1-flash-lite-preview"
+})
+```
+
+Flash-lite tem quota separada (bar Flash-Lite no TUI) — efetivamente grátis até
+1k/dia. Ver `.agents/skills/bulk-classify.md` pro padrão completo.

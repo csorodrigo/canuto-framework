@@ -28,25 +28,33 @@ which provider should handle it. The goal: **minimize Anthropic spend without lo
 
 | Task Type | Size | Provider | Tool | Est. Savings vs Opus |
 |-----------|------|----------|------|---------------------|
-| **Code generation** | M/L | Codex (gpt-5-codex) | `mcp__codex-coder__spawn_agent` | 60-70% |
+| **Code generation** | M/L | Codex (gpt-5.4 (high)) | `mcp__codex-coder__spawn_agent` | 60-70% |
 | **Code generation** | XS/S | Claude (direct) | — | 0% (MCP overhead exceeds benefit) |
 | **Code review** | M/L | Codex (reviewer profile) | `mcp__codex-reviewer__spawn_agent` | 40-50% |
+| **Code review (big diff / cross-model)** | L+ | Gemini 3.1-pro-preview (secondary) | `mcp__gemini__ask-gemini` | 40% |
 | **Code review** | XS/S | Claude (direct) | — | 0% |
-| **Test-fix loop** | Any | Codex (gpt-5-codex) | `mcp__codex-coder__spawn_agent` | 80% |
-| **Context reading** | Any | Codex (vault MCP) | Codex reads via obsidian-vault MCP | 90% |
-| **Browser QA** | Any | Codex (Playwright) | `mcp__codex-coder__spawn_agent` | 70% |
+| **Test-fix loop** | Any | Codex (gpt-5.4 (high)) | `mcp__codex-coder__spawn_agent` | 80% |
+| **Context reading / @folder digest** | Any | Gemini 3.1-pro-preview | `mcp__gemini__ask-gemini` | 70% vs Opus |
+| **Context reading (vault notes)** | Any | Codex (vault MCP) | Codex reads via obsidian-vault MCP | 90% |
+| **Screenshot OCR / visual diff** | Any | Gemini 3.1-pro-preview (multimodal) | `mcp__gemini__ask-gemini` | new capability |
+| **Browser QA (exec + capture)** | Any | Codex (Playwright) | `mcp__codex-coder__spawn_agent` | 70% |
 | **Planning** | Any | Claude Opus | — | N/A (needs best reasoning) |
 | **Architecture** | Any | Claude Opus | — | N/A |
 | **User interview** | Any | Claude Opus | — | N/A (needs AskUserQuestion) |
-| **Brainstorm** | Any | Codex (parallel) | `spawn_agents_parallel` | 60% |
+| **Brainstorm (structured)** | Any | Gemini brainstorm tool | `mcp__gemini__brainstorm` | ~grátis via OAuth |
+| **Brainstorm (parallel)** | Any | Codex (parallel) | `spawn_agents_parallel` | 60% |
 | **Security scan** | Any | Codex (reviewer profile) | `mcp__codex-reviewer__spawn_agent` | 40% |
-| **Documentation** | Any | Codex (gpt-5-codex) | `mcp__codex-coder__spawn_agent` | 70% |
+| **Security review (triple cross-model)** | M/L | Codex + Gemini + Opus | 3 calls | — |
+| **Bulk classify (labels, triagem)** | Any | Gemini 3.1-flash-lite-preview | `mcp__gemini__ask-gemini` | separate quota |
+| **Research Phase 0 (community intel)** | Any | Gemini brainstorm + Codex parallel | both in parallel | diverse viés |
+| **Documentation** | Any | Codex (gpt-5.4 (high)) | `mcp__codex-coder__spawn_agent` | 70% |
 | **Context loading** | Any | Codex (context-loader) | `mcp__codex-coder__spawn_agent` | 90% |
 | **Session notes** | Any | Codex (session-writer) | `mcp__codex-coder__spawn_agent` | 80% |
 | **PR description** | Any | Codex (pr-writer) | `mcp__codex-coder__spawn_agent` | 70% |
 | **GitHub ops** | Any | Codex (github MCP) | `mcp__codex-coder__spawn_agent` | 60% |
 | **Refactoring prep** | M/L | Codex (refactor-prep) | `mcp__codex-coder__spawn_agent` | 60% |
-| **Onboarding** | Any | Codex (onboarding) | `mcp__codex-coder__spawn_agent` | 90% |
+| **Onboarding / repo pré-digest** | Any | Gemini 3.1-pro-preview → Opus refine | `mcp__gemini__ask-gemini` + Opus | ~90% vs Opus solo |
+| **Onboarding (Codex path)** | Any | Codex (onboarding) | `mcp__codex-coder__spawn_agent` | 90% |
 | **Vault reading** | Any | Codex (multi-vault) | `mcp__codex-coder__spawn_agent` | 90% |
 
 ---
@@ -68,10 +76,19 @@ Before each delegation, Maestro follows this flowchart:
    → YES: Opus handles directly. STOP.
    → NO: continue.
 
-4. Route to Codex per the matrix above.
-   → If codex-coder MCP available: use spawn_agent
-   → If codex-reviewer MCP available: use spawn_agent
-   → Fallback: CCB ask codex only when an active Codex session exists → Claude direct
+4. Route per the matrix above.
+   → If task type is Gemini-native (context-digest, multimodal, brainstorm, bulk-classify):
+     use `mcp__gemini__*` directly.
+   → Else if codex-coder MCP available: use spawn_agent
+   → Else if codex-reviewer MCP available: use spawn_agent
+   → Fallback chain (by task type):
+     - code-gen: codex-coder → codex-reviewer → Claude  (never Gemini — no sandbox)
+     - code-review: codex-reviewer → gemini-3.1-pro-preview (second opinion) → Claude
+     - context-digest / @folder: gemini-3.1-pro-preview → codex context-preload → Claude
+     - multimodal: gemini-3.1-pro-preview → Claude (no plan B)
+     - brainstorm: gemini-3.1-pro-preview + codex parallel → Claude
+     - bulk classify: gemini-3.1-flash-lite-preview → Claude (rate-limit bulk)
+     - security review: triple required (codex-reviewer + gemini + Opus)
 ```
 
 ---
@@ -120,3 +137,16 @@ Sometimes Opus should handle despite the matrix saying Codex:
 - Task involves sensitive operations (deploy, migration, data mutation)
 
 Always log overrides in the session summary with justification.
+
+---
+
+## Gemini-specific gotchas
+
+See `.agents/skills/gemini-routing.md` for the full cheat-sheet. Quick reminders:
+
+- **`gemini-2.5-pro` is banned** — ~50% 429 MODEL_CAPACITY_EXHAUSTED in POC. Use `gemini-3.1-pro-preview`.
+- **Serialize stdio MCP calls** — parallel returns `Not connected` in 5/6.
+- **Copy `@file` into workspace first** — gemini-cli sandbox blocks `/tmp` and `~/*`.
+- **Sandbox mode does not execute** — `sandbox: true` returns hypothetical output. Use Codex for real exec.
+- **Screencapture is full-screen** — mask PII / delete immediately after multimodal calls.
+- **Flash-lite has separate quota bucket** — ideal for bulk classify at volume.

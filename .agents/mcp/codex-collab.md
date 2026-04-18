@@ -7,11 +7,11 @@ Auto-configured by `install.sh` via wrapper scripts in `~/.claude/scripts/`.
 
 | MCP Server | Target Profile | Default Model | Sandbox | Role | Tools |
 |------------|----------------|---------------|---------|------|-------|
-| **codex-coder** | `coder` | `gpt-5-codex` | full write | Coder, Brainstorm, Tester | `spawn_agent`, `spawn_agents_parallel` |
-| **codex-reviewer** | `reviewer` | `o1-pro` when supported | read-only | Reviewer (deep review) | `spawn_agent` |
-| **codex-maestro** | `maestro` | `o1-pro` when supported | full write | Maestro orchestration (o1-pro with write access) | `spawn_agent`, `spawn_agents_parallel` |
+| **codex-coder** | `coder` | `gpt-5.4` (high) | full write | Coder, Brainstorm, Tester | `spawn_agent`, `spawn_agents_parallel` |
+| **codex-reviewer** | `reviewer` | `gpt-5.4` (high, reviewer profile) | read-only | Reviewer (deep review) | `spawn_agent` |
+| **codex-maestro** | `maestro` | `gpt-5.4` (high, reviewer profile) | full write | Maestro orchestration (gpt-5.4 with reasoning: xhigh + write access) | `spawn_agent`, `spawn_agents_parallel` |
 
-**Principle**: `gpt-5-codex` writes code fast. The `reviewer` profile performs the second-opinion review. If the preferred reviewer model is unavailable, the fallback must be reported explicitly.
+**Principle**: `gpt-5.4` (high) writes code fast. The `reviewer` profile performs the second-opinion review. If the preferred reviewer model is unavailable, the fallback must be reported explicitly.
 
 ## Setup
 
@@ -92,8 +92,8 @@ Claude consolidates the result for the user
 
 - `codex-coder` always uses `--profile coder`
 - `codex-reviewer` always uses `--profile reviewer`
-- `reviewer` defaults to `o1-pro` in `~/.codex/config.toml`, but account support is required
-- if `o1-pro` is unavailable, the framework may fall back to another reviewer path; that degradation must be surfaced in output and logs
+- `reviewer` uses `gpt-5.4` with reasoning: high in `~/.codex/config.toml`, but account support is required
+- if the reviewer profile model is unavailable, the framework may fall back to another reviewer path; that degradation must be surfaced in output and logs
 
 ## Fallback Chain
 
@@ -124,5 +124,5 @@ Persist instead:
 
 - **Wrapper command missing**: re-run `bash install.sh --repair`
 - **Reviewer connected but failing**: test `codex exec --profile reviewer` directly; connection alone does not prove model availability
-- **`o1-pro` unsupported**: keep the reviewer path explicit and report the fallback path actually used
+- **reviewer profile unsupported**: keep the reviewer path explicit and report the fallback path actually used
 - **`/ask codex` unavailable**: open a CCB Codex session first; the bridge is not universal

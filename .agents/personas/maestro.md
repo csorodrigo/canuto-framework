@@ -517,7 +517,7 @@ Claude remains the default Maestro runtime. Codex becomes Maestro only when the 
 ### Runtime rules
 - Do NOT switch providers automatically mid-session.
 - Claude runtime keeps Claude Opus as Maestro.
-- Direct Codex runtime uses `CODEX.md` plus the `maestro` profile (`o1-pro` by default when the account supports it).
+- Direct Codex runtime uses `CODEX.md` plus the `maestro` profile (`gpt-5.4` with reasoning: xhigh via the architect profile).
 - Cross-runtime handoff is explicit, never implicit.
 
 ### Triggering conditions
@@ -528,7 +528,7 @@ Claude remains the default Maestro runtime. Codex becomes Maestro only when the 
 
 ### Handoff via MCP (from within Claude)
 
-Prepare a handoff context and spawn Codex via MCP using the **maestro** server (o1-pro with write access):
+Prepare a handoff context and spawn Codex via MCP using the **maestro** server (`gpt-5.4` with reasoning: xhigh + write access):
 
 ```
 mcp__codex-maestro__spawn_agent(prompt="

@@ -13,7 +13,7 @@ Trace analysis can propose (never auto-run) experiment series when review signal
 - When multiple task-types trigger simultaneously, keep the highest variance (largest drop from 7.0) and mention others as "watch" items.
 
 ## Model Affinity Tracking
-- Record which model/persona pairing produced the low scores (e.g., `coder:gpt-5-codex`).
+- Record which model/persona pairing produced the low scores (e.g., `coder:gpt-5.4-high`).
 - If the same model appears in ≥3 low-score sessions, note "model-affinity" so user can direct experiments toward prompt/pattern changes for that model.
 
 ## Proposal Template
@@ -22,7 +22,7 @@ Experiment Proposal: Improve Reviewer Quality (avg 6.6/10 over last 5 S tasks)
 Metric: Reviewer Quality score (higher is better)
 Variable ideas: reviewer checklist prompt, enforce adaptive routing before coding, require unit test diff summary.
 Evidence:
-- 2026-04-02 (task-type: api-fix, model: coder/gpt-5-codex) — 6.5
+- 2026-04-02 (task-type: api-fix, model: coder/gpt-5.4-high) — 6.5
 - 2026-04-03 ...
 Recommendation: start SER-00X once user approves.
 ```

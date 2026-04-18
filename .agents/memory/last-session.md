@@ -1,5 +1,8 @@
 # Last Session — 2026-04-01
 
+> **Note:** model references below reflect decisions as of 2026-04-01. Current config (2026-04-17) uses `gpt-5.4` across all profiles — see `~/.codex/config.toml`. The decision "manter gpt-5-codex no coder profile" was later invalidated when it was discovered `gpt-5-codex` is a phantom slug on ChatGPT accounts.
+
+
 ## What Was Done
 
 ### Validação Codex + GitHub

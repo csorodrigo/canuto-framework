@@ -19,7 +19,7 @@ Obsidian Dataview queries at the bottom provide trend analysis.
 
 | Date | Branch | Review Type | Reviewer | Overall | Correctness | Security | Performance | Readability | Verdict | threadId |
 |------|--------|------------|----------|---------|-------------|----------|-------------|-------------|---------|----------|
-| 2026-03-30 | example | co-validate | o1-pro | 8.5 | 9 | 8 | 8 | 9 | PASS | thread_example |
+| 2026-03-30 | example | co-validate | gpt-5.4 (high, reviewer) | 8.5 | 9 | 8 | 8 | 9 | PASS | thread_example |
 
 ## Dataview Queries
 
@@ -84,7 +84,7 @@ type: review-score
 date: YYYY-MM-DD
 branch: feature/xyz
 review-type: co-validate | pre-commit | security-gate | competition
-reviewer: o1-pro | gpt-5-codex
+reviewer: gpt-5.4 (high, reviewer profile) | gpt-5.4 (high, coder profile)
 overall: 8.5
 correctness: 9
 security: 8
@@ -93,7 +93,7 @@ readability: 9
 verdict: PASS | FAIL | WARN
 threadId: thread_abc123
 escalated: false
-escalation-from: gpt-5-codex  # only if escalated
+escalation-from: coder-profile  # only if escalated
 tags:
   - review-score
   - metrics
@@ -107,5 +107,5 @@ tags:
 | Overall rising | Code quality improving | Keep current practices |
 | Security dropping | New patterns introducing vulnerabilities | Run `/cso` comprehensive audit |
 | Readability dropping | Rushed implementations or complex logic | Slow down, add more planning |
-| High escalation rate | gpt-5-codex struggling with task complexity | Consider using o1-pro as default coder |
+| High escalation rate | coder profile struggling with task complexity | Consider bumping default reasoning_effort to xhigh or using architect profile |
 | Many FAIL verdicts | Systematic quality issue | Review architecture and constraints |

@@ -324,9 +324,9 @@ if [ "$MODE" = "full" ]; then
 
   if command -v codex >/dev/null 2>&1; then
     if codex_run_with_timeout 30 codex exec --profile reviewer --ephemeral -s read-only "Reply with exactly: OK" 2>/dev/null | grep -q "OK"; then
-      pass "o1-pro model available (reviewer profile)"
+      pass "reviewer profile available (gpt-5.4, high)"
     else
-      warn "o1-pro model unavailable — reviewer/maestro calls will fall back"
+      warn "reviewer profile unavailable — reviewer/maestro calls will fall back"
     fi
   fi
 fi

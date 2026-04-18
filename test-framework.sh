@@ -166,6 +166,20 @@ for tool in "${CODEX_TOOLS[@]}"; do
   fi
 done
 
+for js_tool in framework-session-audit framework-session-audit-lib framework-session-audit.test; do
+  TFILE="$AGENTS_DIR/tools/$js_tool.js"
+  if [ ! -f "$TFILE" ]; then
+    fail "Codex JS tool missing: $js_tool.js"
+    continue
+  fi
+
+  if node --check "$TFILE" >/dev/null 2>&1; then
+    pass "$js_tool.js syntax valid"
+  else
+    fail "$js_tool.js has syntax errors"
+  fi
+done
+
 mkdir -p "$AGENTS_DIR/tmp"
 CONTEXT_SMOKE="$AGENTS_DIR/tmp/context-package-smoke.md"
 if bash "$AGENTS_DIR/tools/codex-context-package.sh" --task "Smoke Test" --output "$CONTEXT_SMOKE" --file "CLAUDE.md" >/dev/null 2>&1; then
@@ -255,6 +269,19 @@ if bash -c "source '$AGENTS_DIR/tools/codex-common.sh' && codex_run_with_timeout
   pass "codex-common timeout wrapper works"
 else
   fail "codex-common timeout wrapper failed"
+fi
+
+if node --test "$AGENTS_DIR/tools/framework-session-audit.test.js" >/tmp/framework-session-audit-test.$$ 2>&1; then
+  pass "framework-session-audit tests"
+else
+  fail "framework-session-audit tests failed"
+fi
+rm -f /tmp/framework-session-audit-test.$$
+
+if node "$AGENTS_DIR/tools/framework-session-audit.js" --help >/dev/null 2>&1; then
+  pass "framework-session-audit CLI help"
+else
+  fail "framework-session-audit CLI help failed"
 fi
 
 PORTABILITY_HOME="$(mktemp -d)"

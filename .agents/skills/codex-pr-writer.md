@@ -1,11 +1,12 @@
 ---
 skill: codex-pr-writer
-trigger: /pr-write, or after code review passes and commit is ready
+trigger: /pr-write, or whenever PR prose is needed — keywords "pull request description", "PR body", "PR summary", "PR writeup", "describe this PR", "summary for merge", "changelog entry", "release notes entry", "merge message", "write up this diff"
 persona: maestro
-version: 1.0.0
-lastUpdated: 2026-03-30
+version: 1.1.0
+lastUpdated: 2026-04-17
 shortDescription: >
-  Codex generates PR description + changelog from git diff. Opus only validates.
+  Codex generates PR description, merge summary, and changelog from git diff. Opus only
+  validates. Fires before any PR creation or when a human asks for a writeup of pending changes.
   70% savings on documentation tasks.
 usedBy: [maestro]
 evals:
@@ -13,7 +14,17 @@ evals:
     should_trigger: true
   - prompt: "generate changelog from the diff"
     should_trigger: true
+  - prompt: "describe the pull request body for this branch"
+    should_trigger: true
+  - prompt: "write the merge summary before I push"
+    should_trigger: true
+  - prompt: "draft release notes from main...HEAD"
+    should_trigger: true
+  - prompt: "summarize what changed in this PR"
+    should_trigger: true
   - prompt: "review the code"
+    should_trigger: false
+  - prompt: "run the tests"
     should_trigger: false
 ---
 

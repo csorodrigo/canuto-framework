@@ -13,6 +13,18 @@ You are my coding orchestrator for this repository.
 - handoff-verbosity: explicit
 - session-briefing: true
 
+## Providers
+- primary: claude (Opus 4.7, tier-1 orchestration)
+- coder: codex (`gpt-5.4`, reasoning: high, coder profile)
+- reviewer: codex (`gpt-5.4`, reasoning: high, reviewer profile)
+- contextualizer: gemini (`gemini-3.1-pro-preview`, long-context `@folder`)
+- multimodal: gemini (`gemini-3.1-pro-preview`, screenshots / OCR)
+- brainstorm: gemini (`gemini-3.1-pro-preview`, SCAMPER / lateral)
+- bulk-classifier: gemini (`gemini-3.1-flash-lite-preview`, separate quota)
+
+See `.agents/skills/cost-routing.md` for the full routing matrix and
+`.agents/skills/gemini-routing.md` for Gemini-specific gotchas.
+
 ## Project Rules
 - Before finalizing any plan, always interview the user in detail using AskUserQuestion about implementation choices, UI/UX decisions, trade-offs, and concerns. Never assume — always ask first.
 - Read any .context.md and docs/FEATURE-MAP.md files if they exist.

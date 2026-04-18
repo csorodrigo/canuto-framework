@@ -56,7 +56,7 @@ N >= 9? → Accept. Skim git diff (30 seconds). Log "[Lazy-Review] Auto-accepted
   ↓
 N >= 7? → Quick review. Read diff + check UNCERTAIN_AREAS only.
   ↓
-N >= 4? → Full review. Read all changes. Optionally trigger codex-reviewer (o1-pro).
+N >= 4? → Full review. Read all changes. Optionally trigger codex-reviewer (reviewer profile, `gpt-5.4` high).
   ↓
 N < 4? → Reject. Re-prompt with more context or escalate.
 ```
@@ -95,3 +95,43 @@ Trends: if average confidence drops below 6, review the prompt templates.
 - **multi-provider.md**: all Codex prompts include confidence protocol
 - **budget-controls.md**: lazy review reduces review token budget
 - **review-scores-template.md**: track confidence vs actual quality correlation
+
+---
+
+## Gemini integration — Diff-router by PR type (FASE 2a+)
+
+O reviewer primary é Codex, mas roteamos um subset de diffs pro Gemini quando o
+perfil de review se beneficia de long-context ou multimodal:
+
+| Tipo de diff | Reviewer primary | Reviewer secundário |
+|---|---|---|
+| Small (<100 linhas, 1-3 arquivos) | Codex reviewer | — |
+| Large (>500 linhas, múltiplos módulos) | **Gemini 3.1-pro-preview** (long-context vê repo inteiro) | Codex reviewer (bugs exec) |
+| UI / frontend | **Gemini multimodal** (lê screenshots antes/depois) | Opus pra design taste |
+| Refactor / renomeação | **Gemini** (long-context vê todos call sites) | — |
+| Security (auth, crypto, payment) | **Triple:** Codex + Gemini + Opus (obrigatório) | — |
+| Config / infra | Codex reviewer | Opus pra blast-radius decisions |
+
+### Gemini call pattern (big diff)
+```
+mcp__gemini__ask-gemini({
+  prompt: "@./ Review this diff focusing on: [cross-module impacts, broken
+           contracts, migration safety, backwards compat]. --- CHANGES START ---
+           <git diff> --- CHANGES END ---",
+  model: "gemini-3.1-pro-preview"
+})
+```
+
+### Gemini call pattern (UI diff com screenshots)
+```
+# /browse ou /gstack capturam before.png e after.png
+cp ... .context/before.png .context/after.png
+mcp__gemini__ask-gemini({
+  prompt: "@.context/before.png @.context/after.png Compare layout, spacing,
+           a11y, hierarquia visual. Liste regressões com severidade.",
+  model: "gemini-3.1-pro-preview"
+})
+rm .context/before.png .context/after.png
+```
+
+Ver `.agents/skills/gemini-routing.md` pros gotchas.

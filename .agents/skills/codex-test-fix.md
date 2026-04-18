@@ -99,7 +99,7 @@ If Codex made fixes:
 
 ## Auto-Escalation
 
-If `codex-coder` (gpt-5-codex) fails all 3 attempts:
+If `codex-coder` (gpt-5.4 (high)) fails all 3 attempts:
 1. Collect the test output + Codex's analysis
 2. Escalate to `mcp__codex-reviewer__spawn_agent` (reviewer profile):
 
@@ -107,7 +107,7 @@ If `codex-coder` (gpt-5-codex) fails all 3 attempts:
 mcp__codex-reviewer__spawn_agent({
   prompt: `
 [TEST-FIX ESCALATION]
-gpt-5-codex failed to fix these tests after 3 attempts.
+gpt-5.4 (high) failed to fix these tests after 3 attempts.
 
 ## Failing Tests
 {test_output}

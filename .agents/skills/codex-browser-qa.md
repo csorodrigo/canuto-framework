@@ -1,19 +1,30 @@
 ---
 skill: codex-browser-qa
-trigger: /codex-qa, or when browser testing is needed and Codex has Playwright MCP
+trigger: /codex-qa, or any in-browser testing — keywords "visual regression", "screenshot diff", "DOM check", "accessibility audit", "a11y", "browser test", "e2e", "playwright", "lighthouse", "smoke test UI", "click through", "QA the page", "check layout"
 persona: maestro
-version: 1.0.0
-lastUpdated: 2026-03-30
+version: 1.1.0
+lastUpdated: 2026-04-17
 shortDescription: >
-  Delegates browser QA entirely to Codex via spawn_agent + Playwright MCP. Opus
-  only receives the final report. 70% cost savings vs Opus-driven browser testing.
+  Delegates browser QA entirely to Codex via spawn_agent + Playwright MCP — visual regression,
+  accessibility audits, DOM/layout checks, smoke flows. Opus only receives the final report.
+  70% cost savings vs Opus-driven browser testing.
 usedBy: [maestro, tester]
 evals:
   - prompt: "test the login flow on localhost:3000"
     should_trigger: true
   - prompt: "run browser qa with codex"
     should_trigger: true
+  - prompt: "run a visual regression check against staging"
+    should_trigger: true
+  - prompt: "do an accessibility audit on the checkout page"
+    should_trigger: true
+  - prompt: "smoke test the dashboard UI"
+    should_trigger: true
+  - prompt: "take screenshots of each main route"
+    should_trigger: true
   - prompt: "review the code"
+    should_trigger: false
+  - prompt: "run the unit tests"
     should_trigger: false
 ---
 

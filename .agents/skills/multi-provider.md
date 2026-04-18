@@ -29,9 +29,13 @@ Enable the Maestro to orchestrate multiple AI providers for different personas, 
 | Tier | Role | Default Provider | Model | MCP Tool | Can Delegate? |
 |------|------|-----------------|-------|----------|---------------|
 | tier-1 | Strategic (Maestro, Architect, Contextualizer) | Active runtime (`claude` by default, `codex` in direct Codex sessions) | opus / reviewer profile | — | No — stays on the active runtime |
-| tier-2 | Coder | Codex | gpt-5-codex | `mcp__codex-coder__spawn_agent` | Yes — writes code in filesystem |
-| tier-2 | Reviewer | Codex | reviewer profile (`o1-pro` when supported) | `mcp__codex-reviewer__spawn_agent` | Yes — deep self-review (cross-model) |
-| tier-2 | Tester, Debugger | Codex | gpt-5-codex | `mcp__codex-coder__spawn_agent` | Yes — can use Codex or Claude |
+| tier-2 | Coder | Codex | gpt-5.4 (reasoning: high) | `mcp__codex-coder__spawn_agent` | Yes — writes code in filesystem |
+| tier-2 | Reviewer | Codex | reviewer profile (`gpt-5.4`, reasoning: high) | `mcp__codex-reviewer__spawn_agent` | Yes — deep self-review (cross-model) |
+| tier-2 | Tester, Debugger | Codex | gpt-5.4 (reasoning: high) | `mcp__codex-coder__spawn_agent` | Yes — can use Codex or Claude |
+| tier-2 | Contextualizer (long-context digest) | Gemini | gemini-3.1-pro-preview | `mcp__gemini__ask-gemini` | Yes — reads repo via `@folder`, outputs digest |
+| tier-2 | Multimodal (OCR / screenshots) | Gemini | gemini-3.1-pro-preview | `mcp__gemini__ask-gemini` | Yes — images passed via `@file` |
+| tier-2 | Brainstorm (structured ideation) | Gemini | gemini-3.1-pro-preview | `mcp__gemini__brainstorm` | Yes — SCAMPER / lateral / design-thinking |
+| tier-2 | Bulk classifier | Gemini | gemini-3.1-flash-lite-preview | `mcp__gemini__ask-gemini` | Yes — labeling, triagem at volume |
 
 ---
 
@@ -74,7 +78,7 @@ When Maestro delegates to a tier-2 persona:
    })
    ```
 
-4. **Codex writes code directly in filesystem** (gpt-5-codex).
+4. **Codex writes code directly in filesystem** (gpt-5.4 (reasoning: high)).
 
 5. **Post-code**: Opus reads `git diff`, then triggers Code Review via `mcp__codex-reviewer__spawn_agent` (reviewer profile self-review).
 
@@ -105,22 +109,22 @@ When Maestro delegates to a tier-2 persona:
    - If the output is malformed, retry once with a clarification prompt.
    - If still malformed, fall back to Claude for that task.
 
-### 3. Auto-Escalation: gpt-5-codex → reviewer profile
+### 3. Auto-Escalation: gpt-5.4 (reasoning: high) → reviewer profile
 
-When `codex-coder` (gpt-5-codex) fails a task:
+When `codex-coder` (gpt-5.4 (reasoning: high)) fails a task:
 
 | Failure Type | Detection | Action |
 |-------------|-----------|--------|
 | Tests fail after code | Test runner reports failures | Re-attempt with `/test-fix` loop (3 iterations) |
 | Malformed output | Output doesn't match expected format | Retry once with clarified prompt |
-| Timeout | No response in 120s | Escalate to o1-pro |
-| Logic error | Review catches fundamental flaw | Escalate to o1-pro with error context |
+| Timeout | No response in 120s | Escalate to reasoning: xhigh (architect profile) |
+| Logic error | Review catches fundamental flaw | Escalate to reasoning: xhigh (architect profile) with error context |
 
 **Escalation procedure:**
-1. Collect: original prompt + gpt-5-codex's output + error/failure details
+1. Collect: original prompt + gpt-5.4 (reasoning: high)'s output + error/failure details
 2. Send to `mcp__codex-reviewer__spawn_agent` (reviewer profile) with escalation tag:
    ```
-   [ESCALATION: gpt-5-codex -> reviewer profile]
+   [ESCALATION: gpt-5.4 (reasoning: high) -> reviewer profile]
    The fast model failed this task. Use deeper reasoning than the coding pass.
 
    ## Original Task
@@ -129,7 +133,7 @@ When `codex-coder` (gpt-5-codex) fails a task:
    ## What Failed
    {failure_details}
 
-   ## gpt-5-codex's Attempt
+   ## gpt-5.4 (reasoning: high)'s Attempt
    {codex_output_or_diff}
 
    Please provide the correct implementation.
@@ -137,12 +141,36 @@ When `codex-coder` (gpt-5-codex) fails a task:
 3. Apply the reviewer guidance
 4. Log escalation in session metrics
 
-**Cost note:** reviewer-grade paths are more expensive. Only escalate after gpt-5-codex genuinely fails.
+**Cost note:** reviewer-grade paths are more expensive. Only escalate after gpt-5.4 (reasoning: high) genuinely fails.
 
 ### 4. Fallback Strategy
 
+Fallback matrix by task type:
+
 ```
-codex-coder MCP (gpt-5-codex) -> escalate to codex-reviewer MCP (reviewer profile) -> CCB ask with active Codex session -> Claude-only
+code-gen (escrita):
+  codex-coder → codex-reviewer → Claude   (NÃO Gemini — sem sandbox)
+
+code-review (formal gate):
+  codex-reviewer → gemini-3.1-pro-preview (second opinion) → Claude
+
+context-digest / @folder:
+  gemini-3.1-pro-preview (primary) → codex context-preload → Claude
+
+multimodal (screenshot, image):
+  gemini-3.1-pro-preview (primary) → Claude (sem plano B real)
+
+brainstorm / research Phase 0:
+  gemini-3.1-pro-preview + codex parallel (em paralelo) → Claude consolida
+
+bulk classify:
+  gemini-3.1-flash-lite-preview (primary) → Claude (limite de volume)
+
+security review (auth/crypto/payment):
+  triple obrigatório: codex-reviewer + gemini + Opus
+
+plan review estratégico:
+  triple via /co-plan --triple: opus (self) + codex-reviewer + gemini
 ```
 
 Maestro logs every fallback and escalation in the session summary.
@@ -201,13 +229,20 @@ See `.agents/plugins/ccb/skills/ccb-delegate.md` for the full CCB delegation pro
 
 ```
 ANTHROPIC_API_KEY=...     # Claude (always required)
-OPENAI_API_KEY=...        # Codex (optional)
+OPENAI_API_KEY=...        # Codex (optional — ChatGPT-account Codex CLI uses its own login)
 GLM_API_KEY=...           # GLM (optional)
+# Gemini: uses OAuth (no env var). Run `gemini auth login` once; `mcp__gemini__*` inherits.
 # CCB (optional — only if CCB plugin is installed)
 # CCB reads provider keys from its own config but uses the same env vars above
 ```
 
 These MUST be in `.env` (never committed). See `security-practices` skill.
+
+**Gemini auth note:** `jamubc/gemini-mcp-tool` (registered as `gemini` user-scope) is
+OAuth-only — it shells out to the local `gemini-cli`. No `GEMINI_API_KEY` is needed,
+and per gotcha in `gemini-routing.md` we do NOT add one (would change quota tier
+and trigger different fallback behavior). Quota: 1000 req/day on OAuth, split across
+Pro / Flash / Flash-Lite buckets.
 
 ---
 

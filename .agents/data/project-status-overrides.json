@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "generated_at": "2026-04-17",
+  "source": "Dormant triage decided case-by-case after forensic analysis of audit 2026-04-15",
+  "schema": {
+    "status": "archived | reactivate | keep-dormant",
+    "reason": "human-readable note on why this status was chosen",
+    "decided_at": "ISO date"
+  },
+  "notes": [
+    "framework-session-audit-lib.js should consult this file when computing bucket.",
+    "archived -> excluded from health metrics; bucket forced to 'archived' (not part of 5-bucket taxonomy).",
+    "reactivate -> flagged for batch install v1.8; until install completes, classified by normal rules.",
+    "keep-dormant -> no install; kept in inventory for awareness, not counted against health."
+  ],
+  "overrides": {
+    "jakarta": {
+      "status": "reactivate",
+      "reason": "1 codex session 2026-03-09; workspace /conductor/workspaces/dados-pj-pf/jakarta exists; no global vault — needs install v1.8 + vault bootstrap",
+      "decided_at": "2026-04-17"
+    },
+    "bamako": {
+      "status": "archived",
+      "reason": "3 sessions; workspace has backup dir dated 2026-03-31 suggesting abandonment; no global vault",
+      "decided_at": "2026-04-17"
+    },
+    "nairobi": {
+      "status": "reactivate",
+      "reason": "1 codex session 2026-03-09; workspace /conductor/workspaces/azilados-game/nairobi exists; no global vault — needs install v1.8 + vault bootstrap",
+      "decided_at": "2026-04-17"
+    },
+    "ifood-analise": {
+      "status": "reactivate",
+      "reason": "Repo + workspace + global vault exist; 2 claude sessions with missing timestamps — revive capture flow",
+      "decided_at": "2026-04-17"
+    },
+    "ifood-rafaeldashboard": {
+      "status": "reactivate",
+      "reason": "Global vault has 41 files, congelado em 2026-03-23; 2 claude sessions; resume capture & healthcheck",
+      "decided_at": "2026-04-17"
+    },
+    "ifood-raspador": {
+      "status": "reactivate",
+      "reason": "Workspace + vault exist; parent of bamako (now archived) and other subdirs; 2 claude sessions",
+      "decided_at": "2026-04-17"
+    },
+    "omie-v1": {
+      "status": "reactivate",
+      "reason": "Legacy OMIE integration; repo + workspace + archived-contexts + vault present; 2 claude sessions",
+      "decided_at": "2026-04-17"
+    },
+    "video-produtividade": {
+      "status": "reactivate",
+      "reason": "Repo + workspace + vault present; 2 claude sessions without recognizable timestamp — revive capture",
+      "decided_at": "2026-04-17"
+    }
+  }
+}
