@@ -158,6 +158,19 @@ setup_deps() {
   else
     ok "uvx available"
   fi
+
+  # rtk — optional Bash output compressor (60-90% token savings on git/grep/test commands).
+  # Complements context-digest (file-level) and smart-token-metering (budget tracking).
+  # See .agents/skills/cost-routing.md → "External token-saving layers".
+  if command -v rtk &> /dev/null; then
+    ok "rtk $(rtk --version 2>/dev/null | awk '{print $2}') already installed (Bash output compressor)"
+  else
+    if $has_brew; then
+      log "rtk not found — install with: brew install rtk  (optional, saves 60-90% on Bash command output)"
+    else
+      log "rtk not found — install from https://github.com/rtk-ai/rtk  (optional, saves 60-90% on Bash command output)"
+    fi
+  fi
 }
 
 # ── Check git availability ──────────────────────────────────────────────────
@@ -282,13 +295,24 @@ FRAMEWORK_FILES=(
   ".agents/skills/context-maintenance/references/evaluate-repo-pipeline.md"
   ".agents/skills/context-maintenance/references/examples.md"
   ".agents/skills/api-design.md"
+  ".agents/skills/audit.md"
+  ".agents/skills/auto-analysis.md"
+  ".agents/skills/bulk-classify.md"
+  ".agents/skills/colorize.md"
   ".agents/skills/frontend-implementation.md"
   ".agents/skills/cli-usage.md"
   ".agents/skills/security-practices.md"
   ".agents/skills/git-workflow.md"
+  ".agents/skills/gemini-routing.md"
+  ".agents/skills/knowledge-ingest.md"
   ".agents/skills/plugin-system.md"
   ".agents/skills/multi-provider.md"
+  ".agents/skills/research.md"
+  ".agents/skills/stuck-detection.md"
+  ".agents/skills/typeset.md"
+  ".agents/skills/vault-maintenance.md"
   ".agents/skills/vault-sync.md"
+  ".agents/skills/verification-gates.md"
   ".agents/skills/metrics.md"
   ".agents/skills/squads.md"
   ".agents/skills/pr-description.md"
@@ -344,6 +368,7 @@ FRAMEWORK_FILES=(
   ".agents/skills/context-preload.md"
   ".agents/skills/codex-browser-qa.md"
   ".agents/mcp/codex-collab.md"
+  ".agents/mcp/setup.md"
   ".agents/tools/vault-bridge.sh"
   ".agents/tools/canuto-memory.sh"
   ".agents/tools/codex-common.sh"
@@ -356,6 +381,7 @@ FRAMEWORK_FILES=(
   ".agents/tools/canuto-consumer-smoke.sh"
   ".agents/tools/codex-maestro.sh"
   ".agents/tools/codex-maestro-mcp.sh"
+  ".agents/tools/gemini-smoke-check.sh"
   ".agents/tools/vault-sync.sh"
   # Codex economy + integration skills (Fase 3)
   ".agents/skills/codex-context-loader.md"
@@ -1192,7 +1218,7 @@ model_reasoning_effort = "high"
 
 [profiles.maestro]
 model = "gpt-5.4"
-model_reasoning_effort = "high"
+model_reasoning_effort = "xhigh"
 
 [profiles.reviewer]
 model = "gpt-5.4"
@@ -1200,7 +1226,7 @@ model_reasoning_effort = "high"
 
 [profiles.architect]
 model = "gpt-5.4"
-model_reasoning_effort = "high"
+model_reasoning_effort = "xhigh"
 
 [profiles.fast]
 model = "gpt-5.4"
@@ -1216,7 +1242,7 @@ TOMLEOF
           coder)     echo -e "\n[profiles.coder]\nmodel = \"gpt-5.4\"\nmodel_reasoning_effort = \"high\"" >> "$config_toml" ;;
           maestro)   echo -e "\n[profiles.maestro]\nmodel = \"gpt-5.4\"\nmodel_reasoning_effort = \"xhigh\"" >> "$config_toml" ;;
           reviewer)  echo -e "\n[profiles.reviewer]\nmodel = \"gpt-5.4\"\nmodel_reasoning_effort = \"high\"" >> "$config_toml" ;;
-          architect) echo -e "\n[profiles.architect]\nmodel = \"o3\"\nmodel_reasoning_effort = \"high\"" >> "$config_toml" ;;
+          architect) echo -e "\n[profiles.architect]\nmodel = \"gpt-5.4\"\nmodel_reasoning_effort = \"xhigh\"" >> "$config_toml" ;;
           fast)      echo -e "\n[profiles.fast]\nmodel = \"gpt-5.4\"\nmodel_reasoning_effort = \"high\"" >> "$config_toml" ;;
         esac
         patched=true
@@ -1437,7 +1463,7 @@ Available profiles in \`~/.codex/config.toml\` — use when spawned with \`--pro
 | \`coder\` | gpt-5.4 | high | Standard code generation |
 | \`maestro\` | gpt-5.4 | xhigh | Direct Codex runtime orchestration |
 | \`reviewer\` | gpt-5.4 | high | Deep code review, security audit |
-| \`architect\` | o3 | high | Architecture, complex reasoning |
+| \`architect\` | gpt-5.4 | xhigh | Architecture, complex reasoning |
 | \`fast\` | gpt-5.4 | high | Quick edits, formatting, docs |
 
 - Claude sessions keep Claude Opus as Maestro.
@@ -1476,7 +1502,7 @@ Available profiles in `~/.codex/config.toml` — use when spawned with `--profil
 | `coder` | gpt-5.4 | high | Standard code generation |
 | `maestro` | gpt-5.4 | xhigh | Direct Codex runtime orchestration |
 | `reviewer` | gpt-5.4 | high | Deep code review, security audit |
-| `architect` | o3 | high | Architecture, complex reasoning |
+| `architect` | gpt-5.4 | xhigh | Architecture, complex reasoning |
 | `fast` | gpt-5.4 | high | Quick edits, formatting, docs |
 
 - Claude sessions keep Claude Opus as Maestro.
@@ -2628,33 +2654,50 @@ if [ "$MODE" = "check" ]; then
   UP_TO_DATE=0
   OUTDATED=0
   MISSING=0
+  FETCH_FAIL=0
+  UNKNOWN=0
 
   for file in "${FRAMEWORK_FILES[@]}"; do
     if [ ! -f "$file" ]; then
       echo -e "  ${RED}\u2717 MISSING${RESET}    $file"
       MISSING=$((MISSING + 1))
-    else
-      LOCAL_VER=$(grep "^version:" "$file" 2>/dev/null | head -1 | awk '{print $2}')
-      REMOTE_VER=$(fetch_content "$file" | grep "^version:" | head -1 | awk '{print $2}')
+      continue
+    fi
 
-      if [ -z "$LOCAL_VER" ] || [ -z "$REMOTE_VER" ]; then
-        echo -e "  ${YELLOW}? UNKNOWN${RESET}    $file (no version field)"
-      elif [ "$LOCAL_VER" = "$REMOTE_VER" ]; then
-        echo -e "  ${GREEN}\u2713 OK${RESET}        $file (v$LOCAL_VER)"
-        UP_TO_DATE=$((UP_TO_DATE + 1))
-      else
-        echo -e "  ${YELLOW}\u26a0 OUTDATED${RESET}   $file (local: v$LOCAL_VER \u2192 remote: v$REMOTE_VER)"
-        OUTDATED=$((OUTDATED + 1))
-      fi
+    # Local: tolerate missing version: field (grep no-match) without aborting.
+    LOCAL_VER=$(grep "^version:" "$file" 2>/dev/null | head -1 | awk '{print $2}' || true)
+
+    # Remote: distinguish fetch failure from "no version field".
+    if REMOTE_CONTENT=$(fetch_content "$file" 2>/dev/null); then
+      REMOTE_VER=$(printf '%s\n' "$REMOTE_CONTENT" | grep "^version:" | head -1 | awk '{print $2}' || true)
+    else
+      echo -e "  ${RED}\u2717 FETCH_FAIL${RESET} $file (could not retrieve remote)"
+      FETCH_FAIL=$((FETCH_FAIL + 1))
+      continue
+    fi
+
+    if [ -z "$LOCAL_VER" ] || [ -z "$REMOTE_VER" ]; then
+      echo -e "  ${YELLOW}? UNKNOWN${RESET}    $file (no version field)"
+      UNKNOWN=$((UNKNOWN + 1))
+    elif [ "$LOCAL_VER" = "$REMOTE_VER" ]; then
+      echo -e "  ${GREEN}\u2713 OK${RESET}        $file (v$LOCAL_VER)"
+      UP_TO_DATE=$((UP_TO_DATE + 1))
+    else
+      echo -e "  ${YELLOW}\u26a0 OUTDATED${RESET}   $file (local: v$LOCAL_VER \u2192 remote: v$REMOTE_VER)"
+      OUTDATED=$((OUTDATED + 1))
     fi
   done
 
   echo ""
-  echo -e "  Summary: ${GREEN}${UP_TO_DATE} up-to-date${RESET}  ${YELLOW}${OUTDATED} outdated${RESET}  ${RED}${MISSING} missing${RESET}"
+  echo -e "  Summary: ${GREEN}${UP_TO_DATE} up-to-date${RESET}  ${YELLOW}${OUTDATED} outdated${RESET}  ${RED}${MISSING} missing${RESET}  ${YELLOW}${UNKNOWN} unknown${RESET}  ${RED}${FETCH_FAIL} fetch-fail${RESET}"
   echo ""
 
   if [ "$OUTDATED" -gt 0 ] || [ "$MISSING" -gt 0 ]; then
     log "Run 'bash install.sh --update' to update outdated/missing files."
+  elif [ "$FETCH_FAIL" -gt 0 ]; then
+    log "Could not verify ${FETCH_FAIL} file(s) due to remote fetch errors — re-run with network access."
+  elif [ "$UNKNOWN" -gt 0 ]; then
+    log "${UP_TO_DATE} file(s) up to date; ${UNKNOWN} file(s) without version field were not verified."
   else
     ok "All framework files are up to date."
   fi
