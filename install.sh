@@ -10,6 +10,7 @@
 #   Smoke test:       bash install.sh --test
 #   Repair runtime:   bash install.sh --repair
 #   Doctor mode:      bash install.sh --doctor
+#   Dependency setup: bash install.sh --deps-only
 #   Migrate from v1:  bash install.sh --migrate
 #   With API key:     bash install.sh --migrate --api-key YOUR_OBSIDIAN_API_KEY
 #   Via curl + key:   curl ... | bash -s -- --migrate --api-key YOUR_KEY
@@ -23,7 +24,7 @@ REPO_URL="https://raw.githubusercontent.com/csorodrigo/canuto-framework/main"
 AGENTS_DIR=".agents"
 CLAUDE_MD="CLAUDE.md"
 TMP_DIR=$(mktemp -d)
-MODE="auto" # auto | install | update | check | skill | migrate | repair | doctor | test
+MODE="auto" # auto | install | update | check | skill | migrate | repair | doctor | test | deps
 ORIGINAL_ARGS=("$@")
 SCRIPT_SOURCE="${BASH_SOURCE[0]:-$0}"
 SKILLS_TO_INSTALL=()
@@ -50,6 +51,7 @@ while [[ $# -gt 0 ]]; do
     --test)    MODE="test"    ;;
     --migrate) MODE="migrate" ;;
     --repair)  MODE="repair"  ;;
+    --deps-only|--deps) MODE="deps" ;;
     --doctor|--health) MODE="doctor" ;;
     --json) JSON_OUTPUT=true ;;
     --yes) AUTO_YES=true ;;
@@ -106,58 +108,264 @@ if git remote -v 2>/dev/null | grep -q "canuto-framework"; then
 fi
 
 # ── setup_deps ──────────────────────────────────────────────────────────────
-# Ensures required CLI tools are available, installing via brew when possible.
+# Ensures required global runtime tools are available and RTK is initialized.
 setup_deps() {
-  # brew — package manager for macOS (install all other deps via brew)
+  local failures=0
   local has_brew=false
-  if command -v brew &> /dev/null; then
-    has_brew=true
-    ok "brew $(brew --version | head -1) already installed"
-  elif [[ "$OSTYPE" == "darwin"* ]]; then
+
+  fail_dep() {
+    local message="$1"
+    failures=$((failures + 1))
+    warn "$message"
+  }
+
+  add_brew_formula_path() {
+    local formula="$1"
+    local prefix=""
+
+    if ! command -v brew >/dev/null 2>&1; then
+      return 0
+    fi
+
+    prefix=$(brew --prefix "$formula" 2>/dev/null || true)
+    if [ -n "$prefix" ] && [ -d "$prefix/bin" ]; then
+      case ":$PATH:" in
+        *":$prefix/bin:"*) ;;
+        *) export PATH="$prefix/bin:$PATH" ;;
+      esac
+    fi
+  }
+
+  ensure_homebrew() {
+    if command -v brew >/dev/null 2>&1; then
+      has_brew=true
+      ok "brew $(brew --version | head -1) already installed"
+      return 0
+    fi
+
+    if [[ "$OSTYPE" != "darwin"* ]]; then
+      fail_dep "Homebrew is required for automatic dependency setup. Install the missing tools manually; apt/yum are not used by this installer."
+      return 0
+    fi
+
+    if ! command -v curl >/dev/null 2>&1; then
+      fail_dep "Homebrew is missing and curl is unavailable. Install Homebrew manually from https://brew.sh and retry."
+      return 0
+    fi
+
     log "Installing Homebrew..."
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
-      && has_brew=true && ok "Homebrew installed" \
-      || warn "Failed to install Homebrew — install manually: https://brew.sh"
-  else
-    warn "brew not available (non-macOS). Install jq and ast-grep manually."
+    if /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; then
+      export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+      if command -v brew >/dev/null 2>&1; then
+        has_brew=true
+        ok "Homebrew installed"
+      else
+        fail_dep "Homebrew installer completed, but brew is still not on PATH. Add Homebrew to PATH and retry."
+      fi
+    else
+      fail_dep "Failed to install Homebrew. Install manually from https://brew.sh and retry."
+    fi
+  }
+
+  ensure_command() {
+    local command_name="$1"
+    local install_hint="$2"
+    local label="$3"
+
+    if command -v "$command_name" >/dev/null 2>&1; then
+      ok "$label available: $(command -v "$command_name")"
+    else
+      fail_dep "$label missing. $install_hint"
+    fi
+  }
+
+  ensure_brew_formula() {
+    local command_name="$1"
+    local formula="$2"
+    local label="$3"
+
+    if command -v "$command_name" >/dev/null 2>&1; then
+      ok "$label already installed: $(command -v "$command_name")"
+      return 0
+    fi
+
+    if [ "$has_brew" != true ]; then
+      fail_dep "$label missing. Install manually or install Homebrew, then run: brew install $formula"
+      return 0
+    fi
+
+    log "Installing $label via Homebrew: brew install $formula"
+    if brew install "$formula"; then
+      add_brew_formula_path "$formula"
+      if command -v "$command_name" >/dev/null 2>&1; then
+        ok "$label installed: $(command -v "$command_name")"
+      else
+        fail_dep "$label installed via Homebrew, but '$command_name' is still not on PATH."
+      fi
+    else
+      add_brew_formula_path "$formula"
+      if command -v "$command_name" >/dev/null 2>&1; then
+        ok "$label available after Homebrew check: $(command -v "$command_name")"
+      else
+        fail_dep "Failed to install $label. Retry manually with: brew install $formula"
+      fi
+    fi
+  }
+
+  ensure_brew_cask() {
+    local command_name="$1"
+    local cask="$2"
+    local label="$3"
+
+    if command -v "$command_name" >/dev/null 2>&1; then
+      ok "$label already installed: $(command -v "$command_name")"
+      return 0
+    fi
+
+    if [ "$has_brew" != true ]; then
+      fail_dep "$label missing. Install manually or install Homebrew, then run: brew install --cask $cask"
+      return 0
+    fi
+
+    log "Installing $label via Homebrew cask: brew install --cask $cask"
+    if brew install --cask "$cask"; then
+      if command -v "$command_name" >/dev/null 2>&1; then
+        ok "$label installed: $(command -v "$command_name")"
+      else
+        fail_dep "$label installed via Homebrew cask, but '$command_name' is still not on PATH."
+      fi
+    else
+      if command -v "$command_name" >/dev/null 2>&1; then
+        ok "$label available after Homebrew cask check: $(command -v "$command_name")"
+      else
+        fail_dep "Failed to install $label. Retry manually with: brew install --cask $cask"
+      fi
+    fi
+  }
+
+  ensure_npm_global() {
+    local command_name="$1"
+    local package="$2"
+    local label="$3"
+
+    if command -v "$command_name" >/dev/null 2>&1; then
+      ok "$label already installed: $(command -v "$command_name")"
+      return 0
+    fi
+
+    if ! command -v npm >/dev/null 2>&1; then
+      fail_dep "$label missing and npm is unavailable. Install Node.js/npm first."
+      return 0
+    fi
+
+    log "Installing $label globally via npm: npm install -g $package"
+    if npm install -g "$package"; then
+      if command -v "$command_name" >/dev/null 2>&1; then
+        ok "$label installed: $(command -v "$command_name")"
+      else
+        fail_dep "$label installed via npm, but '$command_name' is still not on PATH."
+      fi
+    else
+      fail_dep "Failed to install $label. Retry manually with: npm install -g $package"
+    fi
+  }
+
+  setup_rtk() {
+    local rtk_show=""
+
+    if ! command -v rtk >/dev/null 2>&1; then
+      fail_dep "rtk missing. Install with: brew install rtk"
+      return 0
+    fi
+
+    if rtk --version >/dev/null 2>&1; then
+      ok "rtk available: $(rtk --version 2>/dev/null | head -1)"
+    else
+      fail_dep "rtk is installed but 'rtk --version' failed."
+    fi
+
+    log "Initializing RTK for Claude..."
+    if rtk init -g --auto-patch >/dev/null 2>&1; then
+      ok "rtk init -g --auto-patch configured"
+    else
+      fail_dep "rtk init -g --auto-patch failed."
+    fi
+
+    log "Initializing RTK for Codex..."
+    if rtk init -g --codex >/dev/null 2>&1; then
+      ok "rtk init -g --codex configured"
+    else
+      fail_dep "rtk init -g --codex failed."
+    fi
+
+    rtk_show=$(mktemp)
+    if rtk init --show >"$rtk_show" 2>&1; then
+      ok "rtk init --show succeeded"
+      if grep -q "settings.json: exists but RTK hook not configured" "$rtk_show" 2>/dev/null; then
+        fail_dep "Claude settings.json exists but RTK hook is not configured."
+      fi
+      if grep -q "Hook: not found" "$rtk_show" 2>/dev/null; then
+        fail_dep "Claude RTK hook is not configured."
+      fi
+    else
+      fail_dep "rtk init --show failed: $(head -1 "$rtk_show" 2>/dev/null || echo unknown error)"
+    fi
+    rm -f "$rtk_show"
+
+    if [ -f "$HOME/.claude/RTK.md" ]; then
+      ok "~/.claude/RTK.md exists"
+    else
+      fail_dep "~/.claude/RTK.md missing after RTK init."
+    fi
+
+    if [ -f "$HOME/.claude/CLAUDE.md" ] && grep -q "RTK.md" "$HOME/.claude/CLAUDE.md" 2>/dev/null; then
+      ok "~/.claude/CLAUDE.md references RTK.md"
+    else
+      fail_dep "~/.claude/CLAUDE.md does not reference RTK.md."
+    fi
+
+    if [ -f "$HOME/.codex/RTK.md" ]; then
+      ok "~/.codex/RTK.md exists"
+    else
+      fail_dep "~/.codex/RTK.md missing after RTK init."
+    fi
+
+    if [ -f "$HOME/.codex/AGENTS.md" ] && grep -q "RTK.md" "$HOME/.codex/AGENTS.md" 2>/dev/null; then
+      ok "~/.codex/AGENTS.md references RTK.md"
+    else
+      fail_dep "~/.codex/AGENTS.md does not reference RTK.md."
+    fi
+  }
+
+  ensure_homebrew
+
+  ensure_brew_formula git git "git"
+  ensure_brew_formula curl curl "curl"
+  ensure_brew_formula wget wget "wget"
+  ensure_brew_formula jq jq "jq"
+  ensure_brew_formula node node "node/npm/npx"
+  ensure_command npm "Install with: brew install node" "npm"
+  ensure_command npx "Install with: brew install node" "npx"
+  ensure_brew_formula python3 python "python3"
+  ensure_brew_formula uvx uv "uv/uvx"
+  ensure_command uv "Install with: brew install uv" "uv"
+  ensure_brew_formula sg ast-grep "ast-grep"
+  ensure_brew_formula rg ripgrep "ripgrep"
+  ensure_brew_formula rtk rtk "rtk"
+  ensure_brew_formula bun oven-sh/bun/bun "bun"
+  ensure_brew_formula gh gh "GitHub CLI"
+  ensure_brew_cask gcloud gcloud-cli "Google Cloud CLI"
+  ensure_npm_global codex "@openai/codex@latest" "Codex CLI"
+  ensure_npm_global gemini "@google/gemini-cli@latest" "Gemini CLI"
+  setup_rtk
+
+  if [ "$failures" -gt 0 ]; then
+    warn "$failures dependency check(s) failed."
+    return 1
   fi
 
-  # jq — required for hooks and MCP setup
-  if ! command -v jq &> /dev/null; then
-    if $has_brew; then
-      log "Installing jq via Homebrew..."
-      brew install jq 2>/dev/null && ok "jq installed" || warn "Failed to install jq — install manually: brew install jq"
-    else
-      warn "jq not found and brew unavailable. Install manually: brew install jq"
-      warn "Hooks and MCP setup will be skipped."
-    fi
-  else
-    ok "jq $(jq --version) already installed"
-  fi
-
-  # node / npx — required for ast-grep MCP server
-  if ! command -v node &> /dev/null; then
-    warn "node not found — ast-grep MCP server requires Node.js."
-    if $has_brew; then
-      warn "Install with: brew install node"
-    else
-      warn "Install from: https://nodejs.org"
-    fi
-  else
-    ok "node $(node --version) already installed"
-  fi
-
-  # uv / uvx — required for codex-as-mcp
-  if ! command -v uvx &> /dev/null; then
-    if $has_brew; then
-      log "Installing uv via Homebrew..."
-      brew install uv 2>/dev/null && ok "uv/uvx installed" || warn "Failed to install uv — install manually: brew install uv"
-    else
-      warn "uvx not found and brew unavailable. Install manually: brew install uv"
-    fi
-  else
-    ok "uvx available"
-  fi
+  ok "All Canuto runtime dependencies are installed and configured."
+  return 0
 }
 
 # ── Check git availability ──────────────────────────────────────────────────
@@ -196,7 +404,7 @@ fetch_content() {
 
 should_refresh_installer() {
   case "$MODE" in
-    install|update|check|skill|migrate|repair|doctor)
+    install|update|check|skill|migrate|repair|doctor|test|deps)
       ;;
     *)
       return 1
@@ -271,6 +479,7 @@ skill_remote_files() {
 # ── File lists ──────────────────────────────────────────────────────────────
 
 FRAMEWORK_FILES=(
+  "install.sh"
   ".agents/personas/maestro.md"
   ".agents/personas/architect.md"
   ".agents/personas/coder.md"
@@ -1753,7 +1962,7 @@ PYEOF
 }
 
 repair_runtime() {
-  setup_deps
+  setup_deps || return 1
   setup_local_script_permissions
   merge_claude_md
   merge_agents_md
@@ -1776,6 +1985,7 @@ repair_runtime() {
   if [ -f ".gitignore" ] && ! grep -q ".agents/tmp/" ".gitignore" 2>/dev/null; then
     echo ".agents/tmp/" >> ".gitignore"
   fi
+  return 0
 }
 
 # ── setup_gstack ─────────────────────────────────────────────────────────────
@@ -2712,6 +2922,16 @@ if [ "$MODE" = "skill" ]; then
   echo ""
   rm -rf "$TMP_DIR"
   exit 0
+fi
+
+# ── DEPS ONLY ───────────────────────────────────────────────────────────────
+if [ "$MODE" = "deps" ]; then
+  if setup_deps; then
+    rm -rf "$TMP_DIR"
+    exit 0
+  fi
+  rm -rf "$TMP_DIR"
+  exit 1
 fi
 
 # ── REPAIR ──────────────────────────────────────────────────────────────────

@@ -65,6 +65,17 @@ Useful in specific project types. Install with `bash install.sh --skill <name>`.
 
 ---
 
+## Gemini routing skills
+
+Gemini routing support is available for consultant-style MCP workflows.
+
+- `gemini-routing` — Provider routing matrix and Gemini-specific gotchas
+- `bulk-classify` — High-volume classification workflow via Gemini flash-lite
+
+Concrete routing rules are defined in `cost-routing.md`.
+
+---
+
 ## Global Skills (deployed to ~/.claude/skills/ by install.sh)
 
 These skills are slash commands invokable directly in Claude Code. Installed automatically via `bash .agents/hooks/install.sh`.

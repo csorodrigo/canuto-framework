@@ -61,6 +61,36 @@ curl -k -H "Authorization: Bearer YOUR_API_KEY" https://127.0.0.1:27124/
 
 You should get a JSON response with vault info.
 
+## Optional Gemini MCP
+
+Gemini MCP support is optional and adds a read-only consultant for long-context, multimodal, and bulk classification workflows. It does not require active OAuth for framework smoke checks.
+
+### Install gemini-cli
+
+```bash
+npm install -g @google/gemini-cli
+```
+
+### Authenticate
+
+```bash
+gemini auth login
+```
+
+This starts the OAuth flow in your browser.
+
+### Register the Gemini MCP
+
+```bash
+claude mcp add gemini -- npx -y gemini-mcp-tool
+```
+
+### Verify Gemini MCP
+
+```bash
+claude mcp list | grep gemini
+```
+
 ## Available MCP Tools
 
 | Tool | Purpose |

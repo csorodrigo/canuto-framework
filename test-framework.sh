@@ -145,7 +145,7 @@ echo ""
 
 echo "── Test 3b: Tooling ──"
 
-CODEX_TOOLS=(canuto-memory codex-common codex-diff-context codex-context-package codex-health-check canuto-consumer-smoke codex-maestro vault-sync)
+CODEX_TOOLS=(canuto-memory codex-common codex-diff-context codex-context-package codex-health-check canuto-consumer-smoke codex-maestro gemini-smoke-check vault-sync)
 for tool in "${CODEX_TOOLS[@]}"; do
   TFILE="$AGENTS_DIR/tools/$tool.sh"
   if [ ! -f "$TFILE" ]; then
@@ -315,6 +315,16 @@ else
 fi
 echo ""
 
+if [ "${GEMINI_INTEGRATION:-0}" = "1" ]; then
+  echo "── Test 3c: Gemini Integration ──"
+  if bash "$AGENTS_DIR/tools/gemini-smoke-check.sh" >/dev/null 2>&1; then
+    pass "gemini-smoke-check.sh"
+  else
+    fail "gemini-smoke-check.sh failed"
+  fi
+  echo ""
+fi
+
 # ═══════════════════════════════════════════════════════════════════════════
 # TEST 4: Vault Bases
 # ═══════════════════════════════════════════════════════════════════════════
@@ -367,6 +377,40 @@ if [ -f "$FRAMEWORK_DIR/install.sh" ]; then
   else
     fail "install.sh has syntax errors"
   fi
+
+  INSTALL_STATIC_PATTERNS=(
+    'install|update|check|skill|migrate|repair|doctor|test|deps)'
+    '"install.sh"'
+    '--test)    MODE="test"'
+    '--repair)  MODE="repair"'
+    '--doctor|--health) MODE="doctor"'
+    'ensure_brew_formula git git "git"'
+    'ensure_brew_formula curl curl "curl"'
+    'ensure_brew_formula wget wget "wget"'
+    'ensure_brew_formula jq jq "jq"'
+    'ensure_brew_formula node node "node/npm/npx"'
+    'ensure_brew_formula python3 python "python3"'
+    'ensure_brew_formula uvx uv "uv/uvx"'
+    'ensure_brew_formula sg ast-grep "ast-grep"'
+    'ensure_brew_formula rg ripgrep "ripgrep"'
+    'ensure_brew_formula rtk rtk "rtk"'
+    'ensure_brew_formula bun oven-sh/bun/bun "bun"'
+    'ensure_brew_formula gh gh "GitHub CLI"'
+    'ensure_brew_cask gcloud gcloud-cli "Google Cloud CLI"'
+    'ensure_npm_global codex "@openai/codex@latest" "Codex CLI"'
+    'ensure_npm_global gemini "@google/gemini-cli@latest" "Gemini CLI"'
+    'rtk init -g --auto-patch'
+    'rtk init -g --codex'
+    '--deps-only|--deps'
+  )
+
+  for pattern in "${INSTALL_STATIC_PATTERNS[@]}"; do
+    if grep -qF -- "$pattern" "$FRAMEWORK_DIR/install.sh" 2>/dev/null; then
+      pass "install.sh covers: $pattern"
+    else
+      fail "install.sh missing expected dependency coverage: $pattern"
+    fi
+  done
 else
   fail "install.sh not found"
 fi

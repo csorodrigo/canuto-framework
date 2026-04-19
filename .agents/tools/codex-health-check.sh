@@ -72,6 +72,81 @@ fail() {
   fi
 }
 
+first_version_line() {
+  local command_name="$1"
+  shift
+  "$command_name" "$@" 2>/dev/null | head -1 | tr -d '\r'
+}
+
+check_required_command() {
+  local command_name="$1"
+  local label="$2"
+  shift 2
+  local version=""
+
+  if command -v "$command_name" >/dev/null 2>&1; then
+    version=$(first_version_line "$command_name" "$@" || true)
+    if [ -n "$version" ]; then
+      pass "$label available: $version"
+    else
+      pass "$label available: $(command -v "$command_name")"
+    fi
+  else
+    fail "$label missing: $command_name"
+  fi
+}
+
+check_required_file() {
+  local file_path="$1"
+  local label="$2"
+
+  if [ -f "$file_path" ]; then
+    pass "$label exists"
+  else
+    fail "$label missing: $file_path"
+  fi
+}
+
+check_required_reference() {
+  local file_path="$1"
+  local pattern="$2"
+  local label="$3"
+
+  if [ -f "$file_path" ] && grep -q "$pattern" "$file_path" 2>/dev/null; then
+    pass "$label"
+  else
+    fail "$label missing"
+  fi
+}
+
+check_rtk_activation() {
+  local rtk_show=""
+
+  if command -v rtk >/dev/null 2>&1; then
+    rtk_show=$(mktemp)
+    if rtk init --show >"$rtk_show" 2>&1; then
+      pass "rtk init --show executes"
+      if grep -q "settings.json: exists but RTK hook not configured" "$rtk_show" 2>/dev/null; then
+        fail "Claude RTK hook configured"
+      elif grep -q "Hook: not found" "$rtk_show" 2>/dev/null; then
+        fail "Claude RTK hook configured"
+      else
+        pass "Claude RTK hook configured"
+      fi
+    else
+      fail "rtk init --show failed: $(head -n 1 "$rtk_show" 2>/dev/null || echo unknown error)"
+    fi
+    rm -f "$rtk_show"
+  else
+    fail "rtk init --show unavailable: rtk missing"
+  fi
+
+  check_required_file "$HOME/.claude/RTK.md" "Claude RTK.md"
+  check_required_reference "$HOME/.claude/CLAUDE.md" "RTK.md" "Claude CLAUDE.md references RTK.md"
+  check_required_file "$HOME/.codex/RTK.md" "Codex RTK.md"
+  check_required_reference "$HOME/.codex/AGENTS.md" "RTK.md" "Codex AGENTS.md references RTK.md"
+}
+
 run_codex_smoke_exec() {
   local label="$1"
   shift
@@ -162,6 +237,36 @@ EXPECTED_CODEX_REVIEWER="$CLAUDE_SCRIPTS_DIR/codex-reviewer.sh"
 EXPECTED_CODEX_AGENT_MCP="$CLAUDE_SCRIPTS_DIR/codex-agent-mcp.py"
 
 if [ "$MODE" = "full" ]; then
+  if [ "$JSON_OUTPUT" = false ]; then
+    echo "Dependency checks"
+  fi
+
+  check_required_command brew "brew" --version
+  check_required_command git "git" --version
+  check_required_command curl "curl" --version
+  check_required_command wget "wget" --version
+  check_required_command jq "jq" --version
+  check_required_command node "node" --version
+  check_required_command npm "npm" --version
+  check_required_command npx "npx" --version
+  check_required_command python3 "python3" --version
+  check_required_command uv "uv" --version
+  check_required_command uvx "uvx" --version
+  check_required_command codex "codex" --version
+  check_required_command sg "ast-grep" --version
+  check_required_command rg "ripgrep" --version
+  check_required_command bun "bun" --version
+  check_required_command rtk "rtk" --version
+  check_required_command gcloud "Google Cloud CLI" --version
+  check_required_command gemini "Gemini CLI" --version
+  check_required_command gh "GitHub CLI" --version
+  check_rtk_activation
+
+  if [ "$JSON_OUTPUT" = false ]; then
+    echo ""
+    echo "Codex runtime checks"
+  fi
+
   if command -v codex >/dev/null 2>&1; then
     pass "codex CLI available: $(codex --version 2>/dev/null || echo unknown)"
   else
@@ -255,13 +360,13 @@ if [ "$MODE" = "full" ]; then
           if jq -e '(.transport.env.OBSIDIAN_API_KEY // .env.OBSIDIAN_API_KEY) and (.transport.env.OBSIDIAN_BASE_URL // .env.OBSIDIAN_BASE_URL)' "$_MCP_TMP" >/dev/null 2>&1; then
             pass "obsidian-vault has required env configuration"
           else
-            warn "obsidian-vault missing env configuration"
+            fail "obsidian-vault missing env configuration"
           fi
         else
           pass "codex native MCP present: $server"
         fi
       else
-        warn "codex native MCP missing: $server"
+        fail "codex native MCP missing: $server"
       fi
     done
   else

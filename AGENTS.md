@@ -40,7 +40,7 @@ Available profiles in `~/.codex/config.toml` — use when spawned with `--profil
 | `coder` | gpt-5.4 | high | Standard code generation |
 | `maestro` | gpt-5.4 | xhigh | Direct Codex runtime orchestration |
 | `reviewer` | gpt-5.4 | high | Deep code review, security audit |
-| `architect` | o3 | high | Architecture, complex reasoning |
+| `architect` | gpt-5.4 | xhigh | Architecture, complex reasoning |
 | `fast` | gpt-5.4 | high | Quick edits, formatting, docs |
 
 - Claude sessions keep Claude Opus as Maestro.

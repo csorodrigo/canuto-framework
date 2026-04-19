@@ -8,13 +8,14 @@
 | Area | Status | Entry Points | Notes |
 |------|--------|--------------|-------|
 | Fresh install | implemented | `install.sh` | Bootstraps `.agents/`, hooks, vault, Codex, and docs |
-| Update flow | implemented | `install.sh --update` | Designed to refresh installer logic from `main` before applying updates |
-| Runtime repair | implemented | `install.sh --repair` | Reinstalls hooks, rewires MCP/config, recreates missing bootstrap files |
-| One-command diagnosis | implemented | `install.sh --doctor`, `install.sh --health` | Runs repair plus consumer/Codex health validation |
+| Update flow | implemented | `install.sh --update` | Refreshes installer logic from `main`, persists the updated `install.sh`, then applies framework updates |
+| Runtime repair | implemented | `install.sh --repair` | Provisions strict runtime dependencies, reinstalls hooks, rewires MCP/config, recreates missing bootstrap files |
+| One-command diagnosis | implemented | `install.sh --doctor`, `install.sh --health` | Installs/verifies dependencies, runs repair plus consumer/Codex health validation, and fails if the complete environment is not ready |
 | Consumer smoke test | implemented | `install.sh --test`, `.agents/tools/canuto-consumer-smoke.sh` | Validates project-facing install state |
-| Codex health check | implemented | `.agents/tools/codex-health-check.sh` | Verifies CLI, profiles, trust, hooks, MCPs, contexts |
+| Codex health check | implemented | `.agents/tools/codex-health-check.sh` | Verifies CLI, profiles, trust, hooks, MCPs, contexts, dependency checks, and RTK activation |
 | Cross-project session audit | implemented | `.agents/tools/framework-session-audit.js`, `.agents/tools/framework-session-audit-lib.js` | Audits the latest up-to-200 sessions per project across workspaces, vault artifacts, and Codex logs; emits inventory, NDJSON dataset, JSON summaries, and markdown report |
 | Cost dashboard telemetry | implemented | `.agents/tools/framework-session-audit.js`, `.agents/tools/framework-session-audit-lib.js` | Report-only cost dashboard for Codex, Claude project logs, Claude telemetry, and optional Codeburn exports; emits `04-cost-dashboard.json` and `.md` |
+| Gemini MCP integration | partial | `.agents/mcp/setup.md`, `.agents/skills/gemini-routing.md`, `.agents/skills/bulk-classify.md` | Read-only consultant for long-context, multimodal, and bulk-classify workflows. Setup: see `.agents/mcp/setup.md` |
 | JSON health output | implemented | `install.sh --test --json`, `.agents/tools/codex-health-check.sh --json` | Machine-readable diagnostics for CI and dashboards |
 | Context bootstrap | implemented | `.context.md`, `docs/FEATURE-MAP.md`, `.agents/vault/digests/00-bootstrap-digest.md` | Created automatically when missing |
 | Passive hooks | implemented | `.agents/hooks/` | Session save, pre-compact save, plan review, Codex pretool guard |

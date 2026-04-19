@@ -42,11 +42,23 @@ jobs:
           for skill in .agents/skills/*.md; do
             [ -f "$skill" ] || continue
             name=$(basename "$skill")
-            if ! head -1 "$skill" | grep -q "^shortDescription:"; then
-              echo "  ✗ $name missing shortDescription"
-              ERRORS=$((ERRORS + 1))
+            # Skip non-skill artifacts that may live under .agents/skills/
+            if [ "$name" = "CLAUDE.md" ]; then
+              continue
+            fi
+            first=$(head -1 "$skill")
+            if echo "$first" | grep -q "^shortDescription:"; then
+              echo "  ✓ $name (legacy frontmatter)"
+            elif [ "$first" = "---" ] && awk '
+                NR == 1 { next }
+                /^---$/ { closed = 1; exit (found && closed ? 0 : 1) }
+                /^(shortDescription|description|skill):/ { found = 1 }
+                END { exit (found && closed ? 0 : 1) }
+              ' "$skill"; then
+              echo "  ✓ $name (yaml frontmatter)"
             else
-              echo "  ✓ $name"
+              echo "  ✗ $name missing shortDescription/description/skill"
+              ERRORS=$((ERRORS + 1))
             fi
           done
           if [ $ERRORS -gt 0 ]; then
