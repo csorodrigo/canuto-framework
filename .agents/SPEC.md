@@ -312,8 +312,9 @@ When Maestro starts a new session:
 2. Query `pending/` via MCP → list unfinished tasks.
 3. Search for high/medium confidence instincts via MCP.
 4. Check for **stale contexts** (git-based diff).
-5. Scan `.agents/plugins/` for active plugins.
-6. Report all to user before starting work.
+5. Run `canuto-project-doctor` when setup, memory coverage, context freshness, or framework drift looks suspicious.
+6. Scan `.agents/plugins/` for active plugins.
+7. Report all to user before starting work.
 
 Format:
 ```
@@ -322,6 +323,7 @@ Session Briefing:
 - Stale contexts: src/api/ (3 files changed since last .context.md update)
 - Pending: 2 tasks in vault/pending/
 - Active instincts: 3 high, 5 medium
+- Learning signals: 1 rework loop in auth middleware.
 - Active plugins: ci-pipeline, database-migrations.
 ```
 
@@ -335,6 +337,24 @@ Before closing, Maestro:
 4. Creates metric note in `metrics/YYYY-MM-DD-metrics.md`.
 5. Creates audit events in `audit/` for SESSION_END.
 6. Extracts instincts to individual notes in `instincts/`.
+7. Runs `canuto-session-end-learning` to reconcile session summary, pending tasks, decisions, metrics, rework signals, and candidate instincts into a proposed write plan.
+8. Uses `obsidian-writeback-queue` for non-standard vault writes, cross-project writes, and offline queue flushes. Preview and approval are required before writing outside the resolved project vault path.
+
+### 5.4.1 Learning Loop Guardrails
+
+The framework must close the loop between work, errors, and durable memory:
+
+```
+session work -> session-end-learning -> pending/decisions/metrics/instinct candidates
+             -> writeback preview -> user approval -> vault write or offline queue
+             -> project-doctor checks coverage on the next session
+```
+
+Rules:
+- Repeated errors should become either a pending task, a decision, a metric, or a candidate instinct.
+- `canuto-rework-detector` runs before more implementation when retry loops, review loops, stale assumptions, or repeated pending tasks are suspected.
+- `canuto-pending-triage` runs when pending notes become duplicated, stale, vague, or too large to use.
+- Vault writes are scoped to `projects/{project-slug}/` unless the user explicitly approves a different target.
 
 ### 5.5 Token Economy Strategy
 
@@ -460,9 +480,16 @@ The template generates a default `CLAUDE.md` with these configurable sections:
 ## On Session Start
 1. Query vault via MCP: latest session note, pending tasks, high-confidence instincts
 2. Check for stale contexts
-3. Scan plugins
-4. Brief the user
-5. Ask what to work on
+3. Run canuto-project-doctor if setup, memory, or context looks suspicious
+4. Scan plugins
+5. Brief the user
+6. Ask what to work on
+
+## On Session End
+1. Run canuto-session-end-learning before closing
+2. Update vault memory with summary, pending tasks, decisions, metrics, and instincts
+3. Use obsidian-writeback-queue for any non-standard Obsidian/Canuto vault write-back
+4. Never write outside the resolved project vault path without explicit approval
 ```
 
 ---
@@ -544,6 +571,11 @@ The template generates a default `CLAUDE.md` with these configurable sections:
 | `metrics` | How to track quality, velocity, and compliance |
 | `squads` | How to group personas into parallel workstreams |
 | `stack-lock` | How to enforce approved library choices via `.agents/stack.md` |
+| `canuto-project-doctor` | Diagnose installation, memory coverage, stale context, and framework drift |
+| `canuto-session-end-learning` | Extract session learning into proposed memory writes at session end |
+| `canuto-rework-detector` | Detect retry loops, review loops, stale assumptions, and repeated failed approaches |
+| `canuto-pending-triage` | Deduplicate and prioritize pending tasks across vault notes and local memory |
+| `obsidian-writeback-queue` | Stage safe Obsidian/Canuto vault write-back with preview and approval |
 
 ### Observability & Governance Skills
 | Skill | Purpose |

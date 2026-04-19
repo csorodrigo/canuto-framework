@@ -2,6 +2,14 @@
 
 Personal multi-agent framework for AI-assisted development. Claude-first by default, Codex-maestro when you are talking directly to Codex. Obsidian-native memory.
 
+This release keeps the v1.6 Obsidian-native runtime and adds a sharper learning-loop layer: project diagnosis, rework detection, session-end learning, pending triage, and safe vault write-back preview. It also adds optional QA skills for dashboards, scrapers, routing, spreadsheets, and frontend visual checks.
+
+## Documentation
+
+- [`SUMMARY.md`](SUMMARY.md): short operational summary of the framework, learning loop, and skill activation model.
+- [`TUTORIAL.md`](TUTORIAL.md): step-by-step usage, update, session, and rollout guide.
+- [`registry.md`](registry.md): core, optional, and global skill registry.
+
 ## Structure
 
 ```
@@ -28,6 +36,11 @@ Personal multi-agent framework for AI-assisted development. Claude-first by defa
     squads.md                 — Parallel workstreams for larger projects.
     pr-description.md         — Auto-generate PR descriptions after review.
     health-check.md           — Diagnose framework setup integrity on demand.
+    canuto-project-doctor.md  — Diagnose setup, memory, stale context, and framework drift.
+    canuto-session-end-learning.md — Extract session learning before vault writes.
+    canuto-rework-detector.md — Detect repeated attempts and stale assumptions.
+    canuto-pending-triage.md  — Deduplicate and prioritize pending tasks.
+    obsidian-writeback-queue.md — Stage safe Obsidian/Canuto vault writes.
     continuous-learning/
       SKILL.md                — Extract reusable instincts from session experience.
     frontend-design/
@@ -100,6 +113,8 @@ Maestro → Architect → Coder → Tester → Reviewer
 ## Quick Start
 
 Guia completo: [docs/TUTORIAL.md](docs/TUTORIAL.md)
+Resumo operacional: [SUMMARY.md](SUMMARY.md)
+Tutorial rapido: [TUTORIAL.md](TUTORIAL.md)
 Tutorial visual: [docs/TUTORIAL-VISUAL.html](docs/TUTORIAL-VISUAL.html)
 Troubleshooting: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 Catalogo de skills: [registry.md](registry.md)
@@ -157,6 +172,8 @@ bash test-framework.sh
 ```bash
 bash install.sh --skill adr
 bash install.sh --skill adr --skill session-goals
+bash install.sh --skill dashboard-regression-guard
+bash install.sh --skill frontend-visual-qa
 ```
 
 ### One-time migration from v1.5 (flat-file memory) to v1.6 (Obsidian vault)
@@ -169,7 +186,7 @@ curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/in
 
 | Passive after install | Explicitly ask/run |
 |-----------------------|--------------------|
-| Maestro briefing, normal persona flow, session-save hook, pre-compact-save hook, plan-review hook, Codex pretool guard | `bash install.sh --update`, `bash install.sh --repair`, `bash install.sh --doctor`, `"health check"`, runtime flags like `set FAST_MODE`, slash commands like `/office-hours`, direct skill requests like `"use a skill research"` |
+| Maestro briefing, normal persona flow, session-save hook, pre-compact-save hook, plan-review hook, Codex pretool guard, instinct lookup, project-doctor on suspicious setup, rework detector on repeated loops, session-end learning, write-back preview before vault writes | `bash install.sh --update`, `bash install.sh --repair`, `bash install.sh --doctor`, `"health check"`, `"triage pending"`, runtime flags like `set FAST_MODE`, slash commands like `/office-hours`, direct skill requests like `"use a skill research"` |
 
 ### New project via GitHub template
 
@@ -194,12 +211,34 @@ O runtime grava handoffs persistidos em `projects/{nome}/handoffs/`. Se a sessao
 
 ## Como Funciona
 
-Apos a instalacao, abra o projeto em Claude ou inicie o runtime direto do Codex com `bash .agents/tools/codex-maestro.sh`. O Maestro vai:
-1. Carregar a memoria do vault via MCP e apresentar o briefing da sessao.
-2. Pedir os objetivos da sessao (ate 3 goals).
-3. Detectar o estilo do projeto (Canuto / foreign-schema / novo).
-4. Orquestrar as personas para a sua tarefa.
-5. Ao encerrar: marcar goals, gravar memoria no vault, persistir o envelope de handoff/review, gerar metricas.
+Apos a instalacao, abra o projeto em Claude ou inicie o runtime direto do Codex com `bash .agents/tools/codex-maestro.sh`. O Maestro conduz este ciclo:
+
+1. **Bootstrap**: carrega `CLAUDE.md`, personas, skills, vault, context package e projeto ativo.
+2. **Session start**: consulta o vault via MCP, carrega latest session, pending tasks, instincts e stale-context signals. Se setup/memoria/contexto parecerem suspeitos, roda `canuto-project-doctor`.
+3. **Planejamento**: limita objetivos da sessao, detecta estilo do projeto e escolhe personas/skills relevantes.
+4. **Execucao**: Architect, Coder, Tester, Debugger e Reviewer trabalham no fluxo minimo valido. `canuto-rework-detector` entra quando houver retry loop, review loop, teste repetido ou pendencia recorrente.
+5. **QA e review**: Reviewer valida risco, testes, handoffs, PR readiness e, quando aplicavel, skills opcionais de dominio.
+6. **Session end**: `canuto-session-end-learning` reconcilia goals, pending, decisions, metrics, rework e candidate instincts.
+7. **Write-back seguro**: `obsidian-writeback-queue` prepara preview/queue antes de qualquer escrita fora da memoria normal do projeto.
+
+## Skill Activation Model
+
+Skills no Canuto nao sao daemons. Elas sao playbooks que Maestro/personas chamam conforme regras do ciclo, evidencia da sessao ou pedido explicito do usuario.
+
+| Skill | Tipo | Como e chamada | Observacao |
+|------|------|----------------|------------|
+| `canuto-project-doctor` | Passiva condicional | No session start quando setup, memoria ou contexto parecerem suspeitos; tambem por pedido explicito como "health check" | Read-only |
+| `canuto-rework-detector` | Passiva condicional | Antes de continuar quando houver retry, review loop, stale context, dirty-state ou tarefa repetida | Pode pausar implementacao para replanejar |
+| `canuto-session-end-learning` | Passiva obrigatoria | No encerramento da sessao, antes do resumo final | Propõe memoria, metricas e candidate instincts |
+| `canuto-pending-triage` | Passiva condicional | Quando pending no vault acumular duplicatas, itens vagos ou backlog grande; tambem por pedido explicito | Nunca apaga pendencia sem aprovacao |
+| `obsidian-writeback-queue` | Passiva com gate ativo | Depois de session learning ou pending triage quando houver proposta de escrever no vault | Preview por padrao; escrita viva so com aprovacao |
+| `dashboard-regression-guard` | Ativa opcional | Instalada e chamada em dashboards, BI, admin panels e relatorios visuais | Foca fixtures, totais, filtros e timezone |
+| `scraper-resilience` | Ativa opcional | Instalada e chamada em scrapers, collectors e parsers frageis | Foca fixture, selector drift e retries limitados |
+| `route-optimizer-qa` | Ativa opcional | Instalada e chamada em roteirizacao, logistica e geocoding | Exige metricas before/after |
+| `spreadsheet-delivery-check` | Ativa opcional | Instalada e chamada em entregas `.xlsx`, `.xls`, `.csv` e exports | Reabre arquivo e procura erro de formula |
+| `frontend-visual-qa` | Ativa opcional | Instalada e chamada em web apps, landing pages, jogos e UIs interativas | Exige browser real quando visual importa |
+
+Passiva nao significa silenciosa: a persona deve explicar que esta usando a skill e resumir a evidencia. Ativa significa que a skill entra por tipo de tarefa, por instalacao opcional com `--skill`, ou por pedido direto.
 
 ## Goals vs Pending Tasks
 
@@ -242,8 +281,15 @@ You are my coding orchestrator for this repository.
 ## On Session Start
 1. Query vault via MCP: latest session note, pending tasks, high-confidence instincts
 2. Check for stale contexts (git diff)
-3. Present the session briefing
-4. Ask what to work on
+3. Run canuto-project-doctor if setup, memory, or context looks suspicious
+4. Present the session briefing
+5. Ask what to work on
+
+## On Session End
+1. Run canuto-session-end-learning before closing
+2. Update vault memory with summary, pending tasks, decisions, metrics, and instincts
+3. Use obsidian-writeback-queue for any non-standard Obsidian/Canuto vault write-back
+4. Never write outside the resolved project vault path without explicit approval
 ```
 
 ## Key Concepts
@@ -257,6 +303,10 @@ You are my coding orchestrator for this repository.
 **Handoff envelope**: Toda passagem relevante entre runtimes pode carregar `task_id`, `goal`, `constraints`, `done_definition` e `thread_id`, persistidos em `handoffs/`.
 
 **Rework detection**: Maestro avisa quando o mesmo arquivo e modificado 3+ vezes na sessao.
+
+**Learning loop**: No fim da sessao, Maestro extrai pendencias, decisoes, metricas, rework e candidate instincts antes de qualquer write-back nao padrao.
+
+**Safe vault write-back**: Escrita fora do fluxo normal de sessao passa por preview/queue/aprovacao com `obsidian-writeback-queue`.
 
 **PR description auto**: Reviewer gera o body do PR automaticamente no APPROVE.
 

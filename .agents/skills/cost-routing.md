@@ -111,6 +111,76 @@ To minimize Opus token consumption:
 
 ---
 
+## External token-saving layers
+
+These run **outside** the routing matrix — they compress data before it reaches any
+provider's context. Use them in addition to (not instead of) the matrix routing.
+
+### rtk (Rust Token Killer)
+
+CLI proxy that filters/groups/dedupes Bash command output before it reaches the LLM
+context. Targets a layer none of our skills cover: raw stdout from `git`, `rg`, `cat`,
+test runners, build tools.
+
+| Property | Value |
+|----------|-------|
+| Coverage | Bash tool calls only (Read/Grep/Glob bypass it) |
+| Savings | 60-90% on covered commands (-80% typical 30-min session) |
+| Overhead | <10ms per call |
+| License | Apache-2.0 |
+| Install | `brew install rtk` (optional — `install.sh` only nudges, never requires) |
+
+**Bootstrap per project** (run once after install):
+```bash
+rtk init -g                  # Claude Code (default)
+rtk init -g --codex          # Codex CLI
+rtk init -g --gemini         # Gemini CLI
+```
+
+**Orthogonality with existing skills:**
+- `context-digest` — compresses **file content** (10x on 500-line files). rtk doesn't touch files.
+- `smart-token-metering` — **measures** Opus consumption. rtk reduces what gets measured.
+- `codex-context-loader` — preloads context to disk for Codex. rtk only affects Bash output.
+
+**When NOT to use rtk output:**
+- Debugging unfamiliar errors (rtk truncates → may hide root cause). Override with `command 2>&1 | cat`.
+- Writing PR descriptions where exact stdout is required. Run the command outside rtk.
+
+### Repomix MCP
+
+MCP server that packs the codebase into a compressed Tree-sitter view (~70% token
+reduction on code repos). Targets a layer rtk doesn't cover: bulk codebase context
+needed when Codex/Claude must reason about many files at once.
+
+| Property | Value |
+|----------|-------|
+| Coverage | Codebase reads via MCP query (replaces "read N files manually") |
+| Savings | ~70% on code-heavy contexts (TypeScript/Rust/Python). Negligible on prose/markdown |
+| Mode | MCP server (`repomix --mcp`) — registered in `.mcp.json` of the project |
+| License | MIT |
+| Install | `npx repomix --mcp` (no install needed — runs via npx) |
+
+**Project config** (already wired in `.mcp.json` at repo root):
+```json
+{
+  "mcpServers": {
+    "repomix": { "command": "npx", "args": ["-y", "repomix@latest", "--mcp"], "type": "stdio" }
+  }
+}
+```
+
+**When to route to Repomix instead of `codex-context-loader`:**
+- Bulk codebase summarization (>15 files) — let Repomix Tree-sitter pack first
+- Codex needs cross-file reasoning (call sites, type usage) — packed XML is denser than raw reads
+- One-shot exports for handoff/review — `npx repomix --compress -o handoff.xml`
+
+**When NOT to use Repomix:**
+- Single-file reads — overhead exceeds benefit (use Read tool)
+- Prose/markdown-heavy paths (`.agents/`, `docs/`) — Tree-sitter doesn't help; use `context-digest` instead
+- Strict secret scanning — Repomix has built-in Security Check but is not a replacement for dedicated scanning
+
+---
+
 ## Cost Tracking
 
 After each session, log provider usage to vault metrics:

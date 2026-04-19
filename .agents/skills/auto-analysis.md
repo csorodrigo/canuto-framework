@@ -1,5 +1,6 @@
 ---
 skill: auto-analysis
+shortDescription: Deep project scan plus cross-project vault intelligence that generates project indexes and onboarding reports.
 trigger: /auto-analysis
 persona: maestro
 version: 1.1.0

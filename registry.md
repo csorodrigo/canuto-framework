@@ -31,6 +31,11 @@ These skills ship with every install and update automatically.
 | `git-workflow` | Branching, commits, and PR conventions | workflow |
 | `governance` | Approval gates for high-impact actions (deploy, migration, breaking changes) | governance |
 | `health-check` | Diagnose framework setup integrity | diagnostics |
+| `canuto-project-doctor` | Diagnose setup, memory coverage, stale context, and framework drift | diagnostics |
+| `canuto-session-end-learning` | Extract session learning, pending tasks, decisions, metrics, and candidate instincts | learning, memory |
+| `canuto-rework-detector` | Detect retry loops, review loops, stale assumptions, and repeated failed approaches | quality, memory |
+| `canuto-pending-triage` | Deduplicate and prioritize pending tasks across vault notes and local memory | productivity, memory |
+| `obsidian-writeback-queue` | Stage safe Obsidian/Canuto vault write-back proposals with approval and offline fallback | obsidian, memory |
 | `heartbeat` | Foundation for scheduled agent activation in autonomous setups | orchestration, future |
 | `json-canvas` | JSON Canvas: visual maps and flowcharts (.canvas files) | obsidian, visualization |
 | `knowledge-ingest` | Ingest external sources (videos, articles, PDFs, meeting transcripts) into structured vault notes | ingestion, knowledge, memory |
@@ -62,6 +67,11 @@ Useful in specific project types. Install with `bash install.sh --skill <name>`.
 | `adr` | Architecture Decision Records | Long-lived projects with multiple contributors | architecture |
 | `product-review` | When/how to run /office-hours + /plan-ceo-review before Architect on L/XL features | Product-heavy projects, new features with uncertain scope | product, planning |
 | `browser-qa` | Real-browser QA via gstack + authenticated data extraction via Chrome DevTools MCP | Projects with web frontends, critical user flows | testing, quality, scraping |
+| `dashboard-regression-guard` | Dashboard fixtures, totals, filters, timezone checks, and visual smoke tests | Analytics/admin/reporting dashboards | frontend, qa |
+| `scraper-resilience` | Scraper fixtures, selector drift detection, bounded retries, and failure classification | Scrapers and data collectors | scraper, qa |
+| `route-optimizer-qa` | Route optimization fixtures, geocoding checks, invalid-address handling, and before/after metrics | Logistics and routing projects | routing, qa |
+| `spreadsheet-delivery-check` | Validate spreadsheet deliverables for formulas, expected sheets, totals, formatting, and openability | XLSX/CSV/reporting exports | spreadsheet, qa |
+| `frontend-visual-qa` | Browser-based visual QA for responsive layouts, console errors, overflow, and interactions | Web apps and interactive UI | frontend, qa |
 
 ---
 

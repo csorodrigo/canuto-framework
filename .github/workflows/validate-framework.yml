@@ -44,6 +44,7 @@ jobs:
             name=$(basename "$skill")
             # Skip non-skill artifacts that may live under .agents/skills/
             if [ "$name" = "CLAUDE.md" ]; then
+              echo "  - $name skipped (skill directory instructions)"
               continue
             fi
             first=$(head -1 "$skill")
@@ -71,7 +72,7 @@ jobs:
         run: bash test-framework.sh --verbose
 
       - name: Install check
-        run: bash install.sh --check
+        run: CANUTO_SOURCE_DIR="$PWD" bash install.sh --check
 
       - name: Check vault references
         continue-on-error: true
