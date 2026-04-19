@@ -36,6 +36,7 @@ PASS=0
 WARN=0
 FAIL=0
 ITEMS_FILE=$(mktemp)
+REVIEWER_PROFILE_AVAILABLE=false
 
 cleanup() {
   rm -f "$ITEMS_FILE"
@@ -180,6 +181,7 @@ run_codex_reviewer_profile_smoke() {
     local output
     output=$(tr -d '\r' < "$tmp_output" | tail -n 1 | tr -d '\n')
     if [ "$output" = "OK" ]; then
+      REVIEWER_PROFILE_AVAILABLE=true
       pass "reviewer profile smoke test"
     else
       warn "reviewer profile returned unexpected output: ${output:-<empty>}"
@@ -428,7 +430,7 @@ if [ "$MODE" = "full" ]; then
   fi
 
   if command -v codex >/dev/null 2>&1; then
-    if codex_run_with_timeout 30 codex exec --profile reviewer --ephemeral -s read-only "Reply with exactly: OK" 2>/dev/null | grep -q "OK"; then
+    if [ "$REVIEWER_PROFILE_AVAILABLE" = true ]; then
       pass "reviewer profile available (gpt-5.4, high)"
     else
       warn "reviewer profile unavailable — reviewer/maestro calls will fall back"
