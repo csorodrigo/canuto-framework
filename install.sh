@@ -159,6 +159,19 @@ setup_deps() {
   else
     ok "uvx available"
   fi
+
+  # rtk — optional Bash output compressor (60-90% token savings on git/grep/test commands).
+  # Complements context-digest (file-level) and smart-token-metering (budget tracking).
+  # See .agents/skills/cost-routing.md → "External token-saving layers".
+  if command -v rtk &> /dev/null; then
+    ok "rtk $(rtk --version 2>/dev/null | awk '{print $2}') already installed (Bash output compressor)"
+  else
+    if $has_brew; then
+      log "rtk not found — install with: brew install rtk  (optional, saves 60-90% on Bash command output)"
+    else
+      log "rtk not found — install from https://github.com/rtk-ai/rtk  (optional, saves 60-90% on Bash command output)"
+    fi
+  fi
 }
 
 # ── Check git availability ──────────────────────────────────────────────────
