@@ -16,6 +16,7 @@
 | Cross-project session audit | implemented | `.agents/tools/framework-session-audit.js`, `.agents/tools/framework-session-audit-lib.js` | Audits the latest up-to-200 sessions per project across workspaces, vault artifacts, and Codex logs; emits inventory, NDJSON dataset, JSON summaries, and markdown report |
 | Cost dashboard telemetry | implemented | `.agents/tools/framework-session-audit.js`, `.agents/tools/framework-session-audit-lib.js` | Report-only cost dashboard for Codex, Claude project logs, Claude telemetry, and optional Codeburn exports; emits `04-cost-dashboard.json` and `.md` |
 | Gemini MCP integration | partial | `.agents/mcp/setup.md`, `.agents/skills/gemini-routing.md`, `.agents/skills/bulk-classify.md` | Read-only consultant for long-context, multimodal, and bulk-classify workflows. Setup: see `.agents/mcp/setup.md` |
+| Claude MCP back-delegation | partial | `.agents/tools/claude-agent-mcp.py`, `.agents/tools/claude-architect.sh`, `.agents/tools/claude-reviewer.sh`, `.agents/hooks/install.sh` | Lets Codex Maestro call Claude Opus/Sonnet through MCP when `ANTHROPIC_API_KEY` is configured |
 | JSON health output | implemented | `install.sh --test --json`, `.agents/tools/codex-health-check.sh --json` | Machine-readable diagnostics for CI and dashboards |
 | Context bootstrap | implemented | `.context.md`, `docs/FEATURE-MAP.md`, `.agents/vault/digests/00-bootstrap-digest.md` | Created automatically when missing |
 | Passive hooks | implemented | `.agents/hooks/` | Session save, pre-compact save, plan review, Codex pretool guard |

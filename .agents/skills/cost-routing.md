@@ -28,9 +28,9 @@ which provider should handle it. The goal: **minimize Anthropic spend without lo
 
 | Task Type | Size | Provider | Tool | Est. Savings vs Opus |
 |-----------|------|----------|------|---------------------|
-| **Code generation** | M/L | Codex (gpt-5.4 (high)) | `mcp__codex-coder__spawn_agent` | 60-70% |
+| **Code generation** | M/L | Codex (gpt-5.4 (high)) → GLM-4.6 (fallback) | `mcp__codex-coder__spawn_agent` / `mcp__gemini__ask-gemini` | 60-70% |
 | **Code generation** | XS/S | Claude (direct) | — | 0% (MCP overhead exceeds benefit) |
-| **Code review** | M/L | Codex (reviewer profile) | `mcp__codex-reviewer__spawn_agent` | 40-50% |
+| **Code review** | M/L | Codex (reviewer profile) → GLM-4.6 (fallback) | `mcp__codex-reviewer__spawn_agent` / `mcp__gemini__ask-gemini` | 40-50% |
 | **Code review (big diff / cross-model)** | L+ | Gemini 3.1-pro-preview (secondary) | `mcp__gemini__ask-gemini` | 40% |
 | **Code review** | XS/S | Claude (direct) | — | 0% |
 | **Test-fix loop** | Any | Codex (gpt-5.4 (high)) | `mcp__codex-coder__spawn_agent` | 80% |
@@ -56,6 +56,8 @@ which provider should handle it. The goal: **minimize Anthropic spend without lo
 | **Onboarding / repo pré-digest** | Any | Gemini 3.1-pro-preview → Opus refine | `mcp__gemini__ask-gemini` + Opus | ~90% vs Opus solo |
 | **Onboarding (Codex path)** | Any | Codex (onboarding) | `mcp__codex-coder__spawn_agent` | 90% |
 | **Vault reading** | Any | Codex (multi-vault) | `mcp__codex-coder__spawn_agent` | 90% |
+| **Planning / Architecture (Codex runtime)** | M/L | Claude Opus 4.7 (via MCP) | `mcp__claude-architect__spawn_agent` | — (tier-1 quality, Codex runtime only) |
+| **Code review cruzada (Codex→Claude)** | Any | Claude Sonnet 4.6 (via MCP) | `mcp__claude-reviewer__spawn_agent` | 40% vs Opus solo |
 
 ---
 
@@ -82,8 +84,8 @@ Before each delegation, Maestro follows this flowchart:
    → Else if codex-coder MCP available: use spawn_agent
    → Else if codex-reviewer MCP available: use spawn_agent
    → Fallback chain (by task type):
-     - code-gen: codex-coder → codex-reviewer → Claude  (never Gemini — no sandbox)
-     - code-review: codex-reviewer → gemini-3.1-pro-preview (second opinion) → Claude
+     - code-gen: codex-coder → glm-coder → Claude  (never Gemini — no sandbox)
+     - code-review: codex-reviewer → glm-reviewer → gemini-3.1-pro-preview (second opinion) → claude-reviewer (MCP) → Opus direto
      - context-digest / @folder: gemini-3.1-pro-preview → codex context-preload → Claude
      - multimodal: gemini-3.1-pro-preview → Claude (no plan B)
      - brainstorm: gemini-3.1-pro-preview + codex parallel → Claude

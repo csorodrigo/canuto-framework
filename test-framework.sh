@@ -284,6 +284,49 @@ else
   fail "framework-session-audit CLI help failed"
 fi
 
+GLM_AGENT_MCP="$AGENTS_DIR/hooks/glm-agent-mcp.py"
+if [ -f "$GLM_AGENT_MCP" ]; then
+  pass "glm-agent-mcp.py exists"
+  if python3 -m py_compile "$GLM_AGENT_MCP" >/dev/null 2>&1; then
+    pass "glm-agent-mcp.py syntax valid"
+  else
+    fail "glm-agent-mcp.py syntax invalid"
+  fi
+else
+  fail "glm-agent-mcp.py missing"
+fi
+
+GLM_HOME="$(mktemp -d)"
+mkdir -p "$GLM_HOME/.claude" "$GLM_HOME/.config/canuto"
+printf '{}\n' > "$GLM_HOME/.claude/settings.json"
+printf 'ZAI_API_KEY=test-key\n' > "$GLM_HOME/.config/canuto/zai.env"
+chmod 600 "$GLM_HOME/.config/canuto/zai.env"
+if HOME="$GLM_HOME" bash "$AGENTS_DIR/hooks/install.sh" >/dev/null 2>&1; then
+  GLM_CODER_CMD=$(jq -r '.mcpServers["glm-coder"].command // empty' "$GLM_HOME/.claude/settings.json")
+  GLM_REVIEWER_CMD=$(jq -r '.mcpServers["glm-reviewer"].command // empty' "$GLM_HOME/.claude/settings.json")
+  if [ "$GLM_CODER_CMD" = "$GLM_HOME/.claude/scripts/glm-coder.sh" ] && [ "$GLM_REVIEWER_CMD" = "$GLM_HOME/.claude/scripts/glm-reviewer.sh" ]; then
+    pass "GLM MCPs register when ZAI_API_KEY is configured"
+  else
+    fail "GLM MCPs did not register with configured ZAI_API_KEY"
+  fi
+
+  if [ -f "$GLM_HOME/.claude/scripts/glm-agent-mcp.py" ]; then
+    pass "glm-agent-mcp.py installed to Claude scripts"
+  else
+    fail "glm-agent-mcp.py not installed to Claude scripts"
+  fi
+
+  if grep -qF 'uvx --from codex-as-mcp@latest --with openai' "$GLM_HOME/.claude/scripts/glm-coder.sh" \
+    && grep -qF 'uvx --from codex-as-mcp@latest --with openai' "$GLM_HOME/.claude/scripts/glm-reviewer.sh"; then
+    pass "GLM wrappers launch Python MCP server via uvx"
+  else
+    fail "GLM wrappers do not launch Python MCP server via uvx"
+  fi
+else
+  fail "GLM installer regression test failed"
+fi
+rm -rf "$GLM_HOME"
+
 PORTABILITY_HOME="$(mktemp -d)"
 mkdir -p "$PORTABILITY_HOME/.canuto/vault"
 cat > "$PORTABILITY_HOME/.canuto/vault/A.md" <<'EOF'
