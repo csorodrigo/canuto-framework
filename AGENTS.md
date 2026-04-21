@@ -18,6 +18,10 @@
 - **obsidian-vault**: Read/write vault notes at ~/.canuto/vault/ for project memory
 - **ast-grep**: Structural code search — use for finding patterns, symbols, callers
 - **playwright**: Browser automation — navigate, click, fill, screenshot, assert
+- **claude-architect**: Delegate planning/architecture to Claude Opus — `mcp__claude-architect__spawn_agent`
+- **claude-reviewer**: Cross-model code review via Claude Sonnet — `mcp__claude-reviewer__spawn_agent`
+  - Use for bias-free review: Codex implements → Claude reviews (or vice-versa)
+  - Same interface as `codex-reviewer`: pass diff between `--- CHANGES START/END ---` delimiters
 
 ## Vault Access (Fallback)
 If MCP tools are not available, use the vault-bridge shell script:

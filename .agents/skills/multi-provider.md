@@ -26,6 +26,8 @@ Enable the Maestro to orchestrate multiple AI providers for different personas, 
 
 ## Provider Tiers
 
+> **Codex runtime exception:** When Codex is the active Maestro runtime, "stays on active runtime" means Codex handles tier-1. The `claude-architect` MCP is an optional back-delegation tool for tasks that specifically require Claude Opus reasoning (e.g. tasks needing `AskUserQuestion`, or where Codex determines Opus-quality analysis is needed). It does not replace the Codex Maestro.
+
 | Tier | Role | Default Provider | Model | MCP Tool | Can Delegate? |
 |------|------|-----------------|-------|----------|---------------|
 | tier-1 | Strategic (Maestro, Architect, Contextualizer) | Active runtime (`claude` by default, `codex` in direct Codex sessions) | opus / reviewer profile | — | No — stays on the active runtime |
@@ -36,6 +38,8 @@ Enable the Maestro to orchestrate multiple AI providers for different personas, 
 | tier-2 | Multimodal (OCR / screenshots) | Gemini | gemini-3.1-pro-preview | `mcp__gemini__ask-gemini` | Yes — images passed via `@file` |
 | tier-2 | Brainstorm (structured ideation) | Gemini | gemini-3.1-pro-preview | `mcp__gemini__brainstorm` | Yes — SCAMPER / lateral / design-thinking |
 | tier-2 | Bulk classifier | Gemini | gemini-3.1-flash-lite-preview | `mcp__gemini__ask-gemini` | Yes — labeling, triagem at volume |
+| tier-1-delegate | Architect back-delegation (Codex runtime only) | Claude Opus | claude-opus-4-7 | `mcp__claude-architect__spawn_agent` | Optional — Codex-Maestro calls Opus when Claude reasoning is required |
+| tier-2 | Reviewer (cross-model, Codex runtime) | Claude Sonnet | claude-sonnet-4-6 | `mcp__claude-reviewer__spawn_agent` | Yes — bias-free review: Codex implements → Claude reviews |
 
 ---
 
@@ -149,10 +153,10 @@ Fallback matrix by task type:
 
 ```
 code-gen (escrita):
-  codex-coder → codex-reviewer → Claude   (NÃO Gemini — sem sandbox)
+  codex-coder → glm-coder → Claude   (NÃO Gemini — sem sandbox)
 
 code-review (formal gate):
-  codex-reviewer → gemini-3.1-pro-preview (second opinion) → Claude
+  codex-reviewer → glm-reviewer → gemini-3.1-pro-preview (second opinion) → Claude
 
 context-digest / @folder:
   gemini-3.1-pro-preview (primary) → codex context-preload → Claude

@@ -1,0 +1,76 @@
+- generic [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "logo" [ref=e5] [cursor=pointer]:
+        - /url: /chat
+        - img "logo" [ref=e6]
+      - navigation [ref=e8]:
+        - link "Chat" [ref=e9] [cursor=pointer]:
+          - /url: /chat
+        - link "API" [ref=e10] [cursor=pointer]:
+          - /url: /model-api
+        - link "Contact" [ref=e11] [cursor=pointer]:
+          - /url: /contact
+    - button "Login" [ref=e15] [cursor=pointer]
+  - main [ref=e16]:
+    - generic [ref=e19]:
+      - generic [ref=e20]:
+        - heading "API Management" [level=2] [ref=e21]
+        - list [ref=e22]:
+          - listitem [ref=e23]:
+            - link "API Keys" [ref=e24] [cursor=pointer]:
+              - /url: /manage-apikey/apikey-list
+              - generic [ref=e25]: API Keys
+          - listitem [ref=e26]:
+            - link "Rate Limits" [ref=e27] [cursor=pointer]:
+              - /url: /manage-apikey/rate-limits
+              - generic [ref=e28]: Rate Limits
+          - listitem [ref=e29]:
+            - link "Billing" [ref=e30] [cursor=pointer]:
+              - /url: /manage-apikey/billing
+              - generic [ref=e31]: Billing
+          - listitem [ref=e32]:
+            - link "Subscription" [ref=e33] [cursor=pointer]:
+              - /url: /manage-apikey/subscription
+              - generic [ref=e34]: Subscription
+      - generic [ref=e36]:
+        - heading "Subscription 🔥 GLM Coding Plan refresh User Guide question-circle FAQ" [level=2] [ref=e37]:
+          - generic [ref=e38]: Subscription
+          - generic [ref=e39]:
+            - generic [ref=e40] [cursor=pointer]:
+              - generic [ref=e41]: 🔥
+              - text: GLM Coding Plan
+            - generic [ref=e42] [cursor=pointer]:
+              - img "refresh" [ref=e43]
+              - text: User Guide
+            - generic [ref=e44] [cursor=pointer]:
+              - img "question-circle" [ref=e45]:
+                - img [ref=e46]
+              - text: FAQ
+        - generic [ref=e49]:
+          - tablist [ref=e50]:
+            - tab "Subscription" [selected] [ref=e54] [cursor=pointer]
+          - tabpanel "Subscription" [ref=e57]:
+            - generic [ref=e58]:
+              - generic [ref=e59]: You don't have any subscription.
+              - text: Go and grab one.
+  - region "Notifications alt+T"
+  - alert [ref=e60]
+  - generic [ref=e61]:
+    - dialog:
+      - generic [ref=e62]:
+        - button "Close" [active] [ref=e63] [cursor=pointer]:
+          - generic "Close" [ref=e64]:
+            - img "close" [ref=e65]:
+              - img [ref=e66]
+        - generic [ref=e68]:
+          - heading "Value Subscription" [level=3] [ref=e69]
+          - paragraph [ref=e70]: •Powered by Z.ai's new flagship Models
+          - paragraph [ref=e71]: •Compatible with 20+ popular AI coding tools such as Claude Code
+          - paragraph [ref=e72]: •From only $18/mo, enjoy high quotas
+        - generic [ref=e73]:
+          - link "Learn More" [ref=e74] [cursor=pointer]:
+            - /url: https://docs.z.ai/devpack/overview
+            - generic [ref=e75]: Learn More
+          - button "Join Now" [ref=e76] [cursor=pointer]:
+            - generic [ref=e77]: Join Now
