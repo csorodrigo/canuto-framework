@@ -3,6 +3,28 @@
 
 set -o pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/../tools/otel-emit.sh" ]; then
+  . "$SCRIPT_DIR/../tools/otel-emit.sh"
+elif [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -f "$CLAUDE_PROJECT_DIR/.agents/tools/otel-emit.sh" ]; then
+  . "$CLAUDE_PROJECT_DIR/.agents/tools/otel-emit.sh"
+else
+  otel_emit_span() { return 0; }
+  otel_emit_counter() { return 0; }
+fi
+export CANUTO_OTEL_HOOK_SOURCE="retry-detect"
+
+emit_hook_otel() {
+  local outcome="$1"
+  local retry_count="${2:-0}"
+  local file_path_arg="${3:-}"
+  local command_arg="${4:-}"
+  {
+    CANUTO_OTEL_RETRY_COUNT="$retry_count" otel_emit_span "hook.retry_detect" "$outcome" 0 "$file_path_arg" "$command_arg"
+    otel_emit_counter "hook.retry_detect" "$outcome"
+  } || true
+}
+
 INPUT=$(cat)
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
@@ -23,10 +45,10 @@ init_storage() {
 }
 
 command=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null) || command=""
-[ -z "$command" ] && exit 0
+[ -z "$command" ] && { emit_hook_otel "skipped"; exit 0; }
 
-echo "$command" | grep -Eiq "$VALIDATION_RE" 2>/dev/null || exit 0
-init_storage || exit 0
+echo "$command" | grep -Eiq "$VALIDATION_RE" 2>/dev/null || { emit_hook_otel "skipped" 0 "" "$command"; exit 0; }
+init_storage || { emit_hook_otel "skipped" 0 "" "$command"; exit 0; }
 
 exit_code=$(echo "$INPUT" | jq -r '
   (.tool_response // .tool_output // {}) as $r
@@ -39,15 +61,25 @@ exit_code=$(echo "$INPUT" | jq -r '
 ' 2>/dev/null) || exit_code=0
 
 case "$exit_code" in
-  ''|0|true) (printf '{}\n' > "$RETRY_FILE") 2>/dev/null || true ;;
+  ''|0|true)
+    (printf '{}\n' > "$RETRY_FILE") 2>/dev/null || true
+    emit_hook_otel "success" 0 "" "$command"
+    ;;
   *)
     last_edited=$(jq -r 'to_entries | sort_by(.value) | last | .key // empty' "$PENDING_FILE" 2>/dev/null) || last_edited=""
-    [ -z "$last_edited" ] && exit 0
+    [ -z "$last_edited" ] && { emit_hook_otel "skipped" 0 "" "$command"; exit 0; }
     tmp="$RETRY_FILE.tmp.$$"
     if jq --arg path "$last_edited" '.[$path] = ((.[$path] // 0) + 1)' "$RETRY_FILE" 2>/dev/null > "$tmp"; then
-      mv "$tmp" "$RETRY_FILE" 2>/dev/null || rm -f "$tmp" 2>/dev/null
+      if mv "$tmp" "$RETRY_FILE" 2>/dev/null; then
+        retry_count=$(jq -r --arg path "$last_edited" '.[$path] // 0' "$RETRY_FILE" 2>/dev/null) || retry_count=0
+        emit_hook_otel "retry" "$retry_count" "$last_edited" "$command"
+      else
+        rm -f "$tmp" 2>/dev/null
+        emit_hook_otel "skipped" 0 "$last_edited" "$command"
+      fi
     else
       rm -f "$tmp" 2>/dev/null
+      emit_hook_otel "skipped" 0 "$last_edited" "$command"
     fi
     ;;
 esac

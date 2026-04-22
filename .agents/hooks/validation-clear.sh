@@ -3,6 +3,26 @@
 
 set -o pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/../tools/otel-emit.sh" ]; then
+  . "$SCRIPT_DIR/../tools/otel-emit.sh"
+elif [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -f "$CLAUDE_PROJECT_DIR/.agents/tools/otel-emit.sh" ]; then
+  . "$CLAUDE_PROJECT_DIR/.agents/tools/otel-emit.sh"
+else
+  otel_emit_span() { return 0; }
+  otel_emit_counter() { return 0; }
+fi
+export CANUTO_OTEL_HOOK_SOURCE="validation-clear"
+
+emit_hook_otel() {
+  local outcome="$1"
+  local command_arg="${2:-}"
+  {
+    otel_emit_span "hook.validation_clear" "$outcome" 0 "" "$command_arg"
+    otel_emit_counter "hook.validation_clear" "$outcome"
+  } || true
+}
+
 INPUT=$(cat)
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
@@ -23,9 +43,9 @@ init_storage() {
 }
 
 command=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null) || command=""
-[ -z "$command" ] && exit 0
+[ -z "$command" ] && { emit_hook_otel "skipped"; exit 0; }
 
-echo "$command" | grep -Eiq "$VALIDATION_RE" 2>/dev/null || exit 0
+echo "$command" | grep -Eiq "$VALIDATION_RE" 2>/dev/null || { emit_hook_otel "skipped" "$command"; exit 0; }
 
 # Only clear pending when the validation command actually succeeded.
 exit_code=$(echo "$INPUT" | jq -r '
@@ -44,7 +64,9 @@ case "$exit_code" in
       (printf '{}\n' > "$PENDING_FILE") 2>/dev/null || true
       (printf '{}\n' > "$RETRY_FILE") 2>/dev/null || true
     fi
+    emit_hook_otel "success" "$command"
     ;;
+  *) emit_hook_otel "skipped" "$command" ;;
 esac
 
 exit 0
