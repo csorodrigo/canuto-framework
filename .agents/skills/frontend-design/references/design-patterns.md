@@ -17,16 +17,22 @@ LLMs statistically generate generic UI. Actively avoid these "AI tells":
 - No oversaturated accents — desaturate to blend with neutrals
 - No excessive gradient text on large headers
 - No lazy glassmorphism on solid white backgrounds — `backdrop-blur` is only valid when background justifies frosted glass
+- Do not reduce "premium" to beige serif typography, generic dark glow, or a single luxury-coded color trick
 
 **Typography:**
 - Avoid Inter for premium/creative contexts — prefer Geist, Outfit, Cabinet Grotesk, Satoshi
 - No oversized H1s that scream — control hierarchy with weight and color, not scale
 - Serif fonts only for editorial/creative — never dashboards or software UIs
+- No long, paragraph-like hero headlines. Marketing H1s should read as a sharp statement, not a pitch deck summary
 
 **Layout:**
 - No centered hero when DESIGN_VARIANCE > 4 — use split-screen, left-aligned, or asymmetric
 - No "hero metric layout": large number + small label + stats row as dashboard card — single most repeated AI dashboard cliché
+- No polluted heroes packed with badges, fake stats, logo strips, pills, and multiple competing CTAs
 - No "icon + heading + body text" in 3-column equal grid for features — use zig-zag or asymmetric grid
+- No repeated left-text/right-image sections down the whole page
+- No identical card rows repeated section after section
+- No section rhythm that stays the same from top to bottom. Vary density, image ratio, alignment, and whitespace with control
 - No `h-screen` for full-height sections — always `min-h-[100dvh]`
 - No complex flexbox percentage math — use CSS Grid
 
@@ -34,6 +40,7 @@ LLMs statistically generate generic UI. Actively avoid these "AI tells":
 - No generic placeholder names ("John Doe") — use creative realistic names
 - No predictable numbers (99.99%, 50%) — use organic data (47.2%)
 - No filler AI copywriting ("Elevate", "Seamless", "Unleash") — use concrete verbs
+- No fake startup wordmarks or meaningless brand names unless supplied by the user
 - No broken Unsplash links — use `https://picsum.photos/seed/{random}/800/600`
 
 **Components:**
@@ -91,6 +98,8 @@ LLMs statistically generate generic UI. Actively avoid these "AI tells":
 - Consider overlap: cards over sections, text over images
 - Break grid monotony: not every row needs equal columns
 - Decorative 3D elements (spheres, organic shapes) for ambience when profile allows
+- For public/marketing pages, choose a composition pattern from `aesthetic-patterns.md` before laying out the hero and section sequence
+- For image-led work, use media as layout structure: full-bleed crops, framed product shots, editorial panels, gallery cadence, or object-focused hero treatment
 
 ---
 
@@ -100,6 +109,7 @@ LLMs statistically generate generic UI. Actively avoid these "AI tells":
 
 - **Interview**: ask about mood, visual references, whether to match or evolve existing design profile
   - If user provides images or links: execute Inspiration Ingestion Protocol (see `aesthetic-patterns.md`)
+- **Passive image-first bias**: when planning a landing page, homepage, hero, marketing site, redesign, or visually important first impression, choose a composition pattern and image strategy internally before presenting Design Direction. Do not ask the user to enable this behavior.
 - **Plan**: include `### Design Direction` section with 3 variations (see Design Preview in `aesthetic-patterns.md`)
   - Wait for user choice before finalizing plan
 - **Steps**: reference `frontend-design` skill in any step that produces visible UI
@@ -108,6 +118,7 @@ LLMs statistically generate generic UI. Actively avoid these "AI tells":
 
 - **Before coding**: read `design-profile.md` and `component-inventory.md`
   - If plan contains visual references: read and extract patterns first
+- **Passive image-first bias**: for landing/homepage/hero/redesign work, apply the chosen composition pattern, hero restraint, image role, and section rhythm as part of normal `frontend-design` work
 - **Preview** (S/XS, no Architect): generate 3 style variations before full implementation
 - **During implementation**: apply at least 3 of the 5 design principles. Do not ship vanilla shadcn/ui without customization matching the design profile
 - **After creating a shared component**: add to `component-inventory.md`
@@ -122,6 +133,7 @@ LLMs statistically generate generic UI. Actively avoid these "AI tells":
 - Were at least 3 of the 5 design principles applied?
 - Does this new UI feel consistent with existing pages?
 - Was a design preview approved before full implementation?
+- For landing/homepage/hero/redesign work: did the UI avoid polluted heroes, repeated section templates, decorative-only imagery, generic glow/gradient defaults, and weak section rhythm?
 
 Design issues are **SHOULD FIX**, never MUST FIX. Design is important but does not block shipping.
 - For holistic UX/design evaluation: run `/critique`

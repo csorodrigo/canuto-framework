@@ -3,6 +3,26 @@
 
 set -o pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/../tools/otel-emit.sh" ]; then
+  . "$SCRIPT_DIR/../tools/otel-emit.sh"
+elif [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -f "$CLAUDE_PROJECT_DIR/.agents/tools/otel-emit.sh" ]; then
+  . "$CLAUDE_PROJECT_DIR/.agents/tools/otel-emit.sh"
+else
+  otel_emit_span() { return 0; }
+  otel_emit_counter() { return 0; }
+fi
+export CANUTO_OTEL_HOOK_SOURCE="validation-mark"
+
+emit_hook_otel() {
+  local outcome="$1"
+  local file_path_arg="${2:-}"
+  {
+    otel_emit_span "hook.validation_mark" "$outcome" 0 "$file_path_arg"
+    otel_emit_counter "hook.validation_mark" "$outcome"
+  } || true
+}
+
 INPUT=$(cat)
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
@@ -14,7 +34,7 @@ RETRY_FILE="$AUDIT_DIR/retry-counter.json"
 init_storage() {
   mkdir -p "$AUDIT_DIR" 2>/dev/null || return 1
   for f in "$PENDING_FILE" "$RETRY_FILE"; do
-    if [ ! -f "$f" ] || ! jq -e type "$f" >/dev/null 2>&1; then
+    if [ ! -s "$f" ]; then
       (printf '{}\n' > "$f") 2>/dev/null || return 1
     fi
   done
@@ -28,18 +48,33 @@ normalize_path() {
 }
 
 file_path=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null) || file_path=""
-[ -z "$file_path" ] && exit 0
+[ -z "$file_path" ] && { emit_hook_otel "skipped"; exit 0; }
 
 file_path=$(normalize_path "$file_path")
 timestamp=$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date '+%Y-%m-%dT%H:%M:%S')
+flagged=0
 
 if init_storage; then
   tmp="$PENDING_FILE.tmp.$$"
-  if jq --arg path "$file_path" --arg timestamp "$timestamp" '. + {($path): $timestamp}' "$PENDING_FILE" 2>/dev/null > "$tmp"; then
-    mv "$tmp" "$PENDING_FILE" 2>/dev/null || rm -f "$tmp" 2>/dev/null
+  if ! jq --arg path "$file_path" --arg timestamp "$timestamp" '. + {($path): $timestamp}' "$PENDING_FILE" 2>/dev/null > "$tmp"; then
+    (printf '{}\n' > "$PENDING_FILE") 2>/dev/null || true
+    jq --arg path "$file_path" --arg timestamp "$timestamp" '. + {($path): $timestamp}' "$PENDING_FILE" 2>/dev/null > "$tmp"
+  fi
+  if [ -s "$tmp" ]; then
+    if mv "$tmp" "$PENDING_FILE" 2>/dev/null; then
+      flagged=1
+    else
+      rm -f "$tmp" 2>/dev/null
+    fi
   else
     rm -f "$tmp" 2>/dev/null
   fi
+fi
+
+if [ "$flagged" -eq 1 ]; then
+  emit_hook_otel "flagged" "$file_path"
+else
+  emit_hook_otel "skipped" "$file_path"
 fi
 
 exit 0

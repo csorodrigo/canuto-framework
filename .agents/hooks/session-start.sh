@@ -6,6 +6,24 @@
 
 set -o pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/../tools/otel-emit.sh" ]; then
+  . "$SCRIPT_DIR/../tools/otel-emit.sh"
+elif [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -f "$CLAUDE_PROJECT_DIR/.agents/tools/otel-emit.sh" ]; then
+  . "$CLAUDE_PROJECT_DIR/.agents/tools/otel-emit.sh"
+else
+  otel_emit_span() { return 0; }
+  otel_emit_counter() { return 0; }
+fi
+export CANUTO_OTEL_HOOK_SOURCE="session-start"
+
+emit_hook_otel() {
+  {
+    otel_emit_span "hook.session_start" "success" 0
+    otel_emit_counter "hook.session_start" "success"
+  } || true
+}
+
 # --- Read hook input (ignore errors) --------------------------------------
 INPUT="$(cat 2>/dev/null || true)"
 CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null)
@@ -21,11 +39,13 @@ fi
 
 if [ -z "$ROOT" ] || [ ! -d "$ROOT/.agents" ]; then
   # no framework here — silent exit
+  emit_hook_otel
   exit 0
 fi
 
 HEALTH_SCRIPT="$ROOT/.agents/tools/codex-health-check.sh"
 if [ ! -x "$HEALTH_SCRIPT" ]; then
+  emit_hook_otel
   exit 0
 fi
 
@@ -96,4 +116,5 @@ if [ -d "$AUDIT_DIR" ] || mkdir -p "$AUDIT_DIR" 2>/dev/null; then
   } >> "$AUDIT_FILE" 2>/dev/null || true
 fi
 
+emit_hook_otel
 exit 0

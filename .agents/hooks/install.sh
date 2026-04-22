@@ -28,7 +28,7 @@ echo ""
 echo "📁 Instalando hooks em ~/.claude/hooks/..."
 mkdir -p "$HOOKS_DIR"
 
-for hook in plan-review.sh codex-pretool-guard.sh session-save.sh session-load.sh pre-compact-save.sh protect-files.sh require-tests-for-pr.sh log-commands.sh; do
+for hook in plan-review.sh codex-pretool-guard.sh session-save.sh session-load.sh pre-compact-save.sh protect-files.sh require-tests-for-pr.sh log-commands.sh session-start.sh validation-mark.sh validation-clear.sh retry-detect.sh fingerprint-gate.sh pre-finalize.sh posttooluse-universal.sh; do
   if [ -f "$SCRIPT_DIR/$hook" ]; then
     cp "$SCRIPT_DIR/$hook" "$HOOKS_DIR/$hook"
     chmod +x "$HOOKS_DIR/$hook"

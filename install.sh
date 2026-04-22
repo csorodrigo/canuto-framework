@@ -531,6 +531,7 @@ FRAMEWORK_FILES=(
   ".agents/hooks/validation-clear.sh"
   ".agents/hooks/retry-detect.sh"
   ".agents/hooks/fingerprint-gate.sh"
+  ".agents/hooks/posttooluse-universal.sh"
   ".agents/hooks/pre-finalize.sh"
   ".agents/skills/continuous-learning/SKILL.md"
   ".agents/skills/continuous-learning/references/instinct-promotion.md"
@@ -588,6 +589,7 @@ FRAMEWORK_FILES=(
   ".agents/tools/canuto-consumer-smoke.sh"
   ".agents/tools/codex-maestro.sh"
   ".agents/tools/codex-maestro-mcp.sh"
+  ".agents/tools/otel-emit.sh"
   ".agents/tools/vault-sync.sh"
   # Codex economy + integration skills (Fase 3)
   ".agents/skills/codex-context-loader.md"
@@ -831,6 +833,7 @@ setup_hooks() {
   install_hook ".agents/hooks/validation-mark.sh"   "PostToolUse"   3  "Edit|Write"
   install_hook ".agents/hooks/validation-clear.sh"  "PostToolUse"   3  "Bash"
   install_hook ".agents/hooks/retry-detect.sh"      "PostToolUse"   3  "Bash"
+  install_hook ".agents/hooks/posttooluse-universal.sh" "PostToolUse" 3  ".*"
   install_hook ".agents/hooks/fingerprint-gate.sh"  "PreToolUse"    3  "Edit|Write"
   install_hook ".agents/hooks/pre-finalize.sh"      "Stop"          5
   # session-load.sh is a utility script, not a hook — it's called manually or via CLAUDE.md

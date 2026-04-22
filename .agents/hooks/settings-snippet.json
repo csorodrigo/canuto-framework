@@ -93,6 +93,16 @@
             "timeout": 3
           }
         ]
+      },
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/posttooluse-universal.sh",
+            "timeout": 3
+          }
+        ]
       }
     ],
     "Stop": [

@@ -3,6 +3,27 @@
 
 set -o pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/../tools/otel-emit.sh" ]; then
+  . "$SCRIPT_DIR/../tools/otel-emit.sh"
+elif [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -f "$CLAUDE_PROJECT_DIR/.agents/tools/otel-emit.sh" ]; then
+  . "$CLAUDE_PROJECT_DIR/.agents/tools/otel-emit.sh"
+else
+  otel_emit_span() { return 0; }
+  otel_emit_counter() { return 0; }
+fi
+export CANUTO_OTEL_HOOK_SOURCE="fingerprint-gate"
+
+emit_hook_otel() {
+  local outcome="$1"
+  local retry_count="${2:-0}"
+  local file_path_arg="${3:-}"
+  {
+    CANUTO_OTEL_RETRY_COUNT="$retry_count" otel_emit_span "hook.fingerprint_gate" "$outcome" 0 "$file_path_arg"
+    otel_emit_counter "hook.fingerprint_gate" "$outcome"
+  } || true
+}
+
 INPUT=$(cat)
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
@@ -46,11 +67,11 @@ reset_counter() {
 }
 
 file_path=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null) || file_path=""
-[ -z "$file_path" ] && exit 0
+[ -z "$file_path" ] && { emit_hook_otel "allowed"; exit 0; }
 file_path=$(normalize_path "$file_path")
 
 transcript_path=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null) || transcript_path=""
-init_storage || exit 0
+init_storage || { emit_hook_otel "allowed" 0 "$file_path"; exit 0; }
 
 count=$(jq -r --arg path "$file_path" '.[$path] // 0' "$RETRY_FILE" 2>/dev/null) || count=0
 case "$count" in
@@ -60,6 +81,7 @@ esac
 if [ "$count" -ge 3 ] 2>/dev/null; then
   if has_fingerprint "$transcript_path"; then
     reset_counter
+    emit_hook_otel "allowed" "$count" "$file_path"
     exit 0
   fi
 
@@ -68,7 +90,12 @@ if [ "$count" -ge 3 ] 2>/dev/null; then
   printf '  Fingerprint: <causa-raiz observada em file:linha>\n'
   printf '  Comando falhou: <cmd exato>\n'
   printf '  Validação planejada: <como vai confirmar o fix>\n'
+  # Enforcement invariant: exit 2 must happen in <10ms after decision.
+  # OTel emission is fire-and-forget (see otel-emit.sh).
+  CANUTO_OTEL_RETRY_COUNT="$count" otel_emit_span "hook.fingerprint_gate" "blocked" 0 "$file_path" "" || true
+  CANUTO_OTEL_RETRY_COUNT="$count" otel_emit_counter "hook.fingerprint_gate" "blocked" || true
   exit 2
 fi
 
+emit_hook_otel "allowed" "$count" "$file_path"
 exit 0

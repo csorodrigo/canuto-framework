@@ -119,7 +119,7 @@ echo ""
 # ═══════════════════════════════════════════════════════════════════════════
 echo "── Test 3: Hook Scripts ──"
 
-HOOKS=(session-load session-save pre-compact-save check-references check-orphans plan-review codex-pretool-guard protect-files require-tests-for-pr log-commands session-start validation-mark validation-clear retry-detect fingerprint-gate pre-finalize)
+HOOKS=(session-load session-save pre-compact-save check-references check-orphans plan-review codex-pretool-guard protect-files require-tests-for-pr log-commands session-start validation-mark validation-clear retry-detect fingerprint-gate posttooluse-universal pre-finalize)
 for hook in "${HOOKS[@]}"; do
   HFILE="$AGENTS_DIR/hooks/$hook.sh"
   if [ ! -f "$HFILE" ]; then
@@ -145,7 +145,7 @@ echo ""
 
 echo "── Test 3b: Tooling ──"
 
-CODEX_TOOLS=(canuto-memory codex-common codex-diff-context codex-context-package codex-health-check canuto-consumer-smoke codex-maestro gemini-smoke-check vault-sync)
+CODEX_TOOLS=(canuto-memory codex-common codex-diff-context codex-context-package codex-health-check canuto-consumer-smoke codex-maestro gemini-smoke-check vault-sync otel-emit)
 for tool in "${CODEX_TOOLS[@]}"; do
   TFILE="$AGENTS_DIR/tools/$tool.sh"
   if [ ! -f "$TFILE" ]; then
