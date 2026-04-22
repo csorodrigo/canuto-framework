@@ -36,3 +36,6 @@ build/
 .agents/vault/audit/retry-counter.json
 .agents/vault/audit/validation-pending.json
 .agents/vault/audit/*-SESSION_START.md
+
+# OTLP fallback (runtime metrics state)
+.agents/vault/metrics/canuto-otlp.jsonl

@@ -11,7 +11,7 @@ AUDIT_DIR="$PROJECT_DIR/.agents/vault/audit"
 PENDING_FILE="$AUDIT_DIR/validation-pending.json"
 RETRY_FILE="$AUDIT_DIR/retry-counter.json"
 
-VALIDATION_RE='(npm|bun|pnpm|yarn)[[:space:]]+(test|run[[:space:]]+test|run[[:space:]]+build|build|typecheck|tsc|lint)|vitest|jest|^node[[:space:]]+--test|bash[[:space:]]+test-|install\.sh[[:space:]]+--test|ruff|pytest|cargo[[:space:]]+test|tsc([[:space:]]|$)'
+VALIDATION_RE='(^|[[:space:]]*[;&|]+[[:space:]]*)((npm|bun|pnpm|yarn)[[:space:]]+(run[[:space:]]+)?(test|build|typecheck|tsc|lint)([[:space:]]|$)|npx[[:space:]]+(vitest|jest|mocha|ava|pytest)([[:space:]]|$)|(vitest|jest|mocha|ava|pytest|ruff)([[:space:]]|$)|node[[:space:]]+--test([[:space:]]|$)|bash[[:space:]]+test-|(\./)?install\.sh[[:space:]]+--(test|doctor)([[:space:]]|$)|cargo[[:space:]]+test([[:space:]]|$)|tsc([[:space:]]|$))'
 
 init_storage() {
   mkdir -p "$AUDIT_DIR" 2>/dev/null || return 1
@@ -29,12 +29,13 @@ echo "$command" | grep -Eiq "$VALIDATION_RE" 2>/dev/null || exit 0
 
 # Only clear pending when the validation command actually succeeded.
 exit_code=$(echo "$INPUT" | jq -r '
-  if .tool_output.exitCode != null then .tool_output.exitCode
-  elif .tool_output.exit_code != null then .tool_output.exit_code
-  elif .tool_output.success == true then 0
-  elif .tool_output.success == false then 1
-  else 0
-  end
+  (.tool_response // .tool_output // {}) as $r
+  | if $r.exitCode != null then $r.exitCode
+    elif $r.exit_code != null then $r.exit_code
+    elif $r.success == true then 0
+    elif $r.success == false then 1
+    else 0
+    end
 ' 2>/dev/null) || exit_code=0
 
 case "$exit_code" in
