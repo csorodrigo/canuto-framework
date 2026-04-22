@@ -2774,6 +2774,9 @@ function isCanutoOtlpEnabled(opts = {}) {
   if (typeof opts.enabled === 'boolean') return opts.enabled;
   const explicit = process.env.CANUTO_OTLP_ENABLED;
   if (explicit === '0' || normalizeText(explicit) === 'false') return false;
+  const master = process.env.CLAUDE_CODE_ENABLE_TELEMETRY;
+  const masterOn = master === '1' || normalizeText(master) === 'true';
+  if (!masterOn) return false;
   if (explicit === '1' || normalizeText(explicit) === 'true') return true;
   return Boolean(process.env.OTEL_EXPORTER_OTLP_ENDPOINT);
 }

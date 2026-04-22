@@ -1603,3 +1603,34 @@ test('emitCanutoOtlpMetrics skips when CANUTO_OTLP_ENABLED is zero', async () =>
     else process.env.OTEL_EXPORTER_OTLP_ENDPOINT = previousOtel;
   }
 });
+
+test('emitCanutoOtlpMetrics skips when CLAUDE_CODE_ENABLE_TELEMETRY is off', async () => {
+  const previousMaster = process.env.CLAUDE_CODE_ENABLE_TELEMETRY;
+  const previousEnabled = process.env.CANUTO_OTLP_ENABLED;
+  const previousOtel = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  let called = false;
+
+  try {
+    delete process.env.CLAUDE_CODE_ENABLE_TELEMETRY;
+    delete process.env.CANUTO_OTLP_ENABLED;
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'http://collector.example:4317';
+    const result = await emitCanutoOtlpMetrics(makeMetricAuditResult(), {
+      endpoint: 'http://collector.example/v1/metrics',
+      fallbackNdjson: path.join(makeTempDir(), 'fallback.jsonl'),
+      fetch: async () => {
+        called = true;
+        return { status: 200 };
+      },
+    });
+
+    assert.equal(result.status, 'skipped');
+    assert.equal(called, false);
+  } finally {
+    if (previousMaster === undefined) delete process.env.CLAUDE_CODE_ENABLE_TELEMETRY;
+    else process.env.CLAUDE_CODE_ENABLE_TELEMETRY = previousMaster;
+    if (previousEnabled === undefined) delete process.env.CANUTO_OTLP_ENABLED;
+    else process.env.CANUTO_OTLP_ENABLED = previousEnabled;
+    if (previousOtel === undefined) delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+    else process.env.OTEL_EXPORTER_OTLP_ENDPOINT = previousOtel;
+  }
+});

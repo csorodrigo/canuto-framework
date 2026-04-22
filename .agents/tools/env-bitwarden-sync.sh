@@ -96,7 +96,8 @@ case "$subcmd" in
 
     if [ -f "$envfile" ]; then
       ts=$(date +%s)
-      cp "$envfile" "${envfile}.bak.${ts}" && printf 'backup: %s.bak.%s\n' "$envfile" "$ts"
+      cp "$envfile" "${envfile}.bak.${ts}" || die "failed to back up existing $envfile — aborting to avoid data loss"
+      printf 'backup: %s.bak.%s\n' "$envfile" "$ts"
     fi
 
     mv "$tmp" "$envfile" \
