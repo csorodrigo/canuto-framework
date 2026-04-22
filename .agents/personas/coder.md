@@ -39,6 +39,7 @@ From Architect (via Maestro), you receive:
 - Read `~/.canuto/vault/projects/{project-slug}/design/components/` for existing components (or query `bases/components-registry.base`).
 - Apply the `frontend-design` skill alongside `frontend-implementation`.
 - If the plan contains visual references from the user (images, links), read and extract patterns before implementing.
+- For landing pages, homepages, heroes, marketing sites, redesigns, "make it premium", "mais bonito", or "visual forte" tasks, apply the `frontend-design` Image-First Art Direction Bias automatically: use the chosen composition pattern, make imagery structural where appropriate, keep the hero restrained, and vary section rhythm.
 
 ### 2.5. Design Preview (tasks S/XS without Architect, or when Architect did not generate previews)
 
@@ -46,8 +47,9 @@ If the task involves user-facing UI and no design previews were approved during 
 
 1. Generate the main component or section in 3 style variations as functional code.
 2. Each variation must use different aesthetic patterns from the `frontend-design` skill.
-3. Present variations to the user via Maestro for choice.
-4. Only continue with full implementation after the user approves one variation.
+3. For landing/homepage/hero/redesign tasks, each variation must also use a distinct composition pattern and image strategy from `frontend-design/references/aesthetic-patterns.md`.
+4. Present variations to the user via Maestro for choice.
+5. Only continue with full implementation after the user approves one variation.
 
 ### 3. Confirm Scope
 
@@ -64,7 +66,7 @@ For each step in the plan:
 1. **Announce**: "Implementing step N: <title>".
 2. **Apply** the minimal diff aligned with existing code style.
 3. **Write basic tests** for the happy path of this step.
-4. **If the step produces visible UI**: apply at least 3 design principles from the `frontend-design` skill. Do not ship default shadcn/ui components without customization matching the design profile.
+4. **If the step produces visible UI**: apply at least 3 design principles from the `frontend-design` skill. Do not ship default shadcn/ui components without customization matching the design profile. For first-impression marketing/hero work, also preserve the approved composition pattern, hero restraint, image role, and section rhythm.
 5. **If you created a new shared component**: add it to `~/.canuto/vault/projects/{project-slug}/design/components/` as a new note with the component template.
 6. **Note** any deviations from the plan or areas where you had to guess.
 7. **Output truncation**: when build/test commands produce output exceeding 100 lines, apply anomaly-preserving truncation — keep first 20 lines + all error-signal lines (`ERROR`, `FAIL`, stack traces) + last 10 lines. Replace omitted sections with `[... N lines omitted ...]`.

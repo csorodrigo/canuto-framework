@@ -3,8 +3,8 @@ name: frontend-design
 description: Apply opinionated visual direction and design guardrails so frontend work avoids generic default UI.
 shortDescription: How to make frontend features visually distinctive and design-coherent.
 usedBy: [coder, reviewer, architect]
-version: 4.0.0
-lastUpdated: 2026-03-23
+version: 4.1.0
+lastUpdated: 2026-04-22
 copyright: Rodrigo Canuto © 2026.
 evals:
   - prompt: "implementing the dashboard page now, what design patterns should i apply?"
@@ -15,6 +15,10 @@ evals:
     should_trigger: false
   - prompt: "write unit tests for the dashboard component"
     should_trigger: false
+  - prompt: "create a premium landing page hero"
+    should_trigger: true
+  - prompt: "make this homepage visually stronger"
+    should_trigger: true
 ---
 
 ## When to Use
@@ -37,9 +41,11 @@ Prevent generic-looking UI by encoding opinionated design principles within the 
 
 Works alongside `frontend-implementation` (which covers _where_ to put code). This skill covers _how it should look_.
 
+For landing pages, homepages, heroes, public marketing sites, redesigns, and visually important first impressions, this skill also applies a passive **Image-First Art Direction Bias**. The user does not need to ask for it explicitly: the agent should quietly choose a stronger composition, section rhythm, typography stance, and image strategy before planning or implementing.
+
 > **References** (read on demand):
 > - `references/design-patterns.md` — LLM bias correction, 5 design principles detail, examples
-> - `references/aesthetic-patterns.md` — 8 aesthetic pattern recipes + inspiration/preview protocols
+> - `references/aesthetic-patterns.md` — aesthetic recipes, composition patterns, and inspiration/preview protocols
 
 ---
 
@@ -65,6 +71,8 @@ If `design-profile.md` already exists and answers these, skip directly to readin
 | **DESIGN_VARIANCE** | 6 | 1–10 | 1 = symmetric. 10 = asymmetric, editorial. |
 | **MOTION_INTENSITY** | 5 | 1–10 | 1 = hover only. 10 = choreographed Framer Motion. |
 | **VISUAL_DENSITY** | 4 | 1–10 | 1 = airy editorial. 10 = cockpit-mode packed. |
+| **ART_DIRECTION** | 7 | 1–10 | 1 = safe commercial. 10 = bold concept. |
+| **IMAGE_USAGE_PRIORITY** | 7 | 1–10 | 1 = mostly typographic. 10 = image-led composition. |
 
 > Defaults (6, 5, 4) are more conservative than Taste Skill reference (8, 6, 4) for production SaaS. Adjust in `design-profile.md`.
 
@@ -72,9 +80,26 @@ If `design-profile.md` already exists and answers these, skip directly to readin
 - DESIGN_VARIANCE 1–3: centered, symmetrical. 4–7: offset, left-aligned. 8–10: masonry, fractional CSS Grid.
 - MOTION_INTENSITY 1–3: CSS hover/active only. 4–7: cubic-bezier transitions + staggered delays. 8–10: Framer Motion spring physics.
 - VISUAL_DENSITY 1–3: large section gaps, editorial. 4–7: standard app spacing. 8–10: compact padding, `border-t`/`divide-y`.
+- ART_DIRECTION 1–3: familiar product language. 4–7: distinctive but production-safe. 8–10: memorable editorial or campaign concept.
+- IMAGE_USAGE_PRIORITY 1–3: imagery supports content. 4–7: imagery shapes key sections. 8–10: images are structural, especially in the hero.
 - Mobile override: for DESIGN_VARIANCE 4+, asymmetric layouts above `md:` must collapse to single-column on viewports <768px.
 
 For LLM bias correction patterns and full design principle details, read `references/design-patterns.md`.
+
+---
+
+## Passive Image-First Art Direction Bias
+
+Apply this automatically when the task mentions or implies a landing page, homepage, hero, marketing site, public website, visual redesign, "make it premium", "mais bonito", "visual forte", or any UI where first impression is the primary value.
+
+When active:
+- Choose an internal visual direction before planning or coding: composition pattern, hero architecture, section rhythm, typography character, and image role.
+- Treat imagery as structural material for landing/marketing work: product shots, editorial crops, real venue/object/person media, or generated bitmap assets should shape layout and hierarchy, not sit as small decoration.
+- Keep the hero cinematic and restrained: one clear focal idea, concise headline, meaningful CTA priority, generous negative space, and a hint of the next section.
+- Vary page rhythm across sections: alternate density, alignment, image-to-text ratio, and background intensity while keeping one coherent brand world.
+- Avoid asking the user to activate this. Only ask when visual intent materially changes product scope or brand direction.
+
+Do not apply the image-first bias heavily to normal dashboard, CRUD, settings, or internal app tasks. For those, keep the standard `frontend-design` guardrails and prioritize task efficiency, clarity, and information density.
 
 ---
 
@@ -107,7 +132,7 @@ Do not ship vanilla shadcn/ui components without customization.
 
 ### 4. Reference Aesthetic Patterns
 Apply patterns from the design profile's `Preferred Aesthetic Patterns` section.
-Available patterns: Glassmorphism, Glow Accents, Depth Layering, Color-per-Card, Tactile Surfaces, Spatial Decorators, Liquid Glass, Spring Physics Motion.
+Available patterns: Glassmorphism, Glow Accents, Depth Layering, Color-per-Card, Tactile Surfaces, Spatial Decorators, Liquid Glass, Spring Physics Motion, plus composition patterns for landing/hero work.
 → CSS recipes: `references/aesthetic-patterns.md`
 
 ### 5. Inspiration Ingestion (when user provides references)

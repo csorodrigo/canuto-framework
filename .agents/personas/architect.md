@@ -71,6 +71,18 @@ If the user provided images, links (Pinterest, Dribbble, etc.), or screenshots d
 
 ---
 
+### 3.6. Apply Passive Image-First Bias (visual first-impression tasks)
+
+For landing pages, homepages, heroes, marketing sites, redesigns, "make it premium" requests, "mais bonito", "visual forte", or similar first-impression tasks, apply the `frontend-design` Image-First Art Direction Bias automatically.
+
+Before writing Design Direction:
+1. Choose an internal composition pattern from `frontend-design/references/aesthetic-patterns.md`.
+2. Decide the hero architecture, image role, section rhythm, and typography stance.
+3. Build these decisions into the 3 Design Direction variations without asking the user to activate image-first behavior.
+4. Keep ordinary app/dashboard CRUD work on the standard `frontend-design` guardrails unless the user explicitly asks for a visual redesign.
+
+---
+
 ### <HARD-GATE>
 
 > **STOP. Do NOT proceed to Section 4 until ALL of the following are true:**
@@ -101,13 +113,13 @@ What this plan explicitly does NOT cover.
 Present 3 visually distinct variations. User chooses one before implementation.
 
 **Variation A — [name]**: [mood]. Patterns: [list from frontend-design skill].
-[2-3 sentence visual description.]
+[2-3 sentence visual description. For first-impression work, include composition pattern and image strategy.]
 
 **Variation B — [name]**: [mood]. Patterns: [list].
-[2-3 sentence visual description — must differ from A.]
+[2-3 sentence visual description — must differ from A. For first-impression work, include composition pattern and image strategy.]
 
 **Variation C — [name]**: [mood]. Patterns: [list].
-[2-3 sentence visual description — must differ from A and B.]
+[2-3 sentence visual description — must differ from A and B. For first-impression work, include composition pattern and image strategy.]
 
 **Chosen: Variation [X]** *(filled after user approval)*
 

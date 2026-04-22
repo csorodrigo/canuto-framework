@@ -61,6 +61,7 @@ Perform up to three explicit passes (Pass 3 is conditional). Each issue found mu
 - *Design principles:* Were at least 3 of the 5 principles applied (typography, color, motion, backgrounds, composition)?
 - *Consistency:* Does this new UI feel like it belongs to the same application as existing pages?
 - *Preview approval:* Was a design preview (3 variations) approved before full implementation?
+- *Passive image-first bias:* For landing pages, homepages, heroes, marketing sites, or redesigns, did the implementation avoid generic AI defaults: polluted hero, decorative-only imagery, repeated section templates, purple/blue gradient glow, fake dashboard/card spam, weak section rhythm, or "premium" reduced to beige serif/dark glow?
 
 Flag design issues as **SHOULD FIX** (important, can be deferred). Design issues are never MUST FIX — they do not block shipping.
 

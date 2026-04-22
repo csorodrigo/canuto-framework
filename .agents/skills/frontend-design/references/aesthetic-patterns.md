@@ -113,12 +113,42 @@ Premium interactive feel via Framer Motion spring physics.
 
 ---
 
+## Composition Patterns
+
+Use these when the passive Image-First Art Direction Bias applies: landing pages, homepages, heroes, public marketing sites, redesigns, and visually important first impressions. Pick one dominant pattern and keep the page coherent instead of mixing every idea.
+
+### Cinematic Centered Minimalist
+
+A restrained hero with one strong opening scene, concise headline, generous negative space, and a single dominant CTA. Use only when the brand needs calm authority; avoid adding badges, stats, and decorative clutter to fill the empty space.
+
+### Asymmetric Split Hero
+
+Left or offset copy balanced against a large product, editorial, venue, object, or generated image treatment. Use when clarity matters but the page needs more visual tension than a centered hero.
+
+### Editorial Offset
+
+Typographic hierarchy and image crops sit on an intentionally offset grid. Best for agencies, portfolios, editorial products, luxury, culture, and founder-led brands where the page should feel art-directed but still readable.
+
+### Image-First Hero
+
+The hero is led by full-bleed or dominant media with restrained text layered or adjacent to it. Use for products, places, objects, people, and visual brands where the user must immediately inspect the real thing.
+
+### Gallery-Led Cadence
+
+The page rhythm is built from recurring but varied image panels, crops, or case-study visuals. Useful for multi-section pages that would otherwise become text blocks and repeated cards.
+
+### Swiss Grid Discipline
+
+A precise grid, sharp alignment, strong type scale, and controlled image placement. Best for fintech, enterprise, technical, data, and B2B pages that need trust without becoming bland.
+
+---
+
 ## Inspiration Ingestion Protocol
 
 When the user provides visual references (images, Pinterest/Dribbble links, screenshots):
 
 1. **Read/view** each reference
-2. **Extract patterns**: color palette, typographic style, surface treatment, layout type, effects (glow, glass, shadow, gradients), overall mood
+2. **Extract patterns**: color palette, typographic style, surface treatment, layout type, composition pattern, effects (glow, glass, shadow, gradients), image role, overall mood
 3. **Map** extracted patterns to the Aesthetic Pattern Recipes above — e.g., "image X uses glassmorphism + glow accents on dark background"
 4. **Document** the extraction in the plan's "Design Direction" section (Architect) or update `design-profile.md` directly (if evolving an existing profile)
 5. **Save** reference images to `.context/attachments/` and link in the design profile's References section
@@ -142,7 +172,7 @@ Before implementing user-facing UI, present 3 visually distinct variations. Each
 [2-3 sentence visual description — must differ from A and B.]
 ```
 
-Each variation must combine different patterns (e.g., A = glassmorphism + dark, B = color-per-card + flat-depth, C = tactile + neumorphism). The chosen variation becomes the final Design Direction.
+Each variation must combine different patterns (e.g., A = glassmorphism + dark, B = color-per-card + flat-depth, C = tactile + neumorphism). For landing/homepage/hero/redesign tasks, each variation must also name a dominant composition pattern from the list above. The chosen variation becomes the final Design Direction.
 
 **For Coder (tasks S/XS, or when Architect did not participate):**
 
