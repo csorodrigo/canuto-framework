@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const {
+  emitCanutoOtlpMetrics,
   parseArgs,
   runAudit,
   writeAuditOutputs,
@@ -48,6 +49,7 @@ async function main() {
   const options = parseArgs(process.argv.slice(2), process.cwd());
   const result = await runAudit(options);
   writeAuditOutputs(options.outputDir, result);
+  await emitCanutoOtlpMetrics(result);
 
   const totalSessions = result.project_summaries.reduce(
     (sum, summary) => sum + summary.sessions_analyzed,

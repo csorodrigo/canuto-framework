@@ -119,3 +119,251 @@ claude mcp list | grep gemini
 ### Cache staleness
 - The MCP server caches vault contents and refreshes every 10 minutes
 - After bulk edits, restart the MCP server to force a cache rebuild
+
+---
+
+## Observability (OTel + SigNoz)
+
+The framework ships with OpenTelemetry wiring so Claude Code 2.1.116 and Codex CLI 0.122 stream sessions to a **local SigNoz** instance on `http://localhost:8080`. No data leaves the machine.
+
+### Stack
+
+```
+Claude Code  ──OTLP/gRPC:4317──┐
+Codex CLI    ──OTLP/gRPC:4317──┼──▶ SigNoz (Docker) ──▶ UI :8080
+framework-session-audit-lib ───┘        └─ ClickHouse
+```
+
+### Bring up / down
+
+```bash
+# Up
+cd ~/signoz/deploy/docker && docker compose up -d
+
+# Down (preserve data)
+cd ~/signoz/deploy/docker && docker compose down
+
+# Down + wipe volumes (fresh start)
+cd ~/signoz/deploy/docker && docker compose down -v
+```
+
+### Env vars (already set by install.sh in `~/.claude/settings.json`)
+
+```json
+"CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+"CLAUDE_CODE_ENHANCED_TELEMETRY_BETA": "1",
+"OTEL_METRICS_EXPORTER": "otlp",
+"OTEL_LOGS_EXPORTER": "otlp",
+"OTEL_TRACES_EXPORTER": "otlp",
+"OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
+"OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4317",
+"OTEL_RESOURCE_ATTRIBUTES": "service.name=claude-code,deployment.environment=local-dev,host.name=rod-mac,service.namespace=canuto"
+```
+
+Codex: `~/.codex/config.toml` contains `[otel] environment="local-dev" exporter = { otlp-grpc = { endpoint = "http://localhost:4317" } }`.
+
+### Codex 0.122 emission matrix
+
+Observed locally on 2026-04-21 (smoke in install.sh `--doctor`):
+
+| Mode | Emits OTel spans? | Observed in SigNoz? | Notes |
+|------|-------------------|---------------------|-------|
+| `codex` interactive | yes | yes | needs TTY to smoke manually |
+| `codex exec "..."` | **yes** | **yes** | confirmed — `BatchSpanProcessor` ran, transient `BrokenPipe` during collector warmup |
+| `codex mcp-server` (via `mcp__codex-coder__spawn_agent`) | **not yet verified** | likely partial | tracked upstream at openai/codex#12913; mitigation: Claude's `claude_code.mcp_server_connection` + `claude_code.tool` spans cover scope/duration/success from the orchestrator side |
+
+Re-run `.agents/tools/observability-smoke.sh` after any Codex upgrade to revalidate.
+
+### Queries in SigNoz UI
+
+- Traces tab → filter `service.name=claude-code` → see tool calls with durations.
+- Metrics → search `claude_code.token.usage` (cumulative by model), `claude_code.cost.usage` (USD), `claude_code.code_edit_tool.decision`.
+- Logs → search `user_prompt`, `tool_result`, `api_error`, `mcp_server_connection`.
+- Custom Canuto metrics under `canuto.session.*` (rework_loop_rate, memory_miss_rate, etc.) are emitted by `.agents/tools/framework-session-audit-lib.js` when the audit runs (Stop hook).
+
+### Privacy
+
+Prompt bodies, tool args, and API bodies are **redacted by default**. To opt in (only on your local machine, never in shared configs):
+- `OTEL_LOG_USER_PROMPTS=1`
+- `OTEL_LOG_TOOL_DETAILS=1`
+- `OTEL_LOG_TOOL_CONTENT=1`
+- `OTEL_LOG_RAW_API_BODIES=1` (or `file:<dir>` to write to disk instead of span attrs)
+
+### HTTP interception complementary — Proxyman
+
+OTel shows *where time is spent* and *what tools were called*; Proxyman shows **the actual HTTP payload** (request/response bodies) — useful when OTel redacts content or when an MCP/external API returns a cryptic error.
+
+Ad-hoc activation (not persistent, not global):
+
+```bash
+HTTPS_PROXY=http://localhost:9090 \
+HTTP_PROXY=http://localhost:9090 \
+NODE_EXTRA_CA_CERTS=$HOME/.proxyman-ca.pem \
+claude
+```
+
+Prerequisites: Proxyman.app running, Proxyman CA installed in Keychain (Proxyman → Certificate → Install Certificate on this Mac). Export the CA to `~/.proxyman-ca.pem` once.
+
+Both run simultaneously without conflict.
+
+### Smoke check
+
+```bash
+.agents/tools/observability-smoke.sh            # human output
+.agents/tools/observability-smoke.sh --json     # for install.sh --doctor
+```
+
+---
+
+## Secrets (Bitwarden CLI)
+
+The framework wraps `bw` to sync `.env` files between a project and your Bitwarden vault as **secure notes** (attachments are Premium-only on the Free plan; we use base64-encoded notes which cover typical `.env` sizes).
+
+### One-time setup
+
+```bash
+brew install bitwarden-cli
+bw config server https://vault.bitwarden.com   # skip if default
+bw login                                       # interactive
+eval "$(bw unlock | grep 'export BW_SESSION')" # capture session
+# put the export line in ~/.zshrc (manual — keep BW_SESSION private, never commit)
+```
+
+### Sync `.env`
+
+```bash
+cd <project>
+.agents/tools/env-bitwarden-sync.sh push <project-slug>   # uploads .env to note "canuto-env-<slug>"
+.agents/tools/env-bitwarden-sync.sh pull <project-slug>   # downloads note → .env (backs up existing to .env.bak.$ts)
+```
+
+### Caveats
+
+- **Never** commit `BW_SESSION` — rotate if exposed (`bw lock && bw unlock`).
+- Secure note size limit ~10 KB of plaintext (more than enough for typical `.env`).
+- Attachments (binary) require Premium; out of scope.
+
+---
+
+## Vault Git
+
+The global vault at `~/.canuto/vault` is versioned locally with `git` (no remote by default). The Obsidian-Git community plugin auto-commits every 10 minutes.
+
+### Install
+
+```bash
+cd ~/.canuto/vault
+git init -b main
+cat > .gitignore <<'EOF'
+.obsidian/workspace*
+.obsidian/cache/
+.trash/
+*.tmp
+.DS_Store
+EOF
+git add -A && git commit -m "initial vault snapshot"
+```
+
+In Obsidian:
+1. Settings → Community Plugins → Browse → install **Obsidian Git**.
+2. Enable it. Plugin settings: `autoSaveInterval: 10` (min), `autoPushInterval: 0`, `autoPullInterval: 0`, `commitMessage: "vault: {{date}} auto-commit"`, `mergeOnPull: "merge"`.
+
+### Recovery / rollback
+
+```bash
+cd ~/.canuto/vault
+git log --oneline | head -20
+git checkout <sha> -- <file>         # restore single note
+git reset --hard <sha>               # full rewind (destructive — ensure no uncommitted work)
+```
+
+### Conflict resolution (manual)
+
+Obsidian-Git uses `mergeOnPull: "merge"`. If a conflict appears (you edited on two devices), open the `.md` in Obsidian, resolve `<<<<<<<` markers, save, commit.
+
+### Add a remote later
+
+```bash
+cd ~/.canuto/vault
+git remote add origin git@github.com:<you>/canuto-vault-private.git
+git push -u origin main
+# Then in Obsidian-Git: autoPushInterval > 0 if you want auto-push
+```
+
+---
+
+## Raycast integration
+
+Raycast is Mac's command palette / launcher. Canuto ships no auto-install — the UI is interactive — but the framework recommends these snippets and extensions for a smoother flow:
+
+### Extensions (install via Raycast Store)
+
+- **Obsidian** — create quick notes into `~/.canuto/vault`. Point the extension's vault path to `/Users/<you>/.canuto/vault` in its settings.
+- **GitHub** — for quick PR/issue triage alongside `mcp__github__*`.
+- **Brew** — see what's installed, search casks.
+
+### Snippets (Raycast → Settings → Snippets → "+")
+
+Type `//brief` in any text field and Raycast expands it to the slash command. Use these triggers:
+
+| Snippet | Expands to | Keyword |
+|---------|------------|---------|
+| `//brief` | `/briefing` | briefing |
+| `//ship` | `/ship` | ship |
+| `//qa` | `/qa` | qa |
+| `//co` | `/co-plan` | coplan |
+| `//test` | `/test` | test |
+| `//fix` | `/fix` | fix |
+| `//sig` | `http://localhost:8080` | signoz |
+| `//reset` | `/session-reset` | reset |
+
+### Quicklinks (Raycast → Create Quicklink)
+
+- Name: `SigNoz Dashboard`, URL: `http://localhost:8080`.
+- Name: `Obsidian Canuto`, URL: `obsidian://open?vault=vault`.
+- Name: `Conductor Workspaces`, URL: `file:///Users/<you>/conductor/workspaces`.
+
+These are **manual steps** — Raycast's UI doesn't expose a safe import format for bulk snippet/quicklink config. Add them once and they persist.
+
+---
+
+## Rollback
+
+Everything installed by this integration has a rollback path. Pick the scope you need.
+
+### Full rollback (pre-integration state)
+
+```bash
+# Replace TS with the timestamp used at install (see install.sh output or ls ~/.claude/*.bak.*)
+TS=<timestamp>
+
+# Global Claude / Codex configs
+cp ~/.claude/settings.json.bak.$TS  ~/.claude/settings.json
+cp ~/.claude/CLAUDE.md.bak.$TS      ~/.claude/CLAUDE.md
+cp ~/.codex/config.toml.bak.$TS     ~/.codex/config.toml
+
+# SigNoz stack
+cd ~/signoz/deploy/docker && docker compose down -v
+# rm -rf ~/signoz   # optional: fully remove the clone
+
+# Mac automation
+rm -f ~/.hammerspoon/init.lua ~/.wezterm.lua
+
+# Framework hooks (from ~/.claude/hooks/ if installed there)
+# Revert by editing ~/.claude/settings.json → "hooks" block back to backup
+```
+
+### Just disable OTel (keep SigNoz data)
+
+Remove the `CLAUDE_CODE_ENABLE_TELEMETRY` and `OTEL_*` keys from `~/.claude/settings.json`'s `env` block, comment out `[otel]` in `~/.codex/config.toml`.
+
+### Just stop SigNoz (keep configs)
+
+```bash
+cd ~/signoz/deploy/docker && docker compose down
+```
+
+### Just remove a hook
+
+Edit `~/.claude/settings.json` → `hooks` array → remove the entry. No restart needed.
+

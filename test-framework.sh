@@ -119,7 +119,7 @@ echo ""
 # ═══════════════════════════════════════════════════════════════════════════
 echo "── Test 3: Hook Scripts ──"
 
-HOOKS=(session-load session-save pre-compact-save check-references check-orphans plan-review codex-pretool-guard protect-files require-tests-for-pr log-commands)
+HOOKS=(session-load session-save pre-compact-save check-references check-orphans plan-review codex-pretool-guard protect-files require-tests-for-pr log-commands session-start validation-mark validation-clear retry-detect fingerprint-gate pre-finalize)
 for hook in "${HOOKS[@]}"; do
   HFILE="$AGENTS_DIR/hooks/$hook.sh"
   if [ ! -f "$HFILE" ]; then

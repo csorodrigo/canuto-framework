@@ -1,6 +1,18 @@
 {
-  "_comment": "Merge this into ~/.claude/settings.json. Valid Claude Code hook events: PreToolUse, PostToolUse, Stop, Notification.",
+  "_comment": "Merge this into ~/.claude/settings.json. Events: SessionStart, PreToolUse, PostToolUse, Stop, Notification.",
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/session-start.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "",
@@ -27,6 +39,11 @@
           {
             "type": "command",
             "command": "~/.claude/hooks/protect-files.sh"
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/fingerprint-gate.sh",
+            "timeout": 3
           }
         ]
       },
@@ -51,12 +68,42 @@
             "timeout": 180
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/validation-mark.sh",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/validation-clear.sh",
+            "timeout": 3
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/retry-detect.sh",
+            "timeout": 3
+          }
+        ]
       }
     ],
     "Stop": [
       {
         "matcher": "",
         "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/pre-finalize.sh",
+            "timeout": 5
+          },
           {
             "type": "command",
             "command": "~/.claude/hooks/session-save.sh",

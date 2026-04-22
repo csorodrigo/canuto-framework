@@ -31,3 +31,8 @@ build/
 .turbo/
 *.tsbuildinfo
 .agents/tmp/
+
+# Hook runtime state (produced by validation/retry/fingerprint hooks)
+.agents/vault/audit/retry-counter.json
+.agents/vault/audit/validation-pending.json
+.agents/vault/audit/*-SESSION_START.md
