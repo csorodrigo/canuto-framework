@@ -9,6 +9,8 @@ const DEFAULT_ANALYSIS_MODE = 'deterministic';
 const DEFAULT_CLAUDE_PROJECTS_ROOT = '~/.claude/projects';
 const DEFAULT_CLAUDE_TELEMETRY_ROOT = '~/.claude/telemetry';
 const DEFAULT_PRICING_PATH = '~/.cache/codeburn/litellm-pricing.json';
+const DEFAULT_CANUTO_OTLP_HTTP_ENDPOINT = 'http://localhost:4318/v1/metrics';
+const DEFAULT_CANUTO_OTLP_FALLBACK = '.agents/vault/metrics/canuto-otlp.jsonl';
 
 const EXCLUDED_WORKSPACE_ROOTS = new Set(['.claude', 'CODEX-GERAL']);
 const EXCLUDED_PATH_MARKERS = ['backup-before', '.backup-'];
@@ -78,6 +80,16 @@ const OBSIDIAN_PRIORITY = {
   non_compliant_local: 1,
   non_compliant_missing: 2,
 };
+
+const CANUTO_SESSION_METRIC_DEFS = [
+  { name: 'canuto.session.validation_skip_rate', kind: 'gauge', unit: '1' },
+  { name: 'canuto.session.rework_loop_rate', kind: 'gauge', unit: '1' },
+  { name: 'canuto.session.same_file_reopened_rate', kind: 'gauge', unit: '1' },
+  { name: 'canuto.session.context_reset_need_rate', kind: 'gauge', unit: '1' },
+  { name: 'canuto.session.memory_miss_rate', kind: 'gauge', unit: '1' },
+  { name: 'canuto.session.retry_exhaustion_count', kind: 'counter', unit: '{count}' },
+  { name: 'canuto.session.rule_gap_count', kind: 'counter', unit: '{count}' },
+];
 
 const EMPTY_TOKEN_USAGE = Object.freeze({
   input_tokens: 0,
@@ -2574,6 +2586,250 @@ function buildProjectSummary(project, allSessions, sessionLimit, generatedAt = n
   };
 }
 
+function clampRate(value) {
+  if (!Number.isFinite(value)) return 0;
+  return roundedMetric(Math.max(0, Math.min(1, value)));
+}
+
+function safeDivide(numerator, denominator) {
+  return denominator > 0 ? numerator / denominator : 0;
+}
+
+function hasImplementationSignal(session) {
+  const toolNames = (session.tool_calls || []).map((item) => normalizeText(item.name));
+  return (
+    toNumber(session.tasks_completed, 0) > 0 ||
+    Boolean(session.activity_breakdown?.Coding) ||
+    toolNames.some((name) => ['edit', 'write', 'apply_patch'].includes(name))
+  );
+}
+
+function hasValidationSignal(session) {
+  return toNumber(session.tests_run, 0) > 0 || (session.validation || []).length > 0;
+}
+
+function hasReworkSignal(session) {
+  return (
+    toNumber(session.review_fix_cycles, 0) > 0 ||
+    toNumber(session.efficiency?.failed_command_count, 0) >= 2
+  );
+}
+
+function hasContextResetSignal(session) {
+  return (
+    toNumber(session.efficiency?.prompt_too_long_errors, 0) > 0 ||
+    toNumber(session.efficiency?.compact_failures, 0) > 0
+  );
+}
+
+function extractMentionedFilePaths(session) {
+  const corpus = [
+    ...(session.summary || []),
+    ...(session.what_was_done || []),
+    ...(session.validation || []),
+    ...(session.learnings || []),
+    ...(session._user_messages || []),
+  ].join('\n');
+  const paths = new Set();
+  const matcher =
+    /(?:^|[\s`'"])((?:[./~]?(?:[A-Za-z0-9_.-]+\/)+[A-Za-z0-9_.-]+\.[A-Za-z0-9]{1,8})|(?:[A-Za-z0-9_.-]+\.(?:js|ts|tsx|jsx|mjs|cjs|json|md|sh|py|go|rs|toml|ya?ml|css|html)))(?=$|[\s`'",:;)])/g;
+  let match;
+  while ((match = matcher.exec(corpus)) !== null) {
+    const candidate = match[1].replace(/^\.?\//, '');
+    if (!candidate || candidate.endsWith('.jsonl')) continue;
+    paths.add(candidate);
+  }
+  return [...paths];
+}
+
+function computeSameFileReopenedRate(sessions) {
+  const seen = new Set();
+  let reopened = 0;
+  const chronologicalSessions = [...sessions].sort((left, right) => {
+    const leftTs = Date.parse(left.timestamp || '');
+    const rightTs = Date.parse(right.timestamp || '');
+    return toNumber(leftTs, 0) - toNumber(rightTs, 0);
+  });
+
+  for (const session of chronologicalSessions) {
+    const mentionedPaths = extractMentionedFilePaths(session);
+    if (mentionedPaths.some((filePath) => seen.has(filePath))) {
+      reopened += 1;
+    }
+    for (const filePath of mentionedPaths) {
+      seen.add(filePath);
+    }
+  }
+
+  return clampRate(safeDivide(reopened, sessions.length));
+}
+
+function sumRankedCounts(items) {
+  return (items || []).reduce((sum, item) => sum + toNumber(item.count, 0), 0);
+}
+
+function buildCanutoSessionMetricValues(summary) {
+  const sessions = summary.sessions || [];
+  const sessionCount = toNumber(summary.sessions_analyzed, sessions.length);
+  const implementationSessions = sessions.filter(hasImplementationSignal);
+  const validationDenominator = implementationSessions.length > 0 ? implementationSessions.length : sessionCount;
+  const validationSkipped = implementationSessions.length > 0
+    ? implementationSessions.filter((session) => !hasValidationSignal(session)).length
+    : sessions.filter((session) => !hasValidationSignal(session)).length;
+  const retryExhaustionCount = sessions.filter((session) => toNumber(session.efficiency?.failed_command_count, 0) >= 3).length;
+  const ruleGapCategories = new Set(['playbook-gap', 'skill-gap', 'framework-version-skew']);
+  const ruleGapCount = (summary.top_findings || []).filter((finding) => ruleGapCategories.has(finding.category)).length;
+  const skillMissCount = sumRankedCounts(summary.top_skills_missed);
+
+  return {
+    'canuto.session.validation_skip_rate': clampRate(safeDivide(validationSkipped, validationDenominator)),
+    'canuto.session.rework_loop_rate': clampRate(safeDivide(sessions.filter(hasReworkSignal).length, sessionCount)),
+    // TODO: replace this approximation with explicit edit-path history once hooks persist per-session file reopen events.
+    'canuto.session.same_file_reopened_rate': computeSameFileReopenedRate(sessions),
+    'canuto.session.context_reset_need_rate': clampRate(safeDivide(sessions.filter(hasContextResetSignal).length, sessionCount)),
+    // TODO: replace this skill-miss proxy with explicit memory-worthy-rule persistence signals when available.
+    'canuto.session.memory_miss_rate': clampRate(safeDivide(skillMissCount, sessionCount)),
+    'canuto.session.retry_exhaustion_count': retryExhaustionCount,
+    'canuto.session.rule_gap_count': ruleGapCount,
+  };
+}
+
+function otlpAttribute(key, value) {
+  if (typeof value === 'number' && Number.isInteger(value)) {
+    return { key, value: { intValue: String(value) } };
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return { key, value: { doubleValue: value } };
+  }
+  return { key, value: { stringValue: String(value || '') } };
+}
+
+function otlpTimeUnixNano(generatedAt) {
+  const millis = Date.parse(generatedAt || '');
+  const safeMillis = Number.isFinite(millis) ? millis : Date.now();
+  return String(BigInt(safeMillis) * 1000000n);
+}
+
+function buildCanutoOtlpPayload(auditResult) {
+  const generatedAt = auditResult?.generated_at || new Date().toISOString();
+  const timeUnixNano = otlpTimeUnixNano(generatedAt);
+  const projectSummaries = auditResult?.project_summaries || [];
+  const metrics = CANUTO_SESSION_METRIC_DEFS.map((definition) => {
+    const dataPoints = projectSummaries.map((summary) => {
+      const values = buildCanutoSessionMetricValues(summary);
+      const value = values[definition.name] || 0;
+      const point = {
+        attributes: [
+          otlpAttribute('project.key', summary.project_key || ''),
+          otlpAttribute('project.slug', summary.project_slug || summary.project_key || ''),
+          otlpAttribute('sessions.analyzed', toNumber(summary.sessions_analyzed, 0)),
+        ],
+        timeUnixNano,
+      };
+      if (definition.kind === 'counter') {
+        point.asInt = String(Math.max(0, Math.round(toNumber(value, 0))));
+      } else {
+        point.asDouble = toNumber(value, 0);
+      }
+      return point;
+    });
+
+    const metric = {
+      name: definition.name,
+      unit: definition.unit,
+    };
+    if (definition.kind === 'counter') {
+      metric.sum = {
+        aggregationTemporality: 'AGGREGATION_TEMPORALITY_DELTA',
+        isMonotonic: true,
+        dataPoints,
+      };
+    } else {
+      metric.gauge = { dataPoints };
+    }
+    return metric;
+  });
+
+  return {
+    resourceMetrics: [
+      {
+        resource: {
+          attributes: [
+            otlpAttribute('service.name', 'canuto-framework-audit'),
+            otlpAttribute('deployment.environment', 'local-dev'),
+          ],
+        },
+        scopeMetrics: [
+          {
+            scope: { name: 'canuto' },
+            metrics,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function isCanutoOtlpEnabled(opts = {}) {
+  if (typeof opts.enabled === 'boolean') return opts.enabled;
+  const explicit = process.env.CANUTO_OTLP_ENABLED;
+  if (explicit === '0' || normalizeText(explicit) === 'false') return false;
+  if (explicit === '1' || normalizeText(explicit) === 'true') return true;
+  return Boolean(process.env.OTEL_EXPORTER_OTLP_ENDPOINT);
+}
+
+function fallbackCanutoOtlpPayload(fallbackPath, payload) {
+  try {
+    ensureDir(path.dirname(fallbackPath));
+    fs.appendFileSync(fallbackPath, `${JSON.stringify(payload)}\n`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function emitCanutoOtlpMetrics(auditResult, opts = {}) {
+  const endpoint = opts.endpoint || process.env.CANUTO_OTLP_HTTP_ENDPOINT || DEFAULT_CANUTO_OTLP_HTTP_ENDPOINT;
+  const fallbackPath = resolvePath(
+    opts.fallbackNdjson || process.env.CANUTO_OTLP_FALLBACK || DEFAULT_CANUTO_OTLP_FALLBACK,
+    opts.cwd || process.cwd(),
+  );
+
+  if (!isCanutoOtlpEnabled(opts)) {
+    return { status: 'skipped', endpoint, fallback_path: fallbackPath };
+  }
+
+  const payload = buildCanutoOtlpPayload(auditResult);
+  const fetchImpl = opts.fetch || globalThis.fetch;
+  const timeoutMs = toNumber(opts.timeoutMs, 3000);
+
+  if (typeof fetchImpl === 'function') {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timeout = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+    try {
+      const response = await fetchImpl(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller?.signal,
+      });
+      if (!response || response.status < 200 || response.status >= 300) {
+        throw new Error(`OTLP HTTP status ${response?.status || 'unknown'}`);
+      }
+      return { status: 'otlp', endpoint, fallback_path: fallbackPath };
+    } catch {
+      // Fall through to NDJSON so local audits remain useful when SigNoz is down.
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
+  }
+
+  if (fallbackCanutoOtlpPayload(fallbackPath, payload)) {
+    return { status: 'ndjson', endpoint, fallback_path: fallbackPath };
+  }
+  return { status: 'skipped', endpoint, fallback_path: fallbackPath };
+}
+
 function sortProjectSummariesByBucket(projectSummaries) {
   return [...projectSummaries].sort((left, right) => {
     const bucketDiff = (BUCKET_TRIAGE_ORDER[left.bucket] ?? 99) - (BUCKET_TRIAGE_ORDER[right.bucket] ?? 99);
@@ -3590,6 +3846,7 @@ module.exports = {
   collectProjectSessions,
   detectSkillBreakages,
   detectProbableSkillMatches,
+  emitCanutoOtlpMetrics,
   generateCostDashboardReport,
   generateReport,
   parseArgs,

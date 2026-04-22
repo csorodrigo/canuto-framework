@@ -8,6 +8,7 @@ const {
   buildProjectSummary,
   buildInventory,
   detectSkillBreakages,
+  emitCanutoOtlpMetrics,
   generateReport,
   parseCodexLogMeta,
   parseCodexLogRecord,
@@ -1444,4 +1445,161 @@ test('missing pricing preserves tokens and records the model gap', async () => {
   assert.equal(session.estimated_cost_usd, null);
   assert.deepEqual(session.missing_pricing, ['unknown-expensive-model']);
   assert.deepEqual(result.cost_dashboard.missing_pricing, ['unknown-expensive-model']);
+});
+
+function makeMetricAuditResult() {
+  const tempDir = makeTempDir();
+  const project = makeBucketProject(tempDir, 'metric-project', {
+    sessionSaveHookPresent: true,
+    healthCheckToolPresent: true,
+  });
+  project.skill_catalog = [{ id: 'co-review', trigger_phrases: ['co review'] }];
+  const summary = buildProjectSummary(
+    project,
+    [
+      makeBucketSession({
+        session_id: 'metric-session-1',
+        captured_to_vault: true,
+        timestamp: '2026-04-16T10:00:00.000Z',
+        tasks_completed: 1,
+        tests_run: 0,
+        validation: [],
+        activity_breakdown: { Coding: { calls: 1, estimated_cost_usd: null } },
+        tool_calls: [{ name: 'Edit', count: 1 }],
+        summary: ['Changed .agents/tools/example.js'],
+        probable_skill_matches: [{ skill_id: 'co-review', score: 4, matched_phrase: 'co review' }],
+        efficiency: {
+          failed_command_count: 3,
+          total_shell_command_count: 3,
+          prompt_too_long_errors: 1,
+          compact_failures: 0,
+        },
+      }),
+      makeBucketSession({
+        session_id: 'metric-session-2',
+        captured_to_vault: true,
+        timestamp: '2026-04-16T11:00:00.000Z',
+        tasks_completed: 1,
+        tests_run: 1,
+        validation: ['node --test'],
+        activity_breakdown: { Coding: { calls: 1, estimated_cost_usd: null } },
+        tool_calls: [{ name: 'Edit', count: 1 }],
+        summary: ['Reopened .agents/tools/example.js'],
+        efficiency: {
+          failed_command_count: 0,
+          total_shell_command_count: 1,
+          prompt_too_long_errors: 0,
+          compact_failures: 0,
+        },
+      }),
+    ],
+    200,
+    '2026-04-17T00:00:00.000Z',
+  );
+
+  return {
+    generated_at: '2026-04-17T00:00:00.000Z',
+    project_summaries: [summary],
+  };
+}
+
+function extractMetricNames(payload) {
+  return payload.resourceMetrics[0].scopeMetrics[0].metrics.map((metric) => metric.name);
+}
+
+test('emitCanutoOtlpMetrics happy path posts OTLP JSON', async () => {
+  const auditResult = makeMetricAuditResult();
+  const calls = [];
+  const result = await emitCanutoOtlpMetrics(auditResult, {
+    enabled: true,
+    endpoint: 'http://collector.example/v1/metrics',
+    fallbackNdjson: path.join(makeTempDir(), 'fallback.jsonl'),
+    fetch: async (url, options) => {
+      calls.push({ url, options });
+      return { status: 200 };
+    },
+  });
+
+  assert.equal(result.status, 'otlp');
+  assert.equal(result.endpoint, 'http://collector.example/v1/metrics');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].options.method, 'POST');
+  assert.equal(calls[0].options.headers['Content-Type'], 'application/json');
+  const payload = JSON.parse(calls[0].options.body);
+  assert.equal(payload.resourceMetrics[0].resource.attributes[0].value.stringValue, 'canuto-framework-audit');
+});
+
+test('emitCanutoOtlpMetrics falls back to NDJSON when fetch rejects', async () => {
+  const tempDir = makeTempDir();
+  const fallbackPath = path.join(tempDir, 'canuto-otlp.jsonl');
+  const result = await emitCanutoOtlpMetrics(makeMetricAuditResult(), {
+    enabled: true,
+    endpoint: 'http://collector.example/v1/metrics',
+    fallbackNdjson: fallbackPath,
+    fetch: async () => {
+      throw new Error('collector down');
+    },
+  });
+
+  assert.equal(result.status, 'ndjson');
+  assert.equal(result.fallback_path, fallbackPath);
+  const lines = fs.readFileSync(fallbackPath, 'utf8').trim().split('\n');
+  assert.equal(lines.length, 1);
+  const payload = JSON.parse(lines[0]);
+  assert.equal(payload.resourceMetrics[0].scopeMetrics[0].scope.name, 'canuto');
+});
+
+test('emitCanutoOtlpMetrics payload has exactly the seven Canuto session metrics', async () => {
+  const calls = [];
+  await emitCanutoOtlpMetrics(makeMetricAuditResult(), {
+    enabled: true,
+    endpoint: 'http://collector.example/v1/metrics',
+    fallbackNdjson: path.join(makeTempDir(), 'fallback.jsonl'),
+    fetch: async (url, options) => {
+      calls.push({ url, options });
+      return { status: 204 };
+    },
+  });
+
+  const payload = JSON.parse(calls[0].options.body);
+  assert.deepEqual(
+    extractMetricNames(payload),
+    [
+      'canuto.session.validation_skip_rate',
+      'canuto.session.rework_loop_rate',
+      'canuto.session.same_file_reopened_rate',
+      'canuto.session.context_reset_need_rate',
+      'canuto.session.memory_miss_rate',
+      'canuto.session.retry_exhaustion_count',
+      'canuto.session.rule_gap_count',
+    ],
+  );
+  assert.equal(payload.resourceMetrics[0].scopeMetrics[0].metrics.length, 7);
+});
+
+test('emitCanutoOtlpMetrics skips when CANUTO_OTLP_ENABLED is zero', async () => {
+  const previousEnabled = process.env.CANUTO_OTLP_ENABLED;
+  const previousOtel = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  let called = false;
+
+  try {
+    process.env.CANUTO_OTLP_ENABLED = '0';
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'http://collector.example:4317';
+    const result = await emitCanutoOtlpMetrics(makeMetricAuditResult(), {
+      endpoint: 'http://collector.example/v1/metrics',
+      fallbackNdjson: path.join(makeTempDir(), 'fallback.jsonl'),
+      fetch: async () => {
+        called = true;
+        return { status: 200 };
+      },
+    });
+
+    assert.equal(result.status, 'skipped');
+    assert.equal(called, false);
+  } finally {
+    if (previousEnabled === undefined) delete process.env.CANUTO_OTLP_ENABLED;
+    else process.env.CANUTO_OTLP_ENABLED = previousEnabled;
+    if (previousOtel === undefined) delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+    else process.env.OTEL_EXPORTER_OTLP_ENDPOINT = previousOtel;
+  }
 });
