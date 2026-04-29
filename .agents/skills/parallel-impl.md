@@ -61,7 +61,7 @@ If any check fails → sequential execution instead.
 ### 3. Spawn Parallel Agents
 
 ```
-mcp__codex-coder__spawn_agents_parallel({
+(parallel codex exec --profile coder)({
   agents: [
     { prompt: "Subtask 1: Create auth middleware at src/middleware/auth.ts. Requirements: ..." },
     { prompt: "Subtask 2: Create user model at src/models/user.ts. Requirements: ..." },
@@ -81,7 +81,7 @@ After all agents complete:
 
 ### 5. Review
 
-Trigger code review via `mcp__codex-reviewer__spawn_agent`:
+Trigger code review via `codex exec --profile reviewer`:
 ```
 [CODE REVIEW REQUEST]
 --- CHANGES START ---
@@ -133,7 +133,7 @@ You are implementing ONE part of a larger feature. Other agents are working on o
 ## Graceful Degradation
 
 If `codex-coder` MCP unavailable:
-1. Try sequential `mcp__codex-coder__spawn_agent` calls
+1. Try sequential `codex exec --profile coder` calls
 2. Fallback: Claude implements sequentially (no parallelism)
 3. Log: `[Parallel-Impl] MCP unavailable, falling back to sequential execution`
 

@@ -52,7 +52,7 @@ evals:
 
 **Codex implementation** (via MCP):
 ```
-mcp__codex-coder__spawn_agent({
+codex exec --profile coder({
   prompt: `
 Implement the following feature. This is a competition — give your BEST implementation.
 
@@ -96,7 +96,7 @@ Run comparison on both implementations:
 Send BOTH implementations to the reviewer path for an independent comparison:
 
 ```
-mcp__codex-reviewer__spawn_agent({
+codex exec --profile reviewer({
   prompt: `
 [COMPETITION REVIEW]
 Two implementations of the same feature. Compare objectively.

@@ -1,12 +1,12 @@
 ---
 name: co-plan
-description: Official plan-review gate through the Codex reviewer path (reviewer profile — `gpt-5.4` with reasoning: high).
+description: Official plan-review gate through the Codex reviewer path (reviewer profile — `gpt-5.5` with reasoning: high).
 ---
 
 # Co-Plan
 
 Use this when the user asks for the official plan gate. This is not generic Codex CLI
-consultation. The preferred reviewer path is `mcp__codex-reviewer__spawn_agent`.
+consultation. The preferred reviewer path is `codex exec --profile reviewer`.
 
 ## Execution
 
@@ -18,7 +18,7 @@ consultation. The preferred reviewer path is `mcp__codex-reviewer__spawn_agent`.
 3. Try the official reviewer first:
 
 ```text
-mcp__codex-reviewer__spawn_agent(prompt="
+codex exec --profile reviewer(prompt="
 You are reviewing an implementation plan before coding starts.
 Review only the embedded plan below.
 Find logical gaps, hidden dependencies, missing validation/test strategy,
@@ -70,7 +70,7 @@ Stream A — Opus (self-review):
   Claude consolida o plano próprio com análise de premissas.
 
 Stream B — Codex reviewer (engineering adversarial):
-  mcp__codex-reviewer__spawn_agent({
+  codex exec --profile reviewer({
     prompt: "Review this plan for engineering gaps, edge cases, test strategy,
              rollback paths. [PLAN INLINE]"
   })

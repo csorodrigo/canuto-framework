@@ -56,7 +56,7 @@ N >= 9? → Accept. Skim git diff (30 seconds). Log "[Lazy-Review] Auto-accepted
   ↓
 N >= 7? → Quick review. Read diff + check UNCERTAIN_AREAS only.
   ↓
-N >= 4? → Full review. Read all changes. Optionally trigger codex-reviewer (reviewer profile, `gpt-5.4` high).
+N >= 4? → Full review. Read all changes. Optionally trigger codex-reviewer (reviewer profile, `gpt-5.5` high).
   ↓
 N < 4? → Reject. Re-prompt with more context or escalate.
 ```

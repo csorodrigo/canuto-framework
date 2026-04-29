@@ -29,7 +29,7 @@ Tests: spawn_agent with trivial task + one-shot reviewer call.
 ### Test 1: codex-coder spawn_agent
 
 ```
-mcp__codex-coder__spawn_agent({
+codex exec --profile coder({
   prompt: "Write a file at .agents/tmp/codex-smoke-test.txt with content: CODEX_CODER_OK_{timestamp}"
 })
 ```
@@ -40,7 +40,7 @@ mcp__codex-coder__spawn_agent({
 ### Test 2: codex-reviewer
 
 ```
-mcp__codex-reviewer__spawn_agent({
+codex exec --profile reviewer({
   prompt: "Review this trivial code and respond with JSON: {\"verdict\": \"PASS\", \"test\": true}\n\nCode: const x = 1 + 1;"
 })
 ```

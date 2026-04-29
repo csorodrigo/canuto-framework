@@ -174,8 +174,8 @@ See `.agents/skills/cost-routing.md` for the full decision matrix.
 
 | Route | Savings |
 |-------|---------|
-| M/L coding → Codex gpt-5.4 (high) | 60-70% |
-| Reviews → Codex gpt-5.4 (high, reviewer profile) | 40-50% |
+| M/L coding → Codex gpt-5.5 (high) | 60-70% |
+| Reviews → Codex gpt-5.5 (high, reviewer profile) | 40-50% |
 | Test-fix → Codex loop | 80% |
 | Context → Codex vault MCP | 90% |
 | Browser QA → Codex Playwright | 70% |

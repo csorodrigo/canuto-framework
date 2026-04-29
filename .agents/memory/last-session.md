@@ -1,6 +1,10 @@
 # Last Session — 2026-04-01
 
-> **Note:** model references below reflect decisions as of 2026-04-01. Current config (2026-04-17) uses `gpt-5.4` across all profiles — see `~/.codex/config.toml`. The decision "manter gpt-5-codex no coder profile" was later invalidated when it was discovered `gpt-5-codex` is a phantom slug on ChatGPT accounts.
+> **Note (atualizado 2026-04-29):** Current config uses `gpt-5.5` across all profiles —
+> single source of truth: `.agents/config/models.yaml`. Invocation moved from MCP
+> (`mcp__codex-*`) to CLI (`codex exec --profile <name>`) for 10-35% lower token overhead.
+> Historical note: 2026-04-17 used `gpt-5.4`; before that, `gpt-5-codex` (phantom slug —
+> see I-025).
 
 
 ## What Was Done

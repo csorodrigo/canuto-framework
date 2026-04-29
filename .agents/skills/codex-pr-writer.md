@@ -41,7 +41,7 @@ per PR. Codex reads the diff directly from git.
 ### 1. Spawn Codex PR Writer
 
 ```
-mcp__codex-coder__spawn_agent({
+codex exec --profile coder({
   prompt: `
 Generate a pull request description and changelog entry.
 

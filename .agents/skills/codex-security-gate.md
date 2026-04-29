@@ -57,7 +57,7 @@ git diff --staged  # or git diff main...HEAD for full branch diff
 ### 3. Send to Reviewer Security Review
 
 ```
-mcp__codex-reviewer__spawn_agent({
+codex exec --profile reviewer({
   prompt: `
 [SECURITY REVIEW REQUEST]
 You are a senior security engineer performing a pre-merge security audit.

@@ -40,7 +40,7 @@ mcp__gemini__ask-gemini({
 → write the returned markdown to .agents/vault/digests/{slug}.md
 ```
 
-**Fallback: Codex** via `mcp__codex-coder__spawn_agent` with a context-preload pointing
+**Fallback: Codex** via `codex exec --profile coder` with a context-preload pointing
 at the target directory. Use when Gemini quota is exhausted or the repo has auth-sensitive
 files that should not cross provider boundaries.
 

@@ -59,15 +59,15 @@ Verify: `claude mcp list` → both should show `✓ Connected`.
 
 | Mode | MCP Server | Tool | Model |
 |------|-----------|------|-------|
-| co-brainstorm | codex-coder | `spawn_agents_parallel` | gpt-5.4 (high) |
-| co-plan | codex-reviewer | `spawn_agent` | `reviewer` profile (`gpt-5.4`, reasoning: high) |
-| co-validate | codex-reviewer | `spawn_agent` | `reviewer` profile (`gpt-5.4`, reasoning: high) |
+| co-brainstorm | codex-coder | `spawn_agents_parallel` | gpt-5.5 (high) |
+| co-plan | codex-reviewer | `spawn_agent` | `reviewer` profile (`gpt-5.5`, reasoning: high) |
+| co-validate | codex-reviewer | `spawn_agent` | `reviewer` profile (`gpt-5.5`, reasoning: high) |
 
 ### Backend Preference (fallback chain)
 
 ```
 1. codex-reviewer MCP (`spawn_agent`, one-shot) — REVIEWS / CO-PLAN / CO-VALIDATE
-2. codex-coder MCP (gpt-5.4 (high), parallel) — CO-BRAINSTORM
+2. codex-coder MCP (gpt-5.5 (high), parallel) — CO-BRAINSTORM
 3. CCB `ask codex` (only with active Codex session, visible panes, anchoring risk) — FALLBACK
 4. Claude-only review — LAST RESORT
 ```
@@ -105,20 +105,20 @@ TN+2: Compare perspectives, synthesize best of both
 For detailed prompts, output formats, and examples, read `references/modes.md`.
 
 ### Mode 1: /co-brainstorm
-1. `mcp__codex-coder__spawn_agents_parallel` → 3 Codex agents brainstorm independently (gpt-5.4 (high))
+1. `(parallel codex exec --profile coder)` → 3 Codex agents brainstorm independently (gpt-5.5 (high))
 2. Main agent brainstorms independently (3-5 approaches)
 3. After all complete → collect Codex ideas
 4. Compare: convergent ideas (high confidence), unique ideas from each, recommend best
 
 ### Mode 2: /co-plan
-1. `mcp__codex-reviewer__spawn_agent` → Codex reviewer creates an implementation plan independently
+1. `codex exec --profile reviewer` → Codex reviewer creates an implementation plan independently
 2. Architect creates its own plan (standard flow)
 3. After both complete → compare Claude's plan with the one-shot reviewer response
 4. Compare: shared steps (validated), unique steps (gaps?), different approaches (trade-offs)
 
 ### Mode 3: /co-validate (auto for M/L)
 1. Read the plan file
-2. `mcp__codex-reviewer__spawn_agent` → Codex reviewer reviews as staff engineer
+2. `codex exec --profile reviewer` → Codex reviewer reviews as staff engineer
 3. Main agent conducts independent review
 4. After both complete → compare the independent review with the one-shot reviewer response
 5. Compare: convergent issues (fix these), unique issues from each (evaluate)
@@ -161,10 +161,10 @@ If Codex MCP servers are not configured or fail:
 ### Flow
 1. Before commit, collect `git diff --staged`
 2. If diff touches security-sensitive files → also trigger `/security-gate`
-3. Send to `mcp__codex-reviewer__spawn_agent` (reviewer profile):
+3. Send to `codex exec --profile reviewer` (reviewer profile):
 
 ```
-mcp__codex-reviewer__spawn_agent({
+codex exec --profile reviewer({
   prompt: `
 [PRE-COMMIT REVIEW]
 Review this staged diff before commit. Focus on:

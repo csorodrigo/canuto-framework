@@ -86,7 +86,7 @@ security, não quer esperar o auto-detect).
 
 ### Path: Codex reviewer (small / config)
 ```
-mcp__codex-reviewer__spawn_agent({
+codex exec --profile reviewer({
   prompt: "Review este diff. Foco em bugs, edge cases, contratos.\n\n--- DIFF ---\n<git diff inline>\n--- END ---"
 })
 ```
@@ -112,7 +112,7 @@ mcp__gemini__ask-gemini({
 ### Path: Triple (security)
 Reusa o fluxo do `/co-plan --triple` aplicado a diff em vez de plan:
 - Stream A: Opus self-review do diff
-- Stream B: `mcp__codex-reviewer__spawn_agent` (engineering adversarial)
+- Stream B: `codex exec --profile reviewer` (engineering adversarial)
 - Stream C: `mcp__gemini__ask-gemini({ prompt: "@./ ... + diff inline", model: "gemini-3.1-pro-preview" })`
 
 Convergência: 3/3 → mandatory fix; 2/3 → medium; 1/3 → evaluate.
@@ -129,7 +129,7 @@ Usuário: /review
 Maestro:
 1. git diff --shortstat → 47 linhas, 2 arquivos
 2. Heurística: small
-3. Dispara mcp__codex-reviewer__spawn_agent
+3. Dispara codex exec --profile reviewer
 4. Output: "[Review] Small diff via Codex. Verdict: 1 minor issue (line 23, var name)."
 ```
 

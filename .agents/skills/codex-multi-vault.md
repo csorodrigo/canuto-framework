@@ -39,7 +39,7 @@ What cross-project insight is needed:
 ### 2. Spawn Codex Vault Reader
 
 ```
-mcp__codex-coder__spawn_agent({
+codex exec --profile coder({
   prompt: `
 You have access to the obsidian-vault MCP. Search across all projects.
 

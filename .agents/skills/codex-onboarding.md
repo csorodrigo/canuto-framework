@@ -39,7 +39,7 @@ stack detection, dependencies, file structure. This runs in Python (fast, no API
 For richer onboarding, spawn Codex:
 
 ```
-mcp__codex-coder__spawn_agent({
+codex exec --profile coder({
   prompt: `
 You are onboarding a new project. Generate a comprehensive analysis.
 

@@ -172,10 +172,13 @@ For **XS**: include in Coder handoff: goal, exact file(s), and expected change. 
 For **S**: Architect conducts an abbreviated interview (see `architect.md`).
 
 > **REGRA CRÍTICA — Tasks M e L:** Após o usuário aprovar o plano, **NÃO use Edit/Write diretamente**. Chame imediatamente:
+> ```bash
+> codex exec --color never -q --profile coder \
+>   --output-last-message /tmp/codex-result.md \
+>   "<plano completo + arquivos + constraints>"
 > ```
-> mcp__codex-coder__spawn_agent(prompt="<plano completo + arquivos + constraints>")
-> ```
-> Maestro nunca implementa código. Delegar ao executor via MCP é obrigatório para tasks M/L.
+> Maestro nunca implementa código. Delegar ao executor via CLI é obrigatório para tasks M/L.
+> Modelo canônico: gpt-5.5 (high). Override via `.agents/config/models.yaml`.
 
 ---
 
@@ -187,13 +190,13 @@ For a **typical feature task**, the standard flow is:
 Maestro → Architect → [Co-Review — Codex, se M/L] → Coder → Tester → Reviewer
 ```
 
-> **Co-Review (co-review skill):** Para tasks **M** e **L**, após o Architect chamar `ExitPlanMode`, o Maestro executa automaticamente `/co-validate` via MCP quando disponível. O hook legado `plan-review.sh` continua como bridge compatível para esse trigger.
+> **Co-Review (co-review skill):** Para tasks **M** e **L**, após o Architect chamar `ExitPlanMode`, o Maestro executa automaticamente `/co-validate` via Codex CLI. O hook legado `plan-review.sh` continua como bridge compatível para esse trigger.
 >
 > **Como funciona (bias-free parallel review):**
-> 1. Spawnar um background subagent que chama Codex via MCP (`mcp__codex-reviewer__spawn_agent`) com o plano + prompt adversarial
-> 2. Codex é instruído a dizer "My review is complete and I'm ready to present" quando terminar (NÃO mostrar resultado antes)
+> 1. Spawnar `codex exec --profile reviewer --color never -q --output-last-message /tmp/codex-review-$$.md "<plano + adversarial prompt>"` em background via Bash (run_in_background)
+> 2. Codex é instruído a fazer revisão completa e gravar em arquivo (NÃO mostrar resultado antes)
 > 3. Enquanto isso, o agente principal faz sua própria revisão independente do plano
-> 4. Quando ambos terminarem: recuperar o output do Codex e comparar com a revisão do Claude
+> 4. Quando ambos terminarem: ler `/tmp/codex-review-$$.md` e comparar com a revisão do Claude
 > 5. Apresentar ao usuário: issues convergentes (alta confiança), issues exclusivas de cada modelo
 >
 > Se todas convergem em "sem problemas":
@@ -209,7 +212,7 @@ Maestro → Architect → [Co-Review — Codex, se M/L] → Coder → Tester →
 >
 > Para tasks **XS** e **S**: pular co-review e rotear ao Coder diretamente.
 > **Runtime flag:** `CO_REVIEW=false` desabilita o trigger automático.
-> **Degradação graciosa:** Se o MCP Codex não estiver configurado, prosseguir com review single-perspective.
+> **Degradação graciosa:** Se o `codex` CLI não estiver no PATH, prosseguir com review single-perspective e logar.
 >
 > Os três modos do co-review também podem ser chamados explicitamente:
 > - `/co-brainstorm <topic>` — ideação divergente com perspectivas independentes
@@ -517,7 +520,7 @@ Claude remains the default Maestro runtime. Codex becomes Maestro only when the 
 ### Runtime rules
 - Do NOT switch providers automatically mid-session.
 - Claude runtime keeps Claude Opus as Maestro.
-- Direct Codex runtime uses `CODEX.md` plus the `maestro` profile (`gpt-5.4` with reasoning: xhigh via the architect profile).
+- Direct Codex runtime uses `CODEX.md` plus the `maestro` profile (`gpt-5.5` with reasoning: xhigh via the architect profile).
 - Cross-runtime handoff is explicit, never implicit.
 
 ### Triggering conditions
@@ -526,23 +529,23 @@ Claude remains the default Maestro runtime. Codex becomes Maestro only when the 
 - User explicitly requests Codex fallback ("use codex", "switch to codex")
 - Network/API error preventing Claude from responding
 
-### Handoff via MCP (from within Claude)
+### Handoff via CLI (from within Claude)
 
-Prepare a handoff context and spawn Codex via MCP using the **maestro** server (`gpt-5.4` with reasoning: xhigh + write access):
+Prepare a handoff context and spawn Codex via CLI using the **maestro** profile (`gpt-5.5` with reasoning: xhigh + write access):
 
-```
-mcp__codex-maestro__spawn_agent(prompt="
-  You are acting as Maestro in the Codex runtime for this repository.
-  Read CODEX.md in the project root for your full persona instructions.
+```bash
+codex --profile maestro <<'EOF'
+You are acting as Maestro in the Codex runtime for this repository.
+Read CODEX.md in the project root for your full persona instructions.
 
-  Handoff context:
-  - Project: {project-slug}
-  - Current task: {one-sentence description}
-  - Relevant files: {list of paths}
-  - Constraints: {active instincts and blockers}
-  - Last decision: {what was decided before handoff}
-  - User request: {original user message}
-")
+Handoff context:
+- Project: {project-slug}
+- Current task: {one-sentence description}
+- Relevant files: {list of paths}
+- Constraints: {active instincts and blockers}
+- Last decision: {what was decided before handoff}
+- User request: {original user message}
+EOF
 ```
 
 ### Handoff via terminal (user-initiated)

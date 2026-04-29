@@ -57,8 +57,8 @@ Skills complementares — não confundir.
 | Signal | What it checks | Healthy | Degraded | Source |
 |---|---|---|---|---|
 | **Claude session** | Você está respondendo (tautológico — sempre PASS quando este skill roda) | running | n/a | the fact `/health` returned |
-| **codex-coder MCP** | `mcp__codex-coder__spawn_agent` registrado e o handshake funciona | ✓ Connected | erro de conexão ou ausente | `claude mcp list \| grep "codex-coder "` |
-| **codex-reviewer MCP** | `mcp__codex-reviewer__spawn_agent` registrado e funciona | ✓ Connected | erro ou ausente | `claude mcp list \| grep "codex-reviewer "` |
+| **codex-coder MCP** | `codex exec --profile coder` registrado e o handshake funciona | ✓ Connected | erro de conexão ou ausente | `claude mcp list \| grep "codex-coder "` |
+| **codex-reviewer MCP** | `codex exec --profile reviewer` registrado e funciona | ✓ Connected | erro ou ausente | `claude mcp list \| grep "codex-reviewer "` |
 | **Gemini MCP** | `mcp__gemini__*` registrado, ping responde | ✓ Connected + ping echo | erro de OAuth, quota, ou ausente | `claude mcp list \| grep "gemini "` + `mcp__gemini__ping` |
 | **Outros MCPs do projeto** | Cada server em `.mcp.json` (project) e `~/.claude/settings.json` (user) está ✓ Connected | todos verdes | algum em erro | `claude mcp list` (cobertura completa) |
 | **Smoke check estrutural** | Skills, hooks e refs estão no lugar (Codex + Gemini) | ambos PASS | 1 ou 2 FAIL | `bash .agents/tools/codex-health-check.sh --smoke` + `bash .agents/tools/gemini-smoke-check.sh` |

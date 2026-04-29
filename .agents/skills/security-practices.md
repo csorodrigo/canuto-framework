@@ -128,7 +128,7 @@ handling → **triple review obrigatório** (cross-model catches diferentes vuln
 
 ```
 Stream 1 — Codex reviewer (adversarial, execution-level vulns):
-  mcp__codex-reviewer__spawn_agent({
+  codex exec --profile reviewer({
     prompt: "Security review. Focus: injection, auth bypass, race conditions,
              timing attacks. [DIFF INLINE]"
   })

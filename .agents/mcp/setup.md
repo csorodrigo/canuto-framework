@@ -170,7 +170,7 @@ Observed locally on 2026-04-21 (smoke in install.sh `--doctor`):
 |------|-------------------|---------------------|-------|
 | `codex` interactive | yes | yes | needs TTY to smoke manually |
 | `codex exec "..."` | **yes** | **yes** | confirmed — `BatchSpanProcessor` ran, transient `BrokenPipe` during collector warmup |
-| `codex mcp-server` (via `mcp__codex-coder__spawn_agent`) | **not yet verified** | likely partial | tracked upstream at openai/codex#12913; mitigation: Claude's `claude_code.mcp_server_connection` + `claude_code.tool` spans cover scope/duration/success from the orchestrator side |
+| `codex mcp-server` (via `codex exec --profile coder`) | **not yet verified** | likely partial | tracked upstream at openai/codex#12913; mitigation: Claude's `claude_code.mcp_server_connection` + `claude_code.tool` spans cover scope/duration/success from the orchestrator side |
 
 Re-run `.agents/tools/observability-smoke.sh` after any Codex upgrade to revalidate.
 

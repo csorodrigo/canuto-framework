@@ -51,7 +51,7 @@ Requires `GITHUB_PERSONAL_ACCESS_TOKEN` env var.
 
 ### Issue Triage
 ```
-mcp__codex-coder__spawn_agent({
+codex exec --profile coder({
   prompt: `
 You have access to the GitHub MCP. Triage open issues for {repo}.
 1. List all open issues
@@ -65,7 +65,7 @@ You have access to the GitHub MCP. Triage open issues for {repo}.
 
 ### PR Creation
 ```
-mcp__codex-coder__spawn_agent({
+codex exec --profile coder({
   prompt: `
 Create a PR for the current branch.
 1. Run git diff main...HEAD to understand changes
@@ -78,7 +78,7 @@ Create a PR for the current branch.
 
 ### Code Search
 ```
-mcp__codex-coder__spawn_agent({
+codex exec --profile coder({
   prompt: `
 Search the GitHub repo for: {query}
 1. Use GitHub MCP code search

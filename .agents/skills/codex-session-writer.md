@@ -42,7 +42,7 @@ metrics: 3 files changed, 2 codex delegations, 1 escalation
 ### 2. Spawn Codex Session Writer
 
 ```
-mcp__codex-coder__spawn_agent({
+codex exec --profile coder({
   prompt: `
 You have access to the obsidian-vault MCP. Write a session note.
 

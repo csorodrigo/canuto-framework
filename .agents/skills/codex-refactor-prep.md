@@ -46,7 +46,7 @@ From the plan, identify what needs preparation:
 ### 2. Spawn Codex Refactorer
 
 ```
-mcp__codex-coder__spawn_agent({
+codex exec --profile coder({
   prompt: `
 You are preparing the codebase for a new feature. Do NOT implement the feature —
 only prepare the structure.

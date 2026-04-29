@@ -56,7 +56,7 @@ handle_codex_spawn() {
   local package_path=""
   local package_count=0
 
-  if [ "$TOOL_NAME" = "mcp__codex-coder__spawn_agent" ]; then
+  if [ "$TOOL_NAME" = "codex exec --profile coder" ]; then
     prompt_blob=$(printf '%s' "$HOOK_INPUT" | jq -r '.tool_input.prompt // ""')
     prompt_count=${#prompt_blob}
   else
@@ -64,7 +64,7 @@ handle_codex_spawn() {
     prompt_count=${#prompt_blob}
   fi
 
-  if [ "$TOOL_NAME" = "mcp__codex-coder__spawn_agent" ]; then
+  if [ "$TOOL_NAME" = "codex exec --profile coder" ]; then
     package_path=$(printf '%s' "$prompt_blob" | grep -oE '\.agents/tmp/context-package[^[:space:]]*\.md' | head -1 || true)
     if [ -n "$package_path" ] && codex_context_package_valid "$ROOT_DIR/$package_path"; then
       context_hint=true
@@ -92,7 +92,7 @@ handle_codex_spawn() {
     fi
   fi
 
-  if [ "$TOOL_NAME" = "mcp__codex-coder__spawn_agents_parallel" ] && [ "$context_hint" = false ]; then
+  if [ "$TOOL_NAME" = "(parallel codex exec --profile coder)" ] && [ "$context_hint" = false ]; then
     block_with_message "Codex delegation blocked: parallel spawn requires scoped context packages in .agents/tmp/. Generate them first with .agents/tools/codex-context-package.sh."
   fi
 
@@ -277,7 +277,7 @@ EOF
 
   local review_ok=false
   if [ "$review_tier" = "fast" ]; then
-    # Fast review: use gpt-5.4 with low reasoning instead of reviewer profile
+    # Fast review: use gpt-5.5 with low reasoning instead of reviewer profile
     local fast_cmd=(codex exec -C "$ROOT_DIR" -s read-only --skip-git-repo-check --ephemeral --profile fast -c 'model_reasoning_effort="low"' --output-schema "$schema_file" -o "$output_file" -)
     if "${fast_cmd[@]}" < "$prompt_file" >/dev/null 2>&1; then
       review_ok=true
@@ -437,7 +437,7 @@ EOF
 }
 
 case "$TOOL_NAME" in
-  mcp__codex-coder__spawn_agent|mcp__codex-coder__spawn_agents_parallel|mcp__codex-maestro__spawn_agent|mcp__codex-maestro__spawn_agents_parallel)
+  codex exec --profile coder|(parallel codex exec --profile coder)|codex --profile maestro|codex --profile maestros_parallel)
     handle_codex_spawn
     ;;
   Bash)

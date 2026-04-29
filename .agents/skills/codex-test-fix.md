@@ -51,7 +51,7 @@ If unclear, ask user.
 Spawn Codex with the full loop prompt:
 
 ```
-mcp__codex-coder__spawn_agent({
+codex exec --profile coder({
   prompt: `
 You are a test-fixer agent. Your job is to make all tests pass.
 
@@ -93,21 +93,21 @@ You are a test-fixer agent. Your job is to make all tests pass.
 If Codex made fixes:
 1. Read `git diff` to see what changed
 2. Verify fixes are correct (not just test-silencing hacks)
-3. If suspicious, trigger `mcp__codex-reviewer__spawn_agent` for review
+3. If suspicious, trigger `codex exec --profile reviewer` for review
 
 ---
 
 ## Auto-Escalation
 
-If `codex-coder` (gpt-5.4 (high)) fails all 3 attempts:
+If `codex-coder` (gpt-5.5 (high)) fails all 3 attempts:
 1. Collect the test output + Codex's analysis
-2. Escalate to `mcp__codex-reviewer__spawn_agent` (reviewer profile):
+2. Escalate to `codex exec --profile reviewer` (reviewer profile):
 
 ```
-mcp__codex-reviewer__spawn_agent({
+codex exec --profile reviewer({
   prompt: `
 [TEST-FIX ESCALATION]
-gpt-5.4 (high) failed to fix these tests after 3 attempts.
+gpt-5.5 (high) failed to fix these tests after 3 attempts.
 
 ## Failing Tests
 {test_output}

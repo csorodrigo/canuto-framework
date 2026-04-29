@@ -39,7 +39,7 @@ src/auth/, src/models/, src/routes/
 ### 2. Spawn Codex Context Loader
 
 ```
-mcp__codex-coder__spawn_agent({
+codex exec --profile coder({
   prompt: `
 You are a context loader. Read the following directories and generate
 compact digests for each. Write the output to .agents/tmp/context-digests.md.

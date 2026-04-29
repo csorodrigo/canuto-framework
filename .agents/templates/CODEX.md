@@ -14,7 +14,7 @@
 - Direct Codex runtime: Codex becomes Maestro for this session.
 - Preferred launcher: `bash .agents/tools/codex-maestro.sh`
 - Equivalent CLI: `codex --profile maestro`
-- The `maestro` profile uses `gpt-5.4` with reasoning: xhigh via the architect profile and does not redefine `coder`, `reviewer`, `architect`, or `fast`.
+- The `maestro` profile uses `gpt-5.5` with reasoning: xhigh via the architect profile and does not redefine `coder`, `reviewer`, `architect`, or `fast`.
 
 ### Memory resolution order
 

@@ -41,11 +41,11 @@ Available profiles in `~/.codex/config.toml` — use when spawned with `--profil
 
 | Profile | Model | Reasoning | Use For |
 |---------|-------|-----------|---------|
-| `coder` | gpt-5.4 | high | Standard code generation |
-| `maestro` | gpt-5.4 | xhigh | Direct Codex runtime orchestration |
-| `reviewer` | gpt-5.4 | high | Deep code review, security audit |
-| `architect` | gpt-5.4 | xhigh | Architecture, complex reasoning |
-| `fast` | gpt-5.4 | high | Quick edits, formatting, docs |
+| `coder` | gpt-5.5 | high | Standard code generation |
+| `maestro` | gpt-5.5 | xhigh | Direct Codex runtime orchestration |
+| `reviewer` | gpt-5.5 | high | Deep code review, security audit |
+| `architect` | gpt-5.5 | xhigh | Architecture, complex reasoning |
+| `fast` | gpt-5.5 | high | Quick edits, formatting, docs |
 
 - Claude sessions keep Claude Opus as Maestro.
 - Direct Codex sessions should use `bash .agents/tools/codex-maestro.sh` or `codex --profile maestro`.

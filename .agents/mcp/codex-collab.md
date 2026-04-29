@@ -7,11 +7,11 @@ Auto-configured by `install.sh` via wrapper scripts in `~/.claude/scripts/`.
 
 | MCP Server | Target Profile | Default Model | Sandbox | Role | Tools |
 |------------|----------------|---------------|---------|------|-------|
-| **codex-coder** | `coder` | `gpt-5.4` (high) | full write | Coder, Brainstorm, Tester | `spawn_agent`, `spawn_agents_parallel` |
-| **codex-reviewer** | `reviewer` | `gpt-5.4` (high, reviewer profile) | read-only | Reviewer (deep review) | `spawn_agent` |
-| **codex-maestro** | `maestro` | `gpt-5.4` (high, reviewer profile) | full write | Maestro orchestration (gpt-5.4 with reasoning: xhigh + write access) | `spawn_agent`, `spawn_agents_parallel` |
+| **codex-coder** | `coder` | `gpt-5.5` (high) | full write | Coder, Brainstorm, Tester | `spawn_agent`, `spawn_agents_parallel` |
+| **codex-reviewer** | `reviewer` | `gpt-5.5` (high, reviewer profile) | read-only | Reviewer (deep review) | `spawn_agent` |
+| **codex-maestro** | `maestro` | `gpt-5.5` (high, reviewer profile) | full write | Maestro orchestration (gpt-5.5 with reasoning: xhigh + write access) | `spawn_agent`, `spawn_agents_parallel` |
 
-**Principle**: `gpt-5.4` (high) writes code fast. The `reviewer` profile performs the second-opinion review. If the preferred reviewer model is unavailable, the fallback must be reported explicitly.
+**Principle**: `gpt-5.5` (high) writes code fast. The `reviewer` profile performs the second-opinion review. If the preferred reviewer model is unavailable, the fallback must be reported explicitly.
 
 ## Setup
 
@@ -51,17 +51,17 @@ codex mcp list
 
 ### codex-coder
 
-#### `mcp__codex-coder__spawn_agent`
+#### `codex exec --profile coder`
 
 Spawn one Codex coding agent that writes directly to the filesystem.
 
-#### `mcp__codex-coder__spawn_agents_parallel`
+#### `(parallel codex exec --profile coder)`
 
 Spawn multiple Codex coding agents in parallel.
 
 ### codex-reviewer
 
-#### `mcp__codex-reviewer__spawn_agent`
+#### `codex exec --profile reviewer`
 
 Spawn one one-shot Codex reviewer using the `reviewer` profile.
 
@@ -75,13 +75,13 @@ Spawn one one-shot Codex reviewer using the `reviewer` profile.
 ```text
 Claude plans the task
   ↓
-mcp__codex-coder__spawn_agent("Implement X per plan: ...")
+codex exec --profile coder("Implement X per plan: ...")
   ↓
 Codex (coder profile) writes code in the filesystem
   ↓
 Claude reads git diff
   ↓
-mcp__codex-reviewer__spawn_agent("Review this diff as staff engineer: ...")
+codex exec --profile reviewer("Review this diff as staff engineer: ...")
   ↓
 Codex (reviewer profile) returns one-shot review output
   ↓
@@ -92,7 +92,7 @@ Claude consolidates the result for the user
 
 - `codex-coder` always uses `--profile coder`
 - `codex-reviewer` always uses `--profile reviewer`
-- `reviewer` uses `gpt-5.4` with reasoning: high in `~/.codex/config.toml`, but account support is required
+- `reviewer` uses `gpt-5.5` with reasoning: high in `~/.codex/config.toml`, but account support is required
 - if the reviewer profile model is unavailable, the framework may fall back to another reviewer path; that degradation must be surfaced in output and logs
 
 ## Fallback Chain

@@ -1433,27 +1433,27 @@ setup_codex() {
   if [ ! -f "$config_toml" ]; then
     cat > "$config_toml" << 'TOMLEOF'
 personality = "pragmatic"
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 
 [profiles.coder]
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 
 [profiles.maestro]
-model = "gpt-5.4"
-model_reasoning_effort = "high"
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
 
 [profiles.reviewer]
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 
 [profiles.architect]
-model = "gpt-5.4"
-model_reasoning_effort = "high"
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
 
 [profiles.fast]
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 TOMLEOF
     ok "Created $config_toml with profiles (coder, maestro, reviewer, architect, fast)"
@@ -1463,11 +1463,11 @@ TOMLEOF
     for profile in coder maestro reviewer architect fast; do
       if ! grep -q "\[profiles\.$profile\]" "$config_toml" 2>/dev/null; then
         case $profile in
-          coder)     echo -e "\n[profiles.coder]\nmodel = \"gpt-5.4\"\nmodel_reasoning_effort = \"high\"" >> "$config_toml" ;;
-          maestro)   echo -e "\n[profiles.maestro]\nmodel = \"gpt-5.4\"\nmodel_reasoning_effort = \"xhigh\"" >> "$config_toml" ;;
-          reviewer)  echo -e "\n[profiles.reviewer]\nmodel = \"gpt-5.4\"\nmodel_reasoning_effort = \"high\"" >> "$config_toml" ;;
-          architect) echo -e "\n[profiles.architect]\nmodel = \"o3\"\nmodel_reasoning_effort = \"high\"" >> "$config_toml" ;;
-          fast)      echo -e "\n[profiles.fast]\nmodel = \"gpt-5.4\"\nmodel_reasoning_effort = \"high\"" >> "$config_toml" ;;
+          coder)     echo -e "\n[profiles.coder]\nmodel = \"gpt-5.5\"\nmodel_reasoning_effort = \"high\"" >> "$config_toml" ;;
+          maestro)   echo -e "\n[profiles.maestro]\nmodel = \"gpt-5.5\"\nmodel_reasoning_effort = \"xhigh\"" >> "$config_toml" ;;
+          reviewer)  echo -e "\n[profiles.reviewer]\nmodel = \"gpt-5.5\"\nmodel_reasoning_effort = \"high\"" >> "$config_toml" ;;
+          architect) echo -e "\n[profiles.architect]\nmodel = \"gpt-5.5\"\nmodel_reasoning_effort = \"xhigh\"" >> "$config_toml" ;;
+          fast)      echo -e "\n[profiles.fast]\nmodel = \"gpt-5.5\"\nmodel_reasoning_effort = \"high\"" >> "$config_toml" ;;
         esac
         patched=true
       fi
@@ -1684,15 +1684,15 @@ Available profiles in \`~/.codex/config.toml\` — use when spawned with \`--pro
 
 | Profile | Model | Reasoning | Use For |
 |---------|-------|-----------|---------|
-| \`coder\` | gpt-5.4 | high | Standard code generation |
-| \`maestro\` | gpt-5.4 | xhigh | Direct Codex runtime orchestration |
-| \`reviewer\` | gpt-5.4 | high | Deep code review, security audit |
+| \`coder\` | gpt-5.5 | high | Standard code generation |
+| \`maestro\` | gpt-5.5 | xhigh | Direct Codex runtime orchestration |
+| \`reviewer\` | gpt-5.5 | high | Deep code review, security audit |
 | \`architect\` | o3 | high | Architecture, complex reasoning |
-| \`fast\` | gpt-5.4 | high | Quick edits, formatting, docs |
+| \`fast\` | gpt-5.5 | high | Quick edits, formatting, docs |
 
 - Claude sessions keep Claude Opus as Maestro.
 - Direct Codex sessions should use `bash .agents/tools/codex-maestro.sh` or `codex --profile maestro`.
-- All profiles use `gpt-5.4`; reasoning effort is the dimension that varies (high/xhigh).
+- All profiles use `gpt-5.5`; reasoning effort is the dimension that varies (high/xhigh).
 
 ## Anti-Patterns
 - Do NOT create README.md, documentation files, or CHANGELOG entries
@@ -1723,15 +1723,15 @@ Available profiles in `~/.codex/config.toml` — use when spawned with `--profil
 
 | Profile | Model | Reasoning | Use For |
 |---------|-------|-----------|---------|
-| `coder` | gpt-5.4 | high | Standard code generation |
-| `maestro` | gpt-5.4 | xhigh | Direct Codex runtime orchestration |
-| `reviewer` | gpt-5.4 | high | Deep code review, security audit |
+| `coder` | gpt-5.5 | high | Standard code generation |
+| `maestro` | gpt-5.5 | xhigh | Direct Codex runtime orchestration |
+| `reviewer` | gpt-5.5 | high | Deep code review, security audit |
 | `architect` | o3 | high | Architecture, complex reasoning |
-| `fast` | gpt-5.4 | high | Quick edits, formatting, docs |
+| `fast` | gpt-5.5 | high | Quick edits, formatting, docs |
 
 - Claude sessions keep Claude Opus as Maestro.
 - Direct Codex sessions should use `bash .agents/tools/codex-maestro.sh` or `codex --profile maestro`.
-- All profiles use `gpt-5.4`; reasoning effort is the dimension that varies (high/xhigh).
+- All profiles use `gpt-5.5`; reasoning effort is the dimension that varies (high/xhigh).
 PROFILEPATCH
       patched=true
     fi
@@ -1754,7 +1754,7 @@ VAULTPATCH
 - Claude sessions keep Claude Opus as Maestro.
 - Direct Codex sessions should use `bash .agents/tools/codex-maestro.sh` or `codex --profile maestro`.
 - The `maestro` profile is runtime-specific and does not redefine `coder`, `reviewer`, `architect`, or `fast`.
-- All profiles use `gpt-5.4`; reasoning effort is the dimension that varies (high/xhigh).
+- All profiles use `gpt-5.5`; reasoning effort is the dimension that varies (high/xhigh).
 RUNTIMEPATCH
       patched=true
     fi

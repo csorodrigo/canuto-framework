@@ -92,7 +92,7 @@ type Role = 'admin' | 'user' | 'guest'
 The spawn_agent prompt references the file instead of inlining:
 
 ```
-mcp__codex-coder__spawn_agent({
+codex exec --profile coder({
   prompt: `
 Read .agents/tmp/context-package.md for full task context and implementation plan.
 Implement everything described in the plan. Write code to the files listed.

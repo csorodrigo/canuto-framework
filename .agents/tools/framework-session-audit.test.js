@@ -149,7 +149,7 @@ function writePricing(filePath) {
     JSON.stringify({
       timestamp: 0,
       data: {
-        'gpt-5.4': {
+        'gpt-5.5': {
           inputCostPerToken: 0.000001,
           outputCostPerToken: 0.000002,
           cacheReadCostPerToken: 0.0000001,
@@ -1176,7 +1176,7 @@ test('runAudit builds Codex cost dashboard fields from token_count and tool call
     {
       type: 'turn_context',
       payload: {
-        model: 'gpt-5.4',
+        model: 'gpt-5.5',
       },
     },
     {
@@ -1240,7 +1240,7 @@ test('runAudit builds Codex cost dashboard fields from token_count and tool call
   const summary = result.project_summaries[0];
   const session = summary.sessions[0];
   assert.equal(session.provider, 'openai');
-  assert.equal(session.model, 'gpt-5.4');
+  assert.equal(session.model, 'gpt-5.5');
   assert.equal(session.token_usage.uncached_input_tokens, 800);
   assert.equal(session.estimated_cost_usd, 0.00092);
   assert.deepEqual(session.tool_calls.map((item) => item.name), ['bash', 'browser_snapshot']);

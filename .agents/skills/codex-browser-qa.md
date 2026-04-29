@@ -63,7 +63,7 @@ Maestro prepares the test specification:
 ### 2. Spawn Codex QA Agent
 
 ```
-mcp__codex-coder__spawn_agent({
+codex exec --profile coder({
   prompt: `
 You are a QA tester with access to Playwright browser automation.
 

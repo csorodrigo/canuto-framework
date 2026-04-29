@@ -147,7 +147,7 @@ Stream A — Gemini brainstorm (SCAMPER / lateral):
   })
 
 Stream B — Codex parallel research (competitor / benchmark intel):
-  mcp__codex-coder__spawn_agents_parallel({
+  (parallel codex exec --profile coder)({
     agents: [
       { prompt: "Search Reddit/HN/X last 30 days for <tópico>. Cite sources." },
       { prompt: "Find 3 open-source competitors. Compare approach + trade-offs." },

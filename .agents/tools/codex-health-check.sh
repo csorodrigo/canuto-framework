@@ -431,7 +431,7 @@ if [ "$MODE" = "full" ]; then
 
   if command -v codex >/dev/null 2>&1; then
     if [ "$REVIEWER_PROFILE_AVAILABLE" = true ]; then
-      pass "reviewer profile available (gpt-5.4, high)"
+      pass "reviewer profile available (gpt-5.5, high)"
     else
       warn "reviewer profile unavailable — reviewer/maestro calls will fall back"
     fi
