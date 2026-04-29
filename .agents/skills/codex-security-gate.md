@@ -56,9 +56,12 @@ git diff --staged  # or git diff main...HEAD for full branch diff
 
 ### 3. Send to Reviewer Security Review
 
-```
-codex exec --profile reviewer({
-  prompt: `
+```bash
+echo "$diff" > /tmp/canuto-security-diff-$$.patch
+codex exec --color never --profile reviewer \
+  -s read-only --skip-git-repo-check \
+  -o /tmp/canuto-security-result-$$.md \
+  "$(cat <<'PROMPT'
 [SECURITY REVIEW REQUEST]
 You are a senior security engineer performing a pre-merge security audit.
 Use maximum reasoning depth for this review.
@@ -125,8 +128,11 @@ Use maximum reasoning depth for this review.
 }
 
 FAIL if any critical issue found. WARN if only warnings. PASS if clean.
-`
-})
+
+The diff is at /tmp/canuto-security-diff-$$.patch — read it and review.
+PROMPT
+)"
+# Read result via: cat /tmp/canuto-security-result-$$.md
 ```
 
 ### 4. Process Verdict

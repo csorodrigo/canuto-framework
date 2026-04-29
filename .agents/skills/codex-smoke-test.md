@@ -26,23 +26,26 @@ Tests: spawn_agent with trivial task + one-shot reviewer call.
 
 ## Tests
 
-### Test 1: codex-coder spawn_agent
+### Test 1: codex coder profile
 
-```
-codex exec --profile coder({
-  prompt: "Write a file at .agents/tmp/codex-smoke-test.txt with content: CODEX_CODER_OK_{timestamp}"
-})
+```bash
+codex exec --color never --profile coder \
+  -s workspace-write --skip-git-repo-check \
+  -o /tmp/codex-smoke-coder.md \
+  "Write a file at .agents/tmp/codex-smoke-test.txt with content: CODEX_CODER_OK_$(date +%s)"
 ```
 
 **Pass**: file exists with correct content.
 **Fail**: timeout, error, or no file created.
 
-### Test 2: codex-reviewer
+### Test 2: codex reviewer profile
 
-```
-codex exec --profile reviewer({
-  prompt: "Review this trivial code and respond with JSON: {\"verdict\": \"PASS\", \"test\": true}\n\nCode: const x = 1 + 1;"
-})
+```bash
+echo 'Review this trivial code and respond with JSON: {"verdict": "PASS", "test": true}
+
+Code: const x = 1 + 1;' | codex exec --color never --profile reviewer \
+  -s read-only --skip-git-repo-check \
+  -o /tmp/codex-smoke-reviewer.md -
 ```
 
 **Pass**: response contains `"verdict": "PASS"`.

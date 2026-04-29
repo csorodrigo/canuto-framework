@@ -234,9 +234,9 @@ fi
 PROJECT_ROOT=$(codex_project_dir)
 CONFIG_TOML="$HOME/.codex/config.toml"
 CLAUDE_SCRIPTS_DIR="$HOME/.claude/scripts"
-EXPECTED_CODEX_CODER="$CLAUDE_SCRIPTS_DIR/codex-coder.sh"
-EXPECTED_CODEX_REVIEWER="$CLAUDE_SCRIPTS_DIR/codex-reviewer.sh"
-EXPECTED_CODEX_AGENT_MCP="$CLAUDE_SCRIPTS_DIR/codex-agent-mcp.py"
+# Codex MCP wrappers were retired on 2026-04-29. Maestro now invokes Codex via
+# `codex exec --profile <name>` directly. The shared lib codex-common.sh is
+# still used by reviewer helpers and by this script.
 
 if [ "$MODE" = "full" ]; then
   if [ "$JSON_OUTPUT" = false ]; then
@@ -288,25 +288,14 @@ if [ "$MODE" = "full" ]; then
 
   SETTINGS_FILE="$HOME/.claude/settings.json"
   if [ -f "$SETTINGS_FILE" ] && command -v jq >/dev/null 2>&1; then
-    for server in codex-coder codex-reviewer; do
+    # Codex is now invoked via CLI (`codex exec --profile <name>`), not MCP.
+    # If legacy codex-* MCP entries are still in settings.json, warn — they were
+    # retired on 2026-04-29 and should be removed by `bash install.sh --doctor`.
+    for server in codex-coder codex-reviewer codex-maestro; do
       if jq -e --arg server "$server" '.mcpServers[$server]' "$SETTINGS_FILE" >/dev/null 2>&1; then
-        pass "settings.json MCP present: $server"
-      else
-        fail "settings.json missing MCP: $server"
+        warn "legacy MCP entry still present: $server (retired — re-run install.sh --doctor to clean)"
       fi
     done
-
-    if jq -e --arg command "$EXPECTED_CODEX_CODER" '.mcpServers["codex-coder"].command == $command' "$SETTINGS_FILE" >/dev/null 2>&1; then
-      pass "settings.json codex-coder points to wrapper script"
-    else
-      fail "settings.json codex-coder is not using $EXPECTED_CODEX_CODER"
-    fi
-
-    if jq -e --arg command "$EXPECTED_CODEX_REVIEWER" '.mcpServers["codex-reviewer"].command == $command' "$SETTINGS_FILE" >/dev/null 2>&1; then
-      pass "settings.json codex-reviewer points to wrapper script"
-    else
-      fail "settings.json codex-reviewer is not using $EXPECTED_CODEX_REVIEWER"
-    fi
 
     for hook_name in codex-pretool-guard.sh plan-review.sh; do
       if grep -q "$hook_name" "$SETTINGS_FILE" 2>/dev/null; then
@@ -317,24 +306,6 @@ if [ "$MODE" = "full" ]; then
     done
   else
     fail "cannot inspect ~/.claude/settings.json"
-  fi
-
-  if [ -x "$EXPECTED_CODEX_CODER" ]; then
-    pass "codex-coder wrapper installed: $EXPECTED_CODEX_CODER"
-  else
-    fail "codex-coder wrapper missing or not executable: $EXPECTED_CODEX_CODER"
-  fi
-
-  if [ -x "$EXPECTED_CODEX_REVIEWER" ]; then
-    pass "codex-reviewer wrapper installed: $EXPECTED_CODEX_REVIEWER"
-  else
-    fail "codex-reviewer wrapper missing or not executable: $EXPECTED_CODEX_REVIEWER"
-  fi
-
-  if [ -x "$EXPECTED_CODEX_AGENT_MCP" ]; then
-    pass "codex-agent MCP wrapper installed: $EXPECTED_CODEX_AGENT_MCP"
-  else
-    fail "codex-agent MCP wrapper missing or not executable: $EXPECTED_CODEX_AGENT_MCP"
   fi
 
   for hook_file in codex-pretool-guard.sh plan-review.sh session-save.sh session-load.sh pre-compact-save.sh; do

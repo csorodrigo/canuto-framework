@@ -28,7 +28,7 @@ echo ""
 echo "📁 Instalando hooks em ~/.claude/hooks/..."
 mkdir -p "$HOOKS_DIR"
 
-for hook in plan-review.sh codex-pretool-guard.sh session-save.sh session-load.sh pre-compact-save.sh protect-files.sh require-tests-for-pr.sh log-commands.sh session-start.sh validation-mark.sh validation-clear.sh retry-detect.sh fingerprint-gate.sh pre-finalize.sh posttooluse-universal.sh; do
+for hook in plan-review.sh codex-pretool-guard.sh session-save.sh session-load.sh pre-compact-save.sh protect-files.sh require-tests-for-pr.sh log-commands.sh session-start.sh validation-mark.sh validation-clear.sh retry-detect.sh fingerprint-gate.sh pre-finalize.sh posttooluse-universal.sh pre-commit-branch-check.sh worktree-collision-check.sh pre-claim-grep.sh; do
   if [ -f "$SCRIPT_DIR/$hook" ]; then
     cp "$SCRIPT_DIR/$hook" "$HOOKS_DIR/$hook"
     chmod +x "$HOOKS_DIR/$hook"
@@ -37,11 +37,14 @@ for hook in plan-review.sh codex-pretool-guard.sh session-save.sh session-load.s
 done
 
 echo ""
-echo "🧠 Instalando wrappers do Codex em ~/.claude/scripts/..."
+echo "🧠 Instalando libs compartilhadas do Codex em ~/.claude/scripts/..."
 mkdir -p "$SCRIPTS_DIR"
 
+# Codex MCP wrappers (codex-coder.sh, codex-reviewer.sh, codex-agent-mcp.py,
+# codex-maestro-mcp.sh) were retired on 2026-04-29 — Maestro now invokes Codex
+# via `codex exec --profile <name>` directly (10-35% lower token overhead).
 TOOLS_DIR="$(cd "$SCRIPT_DIR/../tools" && pwd)"
-for script in codex-agent-mcp.py codex-coder.sh codex-reviewer.sh codex-maestro-mcp.sh codex-common.sh codex-diff-context.sh; do
+for script in codex-common.sh codex-diff-context.sh; do
   if [ -f "$TOOLS_DIR/$script" ]; then
     cp "$TOOLS_DIR/$script" "$SCRIPTS_DIR/$script"
     chmod +x "$SCRIPTS_DIR/$script"
@@ -111,19 +114,22 @@ else
   echo "   ⚠️  settings-snippet.json não encontrado — pulando MCP setup."
 fi
 
+# Cleanup: remove legacy codex-* MCP entries (retired on 2026-04-29).
+# Maestro now invokes Codex via `codex exec --profile <name>` directly.
 if [ -f "$SETTINGS_FILE" ]; then
-  MERGED=$(jq \
-    --arg coder "$SCRIPTS_DIR/codex-coder.sh" \
-    --arg reviewer "$SCRIPTS_DIR/codex-reviewer.sh" \
-    --arg maestro "$SCRIPTS_DIR/codex-maestro-mcp.sh" \
-    '
-      .mcpServers = (.mcpServers // {})
-      | .mcpServers["codex-coder"] = {"command": $coder, "type": "stdio"}
-      | .mcpServers["codex-reviewer"] = {"command": $reviewer, "type": "stdio"}
-      | .mcpServers["codex-maestro"] = {"command": $maestro, "type": "stdio"}
-    ' "$SETTINGS_FILE")
-  echo "$MERGED" > "$SETTINGS_FILE"
-  echo "   ✅ codex-coder, codex-reviewer e codex-maestro apontando para wrappers compatíveis"
+  CLEANED=$(jq '
+    if .mcpServers then
+      .mcpServers |= (
+        del(.["codex-coder"])
+        | del(.["codex-reviewer"])
+        | del(.["codex-maestro"])
+      )
+    else . end
+  ' "$SETTINGS_FILE")
+  if [ -n "$CLEANED" ] && ! cmp -s <(echo "$CLEANED") "$SETTINGS_FILE"; then
+    echo "$CLEANED" > "$SETTINGS_FILE"
+    echo "   ✅ Removidas entradas legacy codex-* do settings.json (Codex agora via CLI)"
+  fi
 fi
 
 # ── Claude MCPs ──────────────────────────────────────────────────────────────
@@ -176,12 +182,17 @@ else
     fi
   }
 
-  # Codex sub-agents
-  _codex_mcp_add codex-coder    -- "$SCRIPTS_DIR/codex-coder.sh"
-  _codex_mcp_add codex-reviewer -- "$SCRIPTS_DIR/codex-reviewer.sh"
-  _codex_mcp_add codex-maestro  -- "$SCRIPTS_DIR/codex-maestro-mcp.sh"
+  # Codex sub-agents (codex-coder, codex-reviewer, codex-maestro) were retired
+  # on 2026-04-29 — Maestro now invokes Codex via `codex exec --profile <name>` directly.
+  # Cleanup any stale registrations.
+  for legacy in codex-coder codex-reviewer codex-maestro; do
+    if codex mcp remove "$legacy" 2>/dev/null; then
+      echo "   🧹 Removed legacy MCP: $legacy"
+    fi
+  done
 
-  # Claude MCPs (subscription-based, no API key required)
+  # Claude MCPs (subscription-based, no API key required) — useful when Codex is
+  # the active runtime and needs to back-delegate to Claude.
   _codex_mcp_add claude-architect -- "$SCRIPTS_DIR/claude-architect.sh"
   _codex_mcp_add claude-reviewer  -- "$SCRIPTS_DIR/claude-reviewer.sh"
 

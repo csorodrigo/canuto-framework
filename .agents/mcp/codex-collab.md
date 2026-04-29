@@ -1,109 +1,106 @@
-# Codex Dual-MCP Architecture (v1.7)
+# Codex CLI Collaboration (v2.0, 2026-04-29)
 
-Two Codex MCP servers with deterministic role routing.
-Auto-configured by `install.sh` via wrapper scripts in `~/.claude/scripts/`.
+Codex is invoked via CLI (`codex exec --profile <name>`), not MCP. Maestro
+delegates tier-2 work to Codex profiles using direct shell invocation.
+
+> Historical note: 2026-03-30 → 2026-04-29 used dual MCP servers
+> (`codex-coder`, `codex-reviewer`, `codex-maestro`). Retired because MCP
+> schema overhead consumes 10-35% extra tokens per call vs raw `codex exec`,
+> and only amortizes after ~50 calls/session (rare). See
+> `.agents/skills/cost-routing.md` for the full rationale.
 
 ## Architecture
 
-| MCP Server | Target Profile | Default Model | Sandbox | Role | Tools |
-|------------|----------------|---------------|---------|------|-------|
-| **codex-coder** | `coder` | `gpt-5.5` (high) | full write | Coder, Brainstorm, Tester | `spawn_agent`, `spawn_agents_parallel` |
-| **codex-reviewer** | `reviewer` | `gpt-5.5` (high, reviewer profile) | read-only | Reviewer (deep review) | `spawn_agent` |
-| **codex-maestro** | `maestro` | `gpt-5.5` (high, reviewer profile) | full write | Maestro orchestration (gpt-5.5 with reasoning: xhigh + write access) | `spawn_agent`, `spawn_agents_parallel` |
+| Profile | Default Model | Sandbox | Role | Invocation |
+|---------|---------------|---------|------|------------|
+| `coder` | `gpt-5.5` (high) | full write | Coder, Brainstorm, Tester | `codex exec --color never --profile coder` |
+| `reviewer` | `gpt-5.5` (high) | read-only | Reviewer (deep review) | `codex exec --color never --profile reviewer` |
+| `architect` | `gpt-5.5` (xhigh) | read-only | Deep planning, escalation, large-diff review | `codex exec --color never --profile architect` |
+| `maestro` | `gpt-5.5` (xhigh) | full write | Direct Codex runtime orchestration | `codex --profile maestro` (interactive launcher) |
+| `fast` | `gpt-5.5` (high) | full write | Quick edits, formatting, docs | `codex exec --color never --profile fast` |
 
-**Principle**: `gpt-5.5` (high) writes code fast. The `reviewer` profile performs the second-opinion review. If the preferred reviewer model is unavailable, the fallback must be reported explicitly.
+**Source of truth for model versions**: `.agents/config/models.yaml`.
 
 ## Setup
 
-**Automatic** (recommended): `bash install.sh`, `bash install.sh --update`, or `bash install.sh --repair`
-- installs Codex CLI profiles in `~/.codex/config.toml`
-- copies wrapper scripts to `~/.claude/scripts/`
-- registers `codex-coder` and `codex-reviewer` in `~/.claude/settings.json`
-- registers native Codex MCPs (Obsidian, ast-grep, Playwright) when available
-
-**Manual** (if needed):
-```bash
-claude mcp add -s user codex-coder -- ~/.claude/scripts/codex-coder.sh
-claude mcp add -s user codex-reviewer -- ~/.claude/scripts/codex-reviewer.sh
-```
+**Automatic**: `bash install.sh`, `bash install.sh --update`, or `bash install.sh --doctor`
+- creates/patches `~/.codex/config.toml` with the 5 profiles above
+- updates existing profiles to the canonical model (no longer just appends)
+- removes any legacy `codex-coder` / `codex-reviewer` / `codex-maestro` MCP entries from `~/.claude/settings.json`
+- installs Codex shared libs (`codex-common.sh`, `codex-diff-context.sh`) to `~/.claude/scripts/`
 
 ## Prerequisites
 
 - Codex CLI installed: `npm i -g @openai/codex`
-- `uvx` available (used by the wrapper launcher)
 - Codex authenticated: `codex login`
 - Project trusted in `~/.codex/config.toml`
 
 ## Verify
 
 ```bash
-claude mcp list
-# codex-coder: ✓ Connected
-# codex-reviewer: ✓ Connected
+codex --version                        # CLI present
+ls ~/.codex/config.toml                # config exists
+grep -A2 '\[profiles\.' ~/.codex/config.toml | head -20  # 5 profiles, gpt-5.5
 
-codex mcp list
-# obsidian-vault: registered
-# ast-grep: registered
-# playwright: registered
+# Smoke test: each profile responds
+echo 'Reply with: OK' | codex exec --color never --profile coder \
+  --skip-git-repo-check -s read-only \
+  -o /tmp/codex-smoke.md - >/dev/null && cat /tmp/codex-smoke.md
 ```
 
-## Tool Reference
+## Standard invocation pattern
 
-### codex-coder
+```bash
+codex exec --color never --profile coder \
+  -s workspace-write \
+  --skip-git-repo-check \
+  -o /tmp/codex-result-$$.md \
+  "$(cat <<'PROMPT'
+Read .agents/tmp/context-package.md for full task context.
+Implement per plan. Output: brief summary of files changed.
+PROMPT
+)"
+# Read result via: cat /tmp/codex-result-$$.md
+```
 
-#### `codex exec --profile coder`
-
-Spawn one Codex coding agent that writes directly to the filesystem.
-
-#### `(parallel codex exec --profile coder)`
-
-Spawn multiple Codex coding agents in parallel.
-
-### codex-reviewer
-
-#### `codex exec --profile reviewer`
-
-Spawn one one-shot Codex reviewer using the `reviewer` profile.
-
-**Important**:
-- This wrapper is one-shot. It does **not** expose `threadId`.
-- Treat it as a deterministic review call, not as a resumable conversation.
-- If the preferred reviewer model is unavailable, report the actual fallback path and model used.
+**Key flags**:
+- `--color never` — strips ANSI/banners (saves 5-15% tokens)
+- `-o <file>` — final message to file, keeps stdout clean
+- `--profile <name>` — routes to coder/reviewer/architect/fast/maestro in `~/.codex/config.toml`
+- `-s read-only` for review tasks; `-s workspace-write` for code-gen
+- `--skip-git-repo-check` when running from `/tmp` or detached HEAD scenarios
 
 ## Pipeline: Code -> Review
 
 ```text
-Claude plans the task
+Claude (Maestro) plans the task
   ↓
-codex exec --profile coder("Implement X per plan: ...")
+codex exec --profile coder "Implement X per plan: ..."
   ↓
-Codex (coder profile) writes code in the filesystem
+Codex writes code directly to filesystem
   ↓
 Claude reads git diff
   ↓
-codex exec --profile reviewer("Review this diff as staff engineer: ...")
+codex exec --profile reviewer "Review this diff as staff engineer: ..."
   ↓
-Codex (reviewer profile) returns one-shot review output
+Reviewer returns one-shot review output via -o flag
   ↓
 Claude consolidates the result for the user
 ```
 
-## Model Routing
-
-- `codex-coder` always uses `--profile coder`
-- `codex-reviewer` always uses `--profile reviewer`
-- `reviewer` uses `gpt-5.5` with reasoning: high in `~/.codex/config.toml`, but account support is required
-- if the reviewer profile model is unavailable, the framework may fall back to another reviewer path; that degradation must be surfaced in output and logs
-
 ## Fallback Chain
 
 ```text
-codex-reviewer MCP -> codex exec --profile reviewer -> /ask codex (only with active CCB session) -> Claude-only
+codex exec --profile coder failed
+  ↓ retry with clarified prompt
+  ↓ if fail: escalate to --profile reviewer (deeper reasoning)
+  ↓ if fail: escalate to --profile architect (xhigh)
+  ↓ if fail: Claude implements directly + log incident
 ```
 
-## Native Codex MCPs
+## Native Codex MCPs (read by Codex itself)
 
-Agents spawned via `codex exec` can access:
+When Codex runs, it can call these MCPs:
 
 | MCP | Purpose | Fallback |
 |-----|---------|----------|
@@ -111,18 +108,25 @@ Agents spawned via `codex exec` can access:
 | ast-grep | Structural code search | `rg` / `grep` |
 | playwright | Browser automation | Claude-driven browser flow |
 
+These are MCPs **inside the Codex runtime** (registered via `codex mcp add ...`),
+not Claude-side MCPs. They are independent of the retired Codex MCP wrappers.
+
 ## Session Continuity
 
-The current reviewer wrapper is **not** multi-turn. There is no reviewer-side `threadId` contract to persist.
+`codex exec` is one-shot. For multi-turn, re-invoke with extended context.
 
-Persist instead:
-- the generated markdown review report in `.agents/tmp/codex/`
-- event entries in `codex-review-events.jsonl`
-- any higher-level handoff metadata you need in the vault
+Persist for follow-up:
+- Generated markdown via `-o /tmp/codex-result-*.md`
+- Event entries in `codex-review-events.jsonl` (when using reviewer helper)
+- Higher-level handoff metadata in the vault
 
 ## Troubleshooting
 
-- **Wrapper command missing**: re-run `bash install.sh --repair`
-- **Reviewer connected but failing**: test `codex exec --profile reviewer` directly; connection alone does not prove model availability
-- **reviewer profile unsupported**: keep the reviewer path explicit and report the fallback path actually used
-- **`/ask codex` unavailable**: open a CCB Codex session first; the bridge is not universal
+- **`codex` not in PATH**: re-run `bash install.sh --doctor`
+- **Reviewer hanging**: timeout via `gtimeout 600 codex exec ...` (install with `brew install coreutils`)
+- **Profile not found**: `~/.codex/config.toml` missing the profile block — re-run `bash install.sh --doctor`
+- **Model drifted (still on gpt-5.4)**: `bash install.sh --doctor` now updates existing profiles to canonical model (single source: `.agents/config/models.yaml`)
+- **Legacy MCP entries still present**: `bash install.sh --doctor` removes them automatically; or manually:
+  ```bash
+  claude mcp remove codex-coder codex-reviewer codex-maestro 2>/dev/null
+  ```

@@ -1,19 +1,20 @@
-# Canuto Framework — Single Source of Truth for Model Versions
+# Canuto Framework — Reference Document for Canonical Model Versions
 #
-# Why this file exists:
-#   Before: 60+ files referenced gpt-5.4 / gpt-5-codex hardcoded.
-#           Bumping a version = sweeping replace across the framework.
-#   After:  Skills and hooks read from this file via {{coder.model}} placeholders.
-#           Bumping a version = 1-line change here.
+# Status: this file is a HUMAN-READABLE SOURCE OF TRUTH and a runtime reference
+# point for `bash install.sh --doctor`. It does NOT have an automatic placeholder
+# substitution pipeline yet; skills currently embed model names inline. The
+# install.sh re-reads canonical model values from here (top of file) and
+# updates `~/.codex/config.toml` profiles to match on each `--doctor` run.
 #
 # Update procedure:
-#   1. Bump version below + bump `last-updated`
-#   2. Run: bash .agents/tools/codex-health-check.sh --smoke
-#   3. If green: commit, ship
-#   4. Skills auto-pick up via placeholder substitution at install/render time
+#   1. Bump model/effort below + bump `last-updated`
+#   2. Run: bash install.sh --doctor   (this updates ~/.codex/config.toml)
+#   3. If you want skills/docs to reflect the new version: grep+replace manually
+#      for now (TODO: add automated substitution pipeline; see open task).
+#   4. Run: bash .agents/tools/codex-health-check.sh
 #
-# Naming convention: <provider>.<role> = the canonical reference used in skill
-# templates and hook scripts. Use `.` accessor in template strings.
+# Naming convention: <provider>.<role> = the canonical reference used in
+# install.sh and codex-health-check.sh.
 
 last-updated: 2026-04-29
 

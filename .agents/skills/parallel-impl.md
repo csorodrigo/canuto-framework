@@ -60,16 +60,30 @@ If any check fails → sequential execution instead.
 
 ### 3. Spawn Parallel Agents
 
+Run multiple `codex exec --profile coder` invocations in parallel via shell `&`
+or via `xargs -P`. Each subtask gets its own output file.
+
+```bash
+# Pattern: spawn N parallel coder runs, capture each output, wait, then read all.
+codex exec --color never --profile coder \
+  -o /tmp/codex-sub1-$$.md \
+  "Subtask 1: Create auth middleware at src/middleware/auth.ts. Requirements: ..." &
+codex exec --color never --profile coder \
+  -o /tmp/codex-sub2-$$.md \
+  "Subtask 2: Create user model at src/models/user.ts. Requirements: ..." &
+codex exec --color never --profile coder \
+  -o /tmp/codex-sub3-$$.md \
+  "Subtask 3: Create auth routes at src/routes/auth.ts. Requirements: ..." &
+codex exec --color never --profile coder \
+  -o /tmp/codex-sub4-$$.md \
+  "Subtask 4: Create auth tests at tests/auth.test.ts. Requirements: ..." &
+wait
+# Read all outputs:
+for f in /tmp/codex-sub*-$$.md; do echo "=== $f ==="; cat "$f"; done
 ```
-(parallel codex exec --profile coder)({
-  agents: [
-    { prompt: "Subtask 1: Create auth middleware at src/middleware/auth.ts. Requirements: ..." },
-    { prompt: "Subtask 2: Create user model at src/models/user.ts. Requirements: ..." },
-    { prompt: "Subtask 3: Create auth routes at src/routes/auth.ts. Requirements: ..." },
-    { prompt: "Subtask 4: Create auth tests at tests/auth.test.ts. Requirements: ..." }
-  ]
-})
-```
+
+Caveat: 4 concurrent Codex sessions write to filesystem simultaneously. Confirm
+the safety check (no two subtasks edit the same file) is solid before parallel.
 
 ### 4. Consolidate
 

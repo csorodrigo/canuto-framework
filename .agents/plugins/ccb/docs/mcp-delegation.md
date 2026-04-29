@@ -21,26 +21,25 @@ After adding the MCP server, these tools should be available in Claude Code:
 | Tool | Description |
 |------|-------------|
 | `ccb_ask_codex(prompt)` | Send task to Codex pane |
-| `ccb_ask_gemini(prompt)` | Send task to Gemini pane |
 | `ccb_ask_claude(prompt)` | Send task to another Claude pane |
 | `ccb_pend(task_id)` | Retrieve async task result |
 | `ccb_ping(provider)` | Check if a provider pane is responsive |
 
-Short aliases also available: `cask` (codex), `gask` (gemini), `lask` (claude), `oask` (opencode).
+Short aliases also available: `cask` (codex), `lask` (claude).
 
-## Relationship to codex-collab MCP
+## Relationship to direct Codex CLI
 
-| Aspect | codex-collab | ccb-delegation |
-|--------|-------------|----------------|
+| Aspect | `codex exec` (direct) | ccb-delegation |
+|--------|-----------------------|----------------|
 | **Backend** | OpenAI Codex CLI directly | CCB askd daemon |
-| **Providers** | Codex only | Codex, Gemini, Claude, OpenCode, Droid |
-| **Terminal panes** | No (background) | Yes (visible) |
-| **Session persistence** | No (threadId in memory) | Yes (JSONL logs, resumable with `-r`) |
-| **Multi-turn** | Via threadId | Via session context |
-| **Best for** | Bias-free background co-review | Visible multi-provider collaboration |
-| **Anchoring risk** | None (output hidden until ready) | Possible (pane output visible) |
+| **Providers** | Codex only | Codex, Claude (and others if configured) |
+| **Terminal panes** | No (background, output via tool_result) | Yes (visible) |
+| **Session persistence** | No (one-shot per call) | Yes (JSONL logs, resumable with `-r`) |
+| **Multi-turn** | Via re-invocation with extended context | Via session context |
+| **Best for** | Default Maestro delegation (M/L tasks) | Visible multi-provider collaboration |
+| **Anchoring risk** | None (output structured) | Possible (pane output visible) |
 
-Both can coexist. Use codex-collab for bias-free background reviews (co-review skill). Use ccb-delegation for visible, session-persistent multi-provider work.
+Both can coexist. Default Maestro flow uses direct CLI for tier-2 (Codex coder/reviewer/architect). Use ccb-delegation for visible, session-persistent multi-provider work.
 
 ## How It Works
 
@@ -70,4 +69,4 @@ The MCP server reads CCB's standard configuration:
 | Task timeout | Default is 3600s (`CLAUDE_SYNC_TIMEOUT`). Reduce if needed |
 | Stale task results | Clean cache: `rm -rf ~/.cache/ccb/delegation/*` |
 
-If the MCP server is unavailable, the `ccb-delegate` skill falls back to CLI `ask` command, then to codex-collab MCP, then to API delegation.
+If the MCP server is unavailable, the `ccb-delegate` skill falls back to CLI `ask` command, then to direct `codex exec --profile <name>`, then to Claude.

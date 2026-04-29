@@ -2,20 +2,19 @@
 skill: review
 trigger: "/review [--auto|--small|--large|--ui|--security|--refactor], or any direct ask to review the current diff"
 persona: maestro
-version: 1.0.0
-lastUpdated: 2026-04-18
+version: 2.0.0
+lastUpdated: 2026-04-29
 shortDescription: >
-  Manual entry-point for the diff-router (lazy-opus-review's Gemini layer).
-  /review with no flag = auto-detect from diff. With flag = force the path.
-  Counterpart for cases where you want explicit control instead of waiting
-  for Maestro to auto-route.
+  Manual entry-point for the diff-router. /review with no flag = auto-detect
+  from diff. With flag = force the path. Counterpart for cases where you want
+  explicit control instead of waiting for Maestro to auto-route.
 usedBy: [maestro]
 evals:
   - prompt: "/review"
     should_trigger: true
   - prompt: "/review --security"
     should_trigger: true
-  - prompt: "review this diff with gemini"
+  - prompt: "review this diff"
     should_trigger: true
   - prompt: "review this PR for security"
     should_trigger: true
@@ -25,10 +24,10 @@ evals:
 
 ## Purpose
 
-`lazy-opus-review.md` já tem um diff-router automático que escolhe Codex / Gemini /
-triple baseado em perfil de diff. Este skill é o **entry point manual** para
-disparar o mesmo router quando você quer controle explícito (ex: já sabe que é
-security, não quer esperar o auto-detect).
+`lazy-opus-review.md` já tem um diff-router automático que escolhe o profile
+(coder/reviewer/architect) baseado em perfil de diff. Este skill é o **entry
+point manual** para disparar o mesmo router quando você quer controle explícito
+(ex: já sabe que é security, não quer esperar o auto-detect).
 
 **Distinção:**
 - `lazy-opus-review` = hook automático sobre output do Codex (você não chama)
@@ -45,9 +44,9 @@ security, não quer esperar o auto-detect).
 - Após Codex implementar M/L task e você quer review extra além do automático
 
 **Not for:**
-- Plan review (use `/co-plan` ou `/co-plan --triple`)
+- Plan review (use `/co-plan` ou `/co-plan --dual`)
 - Skill / docs review (overhead desnecessário)
-- Output do Codex ainda fresco — `lazy-opus-review` já fez isso. Use `/review` se quer **outra rodada** com path diferente.
+- Output do Codex ainda fresco — `lazy-opus-review` já fez isso. Use `/review` se quer **outra rodada** com profile diferente (ex: architect xhigh).
 
 ---
 
@@ -56,12 +55,12 @@ security, não quer esperar o auto-detect).
 | Flag | Quando usar | Reviewer primary | Secundário |
 |---|---|---|---|
 | `--auto` (default) | Não sei o perfil — deixa router decidir | calculado por heurística | calculado |
-| `--small` | < 100 linhas, 1-3 arquivos | Codex reviewer | — |
-| `--large` | > 500 linhas, multi-módulo | **Gemini 3.1-pro** (long-context) | Codex (bugs exec) |
-| `--ui` | Frontend / componentes visuais (precisa screenshot antes/depois) | **Gemini multimodal** | Opus (taste) |
-| `--refactor` | Rename / extração / movimentação cross-file | **Gemini** (vê call sites) | — |
-| `--security` | auth / crypto / payment / RLS / permissions | **Triple obrigatório** (Codex + Gemini + Opus) | — |
-| `--config` | infra / CI / .env / dockerfile | Codex reviewer | Opus (blast radius) |
+| `--small` | < 100 linhas, 1-3 arquivos | `codex exec --profile reviewer` | — |
+| `--large` | > 500 linhas, multi-módulo | `codex exec --profile architect` (xhigh, deeper reasoning) | Claude Opus (taste) |
+| `--ui` | Frontend / componentes visuais (precisa screenshot antes/depois) | Claude (multimodal native) | `codex exec --profile reviewer` (logic) |
+| `--refactor` | Rename / extração / movimentação cross-file | `codex exec --profile architect` (xhigh, sees call sites with deeper reasoning) | — |
+| `--security` | auth / crypto / payment / RLS / permissions | **Dual obrigatório**: Opus self-review + `codex exec --profile reviewer` | optional `codex exec --profile architect` (xhigh) for huge surface |
+| `--config` | infra / CI / .env / dockerfile | `codex exec --profile reviewer` | Opus (blast radius) |
 
 ---
 
@@ -85,37 +84,35 @@ security, não quer esperar o auto-detect).
 ## Reviewer call patterns
 
 ### Path: Codex reviewer (small / config)
-```
-codex exec --profile reviewer({
-  prompt: "Review este diff. Foco em bugs, edge cases, contratos.\n\n--- DIFF ---\n<git diff inline>\n--- END ---"
-})
-```
-
-### Path: Gemini long-context (large / refactor)
-```
-mcp__gemini__ask-gemini({
-  prompt: "@./ Review este diff: cross-module impacts, contratos quebrados, migration safety, backwards compat.\n\n--- DIFF ---\n<git diff>\n--- END ---",
-  model: "gemini-3.1-pro-preview"
-})
+```bash
+git diff > /tmp/canuto-review-diff.patch
+codex exec --color never --profile reviewer -s read-only --skip-git-repo-check \
+  -o /tmp/canuto-review-out.md \
+  "Review the diff at /tmp/canuto-review-diff.patch. Focus: bugs, edge cases, contratos. Output: verdict + list of issues with file:line."
 ```
 
-### Path: Gemini multimodal (ui)
+### Path: Codex architect (large / refactor)
+```bash
+git diff > /tmp/canuto-review-diff.patch
+codex exec --color never --profile architect -s read-only --skip-git-repo-check \
+  -o /tmp/canuto-review-out.md \
+  "Review the diff at /tmp/canuto-review-diff.patch with deep reasoning. Focus: cross-module impacts, contracts broken, migration safety, backwards compat. Walk the repo to verify call sites if needed."
+```
+
+### Path: UI (multimodal via Claude)
 ```
 # Pré-requisito: você tira screenshots antes/depois e copia pra .context/
-mcp__gemini__ask-gemini({
-  prompt: "@.context/before.png @.context/after.png Compare visual: hierarquia, alinhamento, espaçamento, regressões.\n\n--- DIFF ---\n<git diff>\n--- END ---",
-  model: "gemini-3.1-pro-preview"
-})
-# Pós-call: rm .context/before.png .context/after.png
+# Then ask Claude to compare directly — Claude has native multimodal.
+# Pair with a Codex --profile reviewer call for the underlying logic of the diff.
 ```
 
-### Path: Triple (security)
-Reusa o fluxo do `/co-plan --triple` aplicado a diff em vez de plan:
-- Stream A: Opus self-review do diff
+### Path: Dual (security)
+Reusa o fluxo do `/co-plan --dual` aplicado a diff em vez de plan:
+- Stream A: Opus self-review do diff (Claude direct, no spawn)
 - Stream B: `codex exec --profile reviewer` (engineering adversarial)
-- Stream C: `mcp__gemini__ask-gemini({ prompt: "@./ ... + diff inline", model: "gemini-3.1-pro-preview" })`
+- Optional Stream C: `codex exec --profile architect` (xhigh) for very large security surface
 
-Convergência: 3/3 → mandatory fix; 2/3 → medium; 1/3 → evaluate.
+Convergência: 2/2 → mandatory fix; 1/2 → medium worth discussing.
 
 ---
 
@@ -130,7 +127,7 @@ Maestro:
 1. git diff --shortstat → 47 linhas, 2 arquivos
 2. Heurística: small
 3. Dispara codex exec --profile reviewer
-4. Output: "[Review] Small diff via Codex. Verdict: 1 minor issue (line 23, var name)."
+4. Output: "[Review] Small diff via Codex reviewer. Verdict: 1 minor issue (line 23, var name)."
 ```
 
 ### ✅ Good — flag explícita
@@ -140,18 +137,18 @@ Usuário: /review --security
 
 Maestro:
 1. git diff (mudou middleware/auth.ts)
-2. Triple obrigatório (Opus + Codex + Gemini)
-3. Output: "[Review] Triple security. 3/3 flagged: token expiry usa < em vez de <=. Mandatory fix."
+2. Dual obrigatório (Opus self-review + Codex reviewer)
+3. Output: "[Review] Dual security. 2/2 flagged: token expiry usa < em vez de <=. Mandatory fix."
 ```
 
-### ✅ Good — UI com screenshots
+### ✅ Good — UI
 
 ```
 Usuário: /review --ui
 
-Maestro: "Preciso dos screenshots antes/depois em .context/. Você tem?"
-Usuário: "tirei agora, .context/before.png e .context/after.png"
-Maestro: chama Gemini multimodal + Opus pra taste, deleta arquivos depois.
+Maestro: "Preciso de screenshots antes/depois ou descrição do componente. Compartilha?"
+Usuário: cola screenshots inline ou aponta path em .context/
+Maestro: Claude analisa imagens diretamente; opcional spawn `codex exec --profile reviewer` pra logic do diff em paralelo.
 ```
 
 ### ❌ Bad — usar `/review` em output do Codex que acabou de chegar
@@ -161,16 +158,7 @@ Codex retornou implementação com CONFIDENCE: 9.
 Usuário: /review
 
 Maestro: "[Review] lazy-opus-review já aceitou (confidence 9). /review aqui é redundante.
-         Use /review --large só se quiser segunda opinião com Gemini long-context."
-```
-
-### ❌ Bad — `/review --ui` sem screenshots
-
-```
-Usuário: /review --ui
-
-Maestro: NÃO chamar Gemini multimodal sem imagens — gera output hipotético.
-         Resposta correta: "Sem screenshots. Tire e coloca em .context/ antes."
+         Use /review --large com profile architect só se quiser deeper reasoning de uma segunda passada."
 ```
 
 ---
@@ -178,9 +166,7 @@ Maestro: NÃO chamar Gemini multimodal sem imagens — gera output hipotético.
 ## Integration
 
 - **lazy-opus-review.md** — fonte da lógica de roteamento. `/review` é o entry-point manual da mesma matriz.
-- **co-plan/SKILL.md** (`global-skills/`) — o triple usado em `--security` reusa o fluxo `/co-plan --triple`.
-- **gemini-routing.md** — gotchas obrigatórias antes de chamar Gemini (sandbox, multimodal cleanup, modelos banidos).
-- **cost-routing.md** — matriz que mostra quando review cai pra Gemini vs Codex vs Opus.
+- **co-plan/SKILL.md** (`global-skills/`) — o `--dual` usado em `--security` reusa o fluxo `/co-plan --dual`.
+- **cost-routing.md** — matriz que mostra quando review cai para reviewer vs architect vs Opus direto.
 - **codex-test-fix.md** — quando review detecta bug, encadear com fix loop.
-- **ask-gemini.md** — wrapper irmão para chamadas Gemini ad-hoc fora do contexto de review.
-- **health.md** — checa se Codex/Gemini MCPs estão acessíveis antes de invocar.
+- **health.md** — checa se Codex CLI está acessível antes de invocar.

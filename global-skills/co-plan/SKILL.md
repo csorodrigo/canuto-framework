@@ -15,10 +15,13 @@ consultation. The preferred reviewer path is `codex exec --profile reviewer`.
    - `PLAN.md`, `plan.md`, or `PLAN.txt` in the repo
    - the latest matching file in `~/.claude/plans/`
 2. Read the full plan content and embed it in the reviewer prompt.
-3. Try the official reviewer first:
+3. Invoke the reviewer via CLI:
 
-```text
-codex exec --profile reviewer(prompt="
+```bash
+codex exec --color never --profile reviewer \
+  -s read-only --skip-git-repo-check \
+  -o /tmp/co-plan-review-$$.md \
+  "$(cat <<'PROMPT'
 You are reviewing an implementation plan before coding starts.
 Review only the embedded plan below.
 Find logical gaps, hidden dependencies, missing validation/test strategy,
@@ -27,20 +30,20 @@ Be direct. Be terse. No compliments.
 
 THE PLAN:
 <embedded plan>
-")
+PROMPT
+)"
+# Read result via: cat /tmp/co-plan-review-$$.md
 ```
 
 4. Treat this path as:
-   - `reviewer: codex-reviewer`
+   - `reviewer: codex --profile reviewer`
    - `profile: reviewer`
-   - `model: reviewer-profile`
+   - `model: gpt-5.5 (high)` (per `.agents/config/models.yaml`)
    - `fallbackOccurred: false`
-5. If the MCP reviewer is unavailable, degrade explicitly in this order:
-   - `codex exec --profile reviewer`
+5. If `codex` CLI is unavailable, degrade explicitly in this order:
    - `/ask codex` only when an active CCB Codex session exists for this workspace
-   - Claude-only review last
-6. Never claim the reviewer profile ran unless the official reviewer MCP or `--profile reviewer`
-   path actually ran.
+   - Claude-only review last (mark `fallbackOccurred: true` and explain)
+6. Never claim the reviewer profile ran unless `codex exec --profile reviewer` actually returned a result.
 
 ## Required Output
 

@@ -50,42 +50,45 @@ Requires `GITHUB_PERSONAL_ACCESS_TOKEN` env var.
 ## Capabilities
 
 ### Issue Triage
-```
-codex exec --profile coder({
-  prompt: `
+```bash
+codex exec --color never --profile coder \
+  -o /tmp/codex-triage-$$.md \
+  "$(cat <<'PROMPT'
 You have access to the GitHub MCP. Triage open issues for {repo}.
 1. List all open issues
 2. Categorize: bug, feature, docs, question
 3. Estimate size: XS/S/M/L
 4. Suggest priority: P0 (critical), P1 (high), P2 (medium), P3 (low)
 5. Write triage report to .agents/tmp/issue-triage.md
-`
-})
+PROMPT
+)"
 ```
 
 ### PR Creation
-```
-codex exec --profile coder({
-  prompt: `
+```bash
+codex exec --color never --profile coder \
+  -o /tmp/codex-pr-$$.md \
+  "$(cat <<'PROMPT'
 Create a PR for the current branch.
 1. Run git diff main...HEAD to understand changes
 2. Generate PR title and description
 3. Create PR via GitHub MCP
 4. Report the PR URL
-`
-})
+PROMPT
+)"
 ```
 
 ### Code Search
-```
-codex exec --profile coder({
-  prompt: `
+```bash
+codex exec --color never --profile coder \
+  -o /tmp/codex-search-$$.md \
+  "$(cat <<'PROMPT'
 Search the GitHub repo for: {query}
 1. Use GitHub MCP code search
 2. Report matching files and line numbers
 3. Write results to .agents/tmp/search-results.md
-`
-})
+PROMPT
+)"
 ```
 
 ---
