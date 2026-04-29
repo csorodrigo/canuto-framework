@@ -31,7 +31,7 @@ This release keeps the v1.6 Obsidian-native runtime and adds a sharper learning-
     security-practices.md     — Rules for secrets, env vars, and security hygiene.
     git-workflow.md           — Branching, commits, and PR conventions.
     plugin-system.md          — How to create and manage opt-in plugins.
-    multi-provider.md         — How Maestro delegates to Claude, Codex, GLM.
+    multi-provider.md         — How Maestro delegates to Claude (tier-1) and Codex (tier-2).
     metrics.md                — Quality, velocity, compliance, and rework tracking.
     squads.md                 — Parallel workstreams for larger projects.
     pr-description.md         — Auto-generate PR descriptions after review.

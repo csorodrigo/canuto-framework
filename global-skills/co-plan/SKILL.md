@@ -53,48 +53,53 @@ Every `/co-plan` result must state:
 
 ---
 
-## `/co-plan --triple` (tri-plan variant, FASE 2a+)
+## `/co-plan --dual` (dual review variant)
 
-Para planos estratégicos onde o custo de uma decisão errada > custo do triple review,
-use a variante triple: Opus + Codex reviewer + Gemini 3.1-pro-preview em paralelo.
+Para planos estratégicos onde o custo de uma decisão errada > custo do dual review,
+use a variante dual: Opus self-review + Codex reviewer com escalação para architect (xhigh) em paralelo.
 
 ### Quando usar
 - Planos que afetam arquitetura (novos módulos, microserviços, schema changes)
 - Planos com dependências externas (APIs pagas, integrações críticas)
 - Planos de segurança ou compliance
-- Quando o usuário explicitamente pede `--triple` ou "tri-plan"
+- Quando o usuário explicitamente pede `--dual` ou plan crítico
 
-### Fluxo (3 streams paralelos)
+### Fluxo (2 streams paralelos)
 ```
 Stream A — Opus (self-review):
   Claude consolida o plano próprio com análise de premissas.
 
-Stream B — Codex reviewer (engineering adversarial):
-  codex exec --profile reviewer({
-    prompt: "Review this plan for engineering gaps, edge cases, test strategy,
-             rollback paths. [PLAN INLINE]"
-  })
+Stream B — Codex reviewer (engineering adversarial, profile=reviewer):
+  codex exec --color never -q --profile reviewer \
+    --output-last-message /tmp/codex-review-$$.md \
+    "Review this plan for engineering gaps, edge cases, test strategy,
+     rollback paths. [PLAN INLINE]"
 
-Stream C — Gemini 3.1-pro-preview (cross-model + long-context premise check):
-  mcp__gemini__ask-gemini({
-    prompt: "@./ Review this plan against the actual repo. Que premissas desse
-             plano o código existente contradiz? Que padrões já estabelecidos
-             o plano viola silenciosamente? [PLAN INLINE]",
-    model: "gemini-3.1-pro-preview"
-  })
+(opcional) Stream C — Codex architect (premise check com xhigh reasoning):
+  codex exec --color never -q --profile architect \
+    --output-last-message /tmp/codex-arch-$$.md \
+    "Review this plan against the repo. Que premissas desse plano o código
+     existente contradiz? [PLAN INLINE]"
+  Use Stream C apenas se a complexidade justificar (>50 arquivos afetados,
+  ou refactor cross-module).
 ```
 
 ### Síntese
-Claude consolida os 3 streams:
-- **Convergência** (os 3 concordam) → high-confidence issue, fix mandatório
-- **2/3 concordam** → medium, worth fixing
-- **1/3 flagou algo único** → evaluate — pode ser insight genuíno ou ruído
+Claude consolida os streams:
+- **Convergência** (Opus + Codex concordam) → high-confidence issue, fix mandatório
+- **Divergência** → evaluate — Claude apresenta os dois lados
+- **Issue Codex-only** ou **Opus-only** → discuss before deciding
 
 ### Output
-Mesmo formato do `/co-plan` normal, mas com seção "## Triple review matrix"
+Mesmo formato do `/co-plan` normal, mas com seção "## Dual review matrix"
 mostrando quem levantou cada issue.
 
-### Não usar `/co-plan --triple` se:
-- XS/S task (triple overhead > benefit)
+### Não usar `/co-plan --dual` se:
+- XS/S task (dual overhead > benefit)
 - Plan muda só 1 arquivo
 - User está em modo de iteração rápida (trade-off de latência)
+
+> **Nota histórica (2026-04-29)**: anteriormente esta skill suportava `/co-plan --triple`
+> com Gemini como Stream C. Gemini foi removido do framework; Stream C agora é
+> opcional via Codex architect profile (xhigh reasoning) para casos genuinamente
+> grandes. Detalhes em `docs/FEATURE-MAP.md`.

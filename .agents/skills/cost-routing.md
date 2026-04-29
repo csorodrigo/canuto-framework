@@ -150,7 +150,6 @@ test runners, build tools.
 ```bash
 rtk init -g                  # Claude Code (default)
 rtk init -g --codex          # Codex CLI
-rtk init -g --gemini         # Gemini CLI
 ```
 
 **Orthogonality with existing skills:**

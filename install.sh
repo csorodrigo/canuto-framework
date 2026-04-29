@@ -357,7 +357,6 @@ setup_deps() {
   ensure_brew_formula gh gh "GitHub CLI"
   ensure_brew_cask gcloud gcloud-cli "Google Cloud CLI"
   ensure_npm_global codex "@openai/codex@latest" "Codex CLI"
-  ensure_npm_global gemini "@google/gemini-cli@latest" "Gemini CLI"
   setup_rtk
 
   if [ "$failures" -gt 0 ]; then

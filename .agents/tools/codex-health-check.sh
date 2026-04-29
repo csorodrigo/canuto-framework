@@ -260,7 +260,6 @@ if [ "$MODE" = "full" ]; then
   check_required_command bun "bun" --version
   check_required_command rtk "rtk" --version
   check_required_command gcloud "Google Cloud CLI" --version
-  check_required_command gemini "Gemini CLI" --version
   check_required_command gh "GitHub CLI" --version
   check_rtk_activation
 
