@@ -46,8 +46,10 @@ From the plan, identify what needs preparation:
 ### 2. Spawn Codex Refactorer
 
 ```
-codex exec --profile coder({
-  prompt: `
+codex exec --color never --profile coder \
+  -s workspace-write --skip-git-repo-check \
+  -o /tmp/codex-refactor-prep-$$.md \
+  "$(cat <<'PROMPT'
 You are preparing the codebase for a new feature. Do NOT implement the feature —
 only prepare the structure.
 
@@ -64,8 +66,8 @@ only prepare the structure.
 
 ## Context
 Read .agents/tmp/context-package.md for project context.
-`
-})
+PROMPT
+)"
 ```
 
 ### 3. Verify Preparation

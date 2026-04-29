@@ -6,7 +6,7 @@ version: 1.0.0
 lastUpdated: 2026-03-30
 shortDescription: >
   Codex runs auto-analysis on new projects instead of Opus. Generates
-  project-index.json and onboarding-report.md via spawn_agent. Opus-free onboarding.
+  project-index.json and onboarding-report.md via `codex exec`. Opus-free onboarding.
 usedBy: [contextualizer, maestro]
 evals:
   - prompt: "onboard this new project with codex"
@@ -39,8 +39,10 @@ stack detection, dependencies, file structure. This runs in Python (fast, no API
 For richer onboarding, spawn Codex:
 
 ```
-codex exec --profile coder({
-  prompt: `
+codex exec --color never --profile coder \
+  -s workspace-write --skip-git-repo-check \
+  -o /tmp/codex-onboarding-$$.md \
+  "$(cat <<'PROMPT'
 You are onboarding a new project. Generate a comprehensive analysis.
 
 ## Instructions
@@ -73,8 +75,8 @@ Write the following files:
 - Be factual — only describe what you see, don't speculate
 - Note any .env.example vars that need configuration
 - Flag any obvious security concerns
-`
-})
+PROMPT
+)"
 ```
 
 ### 3. Opus Reviews Summary

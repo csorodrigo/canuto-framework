@@ -164,7 +164,7 @@ The security gate feeds data to CSO's trend tracking.
 
 ## Graceful Degradation
 
-- reviewer MCP unavailable → Claude performs security review (less thorough)
+- Codex reviewer CLI unavailable → Claude performs security review (less thorough)
 - No diff available → scan full files in changed list
 - Log: `[Security] ⚠️ Using Claude fallback (reviewer path unavailable)`
 

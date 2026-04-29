@@ -38,7 +38,7 @@ When `economy` mode activates:
 1. Opus stops reading source files → delegates to codex-context-loader
 2. Opus stops writing session notes → delegates to codex-session-writer
 3. Opus stops generating PR descriptions → delegates to codex-pr-writer
-4. Reviews shift to codex-reviewer only (no dual Claude+Codex review)
+4. Reviews shift to `codex exec --profile reviewer` only (no dual Claude+Codex review)
 5. Opus's role reduces to: receive user request → route to Codex → present result
 
 ### Ultra-Economy Mode

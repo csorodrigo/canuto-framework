@@ -55,8 +55,9 @@ Configure providers in `CLAUDE.md`:
 - reviewer: claude
 ```
 
-If no provider section exists, all personas default to Claude. Single source of truth
-for model versions: `.agents/config/models.yaml`.
+If no provider section exists, all personas default to Claude. Canonical model
+reference: `.agents/config/models.yaml` (human-readable; keep install scripts
+synced manually).
 
 Direct Codex sessions are an exception: the active runtime becomes Codex for tier-1 orchestration, using `codex --profile maestro` or `bash .agents/tools/codex-maestro.sh`.
 

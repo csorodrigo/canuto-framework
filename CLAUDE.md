@@ -21,7 +21,8 @@ You are my coding orchestrator for this repository.
 
 **Why CLI over MCP**: 10-35% lower token overhead per call (MCP schema overhead amortizes
 only after ~50 calls/session, which is rare). See `.agents/skills/cost-routing.md`.
-Single source of truth: `.agents/config/models.yaml`.
+Canonical model reference: `.agents/config/models.yaml` (human-readable; keep
+`install.sh` profile values synced manually).
 
 ## Project Rules
 - Before finalizing any plan, always interview the user in detail using AskUserQuestion about implementation choices, UI/UX decisions, trade-offs, and concerns. Never assume — always ask first.

@@ -21,7 +21,8 @@ evals:
 Before delegating ANY tier-2 task, Maestro consults this routing table to determine
 which provider should handle it. **Goal: minimize Anthropic spend without losing quality.**
 
-Single source of truth for model versions: `.agents/config/models.yaml`.
+Canonical model reference: `.agents/config/models.yaml` (human-readable; keep
+`install.sh` profile values synced manually).
 
 **Principle: Use the cheapest provider that meets quality requirements.**
 

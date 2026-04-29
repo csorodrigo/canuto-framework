@@ -132,17 +132,20 @@ Never delete or archive without confirmation.
 
 ---
 
-## Gemini integration — Bulk classify (FASE 2a+)
+## Bulk classification (v2.0, 2026-04-29)
 
-Quando este skill precisa classificar/triaga um volume de itens (instincts,
-notas, audits), delegue ao slot `bulk-classify` via Gemini flash-lite:
+Para classificar/triagar grande volume de itens (instincts, notas, audits),
+delegue a `codex exec --profile fast` (gpt-5.5 high, otimizado para tasks
+rápidas e repetitivas):
 
+```bash
+codex exec --color never --profile fast \
+  -s read-only --skip-git-repo-check \
+  -o /tmp/canuto-classify-$$.md \
+  "Classifique cada linha em uma label do conjunto {X, Y, Z}:
+   <itens>"
 ```
-mcp__gemini__ask-gemini({
-  prompt: "Classifique cada linha em uma label do conjunto {X, Y, Z}:\n<itens>",
-  model: "gemini-3.1-flash-lite-preview"
-})
-```
 
-Flash-lite tem quota separada (bar Flash-Lite no TUI) — efetivamente grátis até
-1k/dia. Ver `.agents/skills/bulk-classify.md` pro padrão completo.
+> Historical note (2026-04-29): previously delegated bulk classify to
+> Gemini flash-lite-preview via `bulk-classify` skill (deleted).
+> Codex --profile fast cobre o use case com uma dependência a menos.

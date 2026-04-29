@@ -661,32 +661,32 @@ curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/in
           </div>
 
           <div class="card" style="background: linear-gradient(135deg, #fff1eb, #f5ddd3);">
-            <div class="kicker" style="color: #a84b2d; background: rgba(198,93,58,0.1); border-color: rgba(198,93,58,0.15);">Codex direto ou via spawn</div>
+            <div class="kicker" style="color: #a84b2d; background: rgba(198,93,58,0.1); border-color: rgba(198,93,58,0.15);">Codex direto via CLI</div>
             <ul class="clean">
-              <li><strong>Runtime direto</strong> — <code>bash .agents/tools/codex-maestro.sh</code> sobe o Codex como Maestro com profile <code>maestro</code> (alvo <code>gpt-5.4</code> com reasoning: xhigh).</li>
-              <li><strong>Tasks M e L</strong> — Architect gera <code>context-package.md</code>, chama <code>mcp__codex-coder__spawn_agent</code>.</li>
-              <li><strong>Tasks paralelas</strong> — <code>spawn_agents_parallel</code> com context package por agente.</li>
+              <li><strong>Runtime direto</strong> — <code>bash .agents/tools/codex-maestro.sh</code> sobe o Codex como Maestro com profile <code>maestro</code> (alvo <code>gpt-5.5</code> com reasoning: xhigh).</li>
+              <li><strong>Tasks M e L</strong> — Architect gera <code>context-package.md</code>, chama <code>codex exec --profile coder</code>.</li>
+              <li><strong>Tasks paralelas</strong> — multiplas chamadas <code>codex exec --profile coder</code> com context package por agente.</li>
               <li><strong>Pre-commit gate</strong> — <code>codex-pretool-guard.sh</code> dispara o <em>reviewer path</em> do Codex em todo <code>git commit</code> e explicita quando entra em fallback.</li>
               <li><strong>Plan review</strong> — ao sair do modo de plano, <code>plan-review.sh</code> chama o <em>reviewer path</em> do Codex e registra o backend real usado.</li>
-              <li><strong>Retomada</strong> — o envelope com <code>task_id</code>, <code>goal</code>, <code>constraints</code>, <code>done_definition</code> e <code>thread_id</code> fica persistido em <code>handoffs/</code>.</li>
+              <li><strong>Retomada</strong> — o envelope com <code>task_id</code>, <code>goal</code>, <code>constraints</code>, <code>done_definition</code> e artefatos de review fica persistido em <code>handoffs/</code>.</li>
             </ul>
           </div>
         </div>
 
         <div class="card flow" style="margin-top: 18px; background: #fffdf9;">
           <h3 style="font-size: 1rem; margin-bottom: 14px;">Fluxo M/L em detalhe</h3>
-          <svg viewBox="0 0 1100 130" role="img" aria-label="Fluxo de handoff: Claude Architect gera context package, passa para Codex Coder via spawn_agent, Codex escreve codigo, Claude Reviewer le o diff e da veredicto">
+          <svg viewBox="0 0 1100 130" role="img" aria-label="Fluxo de handoff: Claude Architect gera context package, passa para Codex Coder via codex exec, Codex escreve codigo, Claude Reviewer le o diff e da veredicto">
             <rect x="10" y="20" width="190" height="86" rx="18" fill="#eef8f7" stroke="#9fc9c4"/>
             <text x="34" y="52" fill="#145d57" font-size="17" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Claude</text>
             <text x="34" y="74" fill="#145d57" font-size="14" font-family="Avenir Next, Segoe UI, sans-serif">Architect</text>
             <text x="34" y="95" fill="#567474" font-size="12" font-family="Avenir Next, Segoe UI, sans-serif">gera context-package.md</text>
 
             <path d="M200 63 L248 63" stroke="#7d8c8f" stroke-width="3" stroke-linecap="round"/>
-            <text x="208" y="56" fill="#7d8c8f" font-size="11" font-family="Avenir Next, Segoe UI, sans-serif">spawn_agent</text>
+            <text x="208" y="56" fill="#7d8c8f" font-size="11" font-family="Avenir Next, Segoe UI, sans-serif">codex exec</text>
 
             <rect x="248" y="20" width="190" height="86" rx="18" fill="#fff1eb" stroke="#ddb6a9"/>
             <text x="272" y="52" fill="#a84b2d" font-size="17" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Codex</text>
-            <text x="272" y="74" fill="#a84b2d" font-size="14" font-family="Avenir Next, Segoe UI, sans-serif">Coder (gpt-5.4, high)</text>
+            <text x="272" y="74" fill="#a84b2d" font-size="14" font-family="Avenir Next, Segoe UI, sans-serif">Coder (gpt-5.5, high)</text>
             <text x="272" y="95" fill="#7f5b50" font-size="12" font-family="Avenir Next, Segoe UI, sans-serif">escreve codigo no filesystem</text>
 
             <path d="M438 63 L486 63" stroke="#7d8c8f" stroke-width="3" stroke-linecap="round"/>
@@ -714,7 +714,7 @@ curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/in
 
         <div class="badge-row" style="margin-top: 14px;">
           <span class="badge" style="background:rgba(15,118,110,0.1); color:#145d57; border-color:rgba(15,118,110,0.15);">Claude session = Opus continua como Maestro</span>
-          <span class="badge" style="background:rgba(198,93,58,0.1); color:#a84b2d; border-color:rgba(198,93,58,0.15);">Codex direto = profile maestro (gpt-5.4, xhigh)</span>
+          <span class="badge" style="background:rgba(198,93,58,0.1); color:#a84b2d; border-color:rgba(198,93,58,0.15);">Codex direto = profile maestro (gpt-5.5, xhigh)</span>
           <span class="badge">context-package.md + handoff envelope persistido</span>
           <span class="badge">codex-pretool-guard intercepta todo git commit automaticamente</span>
         </div>
@@ -991,7 +991,7 @@ set BUDGET_LIMIT=&lt;n&gt;</code></pre></div>
             <li><strong>/codex-gh</strong> — operacoes GitHub (issues, PRs) via Codex + MCP</li>
             <li><strong>/pr-write</strong> — PR description + changelog gerado pelo Codex</li>
             <li><strong>/test-fix</strong> — loop autonomo de correcao de testes via Codex</li>
-            <li><strong>/codex-smoke-test</strong> — verifica MCPs codex-coder e codex-reviewer</li>
+            <li><strong>/codex-smoke-test</strong> — verifica perfis CLI do Codex e limpeza de MCPs legados</li>
             <li><strong>/codex-refactor-prep</strong> — Codex prepara base antes de feature grande</li>
             <li><strong>/cross-project-insights</strong> — Codex le vault de multiplos projetos</li>
             <li><strong>/save-session</strong> — Codex escreve nota de sessao no vault</li>
@@ -1004,7 +1004,7 @@ set BUDGET_LIMIT=&lt;n&gt;</code></pre></div>
             <li><strong>/co-brainstorm</strong> — ideacao paralela independente (anti-ancoragem)</li>
             <li><strong>/co-plan</strong> — planejamento paralelo, reconciliacao posterior</li>
             <li><strong>/co-validate</strong> — review de staff-engineer no plano pelo reviewer path</li>
-            <li><strong>/parallel-impl</strong> — implementacao paralela de subtasks via spawn_agents_parallel</li>
+            <li><strong>/parallel-impl</strong> — implementacao paralela de subtasks via chamadas CLI isoladas</li>
             <li><strong>/compete</strong> — Claude e Codex implementam a mesma feature independentemente</li>
             <li><strong>/lazy-opus-review</strong> — review condicional por nivel de confianca do Codex</li>
             <li><strong>/security-gate</strong> — scan OWASP/injection pre-merge via reviewer path</li>
@@ -1048,7 +1048,7 @@ set BUDGET_LIMIT=&lt;n&gt;</code></pre></div>
             <li><strong>audit-trail</strong> — log imutavel de mutacoes significativas</li>
             <li><strong>metrics</strong> — rastreia qualidade, velocidade e rework</li>
             <li><strong>/skill-creator</strong> — cria novo skill dentro do framework</li>
-            <li><strong>multi-provider</strong> — tabela de delegacao Claude/Codex/Gemini</li>
+            <li><strong>multi-provider</strong> — tabela de delegacao Claude/Codex</li>
           </ul>
         </article>
 

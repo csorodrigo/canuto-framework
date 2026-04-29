@@ -105,14 +105,16 @@ Detect broken or missing framework components before they silently degrade sessi
 - [ ] `~/.claude/hooks/session-load.sh` exists and is executable.
 - [ ] `~/.claude/hooks/pre-compact-save.sh` exists and is executable.
 
-### Codex Integration
-- [ ] `~/.claude/settings.json` has `codex-coder` and `codex-reviewer`.
+### Codex Integration (v2.0, 2026-04-29 — CLI-only)
+- [ ] `codex --version` returns OK.
+- [ ] `~/.codex/config.toml` has 5 profiles (coder, reviewer, architect, fast, maestro), all on canonical model.
+- [ ] `~/.claude/settings.json` does NOT have legacy `codex-coder` / `codex-reviewer` / `codex-maestro` MCP entries (re-run `bash install.sh --doctor` to clean).
 - [ ] `~/.claude/settings.json` has `codex-pretool-guard.sh` on `PreToolUse`.
 - [ ] `~/.claude/settings.json` has `plan-review.sh` on `PostToolUse` with matcher `ExitPlanMode`.
 - [ ] `.agents/tools/codex-diff-context.sh` exists and is executable.
 - [ ] `.agents/tools/codex-context-package.sh` exists and is executable.
 - [ ] `.agents/tools/codex-health-check.sh` exists and is executable.
-- [ ] `codex mcp list` is available.
+- [ ] `codex mcp list` works (Codex's own MCPs: obsidian-vault, ast-grep, playwright).
 - [ ] `codex mcp get obsidian-vault --json` includes `OBSIDIAN_API_KEY` and `OBSIDIAN_BASE_URL`.
 - [ ] Context preload assets exist (`.context.md`, `docs/FEATURE-MAP.md`) or are reported as warnings.
 

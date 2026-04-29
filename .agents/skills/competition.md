@@ -50,10 +50,12 @@ evals:
 
 ### 2. Run in Parallel
 
-**Codex implementation** (via MCP):
+**Codex implementation** (via CLI):
 ```
-codex exec --profile coder({
-  prompt: `
+codex exec --color never --profile coder \
+  -s workspace-write --skip-git-repo-check \
+  -o /tmp/codex-competition-impl-$$.md \
+  "$(cat <<'PROMPT'
 Implement the following feature. This is a competition — give your BEST implementation.
 
 ## Task
@@ -64,8 +66,8 @@ Implement the following feature. This is a competition — give your BEST implem
 
 ## Output
 Write all files. Aim for: clean code, good naming, minimal complexity, correct behavior.
-`
-})
+PROMPT
+)"
 ```
 
 **Claude implementation** (in worktree or stash):
@@ -96,8 +98,10 @@ Run comparison on both implementations:
 Send BOTH implementations to the reviewer path for an independent comparison:
 
 ```
-codex exec --profile reviewer({
-  prompt: `
+codex exec --color never --profile reviewer \
+  -s read-only --skip-git-repo-check \
+  -o /tmp/codex-competition-review-$$.md \
+  "$(cat <<'PROMPT'
 [COMPETITION REVIEW]
 Two implementations of the same feature. Compare objectively.
 
@@ -111,8 +115,8 @@ Two implementations of the same feature. Compare objectively.
 
 Score each on: correctness, readability, performance, maintainability (1-10).
 Declare a winner with justification.
-`
-})
+PROMPT
+)"
 ```
 
 ### 6. Present to User
@@ -160,7 +164,7 @@ Sometimes the best result is a **hybrid** — taking the architecture from one a
 
 ## Graceful Degradation
 
-- MCP unavailable → run both implementations sequentially in Claude (different approaches, not different models)
+- Codex CLI unavailable → run both implementations sequentially in Claude (different approaches, not different models)
 - Worktree unavailable → use temp directories
 - Only one implementation succeeds → use that one, note the failure
 

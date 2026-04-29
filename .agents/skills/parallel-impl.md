@@ -6,7 +6,8 @@ version: 1.0.0
 lastUpdated: 2026-03-30
 shortDescription: >
   Break features into independent subtasks and implement them in parallel via
-  spawn_agents_parallel. 3-5x speedup for large features with independent modules.
+  parallel `codex exec --profile coder` calls. 3-5x speedup for large features
+  with independent modules.
 usedBy: [maestro, architect]
 evals:
   - prompt: "implement these 4 components in parallel"
@@ -146,10 +147,10 @@ You are implementing ONE part of a larger feature. Other agents are working on o
 
 ## Graceful Degradation
 
-If `codex-coder` MCP unavailable:
-1. Try sequential `codex exec --profile coder` calls
+If `codex` CLI unavailable or fails:
+1. Try sequential `codex exec --profile coder` calls (one at a time)
 2. Fallback: Claude implements sequentially (no parallelism)
-3. Log: `[Parallel-Impl] MCP unavailable, falling back to sequential execution`
+3. Log: `[Parallel-Impl] codex CLI unavailable, falling back to sequential execution by Claude`
 
 ---
 

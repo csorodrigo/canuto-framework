@@ -168,8 +168,10 @@ If `codex` CLI is missing or fails:
 3. Send to `codex exec --profile reviewer` (reviewer profile):
 
 ```
-codex exec --profile reviewer({
-  prompt: `
+codex exec --color never --profile reviewer \
+  -s read-only --skip-git-repo-check \
+  -o .agents/tmp/codex/co-review-validate.md \
+  "$(cat <<'PROMPT'
 [PRE-COMMIT REVIEW]
 Review this staged diff before commit. Focus on:
 - Bugs, logic errors, edge cases
@@ -182,8 +184,8 @@ Review this staged diff before commit. Focus on:
 --- CHANGES END ---
 
 Verdict: COMMIT (clean) | HOLD (issues found). If HOLD, list issues with file:line.
-`
-})
+PROMPT
+)"
 ```
 
 4. **COMMIT** verdict → proceed with commit
@@ -245,10 +247,11 @@ If the compressed diff exceeds 5000 lines, split into per-file reviews.
 
 ## Session Continuity
 
-The current `codex-reviewer` MCP wrapper is one-shot. It does **not** return `threadId` and does not support `codex-reply`.
+`codex exec --profile reviewer` is one-shot per invocation. For multi-turn,
+re-invoke with extended context inline.
 
 Persist instead:
-- the generated markdown review in `.agents/tmp/codex/`
+- the generated markdown review via `--output-last-message <path>` in `.agents/tmp/codex/`
 - the JSONL audit trail in `codex-review-events.jsonl`
 - any higher-level handoff metadata you want in the vault
 

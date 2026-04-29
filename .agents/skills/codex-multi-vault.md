@@ -39,8 +39,10 @@ What cross-project insight is needed:
 ### 2. Spawn Codex Vault Reader
 
 ```
-codex exec --profile coder({
-  prompt: `
+codex exec --color never --profile coder \
+  -s read-only --skip-git-repo-check \
+  -o /tmp/codex-cross-project-insights-$$.md \
+  "$(cat <<'PROMPT'
 You have access to the obsidian-vault MCP. Search across all projects.
 
 ## Query
@@ -63,8 +65,8 @@ Write to .agents/tmp/cross-project-insights.md:
 - Cite which project each insight comes from
 - Note confidence levels on instincts
 - Flag any contradictions between projects
-`
-})
+PROMPT
+)"
 ```
 
 ### 3. Opus Applies Insights

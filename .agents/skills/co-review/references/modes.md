@@ -2,8 +2,8 @@
 
 Loaded on demand when a co-review mode activates. See `SKILL.md` for the summary.
 
-The current `codex-reviewer` contract is one-shot via `codex exec --profile reviewer`.
-Do not assume reviewer-side `threadId` or `codex-reply`.
+The current reviewer contract is one-shot via `codex exec --profile reviewer`.
+Do not assume reviewer-side continuation IDs or reply tools.
 
 ---
 

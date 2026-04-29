@@ -19,7 +19,8 @@ delegates tier-2 work to Codex profiles using direct shell invocation.
 | `maestro` | `gpt-5.5` (xhigh) | full write | Direct Codex runtime orchestration | `codex --profile maestro` (interactive launcher) |
 | `fast` | `gpt-5.5` (high) | full write | Quick edits, formatting, docs | `codex exec --color never --profile fast` |
 
-**Source of truth for model versions**: `.agents/config/models.yaml`.
+**Canonical model reference**: `.agents/config/models.yaml` (human-readable;
+keep `install.sh` profile values synced manually).
 
 ## Setup
 
@@ -125,7 +126,7 @@ Persist for follow-up:
 - **`codex` not in PATH**: re-run `bash install.sh --doctor`
 - **Reviewer hanging**: timeout via `gtimeout 600 codex exec ...` (install with `brew install coreutils`)
 - **Profile not found**: `~/.codex/config.toml` missing the profile block — re-run `bash install.sh --doctor`
-- **Model drifted (still on gpt-5.4)**: `bash install.sh --doctor` now updates existing profiles to canonical model (single source: `.agents/config/models.yaml`)
+- **Model drifted (still on gpt-5.4)**: `bash install.sh --doctor` now updates existing profiles to the canonical model reference in `.agents/config/models.yaml`
 - **Legacy MCP entries still present**: `bash install.sh --doctor` removes them automatically; or manually:
   ```bash
   claude mcp remove codex-coder codex-reviewer codex-maestro 2>/dev/null

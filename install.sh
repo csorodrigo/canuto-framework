@@ -1452,8 +1452,8 @@ TOMLEOF
     ok "Created $config_toml with profiles (coder, maestro, reviewer, architect, fast)"
   else
     # Patch-merge: add missing profiles AND update existing model/reasoning_effort
-    # to canonical values from .agents/config/models.yaml. This keeps existing users
-    # in sync when bumping versions (gpt-5.4 → 5.5, etc).
+    # to the canonical hardcoded values below. Keep .agents/config/models.yaml
+    # in sync manually when bumping model versions.
     local patched=false
     local CANONICAL_MODEL="gpt-5.5"
     declare -A CANONICAL_EFFORT=(
