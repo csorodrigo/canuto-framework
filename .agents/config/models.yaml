@@ -1,0 +1,89 @@
+# Canuto Framework — Single Source of Truth for Model Versions
+#
+# Why this file exists:
+#   Before: 60+ files referenced gpt-5.4 / gpt-5-codex hardcoded.
+#           Bumping a version = sweeping replace across the framework.
+#   After:  Skills and hooks read from this file via {{coder.model}} placeholders.
+#           Bumping a version = 1-line change here.
+#
+# Update procedure:
+#   1. Bump version below + bump `last-updated`
+#   2. Run: bash .agents/tools/codex-health-check.sh --smoke
+#   3. If green: commit, ship
+#   4. Skills auto-pick up via placeholder substitution at install/render time
+#
+# Naming convention: <provider>.<role> = the canonical reference used in skill
+# templates and hook scripts. Use `.` accessor in template strings.
+
+last-updated: 2026-04-29
+
+# --- Coder profile (default executor for tier-2 implementation) ---
+coder:
+  provider: codex
+  model: gpt-5.5
+  reasoning: high
+  use-for: "Standard code generation, refactor, multi-file edits"
+  cli-invocation: "codex exec --color never -q --profile coder"
+
+# --- Reviewer profile (peer review of plan and code) ---
+reviewer:
+  provider: codex
+  model: gpt-5.5
+  reasoning: high
+  use-for: "Plan review, code review, security audit"
+  cli-invocation: "codex exec --color never -q --profile reviewer"
+
+# --- Architect profile (deep planning, complex reasoning) ---
+architect:
+  provider: codex
+  model: gpt-5.5
+  reasoning: xhigh
+  use-for: "Architecture, complex decomposition, novel problems"
+  cli-invocation: "codex exec --color never -q --profile architect"
+
+# --- Maestro profile (Codex-runtime orchestration only; Claude Opus is default Maestro) ---
+maestro:
+  provider: codex
+  model: gpt-5.5
+  reasoning: xhigh
+  use-for: "Direct Codex runtime sessions only — Claude Opus is default Maestro"
+  cli-invocation: "codex --profile maestro"
+
+# --- Fast profile (quick edits, formatting, docs) ---
+fast:
+  provider: codex
+  model: gpt-5.5
+  reasoning: high
+  use-for: "Quick edits, formatting, documentation"
+  cli-invocation: "codex exec --color never -q --profile fast"
+
+# --- Tier-1 (Maestro + Architect when Claude is the active runtime) ---
+primary:
+  provider: anthropic
+  model: claude-opus-4-7
+  reasoning: xhigh
+  use-for: "Tier-1 orchestration: Maestro, Architect, user-facing decisions"
+  cli-invocation: null  # Native Claude Code session, no spawn
+
+# --- Cross-model reviewer (only used in Codex-runtime sessions) ---
+claude-reviewer:
+  provider: anthropic
+  model: claude-sonnet-4-6
+  reasoning: max
+  use-for: "Cross-model review when Codex implements (bias-free)"
+  cli-invocation: null  # Spawned via mcp__claude-reviewer when present
+
+# --- Routing notes ---
+notes:
+  delegation: |
+    Tasks XS/S: Claude (primary) implements directly — CLI/MCP overhead not justified.
+    Tasks M/L: Claude delegates to coder via `codex exec` (CLI direct, no MCP).
+    Why CLI over MCP: 10-35% lower token overhead per call. See cost-routing.md.
+  reasoning-levels: |
+    high  = standard reasoning (5K-10K thinking tokens equivalent)
+    xhigh = deep reasoning (10K-20K thinking tokens equivalent)
+    max   = maximum (20K+ tokens; Claude only)
+  fallback-chain: |
+    coder fails  → retry with reviewer profile (deeper reasoning)
+    reviewer fails → escalate to architect profile (xhigh)
+    architect fails → Claude implements directly + log incident

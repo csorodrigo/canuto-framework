@@ -533,6 +533,10 @@ FRAMEWORK_FILES=(
   ".agents/hooks/fingerprint-gate.sh"
   ".agents/hooks/posttooluse-universal.sh"
   ".agents/hooks/pre-finalize.sh"
+  ".agents/hooks/pre-commit-branch-check.sh"
+  ".agents/hooks/worktree-collision-check.sh"
+  ".agents/hooks/pre-claim-grep.sh"
+  ".agents/config/models.yaml"
   ".agents/skills/continuous-learning/SKILL.md"
   ".agents/skills/continuous-learning/references/instinct-promotion.md"
   ".agents/skills/continuous-learning/references/examples.md"
@@ -836,6 +840,10 @@ setup_hooks() {
   install_hook ".agents/hooks/posttooluse-universal.sh" "PostToolUse" 3  ".*"
   install_hook ".agents/hooks/fingerprint-gate.sh"  "PreToolUse"    3  "Edit|Write"
   install_hook ".agents/hooks/pre-finalize.sh"      "Stop"          5
+  # Retrabalho-prevention hooks (v1.7) — born from sessions 2026-04-18 e 04-18b (I-023, I-026, I-027)
+  install_hook ".agents/hooks/worktree-collision-check.sh" "SessionStart" 3
+  install_hook ".agents/hooks/pre-commit-branch-check.sh"  "PreToolUse"   3  "Bash"
+  install_hook ".agents/hooks/pre-claim-grep.sh"           "PreToolUse"   3  "Write"
   # session-load.sh is a utility script, not a hook — it's called manually or via CLAUDE.md
   if [ -f ".agents/hooks/session-load.sh" ]; then
     cp ".agents/hooks/session-load.sh" "$HOME/.claude/hooks/session-load.sh"
