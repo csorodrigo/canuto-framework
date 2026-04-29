@@ -53,11 +53,8 @@ bash test-framework.sh
 | `bash install.sh --doctor` | Quero consertar e validar em uma vez | Roda repair + smoke test do projeto + health check Codex + gera `.agents/tmp/context-package.md` |
 | `bash test-framework.sh` | Manutencao do framework em si | Suite estrutural do repo do framework |
 
-### Enabling Gemini (optional)
+<!-- Gemini provider was removed in 2026-04-29 — see .agents/vault/sessions/ for context. Stack is now Claude (tier-1) + Codex CLI (tier-2). -->
 
-Gemini MCP support is optional and used as a read-only consultant for long-context, multimodal, and bulk classification workflows.
-
-See `.agents/mcp/setup.md` for installation, authentication, MCP registration, and verification steps.
 
 ## Maestro por runtime
 

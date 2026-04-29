@@ -39,42 +39,43 @@ evals:
 
 **Not for:**
 - XS/S tasks (overhead not justified)
-- When Codex MCP is not configured (degrade gracefully, continue without)
+- When `codex` CLI is not in PATH (degrade gracefully, continue without)
 - Implementation tasks (Codex reviews plans, doesn't code)
 
 **Runtime flag:** `CO_REVIEW=false` disables automatic trigger for M/L tasks.
 
-## Prerequisites
+## Prerequisites (v2.0, 2026-04-29)
 
-Two Codex MCP servers must be configured (global `settings.json`):
+Codex CLI must be installed and authenticated:
 
 ```bash
-# Recommended: let install.sh configure these wrapper-backed MCPs
-bash install.sh --repair
+# Recommended: let install.sh handle setup
+bash install.sh --doctor
 ```
 
-Verify: `claude mcp list` → both should show `✓ Connected`.
+Verify: `codex --version` returns OK; `~/.codex/config.toml` has 5 profiles.
 
-### MCP Tool Mapping
+### Profile-to-Mode Mapping
 
-| Mode | MCP Server | Tool | Model |
-|------|-----------|------|-------|
-| co-brainstorm | codex-coder | `spawn_agents_parallel` | gpt-5.5 (high) |
-| co-plan | codex-reviewer | `spawn_agent` | `reviewer` profile (`gpt-5.5`, reasoning: high) |
-| co-validate | codex-reviewer | `spawn_agent` | `reviewer` profile (`gpt-5.5`, reasoning: high) |
+| Mode | Profile | Model | Invocation |
+|------|---------|-------|------------|
+| co-brainstorm | coder | gpt-5.5 (high) | parallel `codex exec --profile coder` × N |
+| co-plan | reviewer | gpt-5.5 (high) | `codex exec --profile reviewer` |
+| co-validate | reviewer | gpt-5.5 (high) | `codex exec --profile reviewer` |
+| escalation (long-context, deeper reasoning) | architect | gpt-5.5 (xhigh) | `codex exec --profile architect` |
 
 ### Backend Preference (fallback chain)
 
 ```
-1. codex-reviewer MCP (`spawn_agent`, one-shot) — REVIEWS / CO-PLAN / CO-VALIDATE
-2. codex-coder MCP (gpt-5.5 (high), parallel) — CO-BRAINSTORM
-3. CCB `ask codex` (only with active Codex session, visible panes, anchoring risk) — FALLBACK
-4. Claude-only review — LAST RESORT
+1. codex exec --profile <reviewer|coder|architect> (CLI, default for all modes)
+2. CCB `ask codex` (only with active Codex CCB session, visible panes, anchoring risk) — FALLBACK
+3. Claude-only review — LAST RESORT
 ```
 
 ### Alternative: CCB Backend
 
-If MCPs are unavailable, co-review falls back to CCB's `ask` CLI:
+If `codex` CLI is unavailable but CCB plugin is installed, co-review falls back
+to CCB's `ask` CLI:
 
 ```bash
 ask codex "<co-review prompt>"
@@ -84,6 +85,11 @@ pend <task-id>  # retrieve when ready
 **Important**:
 - CCB fallback only works when a Codex CCB session is already active for this workspace.
 - CCB panes are visible — risk of anchoring bias. Do not look at the Codex pane until your own review is complete.
+
+> Historical note (2026-04-29): previously this skill required `codex-coder`
+> and `codex-reviewer` MCP servers. Those wrappers were retired; CLI direct
+> invocation has 10-35% lower token overhead. Outputs flow through
+> `--output-last-message <file>` to keep stdout clean.
 
 ---
 
@@ -137,11 +143,9 @@ For detailed prompts, output formats, and examples, read `references/modes.md`.
 
 ## Graceful Degradation
 
-If Codex MCP servers are not configured or fail:
-- Log: `[Co-Review] codex-reviewer MCP not available. Checking fallbacks...`
-- Try `codex exec --profile reviewer` as the first degraded reviewer path.
-  - Log: `[Co-Review] Using codex exec --profile reviewer (degraded path).`
-- If no reviewer path is available, try CCB only when a Codex session is active.
+If `codex` CLI is missing or fails:
+- Log: `[Co-Review] codex CLI failed (<reason>). Checking fallbacks...`
+- Try CCB `ask codex` only when a Codex session is active for this workspace.
   - Log: `[Co-Review] Using CCB ask codex as fallback. Avoid looking at Codex pane until your review is complete.`
 - If CCB also unavailable: fall back to Claude-only review.
   - Log: `[Co-Review] No external reviewer available. Continuing with single-perspective review.`

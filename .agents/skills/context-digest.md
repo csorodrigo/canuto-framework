@@ -27,28 +27,28 @@ Opus plans from digests. Codex receives digests in context packages.
 
 ## Who generates the digest?
 
-**Primary: Gemini** (`gemini-3.1-pro-preview`) — long-context `@folder` makes this
-the cheapest path. Flow:
+**Primary: Codex** via `codex exec --profile coder` — has filesystem access and
+ast-grep MCP, so it can walk the dir cheaply. Flow:
 
-```
-mcp__gemini__ask-gemini({
-  prompt: "@src/auth/ Produce a digest in the format specified at
-           .agents/skills/context-digest.md (Public API, Key Types, Dependencies,
-           Invariants, Gotchas, 5-line summary). Output markdown only.",
-  model: "gemini-3.1-pro-preview"
-})
-→ write the returned markdown to .agents/vault/digests/{slug}.md
-```
+```bash
+codex exec --color never --profile coder \
+  -s read-only --skip-git-repo-check \
+  -o /tmp/canuto-digest-$$.md \
+  "Read the directory src/auth/ and produce a digest in the format specified at
+   .agents/skills/context-digest.md (Public API, Key Types, Dependencies,
+   Invariants, Gotchas, 5-line summary). Use ast-grep MCP for symbols if useful.
+   Output markdown only."
 
-**Fallback: Codex** via `codex exec --profile coder` with a context-preload pointing
-at the target directory. Use when Gemini quota is exhausted or the repo has auth-sensitive
-files that should not cross provider boundaries.
+# Copy result to digests dir
+mkdir -p .agents/vault/digests
+mv /tmp/canuto-digest-$$.md .agents/vault/digests/auth.md
+```
 
 **Never use Opus** to generate digests — that defeats the economy.
 
-Gemini gotchas: serialize calls (stdio single-connection), copy files into the workspace
-before `@` (sandbox blocks `/tmp`), and avoid `gemini-2.5-pro` (banned per POC).
-See `.agents/skills/gemini-routing.md`.
+> Historical note (2026-04-29): previously used Gemini 3.1-pro-preview's
+> `@folder` long-context as primary. Gemini was removed; Codex+ast-grep covers
+> the same use case with one fewer provider dependency.
 
 ---
 

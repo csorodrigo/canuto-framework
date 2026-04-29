@@ -1,20 +1,26 @@
 # Canuto Framework — Reference Document for Canonical Model Versions
 #
-# Status: this file is a HUMAN-READABLE SOURCE OF TRUTH and a runtime reference
-# point for `bash install.sh --doctor`. It does NOT have an automatic placeholder
-# substitution pipeline yet; skills currently embed model names inline. The
-# install.sh re-reads canonical model values from here (top of file) and
-# updates `~/.codex/config.toml` profiles to match on each `--doctor` run.
+# Status: this file is a HUMAN-READABLE REFERENCE. It is NOT automatically
+# read by install.sh at runtime (the model values in install.sh are still
+# hardcoded — see install.sh:1432-1457 for the canonical values that ship).
+# Skills also embed model names inline rather than reading via placeholder.
 #
-# Update procedure:
+# Why it exists anyway:
+#   - Single place to read "what model are we on right now"
+#   - Reference doc when bumping versions across the framework (manual sweep)
+#   - Future: a render script could substitute {{coder.model}} placeholders;
+#     not implemented in this version.
+#
+# Update procedure (manual until substitution pipeline lands):
 #   1. Bump model/effort below + bump `last-updated`
-#   2. Run: bash install.sh --doctor   (this updates ~/.codex/config.toml)
-#   3. If you want skills/docs to reflect the new version: grep+replace manually
-#      for now (TODO: add automated substitution pipeline; see open task).
-#   4. Run: bash .agents/tools/codex-health-check.sh
+#   2. Match install.sh:1432-1457 (TOML heredoc) to the new values
+#   3. Match install.sh:1462-1474 (awk-based update of existing config.toml)
+#      to the new canonical values
+#   4. Grep+replace skill docs / health-check for old version → new version
+#   5. Run: bash install.sh --doctor + bash .agents/tools/codex-health-check.sh
 #
-# Naming convention: <provider>.<role> = the canonical reference used in
-# install.sh and codex-health-check.sh.
+# Naming convention: <role> at top level = the canonical reference for that
+# Canuto persona role.
 
 last-updated: 2026-04-29
 
