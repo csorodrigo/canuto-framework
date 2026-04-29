@@ -357,7 +357,6 @@ setup_deps() {
   ensure_brew_formula gh gh "GitHub CLI"
   ensure_brew_cask gcloud gcloud-cli "Google Cloud CLI"
   ensure_npm_global codex "@openai/codex@latest" "Codex CLI"
-  ensure_npm_global gemini "@google/gemini-cli@latest" "Gemini CLI"
   setup_rtk
 
   if [ "$failures" -gt 0 ]; then
@@ -533,6 +532,10 @@ FRAMEWORK_FILES=(
   ".agents/hooks/fingerprint-gate.sh"
   ".agents/hooks/posttooluse-universal.sh"
   ".agents/hooks/pre-finalize.sh"
+  ".agents/hooks/pre-commit-branch-check.sh"
+  ".agents/hooks/worktree-collision-check.sh"
+  ".agents/hooks/pre-claim-grep.sh"
+  ".agents/config/models.yaml"
   ".agents/skills/continuous-learning/SKILL.md"
   ".agents/skills/continuous-learning/references/instinct-promotion.md"
   ".agents/skills/continuous-learning/references/examples.md"
@@ -583,12 +586,8 @@ FRAMEWORK_FILES=(
   ".agents/tools/codex-diff-context.sh"
   ".agents/tools/codex-context-package.sh"
   ".agents/tools/codex-health-check.sh"
-  ".agents/tools/codex-agent-mcp.py"
-  ".agents/tools/codex-coder.sh"
-  ".agents/tools/codex-reviewer.sh"
   ".agents/tools/canuto-consumer-smoke.sh"
   ".agents/tools/codex-maestro.sh"
-  ".agents/tools/codex-maestro-mcp.sh"
   ".agents/tools/otel-emit.sh"
   ".agents/tools/vault-sync.sh"
   # Codex economy + integration skills (Fase 3)
@@ -836,6 +835,10 @@ setup_hooks() {
   install_hook ".agents/hooks/posttooluse-universal.sh" "PostToolUse" 3  ".*"
   install_hook ".agents/hooks/fingerprint-gate.sh"  "PreToolUse"    3  "Edit|Write"
   install_hook ".agents/hooks/pre-finalize.sh"      "Stop"          5
+  # Retrabalho-prevention hooks (v1.7) — born from sessions 2026-04-18 e 04-18b (I-023, I-026, I-027)
+  install_hook ".agents/hooks/worktree-collision-check.sh" "SessionStart" 3
+  install_hook ".agents/hooks/pre-commit-branch-check.sh"  "PreToolUse"   3  "Bash"
+  install_hook ".agents/hooks/pre-claim-grep.sh"           "PreToolUse"   3  "Write"
   # session-load.sh is a utility script, not a hook — it's called manually or via CLAUDE.md
   if [ -f ".agents/hooks/session-load.sh" ]; then
     cp ".agents/hooks/session-load.sh" "$HOME/.claude/hooks/session-load.sh"
@@ -1366,15 +1369,13 @@ setup_obsidian_mcp() {
 
 # ── setup_codex ──────────────────────────────────────────────────────────────
 # Detects/installs Codex CLI, configures profiles in config.toml, registers
-# project trust (Conductor-aware), and adds codex-coder + codex-reviewer MCPs
-# to ~/.claude/settings.json. Idempotent — safe to run on every update.
+# project trust (Conductor-aware). Idempotent — safe to run on every update.
+#
+# As of 2026-04-29: Codex is invoked exclusively via CLI (`codex exec --profile <name>`).
+# The codex-coder/codex-reviewer/codex-maestro MCP servers were retired — see
+# .agents/skills/cost-routing.md for rationale (10-35% lower token overhead per call).
 setup_codex() {
-  local settings="$HOME/.claude/settings.json"
   local config_toml="$HOME/.codex/config.toml"
-  local claude_scripts_dir="$HOME/.claude/scripts"
-  local coder_wrapper="$claude_scripts_dir/codex-coder.sh"
-  local reviewer_wrapper="$claude_scripts_dir/codex-reviewer.sh"
-  local maestro_wrapper="$claude_scripts_dir/codex-maestro-mcp.sh"
 
   log "Setting up Codex CLI integration..."
 
@@ -1425,49 +1426,93 @@ setup_codex() {
   if [ ! -f "$config_toml" ]; then
     cat > "$config_toml" << 'TOMLEOF'
 personality = "pragmatic"
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 
 [profiles.coder]
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 
 [profiles.maestro]
-model = "gpt-5.4"
-model_reasoning_effort = "high"
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
 
 [profiles.reviewer]
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 
 [profiles.architect]
-model = "gpt-5.4"
-model_reasoning_effort = "high"
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
 
 [profiles.fast]
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 TOMLEOF
     ok "Created $config_toml with profiles (coder, maestro, reviewer, architect, fast)"
   else
-    # Patch-merge: add missing profiles without overwriting
+    # Patch-merge: add missing profiles AND update existing model/reasoning_effort
+    # to the canonical hardcoded values below. Keep .agents/config/models.yaml
+    # in sync manually when bumping model versions.
     local patched=false
+    local CANONICAL_MODEL="gpt-5.5"
+    declare -A CANONICAL_EFFORT=(
+      [coder]="high"
+      [maestro]="xhigh"
+      [reviewer]="high"
+      [architect]="xhigh"
+      [fast]="high"
+    )
     for profile in coder maestro reviewer architect fast; do
+      local effort="${CANONICAL_EFFORT[$profile]}"
       if ! grep -q "\[profiles\.$profile\]" "$config_toml" 2>/dev/null; then
-        case $profile in
-          coder)     echo -e "\n[profiles.coder]\nmodel = \"gpt-5.4\"\nmodel_reasoning_effort = \"high\"" >> "$config_toml" ;;
-          maestro)   echo -e "\n[profiles.maestro]\nmodel = \"gpt-5.4\"\nmodel_reasoning_effort = \"xhigh\"" >> "$config_toml" ;;
-          reviewer)  echo -e "\n[profiles.reviewer]\nmodel = \"gpt-5.4\"\nmodel_reasoning_effort = \"high\"" >> "$config_toml" ;;
-          architect) echo -e "\n[profiles.architect]\nmodel = \"o3\"\nmodel_reasoning_effort = \"high\"" >> "$config_toml" ;;
-          fast)      echo -e "\n[profiles.fast]\nmodel = \"gpt-5.4\"\nmodel_reasoning_effort = \"high\"" >> "$config_toml" ;;
-        esac
+        # Profile missing — append canonical block
+        printf '\n[profiles.%s]\nmodel = "%s"\nmodel_reasoning_effort = "%s"\n' \
+          "$profile" "$CANONICAL_MODEL" "$effort" >> "$config_toml"
         patched=true
+      else
+        # Profile present — update model and reasoning_effort if drifted
+        # Use awk to rewrite values within the [profiles.<name>] block only.
+        local tmp_toml
+        tmp_toml=$(mktemp)
+        awk -v profile="$profile" -v model="$CANONICAL_MODEL" -v effort="$effort" '
+          BEGIN { in_block = 0 }
+          $0 ~ "^\\[profiles\\." profile "\\]$" { in_block = 1; print; next }
+          /^\[/ && in_block { in_block = 0 }
+          in_block && /^model[[:space:]]*=/ {
+            sub(/=.*/, "= \"" model "\"")
+            patched_model = 1
+            print
+            next
+          }
+          in_block && /^model_reasoning_effort[[:space:]]*=/ {
+            sub(/=.*/, "= \"" effort "\"")
+            patched_effort = 1
+            print
+            next
+          }
+          { print }
+          END { if (!(patched_model && patched_effort)) exit 2 }
+        ' "$config_toml" > "$tmp_toml" 2>/dev/null
+        local awk_status=$?
+
+        if [ "$awk_status" -eq 0 ]; then
+          if ! cmp -s "$config_toml" "$tmp_toml"; then
+            mv "$tmp_toml" "$config_toml"
+            patched=true
+          else
+            rm -f "$tmp_toml"
+          fi
+        else
+          # awk couldn't find both keys — leave as is, don't risk corruption
+          rm -f "$tmp_toml"
+        fi
       fi
     done
     if $patched; then
-      ok "Patched $config_toml with missing profiles"
+      ok "Updated $config_toml profiles to canonical $CANONICAL_MODEL"
     else
-      ok "config.toml profiles already configured"
+      ok "config.toml profiles already on canonical model"
     fi
   fi
 
@@ -1508,57 +1553,40 @@ TRUSTEOF2
     fi
   fi
 
-  # ── Install Claude-side Codex MCP wrappers ──────────────────────────────
+  # ── Install Codex shared libs to ~/.claude/scripts ──────────────────────
+  # Only common libs and CLI launcher (codex-common.sh, codex-diff-context.sh).
+  # MCP-server wrappers (codex-coder.sh, codex-reviewer.sh, codex-agent-mcp.py)
+  # were retired — Maestro now invokes Codex via `codex exec --profile <name>` directly.
+  local claude_scripts_dir="$HOME/.claude/scripts"
   mkdir -p "$claude_scripts_dir"
 
-  install_codex_wrapper() {
-    local src="$1"
-    local dst="$claude_scripts_dir/$(basename "$src")"
-
-    if [ ! -f "$src" ]; then
-      warn "Missing Codex wrapper source: $src"
-      return 1
+  for src in .agents/tools/codex-common.sh .agents/tools/codex-diff-context.sh; do
+    if [ -f "$src" ]; then
+      cp "$src" "$claude_scripts_dir/$(basename "$src")"
+      chmod +x "$claude_scripts_dir/$(basename "$src")"
+      ok "Installed Codex shared lib: $claude_scripts_dir/$(basename "$src")"
     fi
+  done
 
-    cp "$src" "$dst"
-    chmod +x "$dst"
-    ok "Installed Codex wrapper: $dst"
-    return 0
-  }
-
-  install_codex_wrapper ".agents/tools/codex-agent-mcp.py" || return
-  install_codex_wrapper ".agents/tools/codex-coder.sh" || return
-  install_codex_wrapper ".agents/tools/codex-reviewer.sh" || return
-  install_codex_wrapper ".agents/tools/codex-maestro-mcp.sh" || return
-  install_codex_wrapper ".agents/tools/codex-common.sh" || return
-  install_codex_wrapper ".agents/tools/codex-diff-context.sh" || return
-
-  # ── Register codex-coder MCP in settings.json ───────────────────────────
-  if ! command -v jq &> /dev/null; then
-    warn "jq not found — skipping Codex MCP registration."
-    return
-  fi
-
-  if [ ! -f "$settings" ]; then
-    echo '{}' > "$settings"
-  fi
-
-  local updated
-  updated=$(jq \
-    --arg coder "$coder_wrapper" \
-    --arg reviewer "$reviewer_wrapper" \
-    --arg maestro "$maestro_wrapper" \
-    '
-      .mcpServers = (.mcpServers // {})
-      | .mcpServers["codex-coder"] = ((.mcpServers["codex-coder"] // {}) * {"command": $coder, "type": "stdio"})
-      | .mcpServers["codex-reviewer"] = ((.mcpServers["codex-reviewer"] // {}) * {"command": $reviewer, "type": "stdio"})
-      | .mcpServers["codex-maestro"] = ((.mcpServers["codex-maestro"] // {}) * {"command": $maestro, "type": "stdio"})
+  # ── Remove legacy codex-* MCP entries from settings.json ────────────────
+  # Cleanup for users upgrading from pre-2026-04-29 versions that registered
+  # codex-coder/codex-reviewer/codex-maestro MCP servers.
+  local settings="$HOME/.claude/settings.json"
+  if command -v jq &> /dev/null && [ -f "$settings" ]; then
+    local cleaned
+    cleaned=$(jq '
+      if .mcpServers then
+        .mcpServers |= (
+          del(.["codex-coder"])
+          | del(.["codex-reviewer"])
+          | del(.["codex-maestro"])
+        )
+      else . end
     ' "$settings")
-  if [[ -n "$updated" ]]; then
-    echo "$updated" > "$settings"
-    ok "codex-coder MCP configured in settings.json via wrapper"
-    ok "codex-reviewer MCP configured in settings.json via wrapper"
-    ok "codex-maestro MCP configured in settings.json via wrapper"
+    if [[ -n "$cleaned" ]] && ! cmp -s <(echo "$cleaned") "$settings"; then
+      echo "$cleaned" > "$settings"
+      ok "Removed legacy codex-* MCP entries from settings.json (Codex now invoked via CLI)"
+    fi
   fi
 }
 
@@ -1676,15 +1704,15 @@ Available profiles in \`~/.codex/config.toml\` — use when spawned with \`--pro
 
 | Profile | Model | Reasoning | Use For |
 |---------|-------|-----------|---------|
-| \`coder\` | gpt-5.4 | high | Standard code generation |
-| \`maestro\` | gpt-5.4 | xhigh | Direct Codex runtime orchestration |
-| \`reviewer\` | gpt-5.4 | high | Deep code review, security audit |
-| \`architect\` | o3 | high | Architecture, complex reasoning |
-| \`fast\` | gpt-5.4 | high | Quick edits, formatting, docs |
+| \`coder\` | gpt-5.5 | high | Standard code generation |
+| \`maestro\` | gpt-5.5 | xhigh | Direct Codex runtime orchestration |
+| \`reviewer\` | gpt-5.5 | high | Deep code review, security audit |
+| \`architect\` | gpt-5.5 | xhigh | Architecture, complex reasoning |
+| \`fast\` | gpt-5.5 | high | Quick edits, formatting, docs |
 
 - Claude sessions keep Claude Opus as Maestro.
 - Direct Codex sessions should use `bash .agents/tools/codex-maestro.sh` or `codex --profile maestro`.
-- All profiles use `gpt-5.4`; reasoning effort is the dimension that varies (high/xhigh).
+- All profiles use `gpt-5.5`; reasoning effort is the dimension that varies (high/xhigh).
 
 ## Anti-Patterns
 - Do NOT create README.md, documentation files, or CHANGELOG entries
@@ -1715,15 +1743,15 @@ Available profiles in `~/.codex/config.toml` — use when spawned with `--profil
 
 | Profile | Model | Reasoning | Use For |
 |---------|-------|-----------|---------|
-| `coder` | gpt-5.4 | high | Standard code generation |
-| `maestro` | gpt-5.4 | xhigh | Direct Codex runtime orchestration |
-| `reviewer` | gpt-5.4 | high | Deep code review, security audit |
-| `architect` | o3 | high | Architecture, complex reasoning |
-| `fast` | gpt-5.4 | high | Quick edits, formatting, docs |
+| `coder` | gpt-5.5 | high | Standard code generation |
+| `maestro` | gpt-5.5 | xhigh | Direct Codex runtime orchestration |
+| `reviewer` | gpt-5.5 | high | Deep code review, security audit |
+| `architect` | gpt-5.5 | xhigh | Architecture, complex reasoning |
+| `fast` | gpt-5.5 | high | Quick edits, formatting, docs |
 
 - Claude sessions keep Claude Opus as Maestro.
 - Direct Codex sessions should use `bash .agents/tools/codex-maestro.sh` or `codex --profile maestro`.
-- All profiles use `gpt-5.4`; reasoning effort is the dimension that varies (high/xhigh).
+- All profiles use `gpt-5.5`; reasoning effort is the dimension that varies (high/xhigh).
 PROFILEPATCH
       patched=true
     fi
@@ -1746,7 +1774,7 @@ VAULTPATCH
 - Claude sessions keep Claude Opus as Maestro.
 - Direct Codex sessions should use `bash .agents/tools/codex-maestro.sh` or `codex --profile maestro`.
 - The `maestro` profile is runtime-specific and does not redefine `coder`, `reviewer`, `architect`, or `fast`.
-- All profiles use `gpt-5.4`; reasoning effort is the dimension that varies (high/xhigh).
+- All profiles use `gpt-5.5`; reasoning effort is the dimension that varies (high/xhigh).
 RUNTIMEPATCH
       patched=true
     fi

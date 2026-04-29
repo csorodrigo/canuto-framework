@@ -61,36 +61,6 @@ curl -k -H "Authorization: Bearer YOUR_API_KEY" https://127.0.0.1:27124/
 
 You should get a JSON response with vault info.
 
-## Optional Gemini MCP
-
-Gemini MCP support is optional and adds a read-only consultant for long-context, multimodal, and bulk classification workflows. It does not require active OAuth for framework smoke checks.
-
-### Install gemini-cli
-
-```bash
-npm install -g @google/gemini-cli
-```
-
-### Authenticate
-
-```bash
-gemini auth login
-```
-
-This starts the OAuth flow in your browser.
-
-### Register the Gemini MCP
-
-```bash
-claude mcp add gemini -- npx -y gemini-mcp-tool
-```
-
-### Verify Gemini MCP
-
-```bash
-claude mcp list | grep gemini
-```
-
 ## Available MCP Tools
 
 | Tool | Purpose |
@@ -170,7 +140,7 @@ Observed locally on 2026-04-21 (smoke in install.sh `--doctor`):
 |------|-------------------|---------------------|-------|
 | `codex` interactive | yes | yes | needs TTY to smoke manually |
 | `codex exec "..."` | **yes** | **yes** | confirmed — `BatchSpanProcessor` ran, transient `BrokenPipe` during collector warmup |
-| `codex mcp-server` (via `mcp__codex-coder__spawn_agent`) | **not yet verified** | likely partial | tracked upstream at openai/codex#12913; mitigation: Claude's `claude_code.mcp_server_connection` + `claude_code.tool` spans cover scope/duration/success from the orchestrator side |
+| `codex mcp-server` (via `codex exec --profile coder`) | **not yet verified** | likely partial | tracked upstream at openai/codex#12913; mitigation: Claude's `claude_code.mcp_server_connection` + `claude_code.tool` spans cover scope/duration/success from the orchestrator side |
 
 Re-run `.agents/tools/observability-smoke.sh` after any Codex upgrade to revalidate.
 

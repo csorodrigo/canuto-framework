@@ -32,26 +32,32 @@ Generates a `project-index.json` (deep scan of the current project) and an `onbo
 
 ## What It Does
 
-### Phase 0 (NEW): Gemini pré-digest of repo
+### Phase 0: Codex pre-digest of repo (v2.0, 2026-04-29)
 
-Before the Opus-driven phases below, route the raw "read the whole repo" step to Gemini
-to save ~70-90% of Opus tokens (see `gemini-routing.md`):
+Before the Opus-driven phases below, route the raw "read the whole repo" step
+to Codex to save Opus tokens. Codex has filesystem access via its native MCPs
+(ast-grep, etc), so it can walk the repo cheaply:
 
+```bash
+codex exec --color never --profile coder \
+  -s read-only --skip-git-repo-check \
+  -o "/tmp/canuto-digest-$(date +%Y-%m-%d).md" \
+  "Walk this repo. Output a dense ~100-line digest covering: structure,
+   stack, entry points, module boundaries. Highlight anything unusual
+   (monorepo layout, multi-runtime, custom build). Use ast-grep MCP if
+   useful. Output markdown."
+
+# Move result to project digest dir
+mv "/tmp/canuto-digest-$(date +%Y-%m-%d).md" \
+   ".agents/tmp/repo-digest-$(date +%Y-%m-%d).md"
 ```
-mcp__gemini__ask-gemini({
-  prompt: "@./ Summarize repo structure, stack, entry points, module boundaries in a
-           dense ~100-line digest. Highlight anything unusual (monorepo layout,
-           multi-runtime, custom build). Output markdown.",
-  model: "gemini-3.1-pro-preview"
-})
-→ write to .agents/tmp/gemini-digest-YYYY-MM-DD.md
-```
 
-Then phases 1-2 consume the digest. Claude Opus only reads the digest + the specific
-files Gemini flagged as "unusual" — never the whole tree.
+Then phases 1-2 consume the digest. Claude Opus only reads the digest + the
+specific files Codex flagged as "unusual" — never the whole tree.
 
-Gemini gotchas still apply: serialize calls, copy `@file` into workspace first if
-you need multimodal. See `.agents/skills/gemini-routing.md`.
+> Historical note (2026-04-29): previously used Gemini 3.1-pro-preview's
+> `@folder` long-context for this. Gemini was removed; Codex+ast-grep covers
+> the same use case with one fewer provider dependency.
 
 ### Phase 1: Deep Project Scan → `project-index.json`
 

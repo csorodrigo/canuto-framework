@@ -31,7 +31,7 @@ This release keeps the v1.6 Obsidian-native runtime and adds a sharper learning-
     security-practices.md     — Rules for secrets, env vars, and security hygiene.
     git-workflow.md           — Branching, commits, and PR conventions.
     plugin-system.md          — How to create and manage opt-in plugins.
-    multi-provider.md         — How Maestro delegates to Claude, Codex, GLM.
+    multi-provider.md         — How Maestro delegates to Claude (tier-1) and Codex (tier-2).
     metrics.md                — Quality, velocity, compliance, and rework tracking.
     squads.md                 — Parallel workstreams for larger projects.
     pr-description.md         — Auto-generate PR descriptions after review.
@@ -107,7 +107,7 @@ Maestro → Architect → Coder → Tester → Reviewer
 ## Runtime Maestro
 
 - Claude session: Claude Opus remains the Maestro and keeps the existing orchestration flow.
-- Direct Codex session: launch `bash .agents/tools/codex-maestro.sh` and Codex becomes the Maestro using `~/.codex/config.toml` profile `maestro` (target `gpt-5.4` with reasoning: xhigh).
+- Direct Codex session: launch `bash .agents/tools/codex-maestro.sh` and Codex becomes the Maestro using `~/.codex/config.toml` profile `maestro` (target `gpt-5.5` with reasoning: xhigh).
 - Cross-runtime handoff: `context-package.md` now carries a persisted handoff envelope (`task_id`, `goal`, `constraints`, `done_definition`, `thread_id`) into the vault so Claude and Codex resume with less reread.
 
 ## Quick Start

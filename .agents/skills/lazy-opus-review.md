@@ -56,7 +56,7 @@ N >= 9? → Accept. Skim git diff (30 seconds). Log "[Lazy-Review] Auto-accepted
   ↓
 N >= 7? → Quick review. Read diff + check UNCERTAIN_AREAS only.
   ↓
-N >= 4? → Full review. Read all changes. Optionally trigger codex-reviewer (reviewer profile, `gpt-5.4` high).
+N >= 4? → Full review. Read all changes. Optionally trigger codex-reviewer (reviewer profile, `gpt-5.5` high).
   ↓
 N < 4? → Reject. Re-prompt with more context or escalate.
 ```
@@ -98,40 +98,43 @@ Trends: if average confidence drops below 6, review the prompt templates.
 
 ---
 
-## Gemini integration — Diff-router by PR type (FASE 2a+)
+## Diff-router by PR type (v2.0, 2026-04-29)
 
-O reviewer primary é Codex, mas roteamos um subset de diffs pro Gemini quando o
-perfil de review se beneficia de long-context ou multimodal:
+O reviewer primary é Codex. Para diffs maiores ou multimodais, escalonamos
+para profile com reasoning mais profundo (architect, xhigh) ou usamos Claude
+diretamente para multimodal (Claude tem multimodal nativo):
 
 | Tipo de diff | Reviewer primary | Reviewer secundário |
 |---|---|---|
-| Small (<100 linhas, 1-3 arquivos) | Codex reviewer | — |
-| Large (>500 linhas, múltiplos módulos) | **Gemini 3.1-pro-preview** (long-context vê repo inteiro) | Codex reviewer (bugs exec) |
-| UI / frontend | **Gemini multimodal** (lê screenshots antes/depois) | Opus pra design taste |
-| Refactor / renomeação | **Gemini** (long-context vê todos call sites) | — |
-| Security (auth, crypto, payment) | **Triple:** Codex + Gemini + Opus (obrigatório) | — |
-| Config / infra | Codex reviewer | Opus pra blast-radius decisions |
+| Small (<100 linhas, 1-3 arquivos) | `codex exec --profile reviewer` | — |
+| Large (>500 linhas, múltiplos módulos) | `codex exec --profile architect` (xhigh, deeper reasoning) | Claude Opus pra blast-radius |
+| UI / frontend | Claude Opus (native multimodal) | `codex exec --profile reviewer` (logic) |
+| Refactor / renomeação | `codex exec --profile architect` (xhigh, sees call sites) | — |
+| Security (auth, crypto, payment) | **Dual:** Claude self-review + `codex exec --profile reviewer` (obrigatório) | optional `codex exec --profile architect` (xhigh) for huge surface |
+| Config / infra | `codex exec --profile reviewer` | Claude Opus pra blast-radius |
 
-### Gemini call pattern (big diff)
-```
-mcp__gemini__ask-gemini({
-  prompt: "@./ Review this diff focusing on: [cross-module impacts, broken
-           contracts, migration safety, backwards compat]. --- CHANGES START ---
-           <git diff> --- CHANGES END ---",
-  model: "gemini-3.1-pro-preview"
-})
-```
-
-### Gemini call pattern (UI diff com screenshots)
-```
-# /browse ou /gstack capturam before.png e after.png
-cp ... .context/before.png .context/after.png
-mcp__gemini__ask-gemini({
-  prompt: "@.context/before.png @.context/after.png Compare layout, spacing,
-           a11y, hierarquia visual. Liste regressões com severidade.",
-  model: "gemini-3.1-pro-preview"
-})
-rm .context/before.png .context/after.png
+### Reviewer call pattern (any diff size)
+```bash
+git diff > /tmp/canuto-review-diff-$$.patch
+codex exec --color never --profile reviewer \
+  -s read-only --skip-git-repo-check \
+  -o /tmp/canuto-review-out-$$.md \
+  "Review the diff at /tmp/canuto-review-diff-$$.patch. Focus: bugs, edge cases, contracts, migration safety, backwards compat."
 ```
 
-Ver `.agents/skills/gemini-routing.md` pros gotchas.
+### Architect-profile call (large diff or refactor)
+```bash
+codex exec --color never --profile architect \
+  -s read-only --skip-git-repo-check \
+  -o /tmp/canuto-review-arch-$$.md \
+  "Review the diff at /tmp/canuto-review-diff-$$.patch with deep reasoning. Walk the repo to verify call sites; check cross-module impacts, broken contracts."
+```
+
+### UI diff with screenshots
+For visual review, share screenshots inline with Claude (native multimodal).
+For logic review of the same diff, spawn `codex exec --profile reviewer` in
+parallel — get both perspectives.
+
+> Historical note (2026-04-29): previously routed UI/large/refactor diffs to
+> Gemini 3.1-pro-preview. Gemini was removed from the framework; xhigh reasoning
+> + Claude multimodal cover the same surface with one fewer dependency.

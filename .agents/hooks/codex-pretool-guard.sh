@@ -49,60 +49,42 @@ reviewer_cmd() {
   codex_run_reviewer "$review_dir" "$schema_file" "$output_file" "$prompt_file" "$used_file" "$error_file"
 }
 
-handle_codex_spawn() {
-  local prompt_blob=""
-  local prompt_count=0
+handle_codex_cli_command() {
+  local command_text="$1"
+  local command_size=${#command_text}
   local context_hint=false
   local package_path=""
-  local package_count=0
+  local codex_exec_count=0
 
-  if [ "$TOOL_NAME" = "mcp__codex-coder__spawn_agent" ]; then
-    prompt_blob=$(printf '%s' "$HOOK_INPUT" | jq -r '.tool_input.prompt // ""')
-    prompt_count=${#prompt_blob}
-  else
-    prompt_blob=$(printf '%s' "$HOOK_INPUT" | jq -r '[.tool_input.agents[].prompt // ""] | join("\n\n")')
-    prompt_count=${#prompt_blob}
+  if ! printf '%s' "$command_text" | grep -Eq 'codex[[:space:]]+exec'; then
+    return 0
   fi
 
-  if [ "$TOOL_NAME" = "mcp__codex-coder__spawn_agent" ]; then
-    package_path=$(printf '%s' "$prompt_blob" | grep -oE '\.agents/tmp/context-package[^[:space:]]*\.md' | head -1 || true)
-    if [ -n "$package_path" ] && codex_context_package_valid "$ROOT_DIR/$package_path"; then
-      context_hint=true
-    fi
-  else
-    # Check each agent's prompt individually to avoid one agent's package covering others.
-    local total_agent_count=0
-    while IFS= read -r agent_prompt; do
-      total_agent_count=$((total_agent_count + 1))
-      local agent_pkg
-      agent_pkg=$(printf '%s' "$agent_prompt" | grep -oE '\.agents/tmp/context-package[^[:space:]]*\.md' | head -1 || true)
-      if [ -n "$agent_pkg" ]; then
-        package_count=$((package_count + 1))
-        if ! codex_context_package_valid "$ROOT_DIR/$agent_pkg"; then
-          block_with_message "Codex delegation blocked: agent $total_agent_count context package '$agent_pkg' is missing, stale, or invalid."
-        fi
-      fi
-    done < <(printf '%s' "$HOOK_INPUT" | jq -r '.tool_input.agents[].prompt // ""')
-    if [ "$package_count" -gt 0 ]; then
-      context_hint=true
-    fi
-    # Block if some but not all agents have context packages (mixed batch).
-    if [ "$total_agent_count" -gt 0 ] && [ "$package_count" -gt 0 ] && [ "$package_count" -lt "$total_agent_count" ]; then
-      block_with_message "Codex delegation blocked: only $package_count of $total_agent_count agents have scoped context packages. Every agent in a parallel spawn must reference its own context package."
-    fi
+  if ! printf '%s' "$command_text" | grep -Eq -- '--profile(=|[[:space:]]+)(coder|fast)'; then
+    return 0
   fi
 
-  if [ "$TOOL_NAME" = "mcp__codex-coder__spawn_agents_parallel" ] && [ "$context_hint" = false ]; then
-    block_with_message "Codex delegation blocked: parallel spawn requires scoped context packages in .agents/tmp/. Generate them first with .agents/tools/codex-context-package.sh."
+  while IFS= read -r package_path; do
+    [ -n "$package_path" ] || continue
+    if codex_context_package_valid "$ROOT_DIR/$package_path"; then
+      context_hint=true
+    else
+      block_with_message "Codex delegation blocked: context package '$package_path' is missing, stale, or invalid."
+    fi
+  done < <(printf '%s' "$command_text" | grep -oE '\.agents/tmp/context-package[^[:space:]]*\.md' || true)
+
+  codex_exec_count=$(printf '%s' "$command_text" | grep -oE 'codex[[:space:]]+exec' | wc -l | tr -d '[:space:]')
+  if [ "${codex_exec_count:-0}" -gt 1 ] && [ "$context_hint" = false ]; then
+    block_with_message "Codex delegation blocked: parallel codex exec requires scoped context packages in .agents/tmp/. Generate them first with .agents/tools/codex-context-package.sh."
   fi
 
   # C6: Basic prompt injection guard
-  if printf '%s' "$prompt_blob" | grep -qiE '(ignore (previous|all|above) instructions|you are now|system prompt override|disregard.*instructions|new persona|forget everything)'; then
+  if printf '%s' "$command_text" | grep -qiE '(ignore (previous|all|above) instructions|you are now|system prompt override|disregard.*instructions|new persona|forget everything)'; then
     block_with_message "Codex delegation blocked: prompt contains patterns resembling injection. Review the prompt content before delegating."
   fi
 
-  if [ "$prompt_count" -gt 240 ] && [ "$context_hint" = false ]; then
-    block_with_message "Codex delegation blocked: missing context package for a medium/large task. Generate .agents/tmp/context-package.md before calling spawn_agent."
+  if [ "$command_size" -gt 240 ] && [ "$context_hint" = false ]; then
+    block_with_message "Codex delegation blocked: missing context package for a medium/large task. Generate .agents/tmp/context-package.md before calling codex exec --profile coder."
   fi
 }
 
@@ -277,7 +259,7 @@ EOF
 
   local review_ok=false
   if [ "$review_tier" = "fast" ]; then
-    # Fast review: use gpt-5.4 with low reasoning instead of reviewer profile
+    # Fast review: use gpt-5.5 with low reasoning instead of reviewer profile
     local fast_cmd=(codex exec -C "$ROOT_DIR" -s read-only --skip-git-repo-check --ephemeral --profile fast -c 'model_reasoning_effort="low"' --output-schema "$schema_file" -o "$output_file" -)
     if "${fast_cmd[@]}" < "$prompt_file" >/dev/null 2>&1; then
       review_ok=true
@@ -437,11 +419,10 @@ EOF
 }
 
 case "$TOOL_NAME" in
-  mcp__codex-coder__spawn_agent|mcp__codex-coder__spawn_agents_parallel|mcp__codex-maestro__spawn_agent|mcp__codex-maestro__spawn_agents_parallel)
-    handle_codex_spawn
-    ;;
   Bash)
-    handle_commit_gate "$(printf '%s' "$HOOK_INPUT" | jq -r '.tool_input.command // ""')"
+    command_text="$(printf '%s' "$HOOK_INPUT" | jq -r '.tool_input.command // ""')"
+    handle_codex_cli_command "$command_text"
+    handle_commit_gate "$command_text"
     ;;
 esac
 

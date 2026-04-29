@@ -39,42 +39,43 @@ evals:
 
 **Not for:**
 - XS/S tasks (overhead not justified)
-- When Codex MCP is not configured (degrade gracefully, continue without)
+- When `codex` CLI is not in PATH (degrade gracefully, continue without)
 - Implementation tasks (Codex reviews plans, doesn't code)
 
 **Runtime flag:** `CO_REVIEW=false` disables automatic trigger for M/L tasks.
 
-## Prerequisites
+## Prerequisites (v2.0, 2026-04-29)
 
-Two Codex MCP servers must be configured (global `settings.json`):
+Codex CLI must be installed and authenticated:
 
 ```bash
-# Recommended: let install.sh configure these wrapper-backed MCPs
-bash install.sh --repair
+# Recommended: let install.sh handle setup
+bash install.sh --doctor
 ```
 
-Verify: `claude mcp list` → both should show `✓ Connected`.
+Verify: `codex --version` returns OK; `~/.codex/config.toml` has 5 profiles.
 
-### MCP Tool Mapping
+### Profile-to-Mode Mapping
 
-| Mode | MCP Server | Tool | Model |
-|------|-----------|------|-------|
-| co-brainstorm | codex-coder | `spawn_agents_parallel` | gpt-5.4 (high) |
-| co-plan | codex-reviewer | `spawn_agent` | `reviewer` profile (`gpt-5.4`, reasoning: high) |
-| co-validate | codex-reviewer | `spawn_agent` | `reviewer` profile (`gpt-5.4`, reasoning: high) |
+| Mode | Profile | Model | Invocation |
+|------|---------|-------|------------|
+| co-brainstorm | coder | gpt-5.5 (high) | parallel `codex exec --profile coder` × N |
+| co-plan | reviewer | gpt-5.5 (high) | `codex exec --profile reviewer` |
+| co-validate | reviewer | gpt-5.5 (high) | `codex exec --profile reviewer` |
+| escalation (long-context, deeper reasoning) | architect | gpt-5.5 (xhigh) | `codex exec --profile architect` |
 
 ### Backend Preference (fallback chain)
 
 ```
-1. codex-reviewer MCP (`spawn_agent`, one-shot) — REVIEWS / CO-PLAN / CO-VALIDATE
-2. codex-coder MCP (gpt-5.4 (high), parallel) — CO-BRAINSTORM
-3. CCB `ask codex` (only with active Codex session, visible panes, anchoring risk) — FALLBACK
-4. Claude-only review — LAST RESORT
+1. codex exec --profile <reviewer|coder|architect> (CLI, default for all modes)
+2. CCB `ask codex` (only with active Codex CCB session, visible panes, anchoring risk) — FALLBACK
+3. Claude-only review — LAST RESORT
 ```
 
 ### Alternative: CCB Backend
 
-If MCPs are unavailable, co-review falls back to CCB's `ask` CLI:
+If `codex` CLI is unavailable but CCB plugin is installed, co-review falls back
+to CCB's `ask` CLI:
 
 ```bash
 ask codex "<co-review prompt>"
@@ -84,6 +85,11 @@ pend <task-id>  # retrieve when ready
 **Important**:
 - CCB fallback only works when a Codex CCB session is already active for this workspace.
 - CCB panes are visible — risk of anchoring bias. Do not look at the Codex pane until your own review is complete.
+
+> Historical note (2026-04-29): previously this skill required `codex-coder`
+> and `codex-reviewer` MCP servers. Those wrappers were retired; CLI direct
+> invocation has 10-35% lower token overhead. Outputs flow through
+> `--output-last-message <file>` to keep stdout clean.
 
 ---
 
@@ -105,20 +111,20 @@ TN+2: Compare perspectives, synthesize best of both
 For detailed prompts, output formats, and examples, read `references/modes.md`.
 
 ### Mode 1: /co-brainstorm
-1. `mcp__codex-coder__spawn_agents_parallel` → 3 Codex agents brainstorm independently (gpt-5.4 (high))
+1. `(parallel codex exec --profile coder)` → 3 Codex agents brainstorm independently (gpt-5.5 (high))
 2. Main agent brainstorms independently (3-5 approaches)
 3. After all complete → collect Codex ideas
 4. Compare: convergent ideas (high confidence), unique ideas from each, recommend best
 
 ### Mode 2: /co-plan
-1. `mcp__codex-reviewer__spawn_agent` → Codex reviewer creates an implementation plan independently
+1. `codex exec --profile reviewer` → Codex reviewer creates an implementation plan independently
 2. Architect creates its own plan (standard flow)
 3. After both complete → compare Claude's plan with the one-shot reviewer response
 4. Compare: shared steps (validated), unique steps (gaps?), different approaches (trade-offs)
 
 ### Mode 3: /co-validate (auto for M/L)
 1. Read the plan file
-2. `mcp__codex-reviewer__spawn_agent` → Codex reviewer reviews as staff engineer
+2. `codex exec --profile reviewer` → Codex reviewer reviews as staff engineer
 3. Main agent conducts independent review
 4. After both complete → compare the independent review with the one-shot reviewer response
 5. Compare: convergent issues (fix these), unique issues from each (evaluate)
@@ -137,11 +143,9 @@ For detailed prompts, output formats, and examples, read `references/modes.md`.
 
 ## Graceful Degradation
 
-If Codex MCP servers are not configured or fail:
-- Log: `[Co-Review] codex-reviewer MCP not available. Checking fallbacks...`
-- Try `codex exec --profile reviewer` as the first degraded reviewer path.
-  - Log: `[Co-Review] Using codex exec --profile reviewer (degraded path).`
-- If no reviewer path is available, try CCB only when a Codex session is active.
+If `codex` CLI is missing or fails:
+- Log: `[Co-Review] codex CLI failed (<reason>). Checking fallbacks...`
+- Try CCB `ask codex` only when a Codex session is active for this workspace.
   - Log: `[Co-Review] Using CCB ask codex as fallback. Avoid looking at Codex pane until your review is complete.`
 - If CCB also unavailable: fall back to Claude-only review.
   - Log: `[Co-Review] No external reviewer available. Continuing with single-perspective review.`
@@ -161,11 +165,13 @@ If Codex MCP servers are not configured or fail:
 ### Flow
 1. Before commit, collect `git diff --staged`
 2. If diff touches security-sensitive files → also trigger `/security-gate`
-3. Send to `mcp__codex-reviewer__spawn_agent` (reviewer profile):
+3. Send to `codex exec --profile reviewer` (reviewer profile):
 
 ```
-mcp__codex-reviewer__spawn_agent({
-  prompt: `
+codex exec --color never --profile reviewer \
+  -s read-only --skip-git-repo-check \
+  -o .agents/tmp/codex/co-review-validate.md \
+  "$(cat <<'PROMPT'
 [PRE-COMMIT REVIEW]
 Review this staged diff before commit. Focus on:
 - Bugs, logic errors, edge cases
@@ -178,8 +184,8 @@ Review this staged diff before commit. Focus on:
 --- CHANGES END ---
 
 Verdict: COMMIT (clean) | HOLD (issues found). If HOLD, list issues with file:line.
-`
-})
+PROMPT
+)"
 ```
 
 4. **COMMIT** verdict → proceed with commit
@@ -241,10 +247,11 @@ If the compressed diff exceeds 5000 lines, split into per-file reviews.
 
 ## Session Continuity
 
-The current `codex-reviewer` MCP wrapper is one-shot. It does **not** return `threadId` and does not support `codex-reply`.
+`codex exec --profile reviewer` is one-shot per invocation. For multi-turn,
+re-invoke with extended context inline.
 
 Persist instead:
-- the generated markdown review in `.agents/tmp/codex/`
+- the generated markdown review via `--output-last-message <path>` in `.agents/tmp/codex/`
 - the JSONL audit trail in `codex-review-events.jsonl`
 - any higher-level handoff metadata you want in the vault
 

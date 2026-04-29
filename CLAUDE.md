@@ -15,15 +15,14 @@ You are my coding orchestrator for this repository.
 
 ## Providers
 - primary: claude (Opus 4.7, tier-1 orchestration)
-- coder: codex (`gpt-5.4`, reasoning: high, coder profile)
-- reviewer: codex (`gpt-5.4`, reasoning: high, reviewer profile)
-- contextualizer: gemini (`gemini-3.1-pro-preview`, long-context `@folder`)
-- multimodal: gemini (`gemini-3.1-pro-preview`, screenshots / OCR)
-- brainstorm: gemini (`gemini-3.1-pro-preview`, SCAMPER / lateral)
-- bulk-classifier: gemini (`gemini-3.1-flash-lite-preview`, separate quota)
+- coder: codex (`gpt-5.5`, reasoning: high) — invoked via CLI: `codex exec --color never -q --profile coder`
+- reviewer: codex (`gpt-5.5`, reasoning: high) — invoked via CLI: `codex exec --color never -q --profile reviewer`
+- architect: codex (`gpt-5.5`, reasoning: xhigh) — invoked via CLI: `codex exec --color never -q --profile architect`
 
-See `.agents/skills/cost-routing.md` for the full routing matrix and
-`.agents/skills/gemini-routing.md` for Gemini-specific gotchas.
+**Why CLI over MCP**: 10-35% lower token overhead per call (MCP schema overhead amortizes
+only after ~50 calls/session, which is rare). See `.agents/skills/cost-routing.md`.
+Canonical model reference: `.agents/config/models.yaml` (human-readable; keep
+`install.sh` profile values synced manually).
 
 ## Project Rules
 - Before finalizing any plan, always interview the user in detail using AskUserQuestion about implementation choices, UI/UX decisions, trade-offs, and concerns. Never assume — always ask first.

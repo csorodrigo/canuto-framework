@@ -186,28 +186,30 @@ The `--connect` flag reuses the session you already have open instead of launchi
 
 ---
 
-## Gemini multimodal integration
+## Multimodal analysis (v2.0, 2026-04-29)
 
-Este skill analisa screenshots ou consome mídia visual. Use **Gemini 3.1-pro-preview**
-como analisador visual primário — OCR + layout understanding são superiores ao que
-Claude isolado faz com imagens (POC 2026-04-17 validou coerência).
+Este skill analisa screenshots ou consome mídia visual. Use **Claude (multimodal
+nativo)** como analisador visual primário — Claude Opus 4.7 lê imagens diretamente.
 
 ```
 # 1. Capture via /browse, /gstack ou Playwright (Codex) — nunca screencapture
-#    automático sem mask (risco PII — ver gemini-routing.md)
-# 2. Copie a imagem pra dentro do workspace (gemini-cli bloqueia /tmp)
-cp /path/to/shot.png .context/shot.png
+#    automático sem mask (risco PII)
 
-# 3. Analise via Gemini multimodal
-mcp__gemini__ask-gemini({
-  prompt: "@.context/shot.png [análise específica — a11y, spacing, hierarquia,
-           overflow, etc.]. Output em markdown estruturado.",
-  model: "gemini-3.1-pro-preview"
-})
+# 2. Compartilhe o screenshot inline na conversa Claude OU referencie o path
+#    Claude lê a imagem diretamente e pode analisar a11y, spacing, hierarquia,
+#    overflow, regressões visuais, etc. Output em markdown estruturado.
 
-# 4. Delete imediatamente
-rm .context/shot.png
+# 3. Para análise objetiva da logic do componente em paralelo:
+codex exec --color never --profile reviewer \
+  -s read-only --skip-git-repo-check \
+  -o /tmp/canuto-component-review-$$.md \
+  "Review the component at <path>. Focus: state management, accessibility
+   (semantic HTML, ARIA), performance (re-renders, memoization)."
 ```
 
-Gemini faz **ver** (OCR objetivo). Claude Opus faz **julgar** (taste).
-Ver `.agents/skills/gemini-routing.md` pros gotchas.
+Claude faz **ver + julgar** (multimodal nativo). Codex profile reviewer faz
+**analisar lógica do componente**.
+
+> Historical note (2026-04-29): previously delegated screenshot analysis to
+> Gemini 3.1-pro-preview multimodal. Gemini foi removido; multimodal nativo
+> do Claude cobre o mesmo use case com uma dependência a menos.

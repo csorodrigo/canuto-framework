@@ -6,7 +6,7 @@ version: 1.0.0
 lastUpdated: 2026-03-30
 shortDescription: >
   Delegates codebase reading to Codex instead of Opus. Codex reads source files
-  and generates digests via spawn_agent. Opus receives only the summary. 90% savings.
+  and generates digests via `codex exec`. Opus receives only the summary. 90% savings.
 usedBy: [contextualizer, maestro]
 evals:
   - prompt: "load context for planning the auth feature"
@@ -39,8 +39,10 @@ src/auth/, src/models/, src/routes/
 ### 2. Spawn Codex Context Loader
 
 ```
-mcp__codex-coder__spawn_agent({
-  prompt: `
+codex exec --color never --profile coder \
+  -s workspace-write --skip-git-repo-check \
+  -o /tmp/codex-context-loader-$$.md \
+  "$(cat <<'PROMPT'
 You are a context loader. Read the following directories and generate
 compact digests for each. Write the output to .agents/tmp/context-digests.md.
 
@@ -66,8 +68,8 @@ compact digests for each. Write the output to .agents/tmp/context-digests.md.
 - Do NOT include comments from source files
 - Do NOT include test files unless specifically requested
 - Keep each digest under 60 lines
-`
-})
+PROMPT
+)"
 ```
 
 ### 3. Opus Reads Digests
@@ -110,5 +112,5 @@ Over 5 sessions/day × 20 days/month = ~$72/month savings.
 
 ## Graceful Degradation
 
-- Codex MCP unavailable → Opus reads files directly (standard behavior)
+- Codex CLI unavailable → Opus reads files directly (standard behavior)
 - Log: `[Context-Loader] Codex unavailable, falling back to direct reads`

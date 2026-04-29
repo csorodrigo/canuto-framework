@@ -56,9 +56,12 @@ git diff --staged  # or git diff main...HEAD for full branch diff
 
 ### 3. Send to Reviewer Security Review
 
-```
-mcp__codex-reviewer__spawn_agent({
-  prompt: `
+```bash
+echo "$diff" > /tmp/canuto-security-diff-$$.patch
+codex exec --color never --profile reviewer \
+  -s read-only --skip-git-repo-check \
+  -o /tmp/canuto-security-result-$$.md \
+  "$(cat <<'PROMPT'
 [SECURITY REVIEW REQUEST]
 You are a senior security engineer performing a pre-merge security audit.
 Use maximum reasoning depth for this review.
@@ -125,8 +128,11 @@ Use maximum reasoning depth for this review.
 }
 
 FAIL if any critical issue found. WARN if only warnings. PASS if clean.
-`
-})
+
+The diff is at /tmp/canuto-security-diff-$$.patch — read it and review.
+PROMPT
+)"
+# Read result via: cat /tmp/canuto-security-result-$$.md
 ```
 
 ### 4. Process Verdict
@@ -158,7 +164,7 @@ The security gate feeds data to CSO's trend tracking.
 
 ## Graceful Degradation
 
-- reviewer MCP unavailable → Claude performs security review (less thorough)
+- Codex reviewer CLI unavailable → Claude performs security review (less thorough)
 - No diff available → scan full files in changed list
 - Log: `[Security] ⚠️ Using Claude fallback (reviewer path unavailable)`
 

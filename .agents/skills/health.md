@@ -2,20 +2,19 @@
 skill: health
 trigger: "/health, or when the user asks if providers/MCPs are working"
 persona: maestro
-version: 1.0.0
-lastUpdated: 2026-04-18
+version: 2.0.0
+lastUpdated: 2026-04-29
 shortDescription: >
-  Unified health check across all providers (Claude, Codex coder/reviewer,
-  Gemini) and MCP servers. Aggregates fragmented checks into a single
-  verdict + 0-10 score. Different from /context-health which scores active
-  context quality.
+  Unified health check across providers (Claude, Codex CLI) and MCP servers.
+  Aggregates fragmented checks into a single verdict + 0-10 score. Different
+  from /context-health which scores active context quality.
 usedBy: [maestro]
 evals:
   - prompt: "/health"
     should_trigger: true
   - prompt: "check all providers"
     should_trigger: true
-  - prompt: "is gemini working?"
+  - prompt: "is codex working?"
     should_trigger: true
   - prompt: "are the mcps connected?"
     should_trigger: true
@@ -25,9 +24,9 @@ evals:
 
 ## Purpose
 
-Verifica em 1 comando se **todos os providers e MCPs do Canuto estão operacionais**.
-Hoje a verificação é fragmentada (`codex-health-check.sh`, `gemini-smoke-check.sh`,
-`claude mcp list`) — esta skill unifica e produz um veredito único.
+Verifica em 1 comando se **providers e MCPs do Canuto estão operacionais**.
+Hoje a verificação é fragmentada (`codex-health-check.sh`, `claude mcp list`)
+— esta skill unifica e produz um veredito único.
 
 **Distinção crítica:** `/health` mede **infra** (provider está acessível?).
 `/context-health` mede **qualidade do contexto da sessão atual** (cache, drift, repetição).
@@ -40,7 +39,7 @@ Skills complementares — não confundir.
 **Triggers:**
 - Usuário escreve `/health`, `/check-all`, `/mounted`, `/status`
 - Usuário pergunta "tá tudo conectado?", "is X working?", "provider health"
-- Antes de iniciar tasks M/L que dependem de Codex ou Gemini
+- Antes de iniciar tasks M/L que dependem de Codex
 - Após `claude mcp list` mostrar algum servidor com erro
 - Em sessão nova num workspace que não foi tocado em > 1 semana
 
@@ -48,20 +47,18 @@ Skills complementares — não confundir.
 - Qualidade do contexto da sessão atual → `/context-health`
 - Custo / consumo de tokens → `smart-token-metering`
 - Diagnóstico profundo de Codex isolado → `bash .agents/tools/codex-health-check.sh --full`
-- Diagnóstico profundo de Gemini isolado → `bash .agents/tools/gemini-smoke-check.sh`
 
 ---
 
-## The 6 health signals
+## The 5 health signals
 
 | Signal | What it checks | Healthy | Degraded | Source |
 |---|---|---|---|---|
 | **Claude session** | Você está respondendo (tautológico — sempre PASS quando este skill roda) | running | n/a | the fact `/health` returned |
-| **codex-coder MCP** | `mcp__codex-coder__spawn_agent` registrado e o handshake funciona | ✓ Connected | erro de conexão ou ausente | `claude mcp list \| grep "codex-coder "` |
-| **codex-reviewer MCP** | `mcp__codex-reviewer__spawn_agent` registrado e funciona | ✓ Connected | erro ou ausente | `claude mcp list \| grep "codex-reviewer "` |
-| **Gemini MCP** | `mcp__gemini__*` registrado, ping responde | ✓ Connected + ping echo | erro de OAuth, quota, ou ausente | `claude mcp list \| grep "gemini "` + `mcp__gemini__ping` |
+| **Codex CLI** | `codex --version` retorna OK + auth válida + canonical model está nos profiles | version + profiles em `gpt-5.5` | versão antiga, auth quebrada, ou drift de modelo | `codex --version`, `codex exec --profile coder ... 'Reply OK'` |
+| **Codex profiles** | `~/.codex/config.toml` tem 5 profiles (coder/reviewer/architect/fast/maestro) com modelo canônico | 5 profiles, todos canonical | profiles missing ou drift de model | `bash .agents/tools/codex-health-check.sh --smoke` |
 | **Outros MCPs do projeto** | Cada server em `.mcp.json` (project) e `~/.claude/settings.json` (user) está ✓ Connected | todos verdes | algum em erro | `claude mcp list` (cobertura completa) |
-| **Smoke check estrutural** | Skills, hooks e refs estão no lugar (Codex + Gemini) | ambos PASS | 1 ou 2 FAIL | `bash .agents/tools/codex-health-check.sh --smoke` + `bash .agents/tools/gemini-smoke-check.sh` |
+| **Smoke check estrutural** | Skills, hooks e refs estão no lugar | PASS | FAIL ou WARN | `bash .agents/tools/codex-health-check.sh --smoke` |
 
 Sinais ausentes (script não está no projeto, MCP não está configurado neste setup) → marcar `unknown`, não inventar.
 
@@ -74,16 +71,16 @@ Cada sinal vale 0-10. Score composto:
 ```text
 health_score =
   claude_session_score      * 0.05  +   # tautológico, peso baixo
-  codex_coder_score         * 0.20  +
-  codex_reviewer_score      * 0.20  +
-  gemini_mcp_score          * 0.20  +
-  other_mcps_score          * 0.15  +
-  smoke_check_score         * 0.20
+  codex_cli_score           * 0.30  +
+  codex_profiles_score      * 0.20  +
+  other_mcps_score          * 0.20  +
+  smoke_check_score         * 0.25
 ```
 
 Scoring rules:
-- Cada MCP: `10` se ✓ Connected, `0` se erro/ausente, `5` se ausente mas opcional (ex: gemini sem OAuth configurado vale 5 — degradado mas esperado)
-- Smoke check: `10` se ambos PASS, `7` se 1 FAIL, `0` se 2 FAIL
+- Codex CLI: `10` se version OK + smoke `OK` retorna; `5` se version OK mas smoke falha; `0` se CLI não está no PATH
+- Profiles: `10` se 5 profiles com canonical model; `7` se 5 profiles mas algum drifted (ex: gpt-5.4); `0` se profiles missing
+- Smoke check: `10` se PASS; `7` se WARN; `0` se FAIL
 - Other MCPs: % conectados × 10 (ex: 4/5 conectados = 8/10)
 
 Status:
@@ -97,13 +94,16 @@ Status:
 
 1. **Collect raw data** (todos em paralelo quando possível):
    ```bash
-   claude mcp list 2>&1                           # lista todos os MCPs registrados
+   claude mcp list 2>&1                                    # lista todos os MCPs registrados
+   codex --version 2>&1                                    # CLI version
    bash .agents/tools/codex-health-check.sh --smoke 2>&1 || true
-   bash .agents/tools/gemini-smoke-check.sh 2>&1 || true   # (se existir)
    ```
-2. **Ping ativo** (custa 1 call cada, opcional via `--deep`):
-   ```
-   mcp__gemini__ping({ prompt: "health" })        # gemini live
+2. **Ping ativo** (custa 1 call, opcional via `--deep`):
+   ```bash
+   echo 'Reply with: OK' | codex exec --color never --profile coder \
+     --skip-git-repo-check -s read-only \
+     -o /tmp/codex-health-ping.md - >/dev/null 2>&1
+   cat /tmp/codex-health-ping.md  # esperado: "OK"
    ```
 3. **Score cada sinal** per regras acima.
 4. **Compose** weighted score.
@@ -141,11 +141,10 @@ tags: [metrics, health]
 | Signal | Status | Score | Note |
 |---|---|---|---|
 | Claude session | running | 10 | (tautológico) |
-| codex-coder MCP | ✓ Connected | 10 | handshake OK |
-| codex-reviewer MCP | ✓ Connected | 10 | handshake OK |
-| Gemini MCP | ✓ Connected + ping echo | 10 | OAuth ativo |
+| Codex CLI | OK + ping | 10 | gpt-5.5 reply OK |
+| Codex profiles | 5/5 canonical | 10 | gpt-5.5 across all profiles |
 | Other MCPs (4/5) | partial | 8 | repomix not responding |
-| Smoke check | both PASS | 10 | structural OK |
+| Smoke check | PASS | 10 | structural OK |
 
 ## Unknowns
 (quando algum sinal foi neutro-5 por dado faltando)
@@ -167,11 +166,11 @@ tags: [metrics, health]
 Usuário: /health
 
 Maestro:
-1. Roda claude mcp list, codex-health-check, gemini-smoke-check em paralelo
-2. Cada MCP recebe score
+1. Roda claude mcp list, codex --version, codex-health-check em paralelo
+2. Cada sinal recebe score
 3. Output:
 [Health] Score: 9.2/10 (healthy). Failing: none.
-Salvou: .agents/vault/metrics/health-2026-04-18.md
+Salvou: .agents/vault/metrics/health-2026-04-29.md
 ```
 
 ### ✅ Good — flag de degradação concreta
@@ -180,7 +179,7 @@ Salvou: .agents/vault/metrics/health-2026-04-18.md
 Usuário: /health
 
 Maestro:
-[Health] Score: 6.5/10 (watch). Failing: gemini MCP (OAuth expirou — re-auth com `gemini auth login`).
+[Health] Score: 6.5/10 (watch). Failing: profiles drifted (coder/reviewer ainda em gpt-5.4 — re-rode `bash install.sh --doctor`).
 ```
 
 ### ❌ Bad — confundir com /context-health
@@ -195,11 +194,11 @@ Skill correta: /context-health.
 ### ❌ Bad — inventar valores quando script não existe
 
 ```
-Maestro (errado): "Smoke check Gemini: PASS"
-                  (mas .agents/tools/gemini-smoke-check.sh não está em main)
+Maestro (errado): "Smoke check: PASS"
+                  (mas .agents/tools/codex-health-check.sh não roda — codex não está no PATH)
 
-Correto: "Smoke check Gemini: unknown — gemini-smoke-check.sh ausente do repo.
-          Score neutro 5. Adicione o script para cobertura completa."
+Correto: "Codex CLI: unknown — `codex --version` falhou.
+          Score 0. Reinstale com `bash install.sh --doctor` ou `npm install -g @openai/codex`."
 ```
 
 ---
@@ -207,7 +206,6 @@ Correto: "Smoke check Gemini: unknown — gemini-smoke-check.sh ausente do repo.
 ## Integration
 
 - **codex-health-check.sh** (em `.agents/tools/`) — fonte de verdade pro lado Codex
-- **gemini-smoke-check.sh** (em `.agents/tools/`) — fonte de verdade pro lado Gemini (verificar se já está em main antes de assumir disponível)
-- **gemini-routing.md** — gotchas que afetam scoring (ex: gemini-2.5-pro banido conta como degraded se aparecer roteado)
 - **context-health.md** — skill irmã que mede qualidade de contexto (não infra)
 - **smart-token-metering.md** — mede consumo, este mede disponibilidade
+- **.agents/config/models.yaml** — canonical model that profiles should be on

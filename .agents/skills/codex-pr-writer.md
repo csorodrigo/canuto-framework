@@ -40,9 +40,10 @@ per PR. Codex reads the diff directly from git.
 
 ### 1. Spawn Codex PR Writer
 
-```
-mcp__codex-coder__spawn_agent({
-  prompt: `
+```bash
+codex exec --color never --profile coder \
+  -o /tmp/codex-pr-writer-$$.md \
+  "$(cat <<'PROMPT'
 Generate a pull request description and changelog entry.
 
 ## Instructions
@@ -80,8 +81,8 @@ Generate a pull request description and changelog entry.
 - Highlight breaking changes prominently
 - Keep PR description under 30 lines
 - Keep changelog concise
-`
-})
+PROMPT
+)"
 ```
 
 ### 2. Opus Validates

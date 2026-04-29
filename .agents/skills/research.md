@@ -133,35 +133,34 @@ After presenting the research report:
 
 ---
 
-## Phase 0 — Trio paralelo (FASE 2a+)
+## Phase 0 — Dual paralelo (v2.0, 2026-04-29)
 
-Antes de qualquer research propriamente dito, rode 3 streams em paralelo:
+Antes de qualquer research propriamente dito, rode 2 streams em paralelo:
 
-```
-Stream A — Gemini brainstorm (SCAMPER / lateral):
-  mcp__gemini__brainstorm({
-    prompt: "<tópico>",
-    methodology: "scamper",  // ou "lateral", "design-thinking"
-    domain: "engineering",
-    ideaCount: 5
-  })
+```bash
+# Stream A — Codex parallel research (competitor + benchmark intel)
+# Spawn 3 codex agents simultaneamente via shell &:
+codex exec --color never --profile coder \
+  -o /tmp/canuto-research-comp-$$.md \
+  "Search Reddit/HN/X last 30 days for <tópico>. Cite sources." &
+codex exec --color never --profile coder \
+  -o /tmp/canuto-research-oss-$$.md \
+  "Find 3 open-source competitors. Compare approach + trade-offs." &
+codex exec --color never --profile coder \
+  -o /tmp/canuto-research-papers-$$.md \
+  "Summarize recent papers (ArXiv) related to <tópico>." &
+wait
 
-Stream B — Codex parallel research (competitor / benchmark intel):
-  mcp__codex-coder__spawn_agents_parallel({
-    agents: [
-      { prompt: "Search Reddit/HN/X last 30 days for <tópico>. Cite sources." },
-      { prompt: "Find 3 open-source competitors. Compare approach + trade-offs." },
-      { prompt: "Summarize recent papers (ArXiv) related to <tópico>." }
-    ]
-  })
-
-Stream C — Opus (premise interview):
-  Opus pergunta ao user qual premissa é negociável, qual é fixa.
+# Stream B — Claude (premise interview + lateral brainstorm)
+#   Claude direct: SCAMPER ou lateral thinking sobre o tópico.
+#   Pergunta ao user qual premissa é negociável, qual é fixa.
 ```
 
-Opus então **consolida os 3 streams** em uma recomendação final com:
-- Convergência (ideias que 2+ streams levantaram) → sinais fortes
+Claude então **consolida os 2 streams** em uma recomendação final com:
+- Convergência (ideias que ambos os streams levantaram) → sinais fortes
 - Ideias únicas por stream → avaliar caso a caso
 - Premises verificadas vs assumidas
 
-Gemini é free via OAuth; Codex parallel é ~60% cheaper que Opus solo.
+> Historical note (2026-04-29): previously trio paralelo (Gemini brainstorm +
+> Codex parallel + Opus premise). Gemini foi removido; Claude direct cobre
+> brainstorm SCAMPER/lateral nativamente.

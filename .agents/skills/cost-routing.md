@@ -2,11 +2,12 @@
 skill: cost-routing
 trigger: Automatic — Maestro consults before every tier-2 delegation
 persona: maestro
-version: 1.0.0
-lastUpdated: 2026-03-30
+version: 2.0.0
+lastUpdated: 2026-04-29
 shortDescription: >
-  Cost-aware task routing table. Routes work to the cheapest provider that can
-  handle the task quality. Saves 60-80% on Anthropic costs by defaulting to Codex.
+  Cost-aware task routing table. Routes work to Codex CLI (gpt-5.5) for tier-2
+  by default; Claude Opus 4.7 owns tier-1. CLI invocation chosen over MCP for
+  10-35% lower token overhead per call.
 usedBy: [maestro]
 evals:
   - prompt: "implement the auth module"
@@ -18,46 +19,50 @@ evals:
 ## Purpose
 
 Before delegating ANY tier-2 task, Maestro consults this routing table to determine
-which provider should handle it. The goal: **minimize Anthropic spend without losing quality.**
+which provider should handle it. **Goal: minimize Anthropic spend without losing quality.**
+
+Canonical model reference: `.agents/config/models.yaml` (human-readable; keep
+`install.sh` profile values synced manually).
 
 **Principle: Use the cheapest provider that meets quality requirements.**
+
+**Why CLI over MCP** (decided 2026-04-29): MCP schema overhead consumes 400-1500
+tokens residentes + 10-35% extra per call vs raw `codex exec`. Schema only amortizes
+after ~50 calls/session, which is rare in this framework's profile (typical: 3-15
+spawns). CLI also has no MCP-server dependency — sessões não param se server cai.
 
 ---
 
 ## Cost Routing Matrix
 
-| Task Type | Size | Provider | Tool | Est. Savings vs Opus |
-|-----------|------|----------|------|---------------------|
-| **Code generation** | M/L | Codex (gpt-5.4 (high)) → GLM-4.6 (fallback) | `mcp__codex-coder__spawn_agent` / `mcp__gemini__ask-gemini` | 60-70% |
-| **Code generation** | XS/S | Claude (direct) | — | 0% (MCP overhead exceeds benefit) |
-| **Code review** | M/L | Codex (reviewer profile) → GLM-4.6 (fallback) | `mcp__codex-reviewer__spawn_agent` / `mcp__gemini__ask-gemini` | 40-50% |
-| **Code review (big diff / cross-model)** | L+ | Gemini 3.1-pro-preview (secondary) | `mcp__gemini__ask-gemini` | 40% |
+All Codex invocations use the CLI: `codex exec --color never -q --profile <profile>`.
+Add `--output-last-message <path>` for clean stdout when output is large.
+
+| Task Type | Size | Provider | Invocation | Est. Savings vs Opus |
+|-----------|------|----------|------------|---------------------|
+| **Code generation** | M/L | Codex (gpt-5.5, high) | `codex exec --profile coder` | 60-70% |
+| **Code generation** | XS/S | Claude (direct) | — | 0% (CLI overhead not justified) |
+| **Code review** | M/L | Codex (reviewer profile) | `codex exec --profile reviewer` | 40-50% |
+| **Code review (big diff / cross-model)** | L+ | Codex (architect profile, xhigh) | `codex exec --profile architect` | 30% |
 | **Code review** | XS/S | Claude (direct) | — | 0% |
-| **Test-fix loop** | Any | Codex (gpt-5.4 (high)) | `mcp__codex-coder__spawn_agent` | 80% |
-| **Context reading / @folder digest** | Any | Gemini 3.1-pro-preview | `mcp__gemini__ask-gemini` | 70% vs Opus |
-| **Context reading (vault notes)** | Any | Codex (vault MCP) | Codex reads via obsidian-vault MCP | 90% |
-| **Screenshot OCR / visual diff** | Any | Gemini 3.1-pro-preview (multimodal) | `mcp__gemini__ask-gemini` | new capability |
-| **Browser QA (exec + capture)** | Any | Codex (Playwright) | `mcp__codex-coder__spawn_agent` | 70% |
-| **Planning** | Any | Claude Opus | — | N/A (needs best reasoning) |
-| **Architecture** | Any | Claude Opus | — | N/A |
-| **User interview** | Any | Claude Opus | — | N/A (needs AskUserQuestion) |
-| **Brainstorm (structured)** | Any | Gemini brainstorm tool | `mcp__gemini__brainstorm` | ~grátis via OAuth |
-| **Brainstorm (parallel)** | Any | Codex (parallel) | `spawn_agents_parallel` | 60% |
-| **Security scan** | Any | Codex (reviewer profile) | `mcp__codex-reviewer__spawn_agent` | 40% |
-| **Security review (triple cross-model)** | M/L | Codex + Gemini + Opus | 3 calls | — |
-| **Bulk classify (labels, triagem)** | Any | Gemini 3.1-flash-lite-preview | `mcp__gemini__ask-gemini` | separate quota |
-| **Research Phase 0 (community intel)** | Any | Gemini brainstorm + Codex parallel | both in parallel | diverse viés |
-| **Documentation** | Any | Codex (gpt-5.4 (high)) | `mcp__codex-coder__spawn_agent` | 70% |
-| **Context loading** | Any | Codex (context-loader) | `mcp__codex-coder__spawn_agent` | 90% |
-| **Session notes** | Any | Codex (session-writer) | `mcp__codex-coder__spawn_agent` | 80% |
-| **PR description** | Any | Codex (pr-writer) | `mcp__codex-coder__spawn_agent` | 70% |
-| **GitHub ops** | Any | Codex (github MCP) | `mcp__codex-coder__spawn_agent` | 60% |
-| **Refactoring prep** | M/L | Codex (refactor-prep) | `mcp__codex-coder__spawn_agent` | 60% |
-| **Onboarding / repo pré-digest** | Any | Gemini 3.1-pro-preview → Opus refine | `mcp__gemini__ask-gemini` + Opus | ~90% vs Opus solo |
-| **Onboarding (Codex path)** | Any | Codex (onboarding) | `mcp__codex-coder__spawn_agent` | 90% |
-| **Vault reading** | Any | Codex (multi-vault) | `mcp__codex-coder__spawn_agent` | 90% |
-| **Planning / Architecture (Codex runtime)** | M/L | Claude Opus 4.7 (via MCP) | `mcp__claude-architect__spawn_agent` | — (tier-1 quality, Codex runtime only) |
-| **Code review cruzada (Codex→Claude)** | Any | Claude Sonnet 4.6 (via MCP) | `mcp__claude-reviewer__spawn_agent` | 40% vs Opus solo |
+| **Test-fix loop** | Any | Codex (gpt-5.5, high) | `codex exec --profile coder` | 80% |
+| **Browser QA (exec + capture)** | Any | Codex (Playwright) | `codex exec --profile coder` | 70% |
+| **Planning** | Any | Claude Opus 4.7 (xhigh) | — (Maestro plans direct) | N/A (tier-1 quality required) |
+| **Architecture** | Any | Claude Opus 4.7 (xhigh) | — (Maestro plans direct) | N/A |
+| **User interview** | Any | Claude Opus 4.7 | — (needs AskUserQuestion tool) | N/A |
+| **Brainstorm (parallel)** | Any | Codex (parallel via xargs) | `codex exec --profile coder` × N in shell | 60% |
+| **Security scan** | Any | Codex (reviewer profile) | `codex exec --profile reviewer` | 40% |
+| **Security review (cross-model)** | M/L | Codex reviewer + Claude | 2 calls (Codex CLI + Claude direct) | — |
+| **Documentation** | Any | Codex (gpt-5.5, high) | `codex exec --profile coder` | 70% |
+| **Context loading** | Any | Codex (context-loader) | `codex exec --profile coder` | 90% |
+| **Session notes** | Any | Codex (session-writer) | `codex exec --profile coder` | 80% |
+| **PR description** | Any | Codex (pr-writer) | `codex exec --profile coder` | 70% |
+| **GitHub ops** | Any | Codex via gh CLI | `codex exec --profile coder` | 60% |
+| **Refactoring prep** | M/L | Codex (refactor-prep) | `codex exec --profile architect` | 60% |
+| **Onboarding (Codex path)** | Any | Codex (onboarding) | `codex exec --profile coder` | 90% |
+| **Vault reading** | Any | Codex (obsidian MCP) | `codex exec --profile coder` | 90% |
+| **Planning / Architecture (Codex runtime)** | M/L | Claude Opus 4.7 (cross-model back-delegation) | optional `mcp__claude-architect__spawn_agent` if present | — (tier-1, Codex runtime only) |
+| **Code review cruzada (Codex→Claude)** | Any | Claude Sonnet 4.6 | optional `mcp__claude-reviewer__spawn_agent` if present | 40% vs Opus solo |
 
 ---
 
@@ -71,27 +76,37 @@ Before each delegation, Maestro follows this flowchart:
    → NO: continue.
 
 2. Is this XS/S size?
-   → YES: Opus handles directly (MCP overhead not justified). STOP.
+   → YES: Opus handles directly (CLI overhead not justified). STOP.
    → NO: continue.
 
 3. Does this task require AskUserQuestion or interactive tools?
    → YES: Opus handles directly. STOP.
    → NO: continue.
 
-4. Route per the matrix above.
-   → If task type is Gemini-native (context-digest, multimodal, brainstorm, bulk-classify):
-     use `mcp__gemini__*` directly.
-   → Else if codex-coder MCP available: use spawn_agent
-   → Else if codex-reviewer MCP available: use spawn_agent
-   → Fallback chain (by task type):
-     - code-gen: codex-coder → glm-coder → Claude  (never Gemini — no sandbox)
-     - code-review: codex-reviewer → glm-reviewer → gemini-3.1-pro-preview (second opinion) → claude-reviewer (MCP) → Opus direto
-     - context-digest / @folder: gemini-3.1-pro-preview → codex context-preload → Claude
-     - multimodal: gemini-3.1-pro-preview → Claude (no plan B)
-     - brainstorm: gemini-3.1-pro-preview + codex parallel → Claude
-     - bulk classify: gemini-3.1-flash-lite-preview → Claude (rate-limit bulk)
-     - security review: triple required (codex-reviewer + gemini + Opus)
+4. Route per the matrix above using `codex exec --profile <profile>` via Bash.
+   → Standard fallback chain (by task type):
+     - code-gen: codex coder → codex reviewer (escalation) → codex architect (xhigh) → Claude direct
+     - code-review: codex reviewer → codex architect (xhigh) → optional claude-reviewer MCP → Claude direct
+     - security review: codex reviewer + Claude direct (two perspectives, no triple)
 ```
+
+### Standard CLI invocation pattern
+
+```bash
+codex exec --color never -q --profile coder \
+  --output-last-message /tmp/codex-result-$$.md \
+  "$(cat <<'EOF'
+<full task prompt with plan + files + constraints>
+EOF
+)"
+# Read result via: cat /tmp/codex-result-$$.md
+```
+
+**Key flags**:
+- `--color never -q` → strips ANSI/banners (saves 5-15% tokens)
+- `--output-last-message <path>` → final message to file, keeps stdout clean
+- `--profile <name>` → routes to coder/reviewer/architect/fast profiles in `~/.codex/config.toml`
+- `--full-auto` → auto-approves edits (use with caution; default is `--auto-edit`)
 
 ---
 
@@ -136,7 +151,6 @@ test runners, build tools.
 ```bash
 rtk init -g                  # Claude Code (default)
 rtk init -g --codex          # Codex CLI
-rtk init -g --gemini         # Gemini CLI
 ```
 
 **Orthogonality with existing skills:**
@@ -212,13 +226,11 @@ Always log overrides in the session summary with justification.
 
 ---
 
-## Gemini-specific gotchas
+## CLI-specific gotchas
 
-See `.agents/skills/gemini-routing.md` for the full cheat-sheet. Quick reminders:
-
-- **`gemini-2.5-pro` is banned** — ~50% 429 MODEL_CAPACITY_EXHAUSTED in POC. Use `gemini-3.1-pro-preview`.
-- **Serialize stdio MCP calls** — parallel returns `Not connected` in 5/6.
-- **Copy `@file` into workspace first** — gemini-cli sandbox blocks `/tmp` and `~/*`.
-- **Sandbox mode does not execute** — `sandbox: true` returns hypothetical output. Use Codex for real exec.
-- **Screencapture is full-screen** — mask PII / delete immediately after multimodal calls.
-- **Flash-lite has separate quota bucket** — ideal for bulk classify at volume.
+- **Always pass `--color never -q`** — without it, ANSI escape codes inflate stdout 5-15%.
+- **Use `--output-last-message <path>`** for outputs >2KB — keeps Bash tool_result lean.
+- **`--skip-git-repo-check`** when running from `/tmp` or non-git dirs.
+- **`--ephemeral`** for one-off review/check tasks where session persistence is wasteful.
+- **Profile inheritance**: `coder` profile is the default fallback when `--profile` is omitted.
+- **Timeout safety**: long-running edits should wrap in `timeout 600 codex exec ...` to prevent runaway sessions.

@@ -1,6 +1,6 @@
 ---
 skill: context-preload
-trigger: Before delegating M/L coding task to Codex via spawn_agent
+trigger: Before delegating M/L coding task to Codex via CLI
 persona: architect
 version: 1.0.0
 lastUpdated: 2026-03-30
@@ -19,11 +19,11 @@ evals:
 
 ## Purpose
 
-Instead of Opus reading 10 files and inlining them in the spawn_agent prompt
+Instead of Opus reading 10 files and inlining them in the `codex exec` prompt
 (expensive — 20-50K Opus tokens), write a single context package file to disk.
 Codex reads it from the filesystem (zero Opus tokens).
 
-**Reusable**: same package serves multiple spawn_agent calls in one session.
+**Reusable**: same package serves multiple `codex exec` calls in one session.
 
 ---
 
@@ -89,27 +89,29 @@ type Role = 'admin' | 'user' | 'guest'
 
 ### 3. Delegate to Codex
 
-The spawn_agent prompt references the file instead of inlining:
+The `codex exec` prompt references the file instead of inlining:
 
 ```
-mcp__codex-coder__spawn_agent({
-  prompt: `
+codex exec --color never --profile coder \
+  -s workspace-write --skip-git-repo-check \
+  -o /tmp/codex-result-$$.md \
+  "$(cat <<'PROMPT'
 Read .agents/tmp/context-package.md for full task context and implementation plan.
 Implement everything described in the plan. Write code to the files listed.
 After implementation, run tests if a test command is available.
-`
-})
+PROMPT
+)"
 ```
 
 ### 4. Cleanup
 
 After the task is complete (code written, reviewed, committed):
 - Delete `.agents/tmp/context-package.md`
-- Or leave for next spawn_agent in same session
+- Or leave for the next `codex exec` call in the same session
 
 ### Verification Gate
 
-The `codex-pretool-guard.sh` hook blocks medium/large `spawn_agent` calls when no
+The `codex-pretool-guard.sh` hook blocks medium/large `codex exec --profile coder` calls when no
 context package is present in `.agents/tmp/`.
 
 ---

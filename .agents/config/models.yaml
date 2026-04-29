@@ -1,0 +1,96 @@
+# Canuto Framework — Reference Document for Canonical Model Versions
+#
+# Status: this file is a HUMAN-READABLE REFERENCE. It is NOT automatically
+# read by install.sh at runtime (the model values in install.sh are still
+# hardcoded — see install.sh:1432-1457 for the canonical values that ship).
+# Skills also embed model names inline rather than reading via placeholder.
+#
+# Why it exists anyway:
+#   - Single place to read "what model are we on right now"
+#   - Reference doc when bumping versions across the framework (manual sweep)
+#   - Future: a render script could substitute {{coder.model}} placeholders;
+#     not implemented in this version.
+#
+# Update procedure (manual until substitution pipeline lands):
+#   1. Bump model/effort below + bump `last-updated`
+#   2. Match install.sh:1432-1457 (TOML heredoc) to the new values
+#   3. Match install.sh:1462-1474 (awk-based update of existing config.toml)
+#      to the new canonical values
+#   4. Grep+replace skill docs / health-check for old version → new version
+#   5. Run: bash install.sh --doctor + bash .agents/tools/codex-health-check.sh
+#
+# Naming convention: <role> at top level = the canonical reference for that
+# Canuto persona role.
+
+last-updated: 2026-04-29
+
+# --- Coder profile (default executor for tier-2 implementation) ---
+coder:
+  provider: codex
+  model: gpt-5.5
+  reasoning: high
+  use-for: "Standard code generation, refactor, multi-file edits"
+  cli-invocation: "codex exec --color never -q --profile coder"
+
+# --- Reviewer profile (peer review of plan and code) ---
+reviewer:
+  provider: codex
+  model: gpt-5.5
+  reasoning: high
+  use-for: "Plan review, code review, security audit"
+  cli-invocation: "codex exec --color never -q --profile reviewer"
+
+# --- Architect profile (deep planning, complex reasoning) ---
+architect:
+  provider: codex
+  model: gpt-5.5
+  reasoning: xhigh
+  use-for: "Architecture, complex decomposition, novel problems"
+  cli-invocation: "codex exec --color never -q --profile architect"
+
+# --- Maestro profile (Codex-runtime orchestration only; Claude Opus is default Maestro) ---
+maestro:
+  provider: codex
+  model: gpt-5.5
+  reasoning: xhigh
+  use-for: "Direct Codex runtime sessions only — Claude Opus is default Maestro"
+  cli-invocation: "codex --profile maestro"
+
+# --- Fast profile (quick edits, formatting, docs) ---
+fast:
+  provider: codex
+  model: gpt-5.5
+  reasoning: high
+  use-for: "Quick edits, formatting, documentation"
+  cli-invocation: "codex exec --color never -q --profile fast"
+
+# --- Tier-1 (Maestro + Architect when Claude is the active runtime) ---
+primary:
+  provider: anthropic
+  model: claude-opus-4-7
+  reasoning: xhigh
+  use-for: "Tier-1 orchestration: Maestro, Architect, user-facing decisions"
+  cli-invocation: null  # Native Claude Code session, no spawn
+
+# --- Cross-model reviewer (only used in Codex-runtime sessions) ---
+claude-reviewer:
+  provider: anthropic
+  model: claude-sonnet-4-6
+  reasoning: max
+  use-for: "Cross-model review when Codex implements (bias-free)"
+  cli-invocation: null  # Spawned via mcp__claude-reviewer when present
+
+# --- Routing notes ---
+notes:
+  delegation: |
+    Tasks XS/S: Claude (primary) implements directly — CLI/MCP overhead not justified.
+    Tasks M/L: Claude delegates to coder via `codex exec` (CLI direct, no MCP).
+    Why CLI over MCP: 10-35% lower token overhead per call. See cost-routing.md.
+  reasoning-levels: |
+    high  = standard reasoning (5K-10K thinking tokens equivalent)
+    xhigh = deep reasoning (10K-20K thinking tokens equivalent)
+    max   = maximum (20K+ tokens; Claude only)
+  fallback-chain: |
+    coder fails  → retry with reviewer profile (deeper reasoning)
+    reviewer fails → escalate to architect profile (xhigh)
+    architect fails → Claude implements directly + log incident

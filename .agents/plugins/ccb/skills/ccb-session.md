@@ -10,7 +10,7 @@ shortDescription: >
   sessions, check pane status, and clean up session logs.
 usedBy: [maestro]
 evals:
-  - prompt: "start a ccb session with codex and gemini"
+  - prompt: "start a ccb session with codex"
     should_trigger: true
   - prompt: "resume yesterday's ccb session"
     should_trigger: true
@@ -45,13 +45,13 @@ evals:
 ccb
 
 # Specific providers
-ccb codex gemini
+ccb codex
 
 # Resume previous session contexts
 ccb -r
 
 # Resume with auto-approval (requires explicit user opt-in)
-ccb -a -r codex gemini
+ccb -a -r codex
 ```
 
 **Before launching**: confirm with the user which providers to include. Never launch without confirmation.
@@ -61,7 +61,6 @@ ccb -a -r codex gemini
 ```bash
 # Ping individual providers
 ccb-ping codex
-ccb-ping gemini
 
 # Check daemon status
 # askd state file: ~/.askd-state.json
@@ -89,7 +88,6 @@ Suggest cleanup when:
 Session log locations:
 - Claude: `~/.claude/projects/<project-key>/`
 - Codex: `~/.codex/sessions/*/messages.jsonl`
-- Gemini: `~/.gemini/tmp/<hash>/chats/`
 - CCB cache: `~/.cache/ccb/`
 
 ---
@@ -113,11 +111,10 @@ Session log locations:
 ### Good — launch with confirmation
 
 ```
-User: start ccb with codex and gemini
+User: start ccb with codex
 Maestro: [CCB] Launching split-pane environment.
   - Pane 1: Claude (this session)
   - Pane 2: Codex
-  - Pane 3: Gemini
   Terminal: WezTerm detected.
   Confirm launch? [y/n]
 ```
@@ -128,7 +125,6 @@ Maestro: [CCB] Launching split-pane environment.
 User: resume ccb session
 Maestro: [CCB] Found resumable session from 2026-03-28:
   - Codex: 23 messages, 2 pending tasks
-  - Gemini: 15 messages, 0 pending
   Resuming with -r flag...
 ```
 

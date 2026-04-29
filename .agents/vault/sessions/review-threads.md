@@ -1,6 +1,6 @@
 ---
 type: index
-purpose: Track codex-reviewer threadIds for cross-session review continuity
+purpose: Track Codex reviewer CLI artifacts for cross-session review continuity
 created: 2026-03-30
 tags:
   - review-threads
@@ -9,12 +9,12 @@ tags:
 
 # Review Threads — Session Continuity
 
-Persist `threadId` from `mcp__codex-reviewer__codex` responses here.
-Use `mcp__codex-reviewer__codex-reply(threadId, message)` to resume.
+Persist the review artifact path produced by `codex exec --profile reviewer`.
+To resume, re-run `codex exec --profile reviewer` with the previous artifact plus the updated diff in the prompt.
 
 ## Active Threads
 
-| Date | Branch | Review Type | Provider | Task ID | threadId | Status | Notes |
+| Date | Branch | Review Type | Provider | Task ID | Artifact | Status | Notes |
 |------|--------|-------------|----------|---------|----------|--------|-------|
 | — | — | — | — | — | — | — | No threads yet |
 
@@ -22,15 +22,23 @@ Use `mcp__codex-reviewer__codex-reply(threadId, message)` to resume.
 
 ### Save after review:
 ```
-| 2026-03-30 | feat/auth | co-validate | codex-reviewer | task-auth-plan | thread_abc123 | open | Initial plan review |
+| 2026-03-30 | feat/auth | co-validate | codex-reviewer | task-auth-plan | .agents/tmp/codex/co-review-auth.md | open | Initial plan review |
 ```
 
 ### Resume in next session:
 ```
-mcp__codex-reviewer__codex-reply({
-  threadId: "thread_abc123",
-  message: "Issues from last review have been fixed. Updated diff: ..."
-})
+codex exec --color never --profile reviewer \
+  -s read-only --skip-git-repo-check \
+  -o .agents/tmp/codex/co-review-auth-rerun.md \
+  "$(cat <<'PROMPT'
+Previous review artifact: .agents/tmp/codex/co-review-auth.md
+Issues from last review have been fixed. Review this updated diff:
+
+--- CHANGES START ---
+{updated_diff}
+--- CHANGES END ---
+PROMPT
+)"
 ```
 
 ### Close after merge:

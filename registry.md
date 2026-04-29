@@ -41,7 +41,7 @@ These skills ship with every install and update automatically.
 | `knowledge-ingest` | Ingest external sources (videos, articles, PDFs, meeting transcripts) into structured vault notes | ingestion, knowledge, memory |
 | `mcp-obsidian` | How the framework uses MCP to interact with the vault (+ semantic search, multi-MCP connectors) | obsidian, mcp, memory |
 | `metrics` | Quality, velocity, compliance, and rework tracking | analytics |
-| `multi-provider` | How Maestro delegates to Claude, Codex, GLM | orchestration |
+| `multi-provider` | How Maestro delegates to Claude (tier-1) and Codex (tier-2) | orchestration |
 | `obsidian-bases` | Obsidian Bases: database views over notes (.base files) | obsidian, queries |
 | `obsidian-cli` | Interact with Obsidian vault via CLI | obsidian, cli |
 | `obsidian-markdown` | Obsidian Flavored Markdown: wikilinks, embeds, callouts, properties, tags | obsidian, markdown |
@@ -72,17 +72,6 @@ Useful in specific project types. Install with `bash install.sh --skill <name>`.
 | `route-optimizer-qa` | Route optimization fixtures, geocoding checks, invalid-address handling, and before/after metrics | Logistics and routing projects | routing, qa |
 | `spreadsheet-delivery-check` | Validate spreadsheet deliverables for formulas, expected sheets, totals, formatting, and openability | XLSX/CSV/reporting exports | spreadsheet, qa |
 | `frontend-visual-qa` | Browser-based visual QA for responsive layouts, console errors, overflow, and interactions | Web apps and interactive UI | frontend, qa |
-
----
-
-## Gemini routing skills
-
-Gemini routing support is available for consultant-style MCP workflows.
-
-- `gemini-routing` — Provider routing matrix and Gemini-specific gotchas
-- `bulk-classify` — High-volume classification workflow via Gemini flash-lite
-
-Concrete routing rules are defined in `cost-routing.md`.
 
 ---
 

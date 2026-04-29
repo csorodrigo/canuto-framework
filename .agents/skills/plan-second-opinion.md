@@ -11,10 +11,10 @@ copyright: Rodrigo Canuto © 2026.
 **This skill is superseded by `co-review.md`.** The co-review skill provides the same functionality plus:
 - Bias-free parallel review (complete your work before seeing Codex's output)
 - Three modes: brainstorm, plan, validate
-- MCP-based multi-turn communication (clarifying questions supported)
-- Background subagent pattern for true parallel work
+- CLI-based independent review via `codex exec --profile reviewer`
+- Background review pattern for true parallel work
 
-To migrate: configure Codex MCP (`codex-coder` + `codex-reviewer`) and use `/co-validate` instead. The legacy hook `plan-review.sh` now runs on `PostToolUse: ExitPlanMode` with the reviewer profile as a fallback.
+To migrate: configure Codex CLI profiles (`coder`, `reviewer`, `architect`) and use `/co-validate` instead. The legacy hook `plan-review.sh` now runs on `PostToolUse: ExitPlanMode` with the reviewer profile as a fallback.
 
 ---
 

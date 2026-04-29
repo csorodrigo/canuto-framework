@@ -2,8 +2,8 @@
 
 Loaded on demand when a co-review mode activates. See `SKILL.md` for the summary.
 
-The current `codex-reviewer` contract is one-shot via `mcp__codex-reviewer__spawn_agent`.
-Do not assume reviewer-side `threadId` or `codex-reply`.
+The current reviewer contract is one-shot via `codex exec --profile reviewer`.
+Do not assume reviewer-side continuation IDs or reply tools.
 
 ---
 
@@ -122,8 +122,8 @@ Return the review directly in this response.
 
 | Tool | Purpose |
 |------|---------|
-| `mcp__codex-coder__spawn_agents_parallel` | Parallel brainstorm or implementation |
-| `mcp__codex-reviewer__spawn_agent` | One-shot reviewer pass using the `reviewer` profile |
+| `(parallel codex exec --profile coder)` | Parallel brainstorm or implementation |
+| `codex exec --profile reviewer` | One-shot reviewer pass using the `reviewer` profile |
 
 If reviewer MCP is unavailable, the explicit degraded path is:
 `codex exec --profile reviewer` -> `/ask codex` only when a CCB Codex session is active -> Claude-only review.

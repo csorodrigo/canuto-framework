@@ -42,8 +42,10 @@ metrics: 3 files changed, 2 codex delegations, 1 escalation
 ### 2. Spawn Codex Session Writer
 
 ```
-mcp__codex-coder__spawn_agent({
-  prompt: `
+codex exec --color never --profile coder \
+  -s workspace-write --skip-git-repo-check \
+  -o /tmp/codex-session-writer-$$.md \
+  "$(cat <<'PROMPT'
 You have access to the obsidian-vault MCP. Write a session note.
 
 ## Raw Data
@@ -72,8 +74,8 @@ tags:
   - session
 goals_met: N/M
 ---
-`
-})
+PROMPT
+)"
 ```
 
 ### 3. Verify
@@ -87,8 +89,8 @@ Codex writes directly to vault via MCP. Opus confirms:
 
 ## Fallback
 
-- Codex vault MCP unavailable → Codex writes to `.agents/vault/sessions/` on disk
-- Codex MCP unavailable entirely → Opus writes the session note directly
+- Obsidian vault connector unavailable → Codex writes to `.agents/vault/sessions/` on disk
+- Codex CLI unavailable entirely → Opus writes the session note directly
 - vault-bridge.sh as final fallback for vault writes
 
 ---

@@ -121,31 +121,42 @@ This is bad because: the secret is committed to git history permanently. Even re
 
 ---
 
-## Gemini integration — Triple security review (FASE 2a+)
+## Dual security review (v2.0, 2026-04-29)
 
 Pra diffs tocando auth, crypto, payment, session tokens, RLS policies, secrets
-handling → **triple review obrigatório** (cross-model catches diferentes vulns):
+handling → **dual review obrigatório** (Claude self-review + Codex reviewer
+adversarial). Para casos de surface gigante, escalar para architect (xhigh)
+como Stream C opcional.
 
-```
-Stream 1 — Codex reviewer (adversarial, execution-level vulns):
-  mcp__codex-reviewer__spawn_agent({
-    prompt: "Security review. Focus: injection, auth bypass, race conditions,
-             timing attacks. [DIFF INLINE]"
-  })
+```bash
+# Save diff for Codex to read
+git diff > /tmp/canuto-security-diff-$$.patch
 
-Stream 2 — Gemini 3.1-pro-preview (cross-model + long-context flow tracing):
-  mcp__gemini__ask-gemini({
-    prompt: "@./ Trace the full end-to-end data flow for this change. Quem
-             toca esse dado antes/depois? Há boundary confuso? [DIFF INLINE]",
-    model: "gemini-3.1-pro-preview"
-  })
+# Stream 1 — Codex reviewer (adversarial, execution-level vulns)
+codex exec --color never --profile reviewer \
+  -s read-only --skip-git-repo-check \
+  -o /tmp/canuto-security-codex-$$.md \
+  "Security review of /tmp/canuto-security-diff-$$.patch. Focus: injection,
+   auth bypass, race conditions, timing attacks. Walk repo if needed to verify
+   call sites. Output: verdict + issue list with file:line."
 
-Stream 3 — Opus (severity judgment, what ships):
-  Claude avalia severidade e decide qual bloqueia ship vs. qual vira backlog.
+# Stream 2 — Claude (self-review + severity judgment)
+# Claude reviews diff inline + decides what ships vs what stays.
+
+# Optional Stream 3 — Codex architect (xhigh, deeper reasoning)
+# Use only when surface is huge (>500 lines, >10 files affected):
+codex exec --color never --profile architect \
+  -s read-only --skip-git-repo-check \
+  -o /tmp/canuto-security-arch-$$.md \
+  "Trace the full end-to-end data flow for the changes in
+   /tmp/canuto-security-diff-$$.patch. Who touches the data before/after?
+   Is there a confused boundary? Use ast-grep + walk repo for callers."
 ```
 
 **Gate de aprovação:** overall >= 7.0 AND no single dimension <= 3 em cada
-stream. Se 2+ streams flagam o mesmo issue → mandatory fix. Se apenas 1 flaga
-→ evaluate (pode ser insight genuíno ou ruído).
+stream. Se Codex reviewer + Claude flagam o mesmo issue → mandatory fix. Se
+apenas 1 flaga → evaluate (pode ser insight genuíno ou ruído).
 
-Ver `.agents/skills/gemini-routing.md` pros gotchas.
+> Historical note (2026-04-29): previously triple review (Codex + Gemini + Opus).
+> Gemini foi removido; xhigh reasoning (architect profile) cobre o caso de
+> "long-context flow tracing" com uma dependência a menos.

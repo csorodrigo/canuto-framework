@@ -5,7 +5,7 @@ persona: maestro
 version: 1.1.0
 lastUpdated: 2026-04-17
 shortDescription: >
-  Delegates browser QA entirely to Codex via spawn_agent + Playwright MCP — visual regression,
+  Delegates browser QA entirely to Codex via CLI + Playwright MCP — visual regression,
   accessibility audits, DOM/layout checks, smoke flows. Opus only receives the final report.
   70% cost savings vs Opus-driven browser testing.
 usedBy: [maestro, tester]
@@ -31,7 +31,7 @@ evals:
 ## Purpose
 
 Browser QA via Opus = every navigate/click/screenshot is an Opus API call (expensive).
-Delegating the entire QA flow to Codex = 1 spawn_agent call → Codex does everything autonomously.
+Delegating the entire QA flow to Codex = 1 `codex exec` call → Codex does everything autonomously.
 
 **70% cost savings** on browser testing sessions.
 
@@ -63,8 +63,10 @@ Maestro prepares the test specification:
 ### 2. Spawn Codex QA Agent
 
 ```
-mcp__codex-coder__spawn_agent({
-  prompt: `
+codex exec --color never --profile coder \
+  -s workspace-write --skip-git-repo-check \
+  -o /tmp/codex-browser-qa-$$.md \
+  "$(cat <<'PROMPT'
 You are a QA tester with access to Playwright browser automation.
 
 ## Target
@@ -94,8 +96,8 @@ At the end, provide:
 - Critical issues: list
 - Warnings: list
 - Overall verdict: SHIP / FIX FIRST
-`
-})
+PROMPT
+)"
 ```
 
 ### 3. Process Results
@@ -113,7 +115,7 @@ Opus presents the report to the user without touching the browser.
 If issues found:
 1. Codex reports the issues with repro steps
 2. Maestro delegates fix to Codex Coder
-3. After fix, re-run QA via spawn_agent
+3. After fix, re-run QA via `codex exec --profile coder`
 4. Repeat until green or max 3 rounds
 
 ---

@@ -9,6 +9,11 @@
             "type": "command",
             "command": "~/.claude/hooks/session-start.sh",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/worktree-collision-check.sh",
+            "timeout": 3
           }
         ]
       }
@@ -30,6 +35,11 @@
           {
             "type": "command",
             "command": "~/.claude/hooks/log-commands.sh"
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/pre-commit-branch-check.sh",
+            "timeout": 3
           }
         ]
       },
@@ -43,6 +53,16 @@
           {
             "type": "command",
             "command": "~/.claude/hooks/fingerprint-gate.sh",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/pre-claim-grep.sh",
             "timeout": 3
           }
         ]

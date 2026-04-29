@@ -13,7 +13,7 @@ usedBy: [maestro]
 evals:
   - prompt: "delegate the coder task to codex in a visible pane"
     should_trigger: true
-  - prompt: "run the implementation on gemini via ccb"
+  - prompt: "run the implementation in a ccb pane"
     should_trigger: true
   - prompt: "send this to codex using terminal panes"
     should_trigger: true
@@ -44,7 +44,7 @@ evals:
 
 - CCB installed: `which ccb && which ask && which pend`
 - Terminal multiplexer: WezTerm or tmux running
-- Provider CLIs authenticated (claude, codex, gemini)
+- Provider CLIs authenticated (claude, codex)
 
 ---
 
@@ -77,7 +77,7 @@ Same protocol as multi-provider.md:
 ask <provider> "<prompt with handoff package>"
 ```
 
-Where `<provider>` is one of: `codex`, `gemini`, `claude`.
+Where `<provider>` is one of: `codex`, `claude`.
 
 The task runs in a visible pane. Use `pend <task-id>` to retrieve results asynchronously.
 
@@ -85,7 +85,6 @@ The task runs in a visible pane. Use `pend <task-id>` to retrieve results asynch
 
 If CCB's MCP delegation server is configured (see `docs/mcp-delegation.md`):
 - `ccb_ask_codex(prompt)` — route to Codex pane
-- `ccb_ask_gemini(prompt)` — route to Gemini pane
 - `ccb_ask_claude(prompt)` — route to Claude pane
 
 These MCP tools route through CCB's `askd` daemon with visible pane output.
@@ -102,11 +101,9 @@ These MCP tools route through CCB's `askd` daemon with visible pane output.
 ```
 CCB installed?
   → YES: delegate via pane
-  → NO:  codex-collab MCP available?
-           → YES: delegate via MCP
-           → NO:  API keys configured?
-                    → YES: delegate via API (multi-provider.md)
-                    → NO:  Claude handles it directly
+  → NO:  codex CLI in PATH?
+           → YES: delegate via `codex exec --profile <name>` (multi-provider.md)
+           → NO:  Claude handles it directly
 ```
 
 Maestro logs every fallback in the session summary.
@@ -143,8 +140,8 @@ Validating output format... accepted.
 ### Good — graceful degradation
 
 ```
-[CCB] ccb not found in PATH. Falling back to codex-collab MCP.
-[codex-collab] Starting new thread for implementation delegation...
+[CCB] ccb not found in PATH. Falling back to direct Codex CLI.
+[codex] codex exec --profile coder ... (running)
 ```
 
 ### Bad — blocking on CCB when not installed

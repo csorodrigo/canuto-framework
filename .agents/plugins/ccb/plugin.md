@@ -1,7 +1,7 @@
 ---
 name: ccb
 version: 1.0.0
-description: Terminal-based multi-model collaboration via claude-code-bridge (CCB) — visible panes for Claude, Codex, Gemini
+description: Terminal-based multi-model collaboration via claude-code-bridge (CCB) — visible panes for Claude and Codex
 author: canuto-framework
 requires:
   - multi-provider
@@ -32,7 +32,6 @@ Integrates CCB v5.2.6 as an optional delegation backend for Canuto sessions. Add
    ```bash
    claude          # Anthropic Max login
    codex --login   # ChatGPT Plus/Pro login
-   gemini          # Google Pro/Ultra login
    ```
 
 3. Verify installation:
@@ -44,9 +43,9 @@ Integrates CCB v5.2.6 as an optional delegation backend for Canuto sessions. Add
    ```markdown
    ## Plugins
    - ccb:
-     providers: codex, gemini     # which providers to launch by default
+     providers: codex             # which providers to launch by default
      auto_approve: false          # -a flag (requires explicit opt-in)
-     max_panes: 3                 # terminal real estate limit
+     max_panes: 2                 # terminal real estate limit
    ```
 
 ## When Maestro Should Load This Plugin
@@ -55,7 +54,7 @@ Integrates CCB v5.2.6 as an optional delegation backend for Canuto sessions. Add
 - User wants to see multiple providers working simultaneously in terminal
 - User requests session resumption across sessions (`-r` flag)
 - User wants terminal-based delegation instead of API/MCP delegation
-- User runs `ccb codex gemini` or similar commands
+- User runs `ccb codex` or similar commands
 
 ## Risks
 
@@ -68,6 +67,6 @@ Integrates CCB v5.2.6 as an optional delegation backend for Canuto sessions. Add
 
 ## Notes
 
-This is an **opt-in** plugin. Does not alter default framework behavior. CCB complements (does not replace) codex-collab MCP and multi-provider API delegation.
+This is an **opt-in** plugin. Does not alter default framework behavior. CCB complements (does not replace) the default CLI delegation pattern (`codex exec --profile <name>`).
 
 CCB sessions track operational history (JSONL logs per provider). Canuto's vault remains the source of truth for strategic memory (decisions, instincts, metrics).
