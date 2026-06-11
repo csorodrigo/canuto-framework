@@ -518,6 +518,7 @@ FRAMEWORK_FILES=(
   ".agents/skills/obsidian-writeback-queue.md"
   ".agents/skills/stack-lock.md"
   ".agents/hooks/codex-pretool-guard.sh"
+  ".agents/hooks/install.sh"
   ".agents/hooks/screenshot-guard.sh"
   ".agents/hooks/session-save.sh"
   ".agents/hooks/session-load.sh"
