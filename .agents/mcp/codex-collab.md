@@ -13,7 +13,7 @@ delegates tier-2 work to Codex profiles using direct shell invocation.
 
 | Profile | Default Model | Sandbox | Role | Invocation |
 |---------|---------------|---------|------|------------|
-| `coder` | `gpt-5.5` (high) | full write | Coder, Brainstorm, Tester | `codex exec --color never --profile coder` |
+| `coder` | `gpt-5.5` (high) | full write | Coder, Brainstorm | `codex exec --color never --profile coder` |
 | `reviewer` | `gpt-5.5` (high) | read-only | Reviewer (deep review) | `codex exec --color never --profile reviewer` |
 | `architect` | `gpt-5.5` (xhigh) | read-only | Deep planning, escalation, large-diff review | `codex exec --color never --profile architect` |
 | `maestro` | `gpt-5.5` (xhigh) | full write | Direct Codex runtime orchestration | `codex --profile maestro` (interactive launcher) |

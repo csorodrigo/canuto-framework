@@ -33,7 +33,7 @@ Without tracking, Maestro can't distinguish between "we checked everything and i
 
 | Dimension | What it Tracks | Example |
 |-----------|---------------|---------|
-| **Persona coverage** | Which personas have been consulted | Architect ✅, Coder ✅, Tester ⏳, Reviewer ❌ |
+| **Persona coverage** | Which personas have been consulted | Architect ✅, Coder ✅, Reviewer ❌ |
 | **Area coverage** | Which codebase areas were touched | src/api/ ✅, src/auth/ ✅, src/ui/ ❌ |
 | **Concern coverage** | Which quality concerns were addressed | Correctness ✅, Security ⏳, Performance ❌ |
 | **Absence coverage** | Confirmed vs. unexplored absences | 3 confirmed absences, 2 not-checked areas |
@@ -60,8 +60,7 @@ When routing a task M or L, Maestro initializes a coverage map:
 
 ### Personas
 - [ ] Architect — planning
-- [ ] Coder — implementation
-- [ ] Tester — edge cases & coverage
+- [ ] Coder — implementation + testes (edge cases & coverage)
 - [ ] Reviewer — quality gate
 
 ### Areas
@@ -84,7 +83,7 @@ After each persona handoff, Maestro updates the map:
 ### Personas
 - [x] Architect — planning ✅ (plan approved)
 - [x] Coder — implementation ✅ (code written, happy-path tests pass)
-- [ ] Tester — edge cases & coverage ⏳ (in progress)
+- [ ] Coder — edge-case tests & coverage ⏳ (in progress)
 - [ ] Reviewer — quality gate
 ```
 
@@ -101,7 +100,7 @@ After each persona handoff, Maestro updates the map:
 
 ### Gaps
 - ❌ Performance concern not addressed (no load testing, no query analysis)
-- ❌ src/db/migrations/ not verified by Tester
+- ❌ src/db/migrations/ not covered by tests (Coder)
 
 ### Absences Tracked
 - 2 confirmed absences (from absence-reporting)
@@ -109,7 +108,7 @@ After each persona handoff, Maestro updates the map:
 
 ### Recommendation
 Coverage is **partial** (64% overall). Consider:
-- Running Tester on migration edge cases
+- Coder escrever testes para os edge cases de migration
 - Adding a performance check before merging
 ```
 

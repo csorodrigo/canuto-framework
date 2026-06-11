@@ -20,7 +20,7 @@ copyright: Rodrigo Canuto © 2026.
 
 ## Purpose
 
-As projects grow, a single sequential flow (Architect → Coder → Tester → Reviewer) can become a bottleneck. Squads allow the Maestro to organize personas into parallel workstreams, each tackling a different part of the system.
+As projects grow, a single sequential flow (Architect → Coder → Reviewer) can become a bottleneck. Squads allow the Maestro to organize personas into parallel workstreams, each tackling a different part of the system.
 
 This is an **advanced feature** for larger projects or multi-feature sessions. For single-feature work, the standard flow is sufficient.
 
@@ -32,11 +32,11 @@ A squad is a **named group of personas assigned to a specific domain or task**. 
 
 ```
 Squad: "auth"
-  Architect → Coder → Tester → Reviewer
+  Architect → Coder (implementa + testes) → Reviewer
   Domain: src/auth/, src/api/middleware/
 
 Squad: "dashboard"
-  Architect → Coder → Tester → Reviewer
+  Architect → Coder (implementa + testes) → Reviewer
   Domain: src/pages/dashboard/, src/components/charts/
 ```
 
@@ -83,8 +83,7 @@ For each independent domain:
 
 ### Personas
 - Architect: plans this domain's changes
-- Coder: implements within this domain
-- Tester: tests this domain's changes
+- Coder: implements within this domain (escreve e roda os testes)
 - Reviewer: reviews this domain's code
 ```
 

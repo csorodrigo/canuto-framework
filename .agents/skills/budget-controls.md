@@ -46,8 +46,6 @@ Defined in `.agents/stack.md` or `CLAUDE.md` under `## Budget`:
 - persona-limits:
   - architect: 30000
   - coder: 80000
-  - tester: 40000
-  - debugger: 30000
   - reviewer: 20000
   - contextualizer: 50000
 - warn-at: 80%
@@ -67,7 +65,7 @@ Defined in `.agents/stack.md` or `CLAUDE.md` under `## Budget`:
 | XS | 10-20K | Coder + Reviewer |
 | S | 20-50K | Architect (abbrev) + Coder + Reviewer |
 | M | 50-150K | Full flow |
-| L | 100-250K+ | Full flow + extended Tester |
+| L | 100-250K+ | Full flow + testes estendidos (Coder) |
 
 These are estimates. Actual consumption varies.
 
@@ -86,17 +84,17 @@ These are estimates. Actual consumption varies.
 Maestro estimates remaining budget:
 
 ```
-[Budget] Session: ~65K / 200K used (32%). Next: Tester (~40K estimated). Sufficient.
+[Budget] Session: ~65K / 200K used (32%). Next: Reviewer (~20K estimated). Sufficient.
 ```
 
 If estimated consumption would exceed the session limit:
 
 ```
 ⚠️ Budget warning: Session at ~170K / 200K (85%).
-Tester pass estimated at ~40K, which would exceed the session limit.
+Test pass (Coder) estimated at ~40K, which would exceed the session limit.
 Options:
-(a) Run Tester with abbreviated scope (edge cases only, skip comprehensive coverage)
-(b) Skip Tester and go directly to Reviewer
+(a) Rodar testes com escopo abreviado — Coder (edge cases only, skip comprehensive coverage)
+(b) Pular testes extras e ir direto ao Reviewer
 (c) Continue anyway (budget is advisory)
 ```
 
@@ -108,7 +106,7 @@ Log consumption in metrics:
 ### Token Budget
 - Session limit: 200K
 - Estimated consumption: ~145K (72%)
-- Breakdown: Architect ~25K, Coder ~70K, Tester ~35K, Reviewer ~15K
+- Breakdown: Architect ~25K, Coder (implementação + testes) ~105K, Reviewer ~15K
 - Budget status: ✅ Within limits
 ```
 
@@ -131,10 +129,10 @@ When using multi-provider delegation, track estimated costs:
 
 ```
 [Budget] Session at ~160K / 200K (80%) — warn threshold reached.
-Remaining personas: Tester, Reviewer.
+Remaining personas: Reviewer.
 Estimated remaining cost: ~55K tokens.
 
-Recommendation: Run Tester with focused scope (critical paths only) to stay within budget.
+Recommendation: rodar os testes restantes (Coder) com escopo focado (critical paths only) to stay within budget.
 Proceed? [Y/abbreviated/skip]
 ```
 
@@ -150,7 +148,7 @@ Session Budget Summary:
 ### ❌ Bad — no budget awareness
 
 ```
-[Maestro → Tester] Run comprehensive tests on all endpoints.
+[Maestro → Coder] Run comprehensive tests on all endpoints.
 ```
 
 No check on remaining budget before routing to an expensive pass. Could exceed session limits silently.

@@ -667,7 +667,7 @@ curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/in
               <li><strong>Tasks M e L</strong> — Architect gera <code>context-package.md</code>, chama <code>codex exec --profile coder</code>.</li>
               <li><strong>Tasks paralelas</strong> — multiplas chamadas <code>codex exec --profile coder</code> com context package por agente.</li>
               <li><strong>Pre-commit gate</strong> — <code>codex-pretool-guard.sh</code> dispara o <em>reviewer path</em> do Codex em todo <code>git commit</code> e explicita quando entra em fallback.</li>
-              <li><strong>Plan review</strong> — ao sair do modo de plano, <code>plan-review.sh</code> chama o <em>reviewer path</em> do Codex e registra o backend real usado.</li>
+            <li><strong>Plan review</strong> — para tasks M/L, o Maestro chama co-review via Codex CLI e registra o backend real usado.</li>
               <li><strong>Retomada</strong> — o envelope com <code>task_id</code>, <code>goal</code>, <code>constraints</code>, <code>done_definition</code> e artefatos de review fica persistido em <code>handoffs/</code>.</li>
             </ul>
           </div>
@@ -764,7 +764,7 @@ curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/in
             <li>Briefing inicial do Maestro ao abrir a sessao.</li>
             <li>Classificacao de task e escolha do fluxo entre personas.</li>
             <li>Carregamento de memoria, pending tasks e instincts no inicio.</li>
-            <li><code>plan-review.sh</code> ao sair do modo de plano.</li>
+            <li><code>screenshot-guard.sh</code> limita screenshots inline em base64.</li>
             <li><code>codex-pretool-guard.sh</code> em <code>git commit</code> e delegacoes Codex.</li>
             <li><code>session-save.sh</code> no evento <code>Stop</code>.</li>
             <li><code>pre-compact-save.sh</code> antes de compactacao.</li>
@@ -1123,7 +1123,7 @@ set BUDGET_LIMIT=&lt;n&gt;</code></pre></div>
           <h3>Mapa dos hooks</h3>
           <ul class="clean">
             <li><strong><code>codex-pretool-guard.sh</code></strong> -> intercepta <code>git commit</code>, comprime diff, roda gate e registra telemetria.</li>
-            <li><strong><code>plan-review.sh</code></strong> -> roda review de plano quando o modo de plano termina.</li>
+            <li><strong><code>screenshot-guard.sh</code></strong> -> limita screenshots inline e orienta uso de arquivo/snapshot textual.</li>
             <li><strong><code>session-save.sh</code></strong> -> snapshot no <code>Stop</code>.</li>
             <li><strong><code>pre-compact-save.sh</code></strong> -> persiste estado antes da compactacao.</li>
             <li><strong><code>session-load.sh</code></strong> -> pode ser chamado manualmente para reidratar o contexto da sessao.</li>

@@ -35,7 +35,7 @@ A scheduled wake-up signal that triggers an agent to check for work:
 
 ```
 Heartbeat: every 30m
-Agent: Tester
+Agent: Coder
 Action: Check if new commits have tests, run test suite if commits found
 ```
 
@@ -46,7 +46,7 @@ Defined in `.agents/heartbeats.yml` (future) or manually triggered:
 ```yaml
 heartbeats:
   - name: test-watcher
-    agent: tester
+    agent: coder
     interval: 30m
     trigger: new-commits-without-tests
     action: run-tests-and-report
@@ -121,7 +121,7 @@ When multi-agent infrastructure is available:
 
 | Pattern | Agent | Interval | Trigger | Action |
 |---------|-------|----------|---------|--------|
-| `test-watcher` | Tester | Per commit | New code without tests | Run test suite |
+| `test-watcher` | Coder | Per commit | New code without tests | Run test suite |
 | `dependency-checker` | Architect | Weekly | Outdated deps | Propose updates |
 | `context-freshness` | Contextualizer | Per session | Stale .context.md | Update context |
 | `security-scan` | Reviewer | Weekly | Known vulnerabilities | Report findings |

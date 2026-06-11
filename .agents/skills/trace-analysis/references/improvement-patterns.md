@@ -5,7 +5,7 @@ Use this cheat sheet when classifying traces. Evidence must come from vault mark
 ## playbook-gap
 - **Missing instructions** — repeated "Need clarification" comments or ad-hoc steps added mid-session. *Fix*: update persona instructions or stack docs with explicit step.
 - **Unclear handoff criteria** — Architect/Coder handoffs that leave Reviewer without test scope. *Fix*: append acceptance checklist.
-- **Unhandled edge cases** — Debugger finds scenario absent from playbook. *Fix*: add branch to relevant skill or stack section.
+- **Unhandled edge cases** — fluxo /fix finds scenario absent from playbook. *Fix*: add branch to relevant skill or stack section.
 
 ## blind-spot-gap
 - **Domain pitfalls not covered** — Two or more reviewers flag same domain error (e.g., caching, auth). Generate candidate per `blind-spot-generator`.
@@ -14,7 +14,7 @@ Use this cheat sheet when classifying traces. Evidence must come from vault mark
 
 ## instinct-candidate
 - **Recurring rework** — Same file edited 3+ times across personas.
-- **Repeated debugging cycle** — Debugger or Reviewer re-runs same fix path >2 times.
+- **Repeated debugging cycle** — fluxo /fix or Reviewer re-runs same fix path >2 times.
 - **Workflow friction** — User feedback repeating ("remember to run smoke tests"). Feed to `continuous-learning` pending user approval.
 
 ## routing-misfire

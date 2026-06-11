@@ -1,5 +1,5 @@
 shortDescription: Protocol that requires checking for applicable skills before any non-trivial action (the 1% Rule).
-usedBy: [maestro, architect, coder, tester, debugger, reviewer, contextualizer]
+usedBy: [maestro, architect, coder, reviewer, contextualizer]
 version: 1.0.0
 lastUpdated: 2026-03-23
 copyright: Rodrigo Canuto © 2026.
@@ -10,8 +10,8 @@ copyright: Rodrigo Canuto © 2026.
 - Before routing a task (Maestro)
 - Before starting implementation of any step (Coder)
 - Before producing a plan (Architect)
-- Before writing tests (Tester)
-- Before diagnosing a bug (Debugger)
+- Before writing tests (Coder)
+- Before diagnosing a bug (fluxo /fix)
 - Before reviewing a diff (Reviewer)
 
 **The 1% Rule:** If there is even a **1% chance** that a skill in `.agents/skills/` applies to the current task or sub-step, that skill MUST be checked before proceeding.

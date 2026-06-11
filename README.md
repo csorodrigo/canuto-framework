@@ -99,9 +99,9 @@ global-skills/          — Global slash commands installed to ~/.claude/skills/
 ## Standard Flow
 
 ```
-Maestro → Architect → Coder → Tester → Reviewer
-                                 ↓ (if tests fail)
-                             Debugger → Coder (fix) → Tester (re-run)
+Maestro → Architect → Coder → Reviewer
+                         ↓
+                    /test or /fix when deeper QA/debugging is needed
 ```
 
 ## Runtime Maestro
@@ -214,9 +214,9 @@ O runtime grava handoffs persistidos em `projects/{nome}/handoffs/`. Se a sessao
 Apos a instalacao, abra o projeto em Claude ou inicie o runtime direto do Codex com `bash .agents/tools/codex-maestro.sh`. O Maestro conduz este ciclo:
 
 1. **Bootstrap**: carrega `CLAUDE.md`, personas, skills, vault, context package e projeto ativo.
-2. **Session start**: consulta o vault via MCP, carrega latest session, pending tasks, instincts e stale-context signals. Se setup/memoria/contexto parecerem suspeitos, roda `canuto-project-doctor`.
+2. **Session start**: consulta o vault via CLI `canuto-brain`, carrega latest session, pending tasks, instincts e stale-context signals. Se setup/memoria/contexto parecerem suspeitos, roda `canuto-project-doctor`.
 3. **Planejamento**: limita objetivos da sessao, detecta estilo do projeto e escolhe personas/skills relevantes.
-4. **Execucao**: Architect, Coder, Tester, Debugger e Reviewer trabalham no fluxo minimo valido. `canuto-rework-detector` entra quando houver retry loop, review loop, teste repetido ou pendencia recorrente.
+4. **Execucao**: Architect, Coder e Reviewer trabalham no fluxo minimo valido; Coder escreve os testes no mesmo spawn e `/test` ou `/fix` entram quando a task exige QA/debugging dedicado. `canuto-rework-detector` entra quando houver retry loop, review loop, teste repetido ou pendencia recorrente.
 5. **QA e review**: Reviewer valida risco, testes, handoffs, PR readiness e, quando aplicavel, skills opcionais de dominio.
 6. **Session end**: `canuto-session-end-learning` reconcilia goals, pending, decisions, metrics, rework e candidate instincts.
 7. **Write-back seguro**: `obsidian-writeback-queue` prepara preview/queue antes de qualquer escrita fora da memoria normal do projeto.

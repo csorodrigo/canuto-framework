@@ -45,8 +45,6 @@ Detect broken or missing framework components before they silently degrade sessi
 - [ ] `.agents/personas/maestro.md` exists.
 - [ ] `.agents/personas/architect.md` exists.
 - [ ] `.agents/personas/coder.md` exists.
-- [ ] `.agents/personas/tester.md` exists.
-- [ ] `.agents/personas/debugger.md` exists.
 - [ ] `.agents/personas/reviewer.md` exists.
 - [ ] `.agents/personas/contextualizer.md` exists.
 
@@ -100,7 +98,7 @@ Detect broken or missing framework components before they silently degrade sessi
 
 ### Hooks
 - [ ] `~/.claude/hooks/codex-pretool-guard.sh` exists and is executable.
-- [ ] `~/.claude/hooks/plan-review.sh` exists and is executable.
+- [ ] `~/.claude/hooks/screenshot-guard.sh` exists and is executable.
 - [ ] `~/.claude/hooks/session-save.sh` exists and is executable.
 - [ ] `~/.claude/hooks/session-load.sh` exists and is executable.
 - [ ] `~/.claude/hooks/pre-compact-save.sh` exists and is executable.
@@ -110,7 +108,7 @@ Detect broken or missing framework components before they silently degrade sessi
 - [ ] `~/.codex/config.toml` has 5 profiles (coder, reviewer, architect, fast, maestro), all on canonical model.
 - [ ] `~/.claude/settings.json` does NOT have legacy `codex-coder` / `codex-reviewer` / `codex-maestro` MCP entries (re-run `bash install.sh --doctor` to clean).
 - [ ] `~/.claude/settings.json` has `codex-pretool-guard.sh` on `PreToolUse`.
-- [ ] `~/.claude/settings.json` has `plan-review.sh` on `PostToolUse` with matcher `ExitPlanMode`.
+- [ ] `~/.claude/settings.json` has `screenshot-guard.sh` on `PreToolUse` with matcher `mcp__playwright__browser_take_screenshot|mcp__claude-in-chrome__computer`.
 - [ ] `.agents/tools/codex-diff-context.sh` exists and is executable.
 - [ ] `.agents/tools/codex-context-package.sh` exists and is executable.
 - [ ] `.agents/tools/codex-health-check.sh` exists and is executable.

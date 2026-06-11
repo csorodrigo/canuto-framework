@@ -65,7 +65,7 @@ Continue with multi-provider.md API delegation or codex-collab MCP. Never block.
 Same protocol as multi-provider.md:
 - Goal statement
 - Relevant context files (`.context.md`, feature map sections)
-- The Architect's plan (for Coder) or implementation summary (for Tester/Reviewer)
+- The Architect's plan (for Coder) or implementation summary (for Reviewer)
 - The persona's playbook content
 - Strip Canuto-specific metadata headers if the provider doesn't understand them
 

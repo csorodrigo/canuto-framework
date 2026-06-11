@@ -148,20 +148,20 @@ Before routing any task, classify its complexity:
 |------|----------|------|
 | **XS** | Bug fix, text change, styling, config tweak, single-file correction | Maestro → Coder → Reviewer |
 | **S** | Simple feature, 1-4 files, low risk, no external integrations | Maestro → Architect (abbreviated) → Coder → Reviewer |
-| **M** | New feature, 5-10 files, OR risky integration with existing systems | Maestro → Architect → Coder → Tester → Reviewer |
-| **L** | New module, external service integration, architectural change | Maestro → Architect → Coder → Tester → Reviewer |
+| **M** | New feature, 5-10 files, OR risky integration with existing systems | Maestro → Architect → [Co-Review se M/L] → Coder (implementa + testes) → Reviewer |
+| **L** | New module, external service integration, architectural change | Maestro → Architect → [Co-Review se M/L] → Coder (implementa + testes) → Reviewer |
 
 > **Calibração (auditoria 2026-06-10):** a barra anterior de M ("3-5 arquivos") roteava
 > quase toda feature para a cadeia Codex completa (6-11 spawns por feature). Contagem
 > de arquivos sozinha não define M — o que define é risco de integração ou plano com
 > etapas independentes. Uma feature de 4 arquivos coesos é S.
 
-**Staged mode for L tasks (optional):** When the Architect's plan has 5+ steps with individual acceptance criteria, consider running the Coder+Tester per-step instead of waiting for full implementation:
+**Staged mode for L tasks (optional):** When the Architect's plan has 5+ steps with individual acceptance criteria, consider running the Coder per-step instead of waiting for full implementation:
 
 ```
 For each step in plan:
-  Coder implements step N → Tester verifies acceptance criteria for step N
-  If acceptance fails → Debugger → Coder (fix) → Tester (re-verify)
+  Coder implements step N + tests → verify acceptance criteria for step N
+  If acceptance fails → fluxo /fix (raiz confirmada + fingerprint) → Coder (fix) → re-verify
   If passes → proceed to step N+1
 After all steps: Reviewer reviews the complete implementation
 ```
@@ -199,10 +199,10 @@ For **S**: Architect conducts an abbreviated interview (see `architect.md`).
 For a **typical feature task**, the standard flow is:
 
 ```
-Maestro → Architect → [Co-Review — Codex, se M/L] → Coder → Tester → Reviewer
+Maestro → Architect → [Co-Review — Codex, se M/L] → Coder (implementa + testes) → Reviewer
 ```
 
-> **Co-Review (co-review skill):** Para tasks **M** e **L**, após o Architect chamar `ExitPlanMode`, o Maestro executa automaticamente `/co-validate` via Codex CLI. O hook legado `plan-review.sh` continua como bridge compatível para esse trigger.
+> **Co-Review (co-review skill):** Para tasks **M** e **L**, após o Architect chamar `ExitPlanMode`, o Maestro executa automaticamente `/co-validate` via Codex CLI. (O hook `plan-review.sh` foi aposentado em 2026-06-11 — 0 firings na auditoria de 200 sessões; o trigger é responsabilidade do Maestro, não de hook.)
 >
 > **Como funciona (bias-free parallel review):**
 > 1. Spawnar `codex exec --profile reviewer --color never --output-last-message /tmp/codex-review-$$.md "<plano + adversarial prompt>" < /dev/null` em background via Bash (run_in_background)
@@ -239,13 +239,13 @@ Maestro → Contextualizer
 
 > **Post-Coder context refresh:** After any Coder task that touches **5+ files**, Maestro MUST trigger the Contextualizer to update `.context.md` and `docs/FEATURE-MAP.md` before moving to Reviewer. This prevents stale context from accumulating mid-session.
 
-For **bug investigation** (root cause unknown):
+For **bug investigation / test failure** (root cause unknown):
 
 ```
-Maestro → Debugger → Coder (fix) → Tester → Reviewer
+Maestro → [fluxo /fix: diagnóstico com raiz confirmada + regras de fingerprint] → Coder (fix + testes) → Reviewer
 ```
 
-> Note: If the root cause is already known and the fix is a single-file change, classify as XS and route directly to Coder. Use the bug investigation flow only when diagnosis is needed.
+> Note: If the root cause is already known and the fix is a single-file change, classify as XS and route directly to Coder. Use the /fix flow only when diagnosis is needed. (Persona Debugger aposentada em 2026-06-11 — o diagnóstico segue a skill `/fix`.)
 
 For **health check** (user says "health check", "diagnose", "is the framework ok?"):
 
@@ -381,7 +381,7 @@ Maestro maintains a **file modification map** during the session: `{ "path/to/fi
 
 ### Loop Self-Regulation (stuck-detection skill)
 
-In addition to file-level rework detection, Maestro tracks **process-level loops** — when the Debugger→Coder→Tester cycle repeats without forward progress.
+In addition to file-level rework detection, Maestro tracks **process-level loops** — when the fix→implement→re-test cycle (fluxo /fix + Coder) repeats without forward progress.
 
 Maintain a **cycle counter** per task alongside the file modification map:
 
@@ -434,7 +434,7 @@ Before closing a session, you MUST:
    - NOTE: continuous-learning approval gate is PRESERVED — user confirms each instinct
 
 2. **Extract instincts** (continuous-learning skill):
-   - Scan the session for learnable patterns: rework files, MUST FIX items, Debugger diagnoses, user corrections, design rejections.
+   - Scan the session for learnable patterns: rework files, MUST FIX items, diagnósticos do fluxo /fix, user corrections, design rejections.
    - For each pattern: check existing instincts via `obsidian_global_search(query="pattern keyword")`.
    - If match exists → reinforce: `obsidian_manage_frontmatter` to bump confidence, applied count, last-seen.
    - If no match → create new instinct note in `instincts/I-XXX-slug.md` with `low` confidence.
@@ -584,7 +584,7 @@ Maestro picks up from the shared memory order:
 ### Notes
 - `CODEX.md` is the Codex equivalent of `CLAUDE.md` — maintained in project root.
 - Template for new projects: `.agents/templates/CODEX.md`.
-- `plan-review.sh` remains the hook bridge for `ExitPlanMode`.
+- `plan-review.sh` was retired on 2026-06-11 (see `.agents/hooks/_retired/`) — plan co-review is Maestro-triggered via the co-review skill.
 - Legacy `.agents/memory/` remains supported for compatibility.
 
 ---

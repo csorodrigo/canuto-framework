@@ -1,5 +1,5 @@
 shortDescription: Systematic multi-dimensional UI quality scan — a11y, UX guidelines, interaction states, responsiveness — with a structured pre-delivery checklist.
-usedBy: [reviewer, tester, architect]
+usedBy: [reviewer, architect]
 version: 1.0.0
 lastUpdated: 2026-03-23
 copyright: Rodrigo Canuto © 2026.

@@ -1,5 +1,5 @@
 shortDescription: Rules for handling secrets, environment variables, and security-sensitive code.
-usedBy: [coder, reviewer, architect, tester]
+usedBy: [coder, reviewer, architect]
 version: 1.0.0
 lastUpdated: 2026-02-25
 copyright: Rodrigo Canuto © 2026.
@@ -9,7 +9,7 @@ copyright: Rodrigo Canuto © 2026.
 **Triggers:**
 - Coder is implementing anything that touches secrets, auth, sessions, or user inputs
 - Reviewer is checking a PR that involves credentials, .env, or sensitive data flows
-- Tester is writing security-related test cases
+- Coder is writing security-related test cases
 - A new external service (API, DB, payment provider) is being integrated
 
 **Not for:**
@@ -20,7 +20,7 @@ copyright: Rodrigo Canuto © 2026.
 
 ## Purpose
 
-Prevent accidental exposure of secrets and enforce security hygiene across all personas. This skill is referenced by Coder (when implementing), Reviewer (when checking), and Tester (when writing security tests).
+Prevent accidental exposure of secrets and enforce security hygiene across all personas. This skill is referenced by Coder (when implementing and writing security tests) and Reviewer (when checking).
 
 ---
 

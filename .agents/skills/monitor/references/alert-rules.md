@@ -30,7 +30,7 @@ Monitor never takes action itself. For each alert:
 3. If automation is requested (e.g., restart dev server), record delegation separately; monitor only observes.
 
 ## Routing Defaults
-- Build/test warnings → Coder/Tester
+- Build/test warnings → Coder
 - Deploy/CI errors → Maestro
 - Security alerts → Reviewer (if session has one) else Maestro
 

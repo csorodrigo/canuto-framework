@@ -1,5 +1,5 @@
 shortDescription: Personas emit flags suggesting which other persona should investigate a discovered concern.
-usedBy: [maestro, architect, coder, tester, debugger, reviewer]
+usedBy: [maestro, architect, coder, reviewer]
 version: 1.0.0
 lastUpdated: 2026-03-18
 copyright: Rodrigo Canuto © 2026.
@@ -9,10 +9,10 @@ inspiration: pgs-engine — outbound flags enable cross-partition awareness desp
 
 **Triggers:**
 - Any persona discovers something outside their scope that another persona should know about
-- Coder notices a testable edge case → flag for Tester
-- Tester finds a design inconsistency → flag for Reviewer
+- Coder notices a testable edge case → flag for Reviewer (testes são escritos pelo próprio Coder no mesmo spawn)
+- Reviewer finds a design inconsistency → flag for Architect
 - Architect spots a security concern → flag for Coder (via security-practices skill)
-- Debugger identifies a pattern that could affect other areas → flag for Architect
+- Fluxo /fix identifica um padrão que pode afetar outras áreas → flag for Architect
 
 **Not for:**
 - Escalations (use the existing escalation protocol for blocking issues)
@@ -35,7 +35,7 @@ This is analogous to how PGS Engine's partitions emit "outbound flags" suggestin
 A non-blocking suggestion from one persona to another, routed through Maestro:
 
 ```
-[FLAG → Tester] Edge case discovered: empty cart checkout is not guarded in src/api/cart.ts:47
+[FLAG → Reviewer] Edge case discovered: empty cart checkout is not guarded in src/api/cart.ts:47
 ```
 
 ### Flag Priority
@@ -57,7 +57,7 @@ Add an `## Outbound Flags` section to any handoff where cross-persona concerns w
 ```markdown
 ## Outbound Flags
 
-- [FLAG → Tester | suggest] Empty cart checkout path not guarded — src/api/cart.ts:47
+- [FLAG → Reviewer | suggest] Empty cart checkout path not guarded — src/api/cart.ts:47
 - [FLAG → Reviewer | info] New utility function duplicates logic in src/utils/format.ts — consider consolidation
 - [FLAG → Architect | urgent] External payment API has no retry logic — may need plan revision
 ```
@@ -76,7 +76,7 @@ When receiving a handoff with outbound flags:
 1. **Urgent flags** → evaluate immediately. If valid, adjust routing or re-plan.
 2. **Suggest flags** → queue and include in the next handoff to the target persona:
    ```
-   [Maestro → Tester] Testing the checkout flow.
+   [Maestro → Coder] Implementing the checkout flow (com testes no mesmo spawn).
    Goal: Verify edge cases in cart and payment.
 
    Cross-persona flags to investigate:
@@ -105,14 +105,14 @@ Target persona acknowledges the flag in their handoff:
 ```markdown
 ## Outbound Flags
 
-- [FLAG → Tester | suggest] Race condition possible: concurrent cart updates don't use optimistic locking — src/api/cart.ts:82
+- [FLAG → Reviewer | suggest] Race condition possible: concurrent cart updates don't use optimistic locking — src/api/cart.ts:82
 - [FLAG → Reviewer | info] Created 3 new utility functions in src/utils/ — may benefit from a consolidation review
 ```
 
 ### ✅ Good — Maestro routing a flag to target persona
 
 ```
-[Maestro → Tester] Testing the user dashboard feature.
+[Maestro → Coder] Implementing the user dashboard feature (testes no mesmo spawn).
 Goal: Cover edge cases and error states.
 
 Cross-persona flags to investigate:

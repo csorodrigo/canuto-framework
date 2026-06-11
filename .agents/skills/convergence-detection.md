@@ -20,7 +20,7 @@ inspiration: pgs-engine — convergent findings across independent partitions in
 
 ## Purpose
 
-When the Architect identifies a risk in planning, and the Tester independently discovers the same issue in testing, and the Reviewer flags it again — that's **convergence**. Three independent observations of the same thing are far more reliable than one.
+When the Architect identifies a risk in planning, and the Coder independently discovers the same issue while writing tests, and the Reviewer flags it again — that's **convergence**. Three independent observations of the same thing are far more reliable than one.
 
 Convergence detection turns coincidental overlap into **actionable confidence signals**, helping Maestro prioritize issues and extract high-quality instincts.
 
@@ -43,8 +43,8 @@ Two or more personas independently identify the same issue, pattern, or concern 
 ### Independence Requirement
 
 Convergence only counts when findings are **independent**:
-- ✅ Architect notes missing validation in plan, Tester discovers it in tests → convergent
-- ❌ Architect notes missing validation, Maestro tells Tester to check for it → not convergent (directed)
+- ✅ Architect notes missing validation in plan, Coder discovers it in tests → convergent
+- ❌ Architect notes missing validation, Maestro tells the Coder to check for it → not convergent (directed)
 
 ---
 
@@ -66,7 +66,7 @@ After each persona handoff, Maestro compares the current findings against previo
 - Independent sources:
   1. Architect (planning): noted missing validation schema in src/schemas/
   2. Coder (implementation): flagged lack of Zod schema for request body
-  3. Tester (testing): found endpoint accepts malformed payloads
+  3. Coder (testes): found endpoint accepts malformed payloads
 - Convergence score: High (3 sources)
 - Recommendation: Address before merging — this is a confirmed gap.
 ```
@@ -127,7 +127,7 @@ Session Learnings:
 - Sources:
   1. Architect: planned rate limiting
   2. Coder: implemented rate limiting per Architect's plan
-  3. Tester: tested rate limiting per plan
+  3. Coder: tested rate limiting per plan
 ```
 
 This is bad because: all sources are following the plan, not independently discovering the same thing. This is plan execution, not convergence.

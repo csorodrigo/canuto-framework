@@ -17,7 +17,7 @@ Profiles define default sampling + alert behavior per process class. Override on
   - Regex samples: `/FAIL|✗|×|failed/i`, `/AssertionError/`, `/Timeout - Async callback/i`, `/Coverage dropped below/`
 - **Scan rate:** every 3rd line
 - **Focus trigger:** any test failure line or coverage delta below threshold
-- **Alert persona:** Tester/Debugger
+- **Alert persona:** Coder (fluxo /fix)
 - **Token budget allocation:** 30% (1.5K tokens per 10m)
 
 ## deploy

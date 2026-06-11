@@ -2,14 +2,14 @@
 
 ## ✅ Good — well-formed instinct extraction
 
-After a session where the Debugger found that API errors were being swallowed by a try/catch:
+After a session where the /fix flow found that API errors were being swallowed by a try/catch:
 
 ```markdown
 ### I-012 — [debugging] Silent error swallowing in API layer
 - **Pattern:** try/catch blocks in src/api/ catch errors but log them without re-throwing
 - **Learning:** Always re-throw after logging in API middleware. Check error propagation in any new endpoint.
 - **Confidence:** low
-- **Source:** Session 2026-03-08 — Debugger traced auth failure to swallowed 401 in src/api/middleware/error-handler.ts
+- **Source:** Session 2026-03-08 — /fix traced auth failure to swallowed 401 in src/api/middleware/error-handler.ts
 - **Applied:** 0
 ```
 

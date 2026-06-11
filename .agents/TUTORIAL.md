@@ -9,7 +9,7 @@
 Canuto is a **multi-persona AI framework** that gives Claude a persistent team structure and memory.
 
 ```
-YOU  ←→  Maestro  ←→  Personas (Architect, Coder, Tester, Reviewer, ...)
+YOU  ←→  Maestro  ←→  Personas (Architect, Coder, Reviewer, ...)
                   ↕
               Vault (Obsidian)
          instincts · decisions · sessions · pending tasks
@@ -56,8 +56,7 @@ Detect session mode            Coverage tracking (M/L)     Write metrics + audit
 | **Maestro** | Orchestrator. Routes, gates, tracks. Never codes. | Always — you talk to Maestro |
 | **Architect** | Plans features. Interviews you. Produces structured plan + REQ-IDs. | S / M / L tasks |
 | **Coder** | Implements per the plan. Writes basic tests. Updates `.context.md`. | After Architect (or directly for XS) |
-| **Tester** | Edge cases, error scenarios, coverage gaps. | M / L tasks, or complex bug fixes |
-| **Debugger** | Root cause diagnosis. Proposes fix, does not implement. | Unknown bugs |
+| *Tester / Debugger* | Aposentados em 2026-06-11 — testes escritos pelo Coder no mesmo spawn; debugging via skill `/fix`. | — |
 | **Reviewer** | Code review: correctness, style, plan alignment. | After Coder |
 | **Contextualizer** | Scans codebase, generates `.context.md` + `FEATURE-MAP.md`. | New projects, context bootstrap |
 
@@ -71,8 +70,8 @@ Maestro classifies every task before routing:
 |------|----------|------|---------|
 | **XS** | Single file, low risk, no design | Maestro → Coder → Reviewer | Fix typo, tweak style, config change |
 | **S** | 1-2 files, known scope | Maestro → Architect (brief) → Coder → Reviewer | Add a button, small endpoint |
-| **M** | 3-5 files, integration | Maestro → Architect → Coder → Tester → Reviewer | New feature, form + API + state |
-| **L** | Module / service, arch change | Maestro → Architect → Coder → Tester → Reviewer | Auth system, new data model |
+| **M** | 3-5 files, integration | Maestro → Architect → Coder (implementa + testes) → Reviewer | New feature, form + API + state |
+| **L** | Module / service, arch change | Maestro → Architect → Coder (implementa + testes) → Reviewer | Auth system, new data model |
 
 Maestro announces the classification:
 ```
@@ -150,8 +149,8 @@ You: "Add user profile page with avatar upload"
 → Maestro: Skill Check + Instinct Lookup
 → Maestro → Architect (interview + plan)
 → Architect → Coder (implements steps)
-→ Coder → Tester (edge cases)
-→ Tester → Reviewer (code review)
+→ Coder (implementa + testes, incl. edge cases)
+→ Coder → Reviewer (code review)
 → Reviewer → Maestro (summary)
 ```
 
@@ -165,9 +164,9 @@ You: "The login button doesn't work on Safari"
 ### Fix an unknown bug (root cause unclear)
 ```
 You: "Users are getting logged out randomly"
-→ Maestro → Debugger (diagnoses root cause)
-→ Debugger → Coder (implements fix)
-→ Coder → Tester → Reviewer
+→ Maestro → fluxo /fix (diagnoses root cause, raiz confirmada + fingerprint)
+→ /fix → Coder (implements fix + tests)
+→ Coder → Reviewer
 ```
 
 ### Bootstrap a new project
@@ -259,7 +258,7 @@ next session briefing → Maestro presents candidates
 [Maestro] Routing Check
 Sizing: S | Architect produced 6 steps across 5 files
 Signal: blast radius exceeds S threshold (1-2 files)
-Recommendation: Promote to M, add Tester
+Recommendation: Promote to M, exigir testes completos do Coder
 Proceed with reroute? [Promote to M / Keep S]
 ```
 

@@ -76,19 +76,19 @@
             "timeout": 120
           }
         ]
-      }
-    ],
-    "PostToolUse": [
+      },
       {
-        "matcher": "ExitPlanMode",
+        "matcher": "mcp__playwright__browser_take_screenshot|mcp__claude-in-chrome__computer",
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/plan-review.sh",
-            "timeout": 180
+            "command": "~/.claude/hooks/screenshot-guard.sh",
+            "timeout": 3
           }
         ]
-      },
+      }
+    ],
+    "PostToolUse": [
       {
         "matcher": "Edit|Write",
         "hooks": [

@@ -23,7 +23,7 @@ evals:
 - At session end — Maestro extracts instincts from the session's decisions, rework, and patterns
 - User says: `"what did we learn?"`, `"show instincts"`, `"evolve"`, `"what patterns have we found?"`
 - After a Reviewer REQUEST CHANGES — extract the "why" as a preventive instinct
-- After Debugger diagnosis — extract the root cause pattern as a diagnostic instinct
+- After a /fix diagnosis — extract the root cause pattern as a diagnostic instinct
 
 **Not for:**
 - Generic knowledge already covered by skills
@@ -113,7 +113,7 @@ At the end of each session, **before** writing `last-session.md`:
 1. **Scan for signals:**
    - Rework files (count ≥ 3) → potential architecture or planning instinct
    - Reviewer MUST FIX items → potential code-pattern or testing instinct
-   - Debugger diagnoses → potential debugging instinct
+   - Diagnósticos do fluxo /fix → potential debugging instinct
    - Repeated user corrections → potential workflow instinct
 
 2. **For each signal, check existing instincts:**
@@ -138,7 +138,7 @@ Personas consult instincts when relevant:
 - **Architect**: Read `high` and `medium` instincts before planning. Consider as soft constraints.
 - **Coder**: Read instincts in the relevant category before implementing.
 - **Reviewer**: Check if any `code-pattern` or `testing` instinct applies to the current diff.
-- **Debugger**: Read `debugging` instincts before investigating — the pattern may already be known.
+- **Fluxo /fix**: Read `debugging` instincts before investigating — the pattern may already be known.
 
 **Format:**
 ```

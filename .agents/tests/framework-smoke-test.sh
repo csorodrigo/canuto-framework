@@ -44,7 +44,7 @@ echo "## Required Files"
 for f in CLAUDE.md .agents/personas/maestro.md .agents/personas/architect.md \
          .agents/personas/coder.md .agents/personas/reviewer.md \
          .agents/tools/codex-common.sh .agents/tools/codex-health-check.sh \
-         .agents/hooks/codex-pretool-guard.sh .agents/hooks/plan-review.sh; do
+         .agents/hooks/codex-pretool-guard.sh .agents/hooks/screenshot-guard.sh; do
   if [ -f "$ROOT_DIR/$f" ]; then
     pass "exists: $f"
   else
@@ -56,7 +56,7 @@ done
 echo ""
 echo "## Executable Permissions"
 for f in .agents/tools/codex-common.sh .agents/tools/codex-health-check.sh \
-         .agents/hooks/codex-pretool-guard.sh .agents/hooks/plan-review.sh \
+         .agents/hooks/codex-pretool-guard.sh .agents/hooks/screenshot-guard.sh \
          .agents/hooks/cleanup-tmp.sh .agents/hooks/validate-config.sh; do
   [ -f "$ROOT_DIR/$f" ] || continue
   if [ -x "$ROOT_DIR/$f" ] || head -1 "$ROOT_DIR/$f" | grep -q '^#!/'; then

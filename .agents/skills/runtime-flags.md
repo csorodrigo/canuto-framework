@@ -5,6 +5,8 @@ lastUpdated: 2026-03-18
 copyright: Rodrigo Canuto © 2026.
 inspiration: everything-claude-code — hook-based runtime configuration with environment variable flags.
 
+> **Nota (2026-06-11):** personas Tester e Debugger aposentadas — os testes são escritos pelo Coder no mesmo spawn e debugging segue o fluxo /fix. Onde este doc menciona "Tester", leia "passo de testes do Coder". `SKIP_TESTER` é legado: equivale a "Coder pula testes" (exige aprovação explícita do usuário).
+
 ## When to Use
 
 **Triggers:**
@@ -32,9 +34,9 @@ This bridges the gap between rigid config (CLAUDE.md) and ad-hoc user requests, 
 
 | Flag | Default | Effect |
 |------|---------|--------|
-| `FAST_MODE` | false | Skip optional passes: abbreviated Architect, skip Tester for S tasks, skip Design Lens in Reviewer |
-| `STRICT_MODE` | false | Enforce all optional checks: full Architect for all sizes, Tester for all sizes, all Review lenses |
-| `SKIP_TESTER` | false | Skip the Tester persona entirely (Coder → Reviewer directly) |
+| `FAST_MODE` | false | Skip optional passes: abbreviated Architect and Design Lens in Reviewer |
+| `STRICT_MODE` | false | Enforce optional checks: full Architect for all sizes, Coder test evidence required, all Review lenses |
+| `SKIP_TESTER` | false | (legado) Coder pula a escrita de testes nesta sessão (Coder → Reviewer directly) |
 | `SKIP_DESIGN_REVIEW` | false | Skip the Design Lens (Pass 3) in Reviewer |
 | `VERBOSE_HANDOFFS` | false | Include full context in every handoff (overrides `handoff-verbosity` config) |
 | `QUIET_MODE` | false | Minimal announcements — only errors and final results |
@@ -62,7 +64,7 @@ Some flags conflict. Maestro resolves by priority:
 | Conflict | Resolution |
 |----------|------------|
 | FAST_MODE + STRICT_MODE | STRICT_MODE wins (safety over speed) |
-| SKIP_TESTER + STRICT_MODE | STRICT_MODE wins (Tester runs) |
+| SKIP_TESTER + STRICT_MODE | STRICT_MODE wins (Coder test evidence required) |
 | QUIET_MODE + VERBOSE_HANDOFFS | VERBOSE_HANDOFFS wins (explicit request) |
 
 ---
@@ -77,7 +79,7 @@ Some flags conflict. Maestro resolves by priority:
    ```
    🏁 Runtime flags set for this session:
    - FAST_MODE = true (skip optional passes)
-   - SKIP_TESTER = true (Coder → Reviewer directly)
+   - SKIP_TESTER = true (Coder may skip tests only with explicit user approval)
 
    These flags expire at session end. Confirm? [Y/n]
    ```
@@ -101,13 +103,13 @@ Maestro checks active flags at each routing decision:
 
 ```
 # Without flags (default)
-[Task S] Routing: Maestro → Architect (abbrev) → Coder → Tester → Reviewer
+[Task S] Routing: Maestro → Architect (abbrev) → Coder → Reviewer
 
 # With FAST_MODE
-[Task S] Routing: Maestro → Coder → Reviewer (fast mode: Architect + Tester skipped)
+[Task S] Routing: Maestro → Coder → Reviewer (fast mode: optional checks skipped)
 
 # With STRICT_MODE
-[Task S] Routing: Maestro → Architect (full) → Coder → Tester → Reviewer (strict: full flow for all sizes)
+[Task S] Routing: Maestro → Architect (full) → Coder → Reviewer (strict: full planning/review for all sizes)
 ```
 
 ### Logging Flags

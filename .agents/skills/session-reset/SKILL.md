@@ -6,7 +6,7 @@ trigger: /session-reset
 persona: maestro
 version: 1.0.0
 lastUpdated: 2026-04-21
-usedBy: [maestro, architect, debugger]
+usedBy: [maestro, architect]
 evals:
   - prompt: "o contexto tá pesado demais, compacta pra gente continuar"
     should_trigger: true

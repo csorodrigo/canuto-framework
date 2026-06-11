@@ -1,5 +1,5 @@
 shortDescription: Quando e como usar /qa + /browse do gstack no fluxo de QA — browser real vs testes unitários, pré-requisitos, integração com coverage-tracking.
-usedBy: [tester, maestro]
+usedBy: [coder, maestro]
 version: 1.1.0
 lastUpdated: 2026-03-23
 copyright: Rodrigo Canuto © 2026.
@@ -22,8 +22,8 @@ evals:
 - Regression testing de releases com mudanças de UI
 
 **Not for:**
-- Lógica de negócio sem UI (use Tester persona)
-- APIs e integrações backend (use Tester + integration tests)
+- Lógica de negócio sem UI (testes do Coder / skill /test)
+- APIs e integrações backend (Coder + integration tests)
 - Projetos sem frontend web
 - Quando gstack não está instalado (verifique antes de invocar)
 
@@ -31,7 +31,7 @@ evals:
 
 ## Purpose
 
-O Tester persona do Canuto escreve e executa testes unitários/integração. Isso cobre a lógica, mas não testa **o que o usuário realmente vê e clica**. O browser QA via gstack usa Chromium real para:
+O Coder escreve e executa testes unitários/integração no mesmo spawn. Isso cobre a lógica, mas não testa **o que o usuário realmente vê e clica**. O browser QA via gstack usa Chromium real para:
 
 - Navegar pela aplicação como um usuário real
 - Clicar em botões, preencher formulários, seguir fluxos
@@ -44,7 +44,7 @@ O Tester persona do Canuto escreve e executa testes unitários/integração. Iss
 
 | Tipo de teste | Quem faz | Quando |
 |---|---|---|
-| Unitários e integração | Tester persona | Sempre — obrigatório |
+| Unitários e integração | Coder (mesmo spawn) | Sempre — obrigatório |
 | QA de fluxo de usuário | /qa (gstack) | Features com UI em tasks M/L |
 | Automação pontual de browser | /browse (gstack) | Quando precisar clicar/navegar como humano |
 | Report sem corrigir | /qa-only (gstack) | Quando quiser identificar bugs sem tocar no código |
@@ -58,15 +58,15 @@ Antes de invocar `/qa` ou `/browse`, verifique:
 1. **gstack instalado**: `ls ~/.claude/skills/ | grep gstack` deve retornar resultado
 2. **Bun instalado**: `bun --version` deve funcionar (necessário para o binary do /browse)
 3. **App rodando localmente**: o `/qa` precisa de uma URL acessível (ex: `http://localhost:3000`)
-4. **Tester já rodou**: os testes unitários devem ter passado antes do browser QA
+4. **Testes já rodaram**: os testes unitários (Coder) devem ter passado antes do browser QA
 
 Se algum pré-requisito falhar: informe o usuário com instrução de correção.
 
 ---
 
-## Protocolo do Tester/Maestro
+## Protocolo do Coder/Maestro
 
-### Quando Tester Deve Sugerir Browser QA
+### Quando o Coder Deve Sugerir Browser QA
 
 Após rodar os testes unitários/integração:
 
@@ -177,7 +177,7 @@ The `--connect` flag reuses the session you already have open instead of launchi
 
 ## Relacionamentos com Outros Skills
 
-- **Tester persona** → roda primeiro; /qa é complementar, não substituto
+- **Testes do Coder** → rodam primeiro; /qa é complementar, não substituto
 - **coverage-tracking.md** → registre cobertura de browser QA
 - **audit-log.md** → bugs críticos de browser QA devem ser logados
 - **gstack /careful** → ative antes do /qa em ambientes de staging (proteção contra deleção acidental)

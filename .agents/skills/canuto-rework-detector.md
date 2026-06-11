@@ -1,5 +1,5 @@
 shortDescription: Detect repeated attempts, review-fix loops, stale assumptions, and prior failed approaches before more work is done.
-usedBy: [maestro, architect, debugger, reviewer]
+usedBy: [maestro, architect, reviewer]
 version: 1.0.0
 lastUpdated: 2026-04-17
 copyright: Rodrigo Canuto © 2026.
