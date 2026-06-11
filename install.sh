@@ -1432,15 +1432,13 @@ TOMLEOF
     # in sync manually when bumping model versions.
     local patched=false
     local CANONICAL_MODEL="gpt-5.5"
-    declare -A CANONICAL_EFFORT=(
-      [coder]="high"
-      [maestro]="xhigh"
-      [reviewer]="high"
-      [architect]="xhigh"
-      [fast]="high"
-    )
     for profile in coder maestro reviewer architect fast; do
-      local effort="${CANONICAL_EFFORT[$profile]}"
+      local effort
+      case "$profile" in
+        maestro|architect) effort="xhigh" ;;
+        coder|reviewer|fast) effort="high" ;;
+        *) effort="high" ;;
+      esac
       if ! grep -q "\[profiles\.$profile\]" "$config_toml" 2>/dev/null; then
         # Profile missing — append canonical block
         printf '\n[profiles.%s]\nmodel = "%s"\nmodel_reasoning_effort = "%s"\n' \
