@@ -165,7 +165,7 @@ echo "      - context-hub (docs de API atualizadas)"
 echo ""
 echo "✅ Hooks e MCP instalados."
 echo ""
-echo "ℹ️  Codex hooks instalados: pretool guard + plan review + session hooks"
+echo "ℹ️  Codex hooks instalados: pretool guard + screenshot guard + session hooks"
 
 # ── Sync todos os MCPs no Codex CLI ─────────────────────────────────────────
 echo ""
