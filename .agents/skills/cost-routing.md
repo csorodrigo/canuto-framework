@@ -35,34 +35,45 @@ spawns). CLI also has no MCP-server dependency — sessões não param se server
 
 ## Cost Routing Matrix
 
-All Codex invocations use the CLI: `codex exec --color never -q --profile <profile>`.
-Add `--output-last-message <path>` for clean stdout when output is large.
+Canonical Codex invocation: `~/.codex/bin/codex-delegate.sh <role> <task-file> <out-file>`
+(roles: coder|architect|reviewer|fast|maestro). Raw form: `codex exec --color never
+--skip-git-repo-check -c model_reasoning_effort="high" --output-last-message <path> "<prompt>" < /dev/null`.
+**Never use `-q`** — removed in codex-cli 0.135+.
 
-| Task Type | Size | Provider | Invocation | Est. Savings vs Opus |
-|-----------|------|----------|------------|---------------------|
-| **Code generation** | M/L | Codex (gpt-5.5, high) | `codex exec --profile coder` | 60-70% |
-| **Code generation** | XS/S | Claude (direct) | — | 0% (CLI overhead not justified) |
-| **Code review** | M/L | Codex (reviewer profile) | `codex exec --profile reviewer` | 40-50% |
-| **Code review (big diff / cross-model)** | L+ | Codex (architect profile, xhigh) | `codex exec --profile architect` | 30% |
-| **Code review** | XS/S | Claude (direct) | — | 0% |
-| **Test-fix loop** | Any | Codex (gpt-5.5, high) | `codex exec --profile coder` | 80% |
-| **Browser QA (exec + capture)** | Any | Codex (Playwright) | `codex exec --profile coder` | 70% |
-| **Planning** | Any | Claude Opus 4.7 (xhigh) | — (Maestro plans direct) | N/A (tier-1 quality required) |
-| **Architecture** | Any | Claude Opus 4.7 (xhigh) | — (Maestro plans direct) | N/A |
-| **User interview** | Any | Claude Opus 4.7 | — (needs AskUserQuestion tool) | N/A |
-| **Brainstorm (parallel)** | Any | Codex (parallel via xargs) | `codex exec --profile coder` × N in shell | 60% |
-| **Security scan** | Any | Codex (reviewer profile) | `codex exec --profile reviewer` | 40% |
-| **Security review (cross-model)** | M/L | Codex reviewer + Claude | 2 calls (Codex CLI + Claude direct) | — |
-| **Documentation** | Any | Codex (gpt-5.5, high) | `codex exec --profile coder` | 70% |
-| **Context loading** | Any | Codex (context-loader) | `codex exec --profile coder` | 90% |
-| **Session notes** | Any | Codex (session-writer) | `codex exec --profile coder` | 80% |
-| **PR description** | Any | Codex (pr-writer) | `codex exec --profile coder` | 70% |
-| **GitHub ops** | Any | Codex via gh CLI | `codex exec --profile coder` | 60% |
-| **Refactoring prep** | M/L | Codex (refactor-prep) | `codex exec --profile architect` | 60% |
-| **Onboarding (Codex path)** | Any | Codex (onboarding) | `codex exec --profile coder` | 90% |
-| **Vault reading** | Any | Codex (obsidian MCP) | `codex exec --profile coder` | 90% |
-| **Planning / Architecture (Codex runtime)** | M/L | Claude Opus 4.7 (cross-model back-delegation) | optional `mcp__claude-architect__spawn_agent` if present | — (tier-1, Codex runtime only) |
-| **Code review cruzada (Codex→Claude)** | Any | Claude Sonnet 4.6 | optional `mcp__claude-reviewer__spawn_agent` if present | 40% vs Opus solo |
+> **Recalibração (auditoria 2026-06-10, 200 sessões):** tarefas auxiliares (docs,
+> session notes, PR description, context/vault reading, GitHub ops) voltaram para
+> Claude inline. O custo real de um spawn Codex = montar prompt + context package +
+> ler resultado de volta + risco de timeout (17% das delegações falharam com rc=124).
+> Para tarefas que Claude faz inline em 1 turno, o spawn não se paga. A coluna de
+> savings anterior ("Est. Savings vs Opus") nunca foi medida e referenciava um
+> baseline desatualizado — foi removida até o cost-dashboard ter dados reais.
+
+| Task Type | Size | Provider | Invocation |
+|-----------|------|----------|------------|
+| **Code generation** | M/L | Codex (gpt-5.5, high) | `codex-delegate.sh coder` |
+| **Code generation** | XS/S | Claude (direct) | — (CLI overhead not justified) |
+| **Code review** | M/L | Codex (reviewer) | `codex-delegate.sh reviewer` |
+| **Code review (big diff / cross-model)** | L+ | Codex (architect, xhigh) | `codex-delegate.sh architect` |
+| **Code review** | XS/S | Claude (direct) | — |
+| **Test-fix loop** | M/L | Codex (gpt-5.5, high) | `codex-delegate.sh coder` |
+| **Test-fix loop** | XS/S | Claude (direct) | — |
+| **Browser QA (exec + capture)** | Any | Codex (Playwright) | `codex-delegate.sh coder` |
+| **Planning** | Any | Claude tier-1 | — (Maestro plans direct) |
+| **Architecture** | Any | Claude tier-1 | — (Maestro plans direct) |
+| **User interview** | Any | Claude tier-1 | — (needs AskUserQuestion tool) |
+| **Brainstorm (parallel)** | Any | Codex (parallel) | `codex-delegate.sh coder` × N |
+| **Security scan** | Any | Codex (reviewer) | `codex-delegate.sh reviewer` |
+| **Security review (cross-model)** | M/L | Codex reviewer + Claude | 2 calls (Codex CLI + Claude direct) |
+| **Documentation** | Any | Claude (inline) | — (spawn não se paga) |
+| **Context loading** | Any | Claude (inline) | — (Read/Grep direto; cache de prompt já amortiza) |
+| **Session notes** | Any | Claude (inline) | `canuto-brain.mjs closeout` (não spawnar Codex) |
+| **PR description** | Any | Claude (inline) | — (gerada do diff que Claude já tem em contexto) |
+| **GitHub ops** | Any | Claude (inline) | `gh` CLI direto |
+| **Refactoring prep** | M/L | Codex (refactor-prep) | `codex-delegate.sh architect` |
+| **Onboarding (Codex path)** | Any | Codex (onboarding) | `codex-delegate.sh coder` |
+| **Vault reading** | Any | Claude (inline) | `canuto-brain.mjs brief` (não spawnar Codex) |
+| **Planning / Architecture (Codex runtime)** | M/L | Claude (cross-model back-delegation) | optional `mcp__claude-architect__spawn_agent` if present |
+| **Code review cruzada (Codex→Claude)** | Any | Claude Sonnet 4.6 | optional `mcp__claude-reviewer__spawn_agent` if present |
 
 ---
 
@@ -93,20 +104,25 @@ Before each delegation, Maestro follows this flowchart:
 ### Standard CLI invocation pattern
 
 ```bash
-codex exec --color never -q --profile coder \
+# Canônico: wrapper que encapsula stdin-hang, sandbox, timeout, check 0-byte e auth
+~/.codex/bin/codex-delegate.sh coder /tmp/codex-task.md /tmp/codex-result.md
+# -> CODEX_DELEGATE_OK <out> | CODEX_DELEGATE_FAILED (exit 4) | FALLBACK auth (exit 5)
+
+# Forma crua (só para flags específicas):
+codex exec --color never --skip-git-repo-check \
+  -c model_reasoning_effort="high" \
   --output-last-message /tmp/codex-result-$$.md \
-  "$(cat <<'EOF'
-<full task prompt with plan + files + constraints>
-EOF
-)"
-# Read result via: cat /tmp/codex-result-$$.md
+  "<full task prompt>" < /dev/null
 ```
 
-**Key flags**:
-- `--color never -q` → strips ANSI/banners (saves 5-15% tokens)
+**Key flags** (codex-cli 0.139, verificado 2026-06-10):
+- `-q` **NÃO EXISTE MAIS** (removido na 0.135) — comandos com `-q` falham
+- `--color never` → strips ANSI/banners (saves 5-15% tokens)
 - `--output-last-message <path>` → final message to file, keeps stdout clean
-- `--profile <name>` → routes to coder/reviewer/architect/fast profiles in `~/.codex/config.toml`
-- `--full-auto` → auto-approves edits (use with caution; default is `--auto-edit`)
+- `--profile <name>` → lê `~/.codex/<name>.config.toml` (semântica v2; o antigo `[profiles.*]` em config.toml não é mais lido)
+- `-c key=value` → override direto, funciona em todas as versões (preferível a --profile)
+- `--skip-git-repo-check` → necessário fora de repos git (ex.: workspaces Conductor)
+- `< /dev/null` → evita stdin-hang em background
 
 ---
 

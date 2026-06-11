@@ -147,9 +147,14 @@ Before routing any task, classify its complexity:
 | Size | Criteria | Flow |
 |------|----------|------|
 | **XS** | Bug fix, text change, styling, config tweak, single-file correction | Maestro → Coder → Reviewer |
-| **S** | Simple feature, 1-2 files, low risk, no external integrations | Maestro → Architect (abbreviated) → Coder → Reviewer |
-| **M** | New feature, 3-5 files, integration with existing systems | Maestro → Architect → Coder → Tester → Reviewer |
+| **S** | Simple feature, 1-4 files, low risk, no external integrations | Maestro → Architect (abbreviated) → Coder → Reviewer |
+| **M** | New feature, 5-10 files, OR risky integration with existing systems | Maestro → Architect → Coder → Tester → Reviewer |
 | **L** | New module, external service integration, architectural change | Maestro → Architect → Coder → Tester → Reviewer |
+
+> **Calibração (auditoria 2026-06-10):** a barra anterior de M ("3-5 arquivos") roteava
+> quase toda feature para a cadeia Codex completa (6-11 spawns por feature). Contagem
+> de arquivos sozinha não define M — o que define é risco de integração ou plano com
+> etapas independentes. Uma feature de 4 arquivos coesos é S.
 
 **Staged mode for L tasks (optional):** When the Architect's plan has 5+ steps with individual acceptance criteria, consider running the Coder+Tester per-step instead of waiting for full implementation:
 
@@ -171,13 +176,20 @@ Announce the classification when routing:
 For **XS**: include in Coder handoff: goal, exact file(s), and expected change. No interview.
 For **S**: Architect conducts an abbreviated interview (see `architect.md`).
 
-> **REGRA CRÍTICA — Tasks M e L:** Após o usuário aprovar o plano, **NÃO use Edit/Write diretamente**. Chame imediatamente:
+> **REGRA CRÍTICA — Tasks M e L:** Após o usuário aprovar o plano, **NÃO use Edit/Write diretamente**. Chame imediatamente o wrapper canônico:
 > ```bash
-> codex exec --color never -q --profile coder \
->   --output-last-message /tmp/codex-result.md \
->   "<plano completo + arquivos + constraints>"
+> # 1) plano completo + arquivos + constraints num arquivo
+> $EDITOR /tmp/codex-task.md
+> # 2) delegar (roles: coder|architect|reviewer|fast|maestro)
+> ~/.codex/bin/codex-delegate.sh coder /tmp/codex-task.md /tmp/codex-result.md
+> ```
+> Forma crua equivalente (só se precisar de flags específicas — NUNCA use `-q`, removido no codex-cli 0.135+):
+> ```bash
+> codex exec --color never --skip-git-repo-check -c model_reasoning_effort="high" \
+>   --output-last-message /tmp/codex-result.md "<plano>" < /dev/null
 > ```
 > Maestro nunca implementa código. Delegar ao executor via CLI é obrigatório para tasks M/L.
+> Se o wrapper retornar `CODEX_DELEGATE_FAILED`/`FALLBACK`, **declare o fallback explicitamente** e implemente com Claude.
 > Modelo canônico: gpt-5.5 (high). Override via `.agents/config/models.yaml`.
 
 ---
@@ -193,7 +205,7 @@ Maestro → Architect → [Co-Review — Codex, se M/L] → Coder → Tester →
 > **Co-Review (co-review skill):** Para tasks **M** e **L**, após o Architect chamar `ExitPlanMode`, o Maestro executa automaticamente `/co-validate` via Codex CLI. O hook legado `plan-review.sh` continua como bridge compatível para esse trigger.
 >
 > **Como funciona (bias-free parallel review):**
-> 1. Spawnar `codex exec --profile reviewer --color never -q --output-last-message /tmp/codex-review-$$.md "<plano + adversarial prompt>"` em background via Bash (run_in_background)
+> 1. Spawnar `codex exec --profile reviewer --color never --output-last-message /tmp/codex-review-$$.md "<plano + adversarial prompt>" < /dev/null` em background via Bash (run_in_background)
 > 2. Codex é instruído a fazer revisão completa e gravar em arquivo (NÃO mostrar resultado antes)
 > 3. Enquanto isso, o agente principal faz sua própria revisão independente do plano
 > 4. Quando ambos terminarem: ler `/tmp/codex-review-$$.md` e comparar com a revisão do Claude
