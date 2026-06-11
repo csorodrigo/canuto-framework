@@ -68,23 +68,25 @@ A personal multi-agent framework for AI-assisted development that:
 |---------|------|----------|------|--------|
 | **Maestro** | Orchestrator. Task sizing, persona routing, session lifecycle, rework detection, refactor cadence. | Claude (always) | tier-1 | Complete |
 | **Architect** | Plans features and refactors. Abbreviated mode for S tasks. | Claude | tier-1 | Complete |
-| **Coder** | Implements code per the Architect's plan. Writes basic tests. | Mixed (Claude/Codex/GLM) | tier-2 | Complete |
-| **Tester** | QA specialist. Focuses on edge cases, error scenarios, coverage gaps. Validates that Coder's tests are sufficient. | Mixed | tier-2 | Complete |
-| **Debugger** | Investigates test failures. Diagnoses root cause and proposes fixes. | Mixed | tier-2 | Complete |
+| **Coder** | Implements code per the Architect's plan and writes happy-path plus focused edge-case tests in the same spawn. | Mixed (Claude/Codex) | tier-2 | Complete |
+| **Tester** | Retired. Dedicated QA work now runs through `/test` when needed. | — | — | Archived |
+| **Debugger** | Retired. Dedicated diagnosis now runs through `/fix` when needed. | — | — | Archived |
 | **Reviewer** | Reviews code for correctness, style, plan alignment. Produces analysis + checklist. | Different-from-coder | tier-2 | Complete |
 | **Contextualizer** | Scans codebase, generates and maintains `.context.md` and `FEATURE-MAP.md`. | Claude | tier-1 | Complete |
+
+> (Tester e Debugger aposentados em 2026-06-11 — fluxo colapsado no Coder + skills /test e /fix; arquivos em `.agents/personas/_archive/`.)
 
 ### 3.2 Standard Flow
 
 ```
-Maestro → Architect → Coder → Tester → Reviewer
-                                  ↓ (if tests fail)
-                              Debugger → Coder (fix) → Tester (re-run)
+Maestro → Architect → Coder → Reviewer
+                         ↓
+                    /test or /fix when dedicated QA/debugging is needed
 ```
 
 - Maestro orchestrates the full flow.
 - Contextualizer is called by Maestro at session start (bootstrap or stale check) and after significant changes.
-- Debugger is triggered **only when tests fail**. Not part of the happy path.
+- Dedicated `/test` or `/fix` flows are triggered only when task risk or failures justify them. They are not part of the default happy path.
 
 ### 3.3 Handoff Protocol
 
@@ -432,12 +434,12 @@ Brief narrative explaining the overall quality, notable patterns, and concerns.
 ### Verdict: APPROVE | REQUEST CHANGES
 ```
 
-### 7.2 Tester Protocol
+### 7.2 Test Responsibility
 
-- Tester runs **after** Coder, **before** Reviewer.
-- Focuses on: edge cases, error scenarios, race conditions, security implications.
-- Does NOT duplicate happy-path tests the Coder already wrote.
-- Output: list of test cases written + coverage assessment.
+- Coder writes implementation tests in the same spawn.
+- Focuses on happy path plus the edge cases touched by the change.
+- Dedicated `/test` is used when broader QA, race-condition checks, or coverage review is explicitly needed.
+- Output: test cases written or intentionally skipped, with validation evidence.
 
 ### 7.3 Test Policy
 
@@ -503,8 +505,8 @@ The template generates a default `CLAUDE.md` with these configurable sections:
 4. **Translate skills to English** — standardize language.
 
 ### Phase 2 — New Personas & Skills ✅
-5. **Create Tester persona**.
-6. **Create Debugger persona**.
+5. **Create Tester persona**. Retired 2026-06-11; archived under `.agents/personas/_archive/`.
+6. **Create Debugger persona**. Retired 2026-06-11; archived under `.agents/personas/_archive/`.
 7. **Create `security-practices` skill**.
 8. **Create `git-workflow` skill**.
 

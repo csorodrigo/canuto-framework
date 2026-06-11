@@ -1,5 +1,5 @@
 shortDescription: Personas explicitly report what they searched and did NOT find, eliminating silence ambiguity.
-usedBy: [maestro, architect, coder, tester, debugger, reviewer]
+usedBy: [maestro, architect, coder, reviewer]
 version: 1.0.0
 lastUpdated: 2026-03-18
 copyright: Rodrigo Canuto © 2026.
@@ -9,9 +9,9 @@ inspiration: pgs-engine (Partitioned Graph Search) — structured absence report
 
 **Triggers:**
 - Every persona handoff that involves investigation or search (code, docs, APIs, patterns)
-- Debugger diagnosis — report what was ruled out, not just what was found
+- Diagnóstico do fluxo /fix — report what was ruled out, not just what was found
 - Architect plan — report alternatives explored and discarded
-- Tester coverage — report scenarios considered but deemed out of scope
+- Cobertura de testes (Coder) — report scenarios considered but deemed out of scope
 
 **Not for:**
 - Trivial handoffs (XS tasks with no investigation needed)
@@ -52,7 +52,7 @@ Something relevant was identified but not investigated due to scope or time cons
 Multiple personas independently report the same absence. Strong signal of a genuine gap.
 
 ```
-[CONVERGENT ABSENCE] Both Architect and Tester report: no error handling strategy for external API failures.
+[CONVERGENT ABSENCE] Both Architect and Coder report: no error handling strategy for external API failures.
 ```
 
 ---
@@ -86,7 +86,7 @@ When receiving handoffs with absences:
 2. **Detect convergent absences** — if 2+ personas report the same gap, flag it:
    ```
    ⚠️ Convergent absence detected: "no error handling for external API failures"
-   Reported by: Architect (planning), Tester (test gaps)
+   Reported by: Architect (planning), Coder (test gaps)
    Consider addressing this gap before continuing.
    ```
 3. **Surface critical absences** to the user when they affect task quality
@@ -111,7 +111,7 @@ When receiving handoffs with absences:
 ```
 ⚠️ Convergent absence: "no input validation on user registration endpoint"
 - Architect noted during planning: no validation schema found in src/schemas/
-- Tester noted during test writing: no validation tests exist
+- Coder noted during test writing: no validation tests exist
 - Coder noted during implementation: endpoint accepts any payload
 Recommendation: Add validation before proceeding with next feature.
 ```

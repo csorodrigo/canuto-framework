@@ -21,6 +21,12 @@ fi
 COMMON_LIB="$ROOT_DIR/.agents/tools/codex-common.sh"
 DIFF_SCRIPT="$ROOT_DIR/.agents/tools/codex-diff-context.sh"
 
+# Projects without a local .agents/ checkout fall back to the globally
+# installed copies (install.sh ships them to ~/.claude/scripts/).
+GLOBAL_SCRIPTS_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/scripts"
+[ -f "$COMMON_LIB" ] || COMMON_LIB="$GLOBAL_SCRIPTS_DIR/codex-common.sh"
+[ -f "$DIFF_SCRIPT" ] || DIFF_SCRIPT="$GLOBAL_SCRIPTS_DIR/codex-diff-context.sh"
+
 if [ ! -f "$COMMON_LIB" ]; then
   _degraded_flag "codex-common.sh not found — all Codex validation skipped"
   exit 0
@@ -120,6 +126,12 @@ handle_commit_gate() {
   local fallback_occurred="true"
 
   if ! printf '%s' "$command_text" | grep -Eq '(^|[[:space:]])git[[:space:]]+commit([[:space:]]|$)'; then
+    return 0
+  fi
+
+  # Deliberate override (mirrors CANUTO_ALLOW_PROTECTED / CANUTO_ALLOW_ENV_READ).
+  if [ "${CANUTO_ALLOW_COMMIT:-}" = "1" ] || printf '%s' "$command_text" | grep -q 'CANUTO_ALLOW_COMMIT=1'; then
+    printf '%s\n' "[codex-pretool-guard] commit review skipped (CANUTO_ALLOW_COMMIT=1)." >&2
     return 0
   fi
 
@@ -413,9 +425,26 @@ EOF
     '{timestamp:$timestamp,review_id:$review_id,review_type:$review_kind,status:$status,provider:"codex",preferred_reviewer_path:$preferred_path,preferred_model:$preferred_model,reviewer_path:$reviewer_path,model:$model,fallback_occurred:$fallback_occurred,score:$score,issues_count:$issues,hook_duration_s:$hook_duration_s,review_tier:$review_tier,summary:$summary,command:$command,files:($files | split("\n") | map(select(length > 0)))}')
   codex_append_event "$ROOT_DIR" "$event_json"
 
+  # Loop-breaker: an agent retrying the same blocked commit burns tokens
+  # (observed: 29 HOLD blocks in a single session). After 3 HOLDs in the same
+  # session the gate degrades to advisory instead of blocking forever.
+  local session_id hold_count_file prev_holds hold_count
+  session_id=$(printf '%s' "$HOOK_INPUT" | jq -r '.session_id // empty' 2>/dev/null || true)
+  [ -n "$session_id" ] || session_id="nosession"
+  hold_count_file="$tmp_dir/commit-hold-count-$session_id"
+  prev_holds=$(cat "$hold_count_file" 2>/dev/null || printf '0')
+  case "$prev_holds" in ''|*[!0-9]*) prev_holds=0 ;; esac
+
   if [ "$verdict" = "HOLD" ]; then
-    block_with_message "Codex blocked git commit: $summary See .agents/tmp/codex/latest-pre-commit-review.md for details."
+    hold_count=$((prev_holds + 1))
+    printf '%s\n' "$hold_count" > "$hold_count_file" 2>/dev/null || true
+    if [ "$hold_count" -ge 3 ]; then
+      printf '%s\n' "Codex review HOLD #$hold_count nesta sessão — gate degradado para advisory; commit liberado. Corrija os issues em .agents/tmp/codex/latest-pre-commit-review.md ou divida o commit." >&2
+      return 0
+    fi
+    block_with_message "Codex blocked git commit (HOLD $hold_count/3): $summary Fix the issues or split the commit — do NOT retry the same commit unchanged (after 3 HOLDs the gate turns advisory). See .agents/tmp/codex/latest-pre-commit-review.md for details."
   fi
+  rm -f "$hold_count_file" 2>/dev/null || true
 }
 
 case "$TOOL_NAME" in

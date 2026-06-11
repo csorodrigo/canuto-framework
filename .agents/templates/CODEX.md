@@ -31,9 +31,9 @@ If no writable vault exists, queue sync payloads in `.agents/.cache/pending-sync
 ### Delegation and review
 
 - Keep the standard Maestro contract from `.agents/personas/maestro.md`.
-- Use the co-review infrastructure when MCPs are available.
-- `plan-review.sh` remains the legacy-compatible hook bridge for `ExitPlanMode`.
-- If MCPs or Codex review infrastructure are unavailable, degrade gracefully and continue without switching runtime automatically.
+- Use Codex CLI via `~/.codex/bin/codex-delegate.sh` for co-review when the task size warrants it.
+- `plan-review.sh` is retired; Maestro triggers plan co-review explicitly through the co-review skill.
+- If Codex review infrastructure is unavailable, degrade gracefully and continue without switching runtime automatically.
 
 ### Session resume
 

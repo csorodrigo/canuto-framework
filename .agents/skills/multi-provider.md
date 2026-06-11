@@ -9,7 +9,7 @@ copyright: Rodrigo Canuto © 2026.
 **Triggers:**
 - CLAUDE.md has a `## Providers` section with non-Claude entries configured
 - User explicitly requests a specific provider for a task
-- A tier-2 persona (Coder, Tester, Debugger, Reviewer) is being handed off
+- A tier-2 persona (Coder, Reviewer) is being handed off
 
 **Not for:**
 - Switching the active runtime automatically mid-session
@@ -20,7 +20,7 @@ copyright: Rodrigo Canuto © 2026.
 
 ## Purpose
 
-Enable the Maestro to orchestrate multiple AI providers for different personas, optimizing cost, speed, and quality. Claude remains the default runtime, but a direct Codex session can also run Maestro via the `maestro` profile. Execution personas (Coder, Tester, Debugger, Reviewer) can still be delegated independently.
+Enable the Maestro to orchestrate multiple AI providers for different personas, optimizing cost, speed, and quality. Claude remains the default runtime, but a direct Codex session can also run Maestro via the `maestro` profile. Execution personas (Coder, Reviewer) can still be delegated independently. (Tester e Debugger aposentados em 2026-06-11 — o Coder escreve testes no mesmo spawn; debugging segue o fluxo /fix.)
 
 ---
 
@@ -33,7 +33,6 @@ Enable the Maestro to orchestrate multiple AI providers for different personas, 
 | tier-1 | Strategic (Maestro, Architect, Contextualizer) | Active runtime (`claude` by default, `codex` in direct Codex sessions) | opus 4.7 (xhigh) | — (native) | No — stays on the active runtime |
 | tier-2 | Coder | Codex | gpt-5.5 (reasoning: high) | `codex exec --profile coder` | Yes — writes code in filesystem |
 | tier-2 | Reviewer | Codex | gpt-5.5 (reasoning: high) | `codex exec --profile reviewer` | Yes — deep self-review (cross-model) |
-| tier-2 | Tester, Debugger | Codex | gpt-5.5 (reasoning: high) | `codex exec --profile coder` | Yes — can use Codex or Claude |
 | tier-2 | Architect (deep reasoning) | Codex | gpt-5.5 (reasoning: xhigh) | `codex exec --profile architect` | Yes — for heavy decomposition or escalations |
 | tier-1-delegate | Architect back-delegation (Codex runtime only) | Claude Opus | claude-opus-4-7 | optional `mcp__claude-architect__spawn_agent` | Optional — Codex-Maestro calls Opus when Claude reasoning is required |
 | tier-2 | Reviewer (cross-model, Codex runtime) | Claude Sonnet | claude-sonnet-4-6 | optional `mcp__claude-reviewer__spawn_agent` | Yes — bias-free review: Codex implements → Claude reviews |
@@ -50,8 +49,6 @@ Configure providers in `CLAUDE.md`:
 ## Providers
 - primary: claude
 - coder: codex | claude
-- tester: claude | codex
-- debugger: claude
 - reviewer: claude
 ```
 

@@ -70,11 +70,12 @@ Depois de instalar e abrir o projeto no Claude/Codex com o framework carregado, 
 | Funciona passivamente | Gatilho |
 |-----------------------|---------|
 | Briefing inicial de sessao do Maestro | Abrir a sessao e comecar o trabalho |
-| Fluxo `Maestro -> Architect -> Coder -> Tester -> Reviewer` | Pedir uma task normal |
+| Fluxo `Maestro -> Architect -> Coder -> Reviewer` | Pedir uma task normal |
 | `session-save.sh` | Evento `Stop` |
 | `pre-compact-save.sh` | Antes de compactacao |
-| `plan-review.sh` | Saida do modo de plano (`ExitPlanMode`) como bridge compativel para o co-review |
+| Co-review de plano | Maestro aciona a skill de co-review quando a task M/L precisa de segunda opiniao |
 | `codex-pretool-guard.sh` | Uso de `git commit` pelo Bash hookado e delegacoes Codex |
+| `screenshot-guard.sh` | Screenshot Playwright/Chrome inline em base64 |
 | Coleta de goals/pending/instincts/metrics | Encerramento formal da sessao |
 | MCPs e profiles Codex disponiveis | Apos `install.sh` / `--update` bem-sucedido |
 | Launcher de Codex Maestro | `bash .agents/tools/codex-maestro.sh` |
@@ -132,7 +133,7 @@ bash .agents/tools/vault-sync.sh
 | Hook | Evento | O que faz |
 |------|--------|-----------|
 | `codex-pretool-guard.sh` | `PreToolUse` | Faz gate de `git commit`, review de diff e bloqueios de delegacao Codex sem contexto |
-| `plan-review.sh` | `PostToolUse: ExitPlanMode` | Bridge compativel que aciona o fluxo de co-review antes de codar |
+| `screenshot-guard.sh` | `PreToolUse: mcp__playwright__browser_take_screenshot\|mcp__claude-in-chrome__computer` | Limita screenshots inline em base64; prefira `filename` ou snapshot textual |
 | `session-save.sh` | `Stop` | Salva snapshot de sessao |
 | `pre-compact-save.sh` | `Notification` | Salva contexto antes da compactacao |
 | `session-load.sh` | manual | Recarrega contexto da sessao quando voce chamar explicitamente |
@@ -174,9 +175,9 @@ Session Briefing:
 ### Fluxo padrao
 
 ```
-Maestro → Architect → Coder → Tester → Reviewer
-                                  ↓ (se testes falham)
-                              Debugger → Coder (fix) → Tester (re-run)
+Maestro → Architect → Coder → Reviewer
+                         ↓
+                    /test ou /fix quando QA/debugging dedicado for necessario
 ```
 
 O Maestro orquestra tudo. Voce so pede o que quer e ele delega.
@@ -186,9 +187,9 @@ O Maestro orquestra tudo. Voce so pede o que quer e ele delega.
 | Voce diz | O que acontece |
 |----------|----------------|
 | "health check" ou "check framework" | Roda diagnostico completo do framework |
-| "set FAST_MODE" | Pula passos opcionais (Tester em tasks S, Design Lens) |
+| "set FAST_MODE" | Pula passos opcionais (Architect abreviado, Design Lens) |
 | "set STRICT_MODE" | Forca todos os checks, mesmo opcionais |
-| "skip tests" ou "set SKIP_TESTER" | Pula o Tester (Coder → Reviewer direto) |
+| "skip tests" ou "set SKIP_TESTER" | Pede para o Coder pular testes nessa task; exige aprovacao explicita |
 | "modo silencioso" ou "set QUIET_MODE" | So mostra erros e resultado final |
 | "verbose" ou "set VERBOSE_HANDOFFS" | Handoffs completos com todo o contexto |
 | "dry run" ou "set DRY_RUN" | Personas descrevem o que fariam sem executar |
@@ -200,7 +201,7 @@ Flags expiram quando a sessao termina. Para ver quais estao ativas, pergunte ao 
 
 Conflitos resolvidos por prioridade:
 - `STRICT_MODE` > `FAST_MODE`
-- `STRICT_MODE` > `SKIP_TESTER`
+- `STRICT_MODE` > `SKIP_TESTER` (exige evidencia de testes do Coder)
 - `VERBOSE_HANDOFFS` > `QUIET_MODE`
 
 ---
@@ -367,6 +368,8 @@ Disponiveis em **qualquer projeto**. Instalados em `~/.claude/skills/`.
 ### D. Skills do Projeto (.agents/skills/)
 
 Estas skills podem ser usadas automaticamente pelo Maestro quando o problema pede, ou explicitamente se voce disser o nome da skill.
+
+> **Nota (2026-06-11):** 30 skills raiz sem leitura em runtime (auditoria de 200 sessões) foram movidas para `.agents/skills/_archive/` — entre elas `adr`, `api-docs-fetch`, `brand-bootstrap`, `competition`, `context-digest`, `context-preload`, `headless-validation`, `health`, `lazy-opus-review`, `parallel-impl`, `plan-second-opinion`, `product-review`, `smart-token-metering` e todas as `codex-*` da seção 5. Restaurar com `git mv`.
 
 #### 1. Workflow, planejamento e pesquisa
 
@@ -660,7 +663,7 @@ Voice-to-text funciona bem com Claude Code — typos e frases incompletas sao in
 - **"/research"** para investigar antes de planejar — consulta comunidade + vault + codebase e gera plano estruturado.
 - **"/auto-analysis"** ao onboardar um projeto — gera index e cross-referencia com outros projetos.
 - **"/vault-maintenance"** periodicamente para arquivar sessoes velhas e agregar metricas.
-- **"set FAST_MODE"** para quick fixes que nao precisam de Tester.
+- **"set FAST_MODE"** para quick fixes que nao precisam de checks opcionais.
 - **Graph view** no Obsidian mostra como decisions, instincts e sessions se conectam.
 - **"health check"** se algo parecer estranho — diagnostica tudo.
 - O Maestro **nunca** roda Git ou shell sem pedir confirmacao.
@@ -676,7 +679,7 @@ Voice-to-text funciona bem com Claude Code — typos e frases incompletas sao in
 2. /research            → Community intelligence + codebase + vault + riscos
 3. Architect planeja    → Maestro delega automaticamente
 4. Coder implementa    → Com testes
-5. Tester valida       → Edge cases + regressoes
+5. Coder valida        → Happy path, edge cases essenciais e regressoes
 6. Reviewer aprova     → Checklist de qualidade
 7. /document-release   → Atualiza docs
 8. Maestro encerra     → Salva tudo no vault

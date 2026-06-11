@@ -1,11 +1,11 @@
 ---
 skill: stuck-detection
-trigger: Passive — Maestro monitors automatically during Debugger-Coder-Tester cycles
+trigger: Passive — Maestro monitors automatically during fix→implement→re-test cycles (fluxo /fix + Coder)
 persona: maestro
 version: 1.0.0
-lastUpdated: 2026-03-29
+lastUpdated: 2026-06-11
 shortDescription: >
-  Detects when the Debugger→Coder→Tester cycle is looping without progress and escalates before wasting tokens.
+  Detects when the fix→implement→re-test cycle (fluxo /fix + Coder) is looping without progress and escalates before wasting tokens.
 usedBy: [maestro]
 evals:
   - prompt: "the tests keep failing even after the third fix attempt"
@@ -20,7 +20,7 @@ evals:
 
 ## When to Use
 
-This skill is **passive** — Maestro applies it automatically during any Debugger→Coder→Tester cycle. It is NOT triggered by the user.
+This skill is **passive** — Maestro applies it automatically during any fix→implement→re-test cycle (fluxo /fix + Coder). It is NOT triggered by the user.
 
 **Activates when:** the same task enters its 3rd iteration of the fix-test cycle, or the same escalation pattern repeats twice.
 
@@ -40,9 +40,9 @@ Maestro maintains a **cycle counter** per task (alongside the existing file modi
 
 | Signal | Threshold | Action |
 |--------|-----------|--------|
-| Debugger→Coder→Tester cycle count | >= 3 | Emit stuck warning |
+| fix→implement→re-test cycle count | >= 3 | Emit stuck warning |
 | Same error message repeating | 2 consecutive cycles with identical root cause | Emit stuck warning |
-| Same escalation pattern | 2x (e.g., Tester→Debugger→Coder→Tester→Debugger→Coder) | Emit stuck warning |
+| Same escalation pattern | 2x (e.g., teste falha→/fix→Coder→teste falha→/fix→Coder) | Emit stuck warning |
 | File rework + cycle count | File modified 3x AND cycle count >= 2 | Emit stuck warning (compound signal) |
 
 ### Stuck Warning
@@ -73,7 +73,7 @@ Options:
 
 ```
 [Maestro] ⚠️ Stuck detected: "Add payment webhook handler" has entered cycle 3.
-Signal: Debugger diagnosed the same TypeError in src/webhooks/stripe.ts:42
+Signal: fluxo /fix diagnosed the same TypeError in src/webhooks/stripe.ts:42
 in cycles 2 and 3. The Coder's fix attempts changed the symptom but not the root cause.
 
 Options:

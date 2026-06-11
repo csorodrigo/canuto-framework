@@ -6,7 +6,7 @@ copyright: Rodrigo Canuto © 2026.
 
 ## Purpose
 
-Eliminate the manual step of writing PR descriptions. After a review cycle, the Reviewer generates a ready-to-paste PR body based on the Architect's plan, Coder's changes, Tester's results, and the review verdict.
+Eliminate the manual step of writing PR descriptions. After a review cycle, the Reviewer generates a ready-to-paste PR body based on the Architect's plan, Coder's changes and test results, and the review verdict.
 
 ---
 
@@ -62,14 +62,14 @@ Eliminate the manual step of writing PR descriptions. After a review cycle, the 
 1. **Collect from the session:**
    - Architect's plan: goal, steps, constraints.
    - Coder's changed files and deviations.
-   - Tester's results.
+   - Coder's test results.
    - Reviewer's MUST FIX items resolved, final verdict.
 
 2. **Fill the template:**
    - Summary: distill from the Architect's goal (1-3 sentences max).
    - Changes: one bullet per file from the Coder's summary.
    - Type of change: infer from the plan (new feature? fix? refactor?).
-   - Testing: summarize Tester's results.
+   - Testing: summarize the Coder's test results.
    - Breaking changes: extract from Architect's plan Constraints/Risks.
    - Notes: include relevant deviations or escalation context.
 
@@ -116,4 +116,4 @@ This is bad because: exposes internal framework details (Maestro, Architect), no
 - Keep Summary to 3 sentences max. If it needs more, it's too complex for one PR.
 - Never include internal framework details (persona names, handoff logs) in the PR description.
 - If the session included multiple tasks, generate one description per task or ask Maestro which task to describe.
-- If Tester was not invoked, write "Manual testing" in the Testing section and flag it.
+- If no automated tests were run, write "Manual testing" in the Testing section and flag it.

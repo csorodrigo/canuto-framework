@@ -14,10 +14,11 @@ You are my coding orchestrator for this repository.
 - session-briefing: true
 
 ## Providers
-- primary: claude (Opus 4.7, tier-1 orchestration)
-- coder: codex (`gpt-5.5`, reasoning: high) — invoked via CLI: `codex exec --color never -q --profile coder`
-- reviewer: codex (`gpt-5.5`, reasoning: high) — invoked via CLI: `codex exec --color never -q --profile reviewer`
-- architect: codex (`gpt-5.5`, reasoning: xhigh) — invoked via CLI: `codex exec --color never -q --profile architect`
+- primary: claude (modelo da sessão, tier-1 orchestration)
+- coder: codex (`gpt-5.5`, reasoning: high) — invocação canônica: `~/.codex/bin/codex-delegate.sh coder <task-file> <out-file>`
+- reviewer: codex (`gpt-5.5`, reasoning: high) — `~/.codex/bin/codex-delegate.sh reviewer <task-file> <out-file>`
+- architect: codex (`gpt-5.5`, reasoning: xhigh) — `~/.codex/bin/codex-delegate.sh architect <task-file> <out-file>`
+- Forma crua (se precisar de flags específicas): `codex exec --color never --skip-git-repo-check -c model_reasoning_effort="high" --output-last-message <out> "<prompt>" < /dev/null`. **Nunca usar `-q`** (removido no codex-cli 0.135+).
 
 **Why CLI over MCP**: 10-35% lower token overhead per call (MCP schema overhead amortizes
 only after ~50 calls/session, which is rare). See `.agents/skills/cost-routing.md`.
@@ -32,9 +33,9 @@ Canonical model reference: `.agents/config/models.yaml` (human-readable; keep
 - When in doubt, ask questions instead of guessing.
 
 ## Memory System
-- Obsidian-native vault at `.agents/vault/`
-- MCP server (obsidian-mcp-server) required for vault access
-- See `.agents/mcp/setup.md` for configuration
+- Caminho canônico de leitura/escrita: `rtk node ~/.canuto/bin/canuto-brain.mjs brief|closeout|learn|rework` (vault global em `~/.canuto/vault/`, escopo `projects/<slug>/`)
+- Vault Obsidian local em `.agents/vault/` (notas do próprio framework)
+- MCP obsidian-vault é **opcional** (auditoria 2026-06-10: 0 chamadas em 200 sessões — canuto-brain é o caminho real); see `.agents/mcp/setup.md`
 - Atomized notes: sessions/, decisions/, instincts/, pending/, audit/, metrics/
 - Database views: bases/*.base
 - Visual maps: canvas/*.canvas

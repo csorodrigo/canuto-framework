@@ -1,12 +1,12 @@
 ---
 skill: verification-gates
-trigger: Automatic — applied during Tester and Reviewer verification of M/L tasks
-persona: tester
+trigger: Automatic — applied during Coder test reporting and Reviewer verification of M/L tasks
+persona: coder
 version: 1.0.0
-lastUpdated: 2026-03-29
+lastUpdated: 2026-06-11
 shortDescription: >
   Prevents agents from gaming test verification by requiring raw command output and dual independent verification for M/L tasks.
-usedBy: [tester, reviewer, maestro]
+usedBy: [coder, reviewer, maestro]
 evals:
   - prompt: "the tests say they all pass but I'm not sure they actually ran"
     should_trigger: true
@@ -20,7 +20,7 @@ evals:
 
 ## When to Use
 
-**Always active for M/L tasks** — Tester and Reviewer follow this protocol automatically.
+**Always active for M/L tasks** — Coder (que escreve e roda os testes no mesmo spawn) and Reviewer follow this protocol automatically.
 **Not required for XS/S tasks** — trust-based model is sufficient for small changes.
 
 ## Purpose
@@ -31,9 +31,9 @@ Adapted from Kodo's verification signal detection pattern (regex-based, anti-gam
 
 ## Procedure
 
-### 1. Raw Output Requirement (Tester)
+### 1. Raw Output Requirement (Coder)
 
-The Tester MUST include **actual command output** in the Test Report, not a summary. Specifically:
+The Coder MUST include **actual command output** in the Test Report, not a summary. Specifically:
 
 - The exact command that was run (e.g., `npm test -- --reporter=verbose`)
 - The raw terminal output (with anomaly-preserving truncation if >100 lines)
@@ -74,16 +74,16 @@ When parsing test output, look for these framework-specific pass/fail signals:
 
 For tasks sized **M or L**, the Reviewer independently verifies test results:
 
-1. **Reviewer runs the test command independently** (same command the Tester reported).
-2. **Compare outputs**: Reviewer's result must match Tester's claim.
-3. **If mismatch**: flag as **MUST FIX** — "Test results cannot be verified. Tester reported X, independent run shows Y."
+1. **Reviewer runs the test command independently** (same command the Coder reported).
+2. **Compare outputs**: Reviewer's result must match the Coder's claim.
+3. **If mismatch**: flag as **MUST FIX** — "Test results cannot be verified. Coder reported X, independent run shows Y."
 
 **Reviewer adds this section to the review:**
 
 ```markdown
 ### Verification Check
 - Command: `npm test`
-- Tester claimed: 15 passed, 0 failed
+- Coder claimed: 15 passed, 0 failed
 - Independent run: 15 passed, 0 failed
 - Status: ✅ Verified | ❌ Mismatch
 ```
@@ -94,7 +94,7 @@ When any persona claims something "works" or "is fixed":
 
 - **Require evidence**: actual command output, screenshot, or verifiable state change.
 - **"It works" without evidence = [ASSUMED]** — must be verified before proceeding.
-- **After a Debugger fix**: Tester must re-run the specific failing test AND the full suite.
+- **After a fix via fluxo /fix**: Coder must re-run the specific failing test AND the full suite.
 
 ## Examples
 
@@ -124,6 +124,6 @@ This is bad because: no command shown, no raw output, no exit code. Could be fab
 ## Anti-Patterns
 
 - DO NOT accept "all tests pass" without seeing the actual output.
-- DO NOT skip dual verification for M/L tasks because "the Tester is reliable."
+- DO NOT skip dual verification for M/L tasks because "the Coder is reliable."
 - DO NOT count a signal inside a quote or code example as actual test output.
 - DO NOT run tests with `--passWithNoTests` or equivalent flags that mask empty test suites.

@@ -22,7 +22,15 @@
 # Naming convention: <role> at top level = the canonical reference for that
 # Canuto persona role.
 
-last-updated: 2026-04-29
+last-updated: 2026-06-10
+
+# CLI compatibility (verified on codex-cli 0.139):
+#   - `-q` was REMOVED in 0.135 — any command carrying it fails.
+#   - `--profile <name>` now reads ~/.codex/<name>.config.toml (v2 semantics);
+#     the legacy [profiles.*] block in config.toml is no longer read.
+#   - Canonical invocation is the wrapper: ~/.codex/bin/codex-delegate.sh <role> <task> <out>
+#     (handles stdin-hang, sandbox, timeout, 0-byte check, auth pre-flight).
+#     The cli-invocation strings below are the raw equivalents.
 
 # --- Coder profile (default executor for tier-2 implementation) ---
 coder:
@@ -30,7 +38,7 @@ coder:
   model: gpt-5.5
   reasoning: high
   use-for: "Standard code generation, refactor, multi-file edits"
-  cli-invocation: "codex exec --color never -q --profile coder"
+  cli-invocation: "codex exec --color never --profile coder"
 
 # --- Reviewer profile (peer review of plan and code) ---
 reviewer:
@@ -38,7 +46,7 @@ reviewer:
   model: gpt-5.5
   reasoning: high
   use-for: "Plan review, code review, security audit"
-  cli-invocation: "codex exec --color never -q --profile reviewer"
+  cli-invocation: "codex exec --color never --profile reviewer"
 
 # --- Architect profile (deep planning, complex reasoning) ---
 architect:
@@ -46,7 +54,7 @@ architect:
   model: gpt-5.5
   reasoning: xhigh
   use-for: "Architecture, complex decomposition, novel problems"
-  cli-invocation: "codex exec --color never -q --profile architect"
+  cli-invocation: "codex exec --color never --profile architect"
 
 # --- Maestro profile (Codex-runtime orchestration only; Claude Opus is default Maestro) ---
 maestro:
@@ -62,7 +70,7 @@ fast:
   model: gpt-5.5
   reasoning: high
   use-for: "Quick edits, formatting, documentation"
-  cli-invocation: "codex exec --color never -q --profile fast"
+  cli-invocation: "codex exec --color never --profile fast"
 
 # --- Tier-1 (Maestro + Architect when Claude is the active runtime) ---
 primary:

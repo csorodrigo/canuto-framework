@@ -494,8 +494,6 @@ FRAMEWORK_FILES=(
   ".agents/personas/maestro.md"
   ".agents/personas/architect.md"
   ".agents/personas/coder.md"
-  ".agents/personas/tester.md"
-  ".agents/personas/debugger.md"
   ".agents/personas/reviewer.md"
   ".agents/personas/contextualizer.md"
   ".agents/skills/context-maintenance/SKILL.md"
@@ -519,9 +517,8 @@ FRAMEWORK_FILES=(
   ".agents/skills/canuto-pending-triage.md"
   ".agents/skills/obsidian-writeback-queue.md"
   ".agents/skills/stack-lock.md"
-  ".agents/skills/plan-second-opinion.md"
-  ".agents/hooks/plan-review.sh"
   ".agents/hooks/codex-pretool-guard.sh"
+  ".agents/hooks/screenshot-guard.sh"
   ".agents/hooks/session-save.sh"
   ".agents/hooks/session-load.sh"
   ".agents/hooks/pre-compact-save.sh"
@@ -548,15 +545,11 @@ FRAMEWORK_FILES=(
   ".agents/skills/runtime-flags.md"
   ".agents/skills/convergence-detection.md"
   ".agents/skills/heartbeat.md"
-  ".agents/skills/product-review.md"
   ".agents/skills/browser-qa.md"
   ".agents/skills/session-goals.md"
-  ".agents/skills/adr.md"
-  ".agents/skills/brand-bootstrap.md"
   ".agents/skills/frontend-design/SKILL.md"
   ".agents/skills/frontend-design/references/design-patterns.md"
   ".agents/skills/frontend-design/references/aesthetic-patterns.md"
-  ".agents/skills/api-docs-fetch.md"
   ".agents/skills/defuddle.md"
   ".agents/skills/obsidian-markdown.md"
   ".agents/skills/obsidian-bases.md"
@@ -571,14 +564,7 @@ FRAMEWORK_FILES=(
   ".agents/SPEC.md"
   # Codex integration skills (Fase 2+3)
   ".agents/skills/co-review/SKILL.md"
-  ".agents/skills/parallel-impl.md"
-  ".agents/skills/codex-test-fix.md"
-  ".agents/skills/competition.md"
-  ".agents/skills/codex-security-gate.md"
   ".agents/skills/cost-routing.md"
-  ".agents/skills/context-digest.md"
-  ".agents/skills/context-preload.md"
-  ".agents/skills/codex-browser-qa.md"
   ".agents/mcp/codex-collab.md"
   ".agents/tools/vault-bridge.sh"
   ".agents/tools/canuto-memory.sh"
@@ -591,16 +577,6 @@ FRAMEWORK_FILES=(
   ".agents/tools/otel-emit.sh"
   ".agents/tools/vault-sync.sh"
   # Codex economy + integration skills (Fase 3)
-  ".agents/skills/codex-context-loader.md"
-  ".agents/skills/codex-session-writer.md"
-  ".agents/skills/codex-pr-writer.md"
-  ".agents/skills/smart-token-metering.md"
-  ".agents/skills/codex-github-ops.md"
-  ".agents/skills/codex-refactor-prep.md"
-  ".agents/skills/lazy-opus-review.md"
-  ".agents/skills/codex-onboarding.md"
-  ".agents/skills/codex-multi-vault.md"
-  ".agents/skills/codex-smoke-test.md"
   # Codex fallback persona (distributed to every project on update)
   "CODEX.md"
   ".agents/templates/CODEX.md"
@@ -779,7 +755,7 @@ setup_hooks() {
 
   # ── Helper: install a single hook ──────────────────────────────────────
   install_hook() {
-    local src="$1"       # e.g. ".agents/hooks/plan-review.sh"
+    local src="$1"       # e.g. ".agents/hooks/session-save.sh"
     local event="$2"     # e.g. "PostToolUse"
     local timeout="$3"   # e.g. 120
     local matcher="${4:-}"
@@ -823,8 +799,8 @@ setup_hooks() {
   }
 
   # ── Install all hooks ──────────────────────────────────────────────────
-  install_hook ".agents/hooks/plan-review.sh"       "PostToolUse"   180 "ExitPlanMode"
   install_hook ".agents/hooks/codex-pretool-guard.sh" "PreToolUse"  240
+  install_hook ".agents/hooks/screenshot-guard.sh"  "PreToolUse"    3  "mcp__playwright__browser_take_screenshot|mcp__claude-in-chrome__computer"
   install_hook ".agents/hooks/session-save.sh"      "Stop"          30
   install_hook ".agents/hooks/pre-compact-save.sh"  "Notification"  15
   # Observability + enforcement gate hooks (v1.9)

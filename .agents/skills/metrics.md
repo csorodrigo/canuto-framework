@@ -34,14 +34,14 @@ Tracked per task (feature, bug fix, refactor):
 |--------|-------------------|---------------|
 | Review verdict | APPROVE vs REQUEST CHANGES on first review | Reviewer |
 | MUST FIX count | Number of blocking issues found | Reviewer |
-| Test failure rate | Tests failed / tests written (by Tester) | Tester |
-| Debugger invocations | How many times Debugger was called | Maestro |
+| Test failure rate | Tests failed / tests written (by Coder) | Coder |
+| Fix-cycle (/fix) invocations | How many times the /fix flow was triggered | Maestro |
 | Rework cycles | Times Coder had to revise after review | Maestro |
 
 **Healthy signals:**
 - First-pass approval rate > 70%.
 - MUST FIX items per review < 2 on average.
-- Debugger invocations < 1 per feature.
+- Fix-cycle (/fix) invocations < 1 per feature.
 
 ### 2. Velocity Metrics
 
@@ -83,7 +83,7 @@ Tracked per file per session:
 |--------|-----------|--------|
 | File modified N times | N ≥ 3 | Maestro emits rework warning |
 | Coder called after REQUEST CHANGES | > 2 cycles | Maestro flags for Architect re-plan |
-| Same test file fails repeatedly | 2+ consecutive failures | Maestro escalates to Debugger |
+| Same test file fails repeatedly | 2+ consecutive failures | Maestro aciona o fluxo /fix |
 
 **Rework Detection Procedure:**
 
@@ -127,7 +127,7 @@ date: 2026-03-21
 quality-verdict: APPROVE
 must-fix-count: 1
 test-failures: 0
-debugger-invocations: 0
+fix-invocations: 0
 rework-cycles: 1
 tasks-completed: 2
 persona-transitions: 8
@@ -151,7 +151,7 @@ tags:
 - Review verdict: APPROVE
 - MUST FIX count: 1
 - Test failures: 0/12
-- Debugger invocations: 0
+- Fix-cycle (/fix) invocations: 0
 - Rework cycles: 1
 - Rework files: src/auth/token-service.ts (3 modifications)
 
@@ -184,7 +184,7 @@ Query metrics via `bases/metrics-dashboard.base` for aggregated summaries (Sum, 
 
 1. **During the session**: Maestro keeps a running tally of transitions, escalations, file modifications, provider usage, and — when monitoring is active — monitor session counts, alert tallies by severity, and token budget consumption.
 2. **After Reviewer's verdict**: Maestro records quality metrics.
-3. **After Tester's report**: Maestro records test metrics.
+3. **After Coder's test report**: Maestro records test metrics.
 4. **At session end**: Maestro creates a metric note in `vault/metrics/YYYY-MM-DD-metrics.md` and marks goals.
 
 ### Reviewing Trends
@@ -212,7 +212,7 @@ When the user asks about metrics or trends:
 - Review verdict: APPROVE
 - MUST FIX count: 1
 - Test failures: 0/12
-- Debugger invocations: 0
+- Fix-cycle (/fix) invocations: 0
 - Rework cycles: 1
 - Rework files: src/auth/token-service.ts (3 modifications)
 

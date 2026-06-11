@@ -53,7 +53,7 @@ echo ""
 # ═══════════════════════════════════════════════════════════════════════════
 echo "── Test 1: Personas ──"
 
-REQUIRED_PERSONAS=(maestro architect coder tester debugger reviewer contextualizer)
+REQUIRED_PERSONAS=(maestro architect coder reviewer contextualizer)
 for persona in "${REQUIRED_PERSONAS[@]}"; do
   PFILE="$AGENTS_DIR/personas/$persona.md"
   if [ ! -f "$PFILE" ]; then
@@ -77,6 +77,14 @@ for persona in "${REQUIRED_PERSONAS[@]}"; do
     pass "$persona.md has Procedure section"
   fi
 done
+
+for archived_persona in tester debugger; do
+  if [ -f "$AGENTS_DIR/personas/_archive/$archived_persona.md" ]; then
+    pass "Archived persona exists: $archived_persona.md"
+  else
+    fail "Archived persona missing: $archived_persona.md"
+  fi
+done
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -98,7 +106,6 @@ CORE_SKILLS=(
   plugin-system
   vault-maintenance
   research
-  headless-validation
 )
 
 for skill in "${CORE_SKILLS[@]}"; do
@@ -119,7 +126,7 @@ echo ""
 # ═══════════════════════════════════════════════════════════════════════════
 echo "── Test 3: Hook Scripts ──"
 
-HOOKS=(session-load session-save pre-compact-save check-references check-orphans plan-review codex-pretool-guard protect-files require-tests-for-pr log-commands session-start validation-mark validation-clear retry-detect fingerprint-gate posttooluse-universal pre-finalize)
+HOOKS=(session-load session-save pre-compact-save check-references check-orphans screenshot-guard codex-pretool-guard protect-files require-tests-for-pr log-commands session-start validation-mark validation-clear retry-detect fingerprint-gate posttooluse-universal pre-finalize)
 for hook in "${HOOKS[@]}"; do
   HFILE="$AGENTS_DIR/hooks/$hook.sh"
   if [ ! -f "$HFILE" ]; then

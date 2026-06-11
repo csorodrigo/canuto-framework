@@ -34,8 +34,8 @@ evals:
 - `/co-validate <plan-file>` — staff-engineer review of a finalized plan
 
 **Automatic trigger:**
-- After Architect calls `ExitPlanMode` on **M/L tasks** (via the legacy-compatible `plan-review.sh` hook bridge)
-- Maestro automatically runs `/co-validate` mode
+- For **M/L tasks**, Maestro explicitly runs `/co-validate` after the plan is ready
+- `plan-review.sh` is retired; do not depend on `ExitPlanMode` hooks for this flow
 
 **Not for:**
 - XS/S tasks (overhead not justified)
@@ -155,7 +155,7 @@ If `codex` CLI is missing or fails:
 
 ## Compatibility
 
-`plan-second-opinion.md` remains the legacy planning reference. The hook `plan-review.sh` remains supported as the compatibility bridge that triggers this skill on `ExitPlanMode`.
+`plan-second-opinion.md` remains the legacy planning reference. The hook `plan-review.sh` was retired on 2026-06-11; Maestro triggers this skill explicitly for M/L plan review.
 
 ## Mode 4: Auto-Review on Commit (Pre-Commit Gate)
 

@@ -28,7 +28,8 @@ echo ""
 echo "📁 Instalando hooks em ~/.claude/hooks/..."
 mkdir -p "$HOOKS_DIR"
 
-for hook in plan-review.sh codex-pretool-guard.sh session-save.sh session-load.sh pre-compact-save.sh protect-files.sh require-tests-for-pr.sh log-commands.sh session-start.sh validation-mark.sh validation-clear.sh retry-detect.sh fingerprint-gate.sh pre-finalize.sh posttooluse-universal.sh pre-commit-branch-check.sh worktree-collision-check.sh pre-claim-grep.sh; do
+# plan-review.sh retired 2026-06-11 (0 firings in the 200-session audit) — see _retired/.
+for hook in codex-pretool-guard.sh session-save.sh session-load.sh pre-compact-save.sh protect-files.sh require-tests-for-pr.sh log-commands.sh session-start.sh validation-mark.sh validation-clear.sh retry-detect.sh fingerprint-gate.sh pre-finalize.sh posttooluse-universal.sh pre-commit-branch-check.sh worktree-collision-check.sh pre-claim-grep.sh screenshot-guard.sh; do
   if [ -f "$SCRIPT_DIR/$hook" ]; then
     cp "$SCRIPT_DIR/$hook" "$HOOKS_DIR/$hook"
     chmod +x "$HOOKS_DIR/$hook"

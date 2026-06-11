@@ -15,8 +15,33 @@ otel_endpoint() {
 }
 
 otel_enabled() {
-  [ "${CANUTO_TOOLS_OTLP_ENABLED:-}" = "1" ] && return 0
-  [ "${CLAUDE_CODE_ENABLE_TELEMETRY:-}" = "1" ]
+  { [ "${CANUTO_TOOLS_OTLP_ENABLED:-}" = "1" ] || [ "${CLAUDE_CODE_ENABLE_TELEMETRY:-}" = "1" ]; } || return 1
+  otel_collector_reachable
+}
+
+# Probe the collector at most once every 5 minutes (cached verdict in /tmp).
+# Without this, every hook spawns curl against a dead port when SigNoz/OrbStack
+# is down and 100% of telemetry is silently dropped at real latency cost.
+otel_collector_reachable() {
+  [ "${CANUTO_OTEL_SKIP_PROBE:-}" = "1" ] && return 0
+  local stamp="${TMPDIR:-/tmp}/canuto-otel-collector.probe"
+  local now mtime age verdict
+  now=$(date +%s 2>/dev/null || printf '0')
+  if [ -f "$stamp" ]; then
+    mtime=$(stat -f %m "$stamp" 2>/dev/null || stat -c %Y "$stamp" 2>/dev/null || printf '0')
+    age=$((now - mtime))
+    if [ "$age" -ge 0 ] && [ "$age" -lt 300 ]; then
+      verdict=$(cat "$stamp" 2>/dev/null)
+      [ "$verdict" = "1" ] && return 0
+      return 1
+    fi
+  fi
+  if curl --silent --max-time 1 --connect-timeout 1 --output /dev/null "$(otel_endpoint)" 2>/dev/null; then
+    printf '1' > "$stamp" 2>/dev/null || true
+    return 0
+  fi
+  printf '0' > "$stamp" 2>/dev/null || true
+  return 1
 }
 
 _json_escape_strings() {

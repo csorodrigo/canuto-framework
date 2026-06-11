@@ -25,7 +25,7 @@ else
   canuto_project_dir()  { echo "${1:-.}"; }
   canuto_project_slug() { basename "${1:-.}"; }
   canuto_cache_dir()    { echo "${1:-.}/.agents/.cache"; }
-  canuto_resolve_memory_backend() { printf 'none\t'; }
+  canuto_resolve_memory_backend() { printf 'none\t\n'; }
 fi
 
 PROJECT_DIR=$(canuto_project_dir "$PROJECT_DIR")
@@ -34,7 +34,10 @@ CACHE_DIR=$(canuto_cache_dir "$PROJECT_DIR")
 BACKEND_KIND=""
 BACKEND_DIR=""
 
-IFS=$'\t' read -r BACKEND_KIND BACKEND_DIR < <(canuto_resolve_memory_backend "$PROJECT_DIR")
+# `|| true`: read returns 1 on EOF-without-newline, which under `set -e` killed
+# the whole hook (29% failure rate in projects without canuto-memory.sh).
+IFS=$'\t' read -r BACKEND_KIND BACKEND_DIR < <(canuto_resolve_memory_backend "$PROJECT_DIR") || true
+[ -n "$BACKEND_KIND" ] || BACKEND_KIND="none"
 
 VAULT_AVAILABLE=false
 if [ "$BACKEND_KIND" = "global" ] || [ "$BACKEND_KIND" = "local" ]; then

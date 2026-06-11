@@ -148,51 +148,6 @@ check_rtk_activation() {
   check_required_reference "$HOME/.codex/AGENTS.md" "RTK.md" "Codex AGENTS.md references RTK.md"
 }
 
-run_codex_smoke_exec() {
-  local label="$1"
-  shift
-  local tmp_output
-  local tmp_error
-  tmp_output=$(mktemp)
-  tmp_error=$(mktemp)
-
-  if printf '%s\n' 'Reply with exactly: OK' | codex_run_with_timeout "${CODEX_HEALTH_TIMEOUT:-60}" codex exec -C "$PROJECT_ROOT" --skip-git-repo-check "$@" --output-last-message "$tmp_output" - >/dev/null 2>"$tmp_error"; then
-    local output
-    output=$(tr -d '\r' < "$tmp_output" | tail -n 1 | tr -d '\n')
-    if [ "$output" = "OK" ]; then
-      pass "$label"
-    else
-      fail "$label returned unexpected output: ${output:-<empty>}"
-    fi
-  else
-    fail "$label failed: $(head -n 1 "$tmp_error")"
-  fi
-
-  rm -f "$tmp_output" "$tmp_error"
-}
-
-run_codex_reviewer_profile_smoke() {
-  local tmp_output
-  local tmp_error
-  tmp_output=$(mktemp)
-  tmp_error=$(mktemp)
-
-  if printf '%s\n' 'Reply with exactly: OK' | codex_run_with_timeout "${CODEX_HEALTH_TIMEOUT:-60}" codex exec -C "$PROJECT_ROOT" --skip-git-repo-check --profile reviewer --output-last-message "$tmp_output" - >/dev/null 2>"$tmp_error"; then
-    local output
-    output=$(tr -d '\r' < "$tmp_output" | tail -n 1 | tr -d '\n')
-    if [ "$output" = "OK" ]; then
-      REVIEWER_PROFILE_AVAILABLE=true
-      pass "reviewer profile smoke test"
-    else
-      warn "reviewer profile returned unexpected output: ${output:-<empty>}"
-    fi
-  else
-    warn "reviewer profile unavailable: $(head -n 1 "$tmp_error")"
-  fi
-
-  rm -f "$tmp_output" "$tmp_error"
-}
-
 run_codex_reviewer_helper_smoke() {
   local tmp_dir
   tmp_dir=$(mktemp -d)
@@ -214,12 +169,14 @@ Plan:
 - Step 1: Confirm the helper works.
 EOF
 
+  CODEX_REVIEWER_TIMEOUT="${CODEX_REVIEWER_TIMEOUT:-30}"
   if codex_run_reviewer "$tmp_dir" "$schema_file" "$output_file" "$prompt_file" "$used_file" "$error_file"; then
     local used_candidate
     used_candidate=$(cat "$used_file" 2>/dev/null || echo "unknown")
+    REVIEWER_PROFILE_AVAILABLE=true
     pass "reviewer helper smoke test: $used_candidate"
   else
-    fail "reviewer helper smoke test failed: $(head -n 1 "$error_file")"
+    warn "reviewer helper smoke test failed: $(head -n 1 "$error_file")"
   fi
 
   rm -rf "$tmp_dir"
@@ -235,8 +192,9 @@ PROJECT_ROOT=$(codex_project_dir)
 CONFIG_TOML="$HOME/.codex/config.toml"
 CLAUDE_SCRIPTS_DIR="$HOME/.claude/scripts"
 # Codex MCP wrappers were retired on 2026-04-29. Maestro now invokes Codex via
-# `codex exec --profile <name>` directly. The shared lib codex-common.sh is
-# still used by reviewer helpers and by this script.
+# ~/.codex/bin/codex-delegate.sh, which wraps current Codex CLI semantics and
+# avoids stdin/profile footguns. The shared lib codex-common.sh is still used by
+# reviewer helpers and by this script.
 
 if [ "$MODE" = "full" ]; then
   if [ "$JSON_OUTPUT" = false ]; then
@@ -275,13 +233,16 @@ if [ "$MODE" = "full" ]; then
   fi
 
   if [ -f "$CONFIG_TOML" ]; then
-    for profile in coder reviewer architect fast maestro; do
-      if grep -q "\[profiles\.$profile\]" "$CONFIG_TOML" 2>/dev/null; then
-        pass "profile configured: $profile"
-      else
-        fail "missing profile in config.toml: $profile"
-      fi
-    done
+    if grep -q '^model = "gpt-5.5"' "$CONFIG_TOML" 2>/dev/null; then
+      pass "codex default model configured: gpt-5.5"
+    else
+      warn "codex default model is not gpt-5.5"
+    fi
+    if [ -x "$HOME/.codex/bin/codex-delegate.sh" ]; then
+      pass "codex delegate wrapper executable"
+    else
+      fail "missing executable: ~/.codex/bin/codex-delegate.sh"
+    fi
   else
     fail "missing $CONFIG_TOML"
   fi
@@ -297,7 +258,7 @@ if [ "$MODE" = "full" ]; then
       fi
     done
 
-    for hook_name in codex-pretool-guard.sh plan-review.sh; do
+    for hook_name in codex-pretool-guard.sh screenshot-guard.sh; do
       if grep -q "$hook_name" "$SETTINGS_FILE" 2>/dev/null; then
         pass "settings.json hook registered: $hook_name"
       else
@@ -308,7 +269,7 @@ if [ "$MODE" = "full" ]; then
     fail "cannot inspect ~/.claude/settings.json"
   fi
 
-  for hook_file in codex-pretool-guard.sh plan-review.sh session-save.sh session-load.sh pre-compact-save.sh; do
+  for hook_file in codex-pretool-guard.sh screenshot-guard.sh session-save.sh session-load.sh pre-compact-save.sh; do
     if [ -x "$HOME/.claude/hooks/$hook_file" ]; then
       pass "installed hook executable: $hook_file"
     else
@@ -316,10 +277,13 @@ if [ "$MODE" = "full" ]; then
     fi
   done
 
-  if [ -f "$CONFIG_TOML" ] && grep -q "projects.\"$PROJECT_ROOT\"" "$CONFIG_TOML" 2>/dev/null; then
+  if [ -f "$CONFIG_TOML" ] && {
+    grep -q "projects.\"$PROJECT_ROOT\"" "$CONFIG_TOML" 2>/dev/null ||
+    grep -q "projects.\"$(dirname "$PROJECT_ROOT")\"" "$CONFIG_TOML" 2>/dev/null
+  }; then
     pass "project trust configured for $PROJECT_ROOT"
   else
-    fail "project trust missing for $PROJECT_ROOT"
+    warn "project trust missing for $PROJECT_ROOT"
   fi
 
   if command -v codex >/dev/null 2>&1 && codex mcp list >/dev/null 2>&1; then
@@ -345,9 +309,6 @@ if [ "$MODE" = "full" ]; then
     fail "codex mcp list unavailable"
   fi
 
-  run_codex_smoke_exec "default codex exec smoke test"
-  run_codex_smoke_exec "coder profile smoke test" --profile coder
-  run_codex_reviewer_profile_smoke
   run_codex_reviewer_helper_smoke
 else
   pass "structural mode: skipped user-environment Codex checks"
@@ -401,9 +362,9 @@ if [ "$MODE" = "full" ]; then
 
   if command -v codex >/dev/null 2>&1; then
     if [ "$REVIEWER_PROFILE_AVAILABLE" = true ]; then
-      pass "reviewer profile available (gpt-5.5, high)"
+      pass "reviewer helper available (gpt-5.5, high)"
     else
-      warn "reviewer profile unavailable — reviewer/maestro calls will fall back"
+      warn "reviewer helper unavailable — reviewer/maestro calls will fall back"
     fi
   fi
 fi

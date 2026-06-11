@@ -47,7 +47,7 @@ Adapted from the Anthropic skill-creator methodology to work within Canuto's per
 | **2. Research** | Maestro | Check if similar skill exists; read related skills for conventions |
 | **3. Structure** | Architect | Define frontmatter, sections, progressive disclosure level (flat vs directory) |
 | **4. Write** | Coder | Write SKILL.md following template and quality checklist |
-| **5. Evals** | Tester | Define 4 eval prompts (2 should-trigger, 2 near-miss should-not-trigger) |
+| **5. Evals** | Coder | Define 4 eval prompts (2 should-trigger, 2 near-miss should-not-trigger) |
 | **6. Review** | Reviewer | Validate shortDescription, body length, evals quality, handoff clarity |
 | **7. Integrate** | Maestro | Register in vault as decision if architectural; update health-check if critical |
 

@@ -33,7 +33,9 @@ AUDIT_DIR="$PROJECT_DIR/.agents/vault/audit"
 PENDING_FILE="$AUDIT_DIR/validation-pending.json"
 RETRY_FILE="$AUDIT_DIR/retry-counter.json"
 
-VALIDATION_RE='(^|[[:space:]]*[;&|]+[[:space:]]*)((npm|bun|pnpm|yarn)[[:space:]]+(run[[:space:]]+)?(test|build|typecheck|tsc|lint)([[:space:]]|$)|npx[[:space:]]+(vitest|jest|mocha|ava|pytest)([[:space:]]|$)|(vitest|jest|mocha|ava|pytest|ruff)([[:space:]]|$)|node[[:space:]]+--test([[:space:]]|$)|bash[[:space:]]+test-|(\./)?install\.sh[[:space:]]+--(test|doctor)([[:space:]]|$)|cargo[[:space:]]+test([[:space:]]|$)|tsc([[:space:]]|$))'
+# NOTE: the rtk PreToolUse rewriter prefixes commands ("npm test" -> "rtk npm test"),
+# so the regex must tolerate an optional "rtk [proxy]" prefix or it never matches.
+VALIDATION_RE='(^|[[:space:]]*[;&|]+[[:space:]]*)(rtk[[:space:]]+(proxy[[:space:]]+)?)?((npm|bun|pnpm|yarn)[[:space:]]+(run[[:space:]]+)?(test|build|typecheck|tsc|lint)([[:space:]]|$)|npx[[:space:]]+(vitest|jest|mocha|ava|pytest)([[:space:]]|$)|(vitest|jest|mocha|ava|pytest|ruff)([[:space:]]|$)|node[[:space:]]+--test([[:space:]]|$)|bash[[:space:]]+test-|(\./)?install\.sh[[:space:]]+--(test|doctor)([[:space:]]|$)|cargo[[:space:]]+test([[:space:]]|$)|tsc([[:space:]]|$))'
 
 init_storage() {
   mkdir -p "$AUDIT_DIR" 2>/dev/null || return 1

@@ -85,4 +85,4 @@ data:
 Present results to user. If CI is failing, offer to:
 1. Show full error logs
 2. Run `/investigate` on the failure
-3. Delegate to Debugger persona for root cause analysis
+3. Acionar o fluxo /fix para root cause analysis

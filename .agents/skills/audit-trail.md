@@ -150,10 +150,10 @@ tags:
 - **Actor:** Coder
 - **Impact:** Maestro added `zod` installation to plan, re-routed to Coder
 
-#### [2026-03-18 14:45] FLAG — Coder → Tester (suggest)
+#### [2026-03-18 14:45] FLAG — Coder → Reviewer (suggest)
 - **Detail:** Email validation regex may not handle unicode — src/utils/validate.ts:23
 - **Actor:** Coder
-- **Impact:** Queued for Tester pass
+- **Impact:** Queued for Reviewer pass
 ```
 
 ### ❌ Bad — verbose, narrative-style log
