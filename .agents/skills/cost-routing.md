@@ -66,12 +66,12 @@ Canonical Codex invocation: `~/.codex/bin/codex-delegate.sh <role> <task-file> <
 | **Security review (cross-model)** | M/L | Codex reviewer + Claude | 2 calls (Codex CLI + Claude direct) |
 | **Documentation** | Any | Claude (inline) | — (spawn não se paga) |
 | **Context loading** | Any | Claude (inline) | — (Read/Grep direto; cache de prompt já amortiza) |
-| **Session notes** | Any | Claude (inline) | `canuto-brain.mjs closeout` (não spawnar Codex) |
+| **Session notes** | Any | Claude (inline) | escrita direta no vault via `canuto-memory.sh` (não spawnar Codex) |
 | **PR description** | Any | Claude (inline) | — (gerada do diff que Claude já tem em contexto) |
 | **GitHub ops** | Any | Claude (inline) | `gh` CLI direto |
 | **Refactoring prep** | M/L | Codex (refactor-prep) | `codex-delegate.sh architect` |
 | **Onboarding (Codex path)** | Any | Codex (onboarding) | `codex-delegate.sh coder` |
-| **Vault reading** | Any | Claude (inline) | `canuto-brain.mjs brief` (não spawnar Codex) |
+| **Vault reading** | Any | Claude (inline) | leitura direta do vault via `canuto-memory.sh` (não spawnar Codex) |
 | **Planning / Architecture (Codex runtime)** | M/L | Claude (cross-model back-delegation) | optional `mcp__claude-architect__spawn_agent` if present |
 | **Code review cruzada (Codex→Claude)** | Any | Claude Sonnet 4.6 | optional `mcp__claude-reviewer__spawn_agent` if present |
 
@@ -134,7 +134,7 @@ To minimize Opus token consumption:
    - Write context to `.agents/tmp/context-package.md`
    - Codex reads from disk (zero Opus tokens)
 
-2. **Use vault digests** (from context-digest skill) instead of reading full files:
+2. **Use vault digests** (padrão descrito em `.agents/skills/_archive/context-digest.md`, skill aposentado) instead of reading full files:
    - 500-line file → 50-line digest = 10x token savings
 
 3. **Let Codex self-serve context** via its native MCPs:
@@ -169,7 +169,7 @@ rtk init -g                  # Claude Code (default)
 rtk init -g --codex          # Codex CLI
 ```
 
-**Orthogonality with existing skills:**
+**Orthogonality with related patterns** (skills arquivados em `_archive/` — os conceitos seguem válidos):
 - `context-digest` — compresses **file content** (10x on 500-line files). rtk doesn't touch files.
 - `smart-token-metering` — **measures** Opus consumption. rtk reduces what gets measured.
 - `codex-context-loader` — preloads context to disk for Codex. rtk only affects Bash output.
@@ -201,14 +201,14 @@ needed when Codex/Claude must reason about many files at once.
 }
 ```
 
-**When to route to Repomix instead of `codex-context-loader`:**
+**When to route to Repomix instead of manual context preload:**
 - Bulk codebase summarization (>15 files) — let Repomix Tree-sitter pack first
 - Codex needs cross-file reasoning (call sites, type usage) — packed XML is denser than raw reads
 - One-shot exports for handoff/review — `npx repomix --compress -o handoff.xml`
 
 **When NOT to use Repomix:**
 - Single-file reads — overhead exceeds benefit (use Read tool)
-- Prose/markdown-heavy paths (`.agents/`, `docs/`) — Tree-sitter doesn't help; use `context-digest` instead
+- Prose/markdown-heavy paths (`.agents/`, `docs/`) — Tree-sitter doesn't help; use manual digests instead (padrão em `_archive/context-digest.md`)
 - Strict secret scanning — Repomix has built-in Security Check but is not a replacement for dedicated scanning
 
 ---
@@ -244,7 +244,7 @@ Always log overrides in the session summary with justification.
 
 ## CLI-specific gotchas
 
-- **Always pass `--color never -q`** — without it, ANSI escape codes inflate stdout 5-15%.
+- **Always pass `--color never`** — without it, ANSI escape codes inflate stdout 5-15%. (**Nunca `-q`** — removido no codex-cli 0.135+; ver regra no topo deste arquivo.)
 - **Use `--output-last-message <path>`** for outputs >2KB — keeps Bash tool_result lean.
 - **`--skip-git-repo-check`** when running from `/tmp` or non-git dirs.
 - **`--ephemeral`** for one-off review/check tasks where session persistence is wasteful.

@@ -24,14 +24,15 @@ evals:
 
 ## Purpose
 
-`lazy-opus-review.md` já tem um diff-router automático que escolhe o profile
-(coder/reviewer/architect) baseado em perfil de diff. Este skill é o **entry
-point manual** para disparar o mesmo router quando você quer controle explícito
-(ex: já sabe que é security, não quer esperar o auto-detect).
+Este skill é o **entry point manual e canônico** do diff-router: escolhe o
+profile (coder/reviewer/architect) baseado no perfil do diff, conforme a
+matriz de flags abaixo.
 
-**Distinção:**
-- `lazy-opus-review` = hook automático sobre output do Codex (você não chama)
-- `/review` = comando manual para reviewar diff arbitrário (working tree, branch, PR)
+> Nota histórica: a lógica nasceu no hook `lazy-opus-review` (arquivado em
+> 2026-06-11 — 0 firings em 200 sessões; ver
+> `.agents/skills/_archive/lazy-opus-review.md`). Desde então **este arquivo é
+> a fonte da matriz de roteamento** — não existe mais review automático sobre
+> output do Codex; toda rodada de review é disparada manualmente por `/review`.
 
 ---
 
@@ -46,7 +47,7 @@ point manual** para disparar o mesmo router quando você quer controle explícit
 **Not for:**
 - Plan review (use `/co-plan` ou `/co-plan --dual`)
 - Skill / docs review (overhead desnecessário)
-- Output do Codex ainda fresco — `lazy-opus-review` já fez isso. Use `/review` se quer **outra rodada** com profile diferente (ex: architect xhigh).
+- Rodada redundante — se um `/review` já passou neste mesmo diff, só repita com profile diferente (ex: `--large` para architect xhigh) se quiser deeper reasoning.
 
 ---
 
@@ -154,10 +155,10 @@ Maestro: Claude analisa imagens diretamente; opcional spawn `codex exec --profil
 ### ❌ Bad — usar `/review` em output do Codex que acabou de chegar
 
 ```
-Codex retornou implementação com CONFIDENCE: 9.
+Codex retornou implementação com CONFIDENCE: 9 e um /review já aprovou o diff.
 Usuário: /review
 
-Maestro: "[Review] lazy-opus-review já aceitou (confidence 9). /review aqui é redundante.
+Maestro: "[Review] Este diff já passou por review (confidence 9). /review aqui é redundante.
          Use /review --large com profile architect só se quiser deeper reasoning de uma segunda passada."
 ```
 
@@ -165,8 +166,7 @@ Maestro: "[Review] lazy-opus-review já aceitou (confidence 9). /review aqui é 
 
 ## Integration
 
-- **lazy-opus-review.md** — fonte da lógica de roteamento. `/review` é o entry-point manual da mesma matriz.
 - **co-plan/SKILL.md** (`global-skills/`) — o `--dual` usado em `--security` reusa o fluxo `/co-plan --dual`.
 - **cost-routing.md** — matriz que mostra quando review cai para reviewer vs architect vs Opus direto.
-- **codex-test-fix.md** — quando review detecta bug, encadear com fix loop.
-- **health.md** — checa se Codex CLI está acessível antes de invocar.
+- **/fix** (gstack) — quando review detecta bug, encadear com fix loop.
+- **codex-health-check.sh** (`.agents/tools/`) — checa se Codex CLI está acessível antes de invocar.

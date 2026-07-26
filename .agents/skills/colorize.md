@@ -15,7 +15,7 @@ copyright: Rodrigo Canuto © 2026.
 
 **Not for:**
 - Generating a full design system from scratch (use `design-consultation` instead)
-- Extracting brand colors from an existing website (use `brand-bootstrap` instead)
+- Extracting brand colors from an existing website (padrão arquivado em `_archive/brand-bootstrap.md`)
 - Typography or layout issues (use `typeset` or `frontend-design` instead)
 
 ---

@@ -40,6 +40,11 @@
             "type": "command",
             "command": "~/.claude/hooks/pre-commit-branch-check.sh",
             "timeout": 3
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/pre-pr-bash-gate.sh",
+            "timeout": 120
           }
         ]
       },
@@ -111,6 +116,11 @@
             "type": "command",
             "command": "~/.claude/hooks/retry-detect.sh",
             "timeout": 3
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/postdelegate-verify.sh",
+            "timeout": 5
           }
         ]
       },

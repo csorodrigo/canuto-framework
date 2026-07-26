@@ -17,23 +17,20 @@ This release keeps the v1.6 Obsidian-native runtime and adds a sharper learning-
   personas/
     maestro.md          — Orchestrator. Manages session lifecycle and delegates.
     architect.md        — Planner. Turns ideas into structured, executable plans.
-    coder.md            — Implementer. Writes code following the Architect's plan.
-    tester.md           — QA. Focuses on edge cases, error scenarios, coverage gaps.
-    debugger.md         — Diagnostician. Investigates test failures and root causes.
+    coder.md            — Implementer. Writes code + tests following the Architect's plan.
     reviewer.md         — Quality gate. Reviews code + generates PR descriptions.
     contextualizer.md   — Knowledge engine. Scans code and maintains context files.
+    _archive/           — tester.md e debugger.md (aposentados 2026-06-11: /test e /fix cobrem os fluxos).
   skills/
     context-maintenance/
       SKILL.md                — How to maintain .context.md and FEATURE-MAP.md.
     api-design.md             — How to design and evolve HTTP/JSON APIs.
     frontend-implementation.md — How to implement frontend features.
-    cli-usage.md              — How to safely use CLI commands and scripts.
     security-practices.md     — Rules for secrets, env vars, and security hygiene.
-    git-workflow.md           — Branching, commits, and PR conventions.
-    plugin-system.md          — How to create and manage opt-in plugins.
     multi-provider.md         — How Maestro delegates to Claude (tier-1) and Codex (tier-2).
     metrics.md                — Quality, velocity, compliance, and rework tracking.
-    squads.md                 — Parallel workstreams for larger projects.
+    event-log.md              — Event log append-only por projeto (fonte de verdade; hooks escrevem).
+    heartbeat.md              — Ativação autônoma agendada (runner single-shot + post-gate).
     pr-description.md         — Auto-generate PR descriptions after review.
     health-check.md           — Diagnose framework setup integrity on demand.
     canuto-project-doctor.md  — Diagnose setup, memory, stale context, and framework drift.
@@ -48,10 +45,7 @@ This release keeps the v1.6 Obsidian-native runtime and adds a sharper learning-
     api-docs-fetch.md         — Fetch current API docs via Context Hub before coding.
     brand-bootstrap.md        — Extract brand assets from URLs via OpenBrand.
     obsidian-markdown.md      — Wikilinks, embeds, callouts, properties, tags.
-    obsidian-bases.md         — Database views over notes (.base files).
-    json-canvas.md            — Visual maps and flowcharts (.canvas files).
     mcp-obsidian.md           — How the framework uses MCP to interact with the vault.
-    obsidian-cli.md           — Interact with vault via Obsidian CLI.
     defuddle.md               — Extract clean markdown from web pages.
     absence-reporting.md      — Personas report what they searched and didn't find.
     cross-persona-flags.md    — Outbound flags between personas for lateral discovery.
@@ -74,7 +68,7 @@ This release keeps the v1.6 Obsidian-native runtime and adds a sharper learning-
   tools/
     codex-maestro.sh    — Launch direct Codex runtime with the `maestro` profile.
     vault-sync.sh       — Flush pending sync notes into the active vault backend.
-  plugins/              — Opt-in plugin extensions (see plugin-system skill).
+  plugins/_archive/     — Plugins arquivados 2026-07-26 (mecanismo de descoberta nunca foi implementado).
   SPEC.md               — Full specification and design decisions.
 
 ~/.canuto/vault/          — Global Obsidian vault (one for all projects)
@@ -214,7 +208,7 @@ O runtime grava handoffs persistidos em `projects/{nome}/handoffs/`. Se a sessao
 Apos a instalacao, abra o projeto em Claude ou inicie o runtime direto do Codex com `bash .agents/tools/codex-maestro.sh`. O Maestro conduz este ciclo:
 
 1. **Bootstrap**: carrega `CLAUDE.md`, personas, skills, vault, context package e projeto ativo.
-2. **Session start**: consulta o vault via CLI `canuto-brain`, carrega latest session, pending tasks, instincts e stale-context signals. Se setup/memoria/contexto parecerem suspeitos, roda `canuto-project-doctor`.
+2. **Session start**: consulta o vault direto no filesystem (paths resolvidos por `.agents/tools/canuto-memory.sh`), carrega latest session, pending tasks, instincts e stale-context signals. Se setup/memoria/contexto parecerem suspeitos, roda `canuto-project-doctor`.
 3. **Planejamento**: limita objetivos da sessao, detecta estilo do projeto e escolhe personas/skills relevantes.
 4. **Execucao**: Architect, Coder e Reviewer trabalham no fluxo minimo valido; Coder escreve os testes no mesmo spawn e `/test` ou `/fix` entram quando a task exige QA/debugging dedicado. `canuto-rework-detector` entra quando houver retry loop, review loop, teste repetido ou pendencia recorrente.
 5. **QA e review**: Reviewer valida risco, testes, handoffs, PR readiness e, quando aplicavel, skills opcionais de dominio.

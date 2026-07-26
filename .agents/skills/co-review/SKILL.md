@@ -104,6 +104,20 @@ TN+1: Both complete → retrieve Codex's output
 TN+2: Compare perspectives, synthesize best of both
 ```
 
+### Blind Reviewer (muro mecânico — ADR-0006)
+
+Para a segunda opinião **estruturalmente** isolada, use o subagent
+`blind-reviewer` (`.claude/agents/blind-reviewer.md`) em vez de instrução de
+"context isolation" no prompt:
+
+- Tools restritos a `Read, Grep, Glob` — sem Bash, sem Write, sem MCP, sem
+  Web: cegueira de conversa e impossibilidade de efeito colateral são do
+  harness, não cortesia do modelo.
+- Entregue no prompt SÓ o artefato (plano/diff + paths citados). O output
+  volta como strikes + veredito APPROVE/REQUEST CHANGES; strikes gate.
+- Complementar (não substituto) do Reviewer normal: o cego não executa
+  testes — verificação de execução continua com `verification-gates`.
+
 ---
 
 ## Three Modes (Summary)
@@ -155,7 +169,7 @@ If `codex` CLI is missing or fails:
 
 ## Compatibility
 
-`plan-second-opinion.md` remains the legacy planning reference. The hook `plan-review.sh` was retired on 2026-06-11; Maestro triggers this skill explicitly for M/L plan review.
+`_archive/plan-second-opinion.md` remains the legacy planning reference (arquivado 2026-06-11). The hook `plan-review.sh` was retired on 2026-06-11; Maestro triggers this skill explicitly for M/L plan review.
 
 ## Mode 4: Auto-Review on Commit (Pre-Commit Gate)
 

@@ -17,6 +17,16 @@ fi
 
 export CANUTO_OTEL_HOOK_SOURCE="posttooluse-universal"
 
+if [ -f "$SCRIPT_DIR/../tools/event-log.sh" ]; then
+  # shellcheck source=../tools/event-log.sh
+  . "$SCRIPT_DIR/../tools/event-log.sh"
+elif [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -f "$CLAUDE_PROJECT_DIR/.agents/tools/event-log.sh" ]; then
+  # shellcheck source=/dev/null
+  . "$CLAUDE_PROJECT_DIR/.agents/tools/event-log.sh"
+else
+  canuto_event_append() { return 0; }
+fi
+
 INPUT=$(cat 2>/dev/null || true)
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 PROJECT_DIR="$(cd "$PROJECT_DIR" 2>/dev/null && pwd -P || pwd)"
@@ -65,5 +75,24 @@ outcome=$(printf '%s' "$INPUT" | jq -r '
   otel_emit_span "$tool_name" "$outcome" "$duration_ms" "$file_path" "$command"
   otel_emit_counter "$tool_name" "$outcome"
 } || true
+
+# ── Event log: TOOL_CALL (fonte de verdade mecânica dos eventos de sessão) ──
+# CANUTO_EVENT_LOG_TOOLS: core (default) = só tools que mudam estado ou delegam;
+# all = todos os tool calls; off = desliga.
+EVENT_TOOLS_MODE="${CANUTO_EVENT_LOG_TOOLS:-core}"
+should_log_event=false
+case "$EVENT_TOOLS_MODE" in
+  all) should_log_event=true ;;
+  off) should_log_event=false ;;
+  *)
+    case "$tool_name" in
+      Bash|Edit|Write|MultiEdit|NotebookEdit|Task|Agent|mcp__*) should_log_event=true ;;
+    esac
+    ;;
+esac
+if [ "$should_log_event" = true ]; then
+  canuto_event_append TOOL_CALL actor=hook tool="$tool_name" outcome="$outcome" \
+    duration_ms="$duration_ms" file="$file_path" cmd="${command:0:120}" || true
+fi
 
 exit 0

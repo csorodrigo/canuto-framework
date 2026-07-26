@@ -17,6 +17,14 @@ else
 fi
 export CANUTO_OTEL_HOOK_SOURCE="session-start"
 
+if [ -f "$SCRIPT_DIR/../tools/event-log.sh" ]; then
+  . "$SCRIPT_DIR/../tools/event-log.sh"
+elif [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -f "$CLAUDE_PROJECT_DIR/.agents/tools/event-log.sh" ]; then
+  . "$CLAUDE_PROJECT_DIR/.agents/tools/event-log.sh"
+else
+  canuto_event_append() { return 0; }
+fi
+
 emit_hook_otel() {
   {
     otel_emit_span "hook.session_start" "success" 0
@@ -115,6 +123,10 @@ if [ -d "$AUDIT_DIR" ] || mkdir -p "$AUDIT_DIR" 2>/dev/null; then
       "$TS" "$BRANCH" "${VERDICT:-unknown}" "${CHANGED:-0}"
   } >> "$AUDIT_FILE" 2>/dev/null || true
 fi
+
+# --- Event log (fonte de verdade; a nota de audit acima é projeção) --------
+canuto_event_append SESSION_START actor=hook \
+  branch="${BRANCH:-}" health="${VERDICT:-unknown}" stale="${CHANGED:-0}" || true
 
 emit_hook_otel
 exit 0

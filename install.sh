@@ -501,14 +501,10 @@ FRAMEWORK_FILES=(
   ".agents/skills/context-maintenance/references/examples.md"
   ".agents/skills/api-design.md"
   ".agents/skills/frontend-implementation.md"
-  ".agents/skills/cli-usage.md"
   ".agents/skills/security-practices.md"
-  ".agents/skills/git-workflow.md"
-  ".agents/skills/plugin-system.md"
   ".agents/skills/multi-provider.md"
   ".agents/skills/vault-sync.md"
   ".agents/skills/metrics.md"
-  ".agents/skills/squads.md"
   ".agents/skills/pr-description.md"
   ".agents/skills/health-check.md"
   ".agents/skills/canuto-project-doctor.md"
@@ -516,9 +512,11 @@ FRAMEWORK_FILES=(
   ".agents/skills/canuto-rework-detector.md"
   ".agents/skills/canuto-pending-triage.md"
   ".agents/skills/obsidian-writeback-queue.md"
-  ".agents/skills/stack-lock.md"
   ".agents/hooks/codex-pretool-guard.sh"
   ".agents/hooks/install.sh"
+  ".agents/hooks/log-commands.sh"
+  ".agents/hooks/protect-files.sh"
+  ".agents/hooks/require-tests-for-pr.sh"
   ".agents/hooks/screenshot-guard.sh"
   ".agents/hooks/session-save.sh"
   ".agents/hooks/session-load.sh"
@@ -553,15 +551,10 @@ FRAMEWORK_FILES=(
   ".agents/skills/frontend-design/references/aesthetic-patterns.md"
   ".agents/skills/defuddle.md"
   ".agents/skills/obsidian-markdown.md"
-  ".agents/skills/obsidian-bases.md"
-  ".agents/skills/json-canvas.md"
   ".agents/skills/mcp-obsidian.md"
-  ".agents/skills/obsidian-cli.md"
   ".agents/skills/obsidian-markdown/references/CALLOUTS.md"
   ".agents/skills/obsidian-markdown/references/EMBEDS.md"
   ".agents/skills/obsidian-markdown/references/PROPERTIES.md"
-  ".agents/skills/obsidian-bases/references/FUNCTIONS_REFERENCE.md"
-  ".agents/skills/json-canvas/references/EXAMPLES.md"
   ".agents/SPEC.md"
   # Codex integration skills (Fase 2+3)
   ".agents/skills/co-review/SKILL.md"
@@ -581,9 +574,53 @@ FRAMEWORK_FILES=(
   # Codex fallback persona (distributed to every project on update)
   "CODEX.md"
   ".agents/templates/CODEX.md"
+  # Learning-loop, QA and design skills (sync 2026-07-26 — previously in the
+  # repo but never distributed; test-framework.sh now enforces this list stays
+  # in sync with .agents/skills/)
+  ".agents/skills/adaptive-routing/SKILL.md"
+  ".agents/skills/audit.md"
+  ".agents/skills/auto-analysis.md"
+  ".agents/skills/co-review/references/modes.md"
+  ".agents/skills/colorize.md"
+  ".agents/skills/design-consultation.md"
+  ".agents/skills/experiment-loop/SKILL.md"
+  ".agents/skills/experiment-loop/references/auto-triggers.md"
+  ".agents/skills/experiment-loop/references/use-cases-and-examples.md"
+  ".agents/skills/experiment-loop/references/vault-schema.md"
+  ".agents/skills/knowledge-ingest.md"
+  ".agents/skills/monitor/SKILL.md"
+  ".agents/skills/monitor/references/alert-rules.md"
+  ".agents/skills/monitor/references/integration-schema.md"
+  ".agents/skills/monitor/references/profiles.md"
+  ".agents/skills/research.md"
+  ".agents/skills/review.md"
+  ".agents/skills/skill-check-protocol.md"
+  ".agents/skills/skill-creator.md"
+  ".agents/skills/stuck-detection.md"
+  ".agents/skills/trace-analysis/SKILL.md"
+  ".agents/skills/trace-analysis/references/blind-spot-generator.md"
+  ".agents/skills/trace-analysis/references/digest-schema.md"
+  ".agents/skills/trace-analysis/references/improvement-patterns.md"
+  ".agents/skills/trace-analysis/references/skill-proposer.md"
+  ".agents/skills/typeset.md"
+  ".agents/skills/vault-maintenance.md"
+  ".agents/skills/verification-gates.md"
+  # Event log (absorção edge-of-chaos, Fase 1 — ADR-0001)
+  ".agents/skills/event-log.md"
+  ".agents/tools/event-log.sh"
+  # Heartbeat v1 (absorção edge-of-chaos, Fase 4 — ADR-0004)
+  ".agents/tools/heartbeat-run.sh"
+  ".agents/tools/instinct-aging.sh"
+  # Revisor cego com muro mecânico (ADR-0006)
+  ".claude/agents/blind-reviewer.md"
+  # Novos gates fail-closed (ADR-0002)
+  ".agents/hooks/pre-pr-bash-gate.sh"
+  ".agents/hooks/postdelegate-verify.sh"
 )
 
 INSTALL_ONLY_FILES=(
+  ".agents/heartbeats/weekly-maintenance.md"
+  ".agents/heartbeats/usage-audit.md"
   ".agents/vault/_index.md"
   ".agents/vault/.obsidian/app.json"
   ".agents/vault/.obsidian/community-plugins.json"
@@ -647,12 +684,22 @@ VAULT_DIRS=(
 # inside existing sections. Safe to run multiple times (idempotent).
 merge_claude_md() {
   if [ ! -f "$CLAUDE_MD" ]; then
-    download "CLAUDE.md" "$CLAUDE_MD"
-    ok "$CLAUDE_MD created"
-    return
+    # Generate a clean template. NEVER download the framework repo's own
+    # CLAUDE.md here: it carries canuto-specific settings (project-slug,
+    # providers, memory paths) and polluted every fresh install with the
+    # canuto slug, colliding vault memory across projects
+    # (2026-04-17 audit follow-up #1). project-slug is intentionally omitted:
+    # canuto-memory.sh falls back to the project directory basename.
+    cat > "$CLAUDE_MD" << 'HEADER'
+# Project AI Setup
+
+You are my coding orchestrator for this repository.
+HEADER
+    ok "$CLAUDE_MD created (clean template — project-slug defaults to the directory name)"
+  else
+    log "$CLAUDE_MD already exists — checking for missing sections and rules..."
   fi
 
-  log "$CLAUDE_MD already exists — checking for missing sections and rules..."
   local appended=0
 
   # ── Section: ## Framework ──────────────────────────────────────────────

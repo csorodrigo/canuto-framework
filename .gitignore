@@ -39,3 +39,8 @@ build/
 
 # OTLP fallback (runtime metrics state)
 .agents/vault/metrics/canuto-otlp.jsonl
+
+# Runtime event logs (fonte de verdade fica no vault de runtime, nunca no git)
+.agents/vault/events/
+.agents/.cache/
+.agents/vault/handoffs/*-smoke-test.md

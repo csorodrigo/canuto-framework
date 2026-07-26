@@ -26,7 +26,7 @@ evals:
 **Not for:**
 - Quick web lookups (use direct answers or `defuddle` for one-off reads)
 - Codebase-related research (use the `research` skill instead)
-- API documentation fetching (use `api-docs-fetch` instead)
+- API documentation fetching (padrão arquivado em `_archive/api-docs-fetch.md`; use WebFetch/Context Hub direto)
 
 ---
 

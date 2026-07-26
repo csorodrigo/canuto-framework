@@ -77,7 +77,7 @@ When Maestro delegates to a tier-2 persona:
 
 2. **Prepare context package** (M/L tasks only):
    - Write `.agents/tmp/context-package.md` with: plan, digests, types, constraints.
-   - See `context-preload` skill for the full procedure.
+   - Procedimento completo arquivado em `.agents/skills/_archive/context-preload.md` (skill aposentado 2026-06-11).
    - Codex reads from disk — zero Opus tokens for context.
 
 3. **Spawn Codex via CLI**:

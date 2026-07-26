@@ -103,7 +103,6 @@ CORE_SKILLS=(
   session-goals
   runtime-flags
   mcp-obsidian
-  plugin-system
   vault-maintenance
   research
 )
@@ -588,6 +587,75 @@ for tool in python3 jq git; do
     warn "$tool not found (some features may not work)"
   fi
 done
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TEST 11: Identity Blinding (grep-gate — padrão edge-of-chaos
+# test_identity_blinding: o genótipo não carrega literais de um install)
+# ═══════════════════════════════════════════════════════════════════════════
+echo "── Test 11: Identity Blinding ──"
+
+# 11a. Literais banidos em superfícies distribuíveis (hooks, tools, templates,
+# install.sh). O CLAUDE.md do próprio repo é fenótipo — fica de fora.
+BANNED_LITERALS=("rodrigooliveira" "/Users/rodrigo")
+BLINDING_SURFACES=("$FRAMEWORK_DIR/install.sh")
+while IFS= read -r f; do BLINDING_SURFACES+=("$f"); done < <(
+  find "$AGENTS_DIR/hooks" "$AGENTS_DIR/tools" "$AGENTS_DIR/templates" \
+    -type f \( -name '*.sh' -o -name '*.js' -o -name '*.py' -o -name '*.md' -o -name '*.json' \) 2>/dev/null
+)
+for literal in "${BANNED_LITERALS[@]}"; do
+  HITS=$(grep -l "$literal" "${BLINDING_SURFACES[@]}" 2>/dev/null || true)
+  if [ -z "$HITS" ]; then
+    pass "banned literal ausente das superfícies distribuíveis: $literal"
+  else
+    fail "literal de identidade '$literal' em: $(echo "$HITS" | tr '\n' ' ')"
+  fi
+done
+
+# 11b. install.sh não pode semear project-slug do próprio canuto em templates
+# (poluição de slug — follow-up #1 da auditoria 2026-04-17)
+if grep -q "project-slug: canuto-framework-v1" "$FRAMEWORK_DIR/install.sh" 2>/dev/null; then
+  fail "install.sh contém 'project-slug: canuto-framework-v1' (poluição de template)"
+else
+  pass "install.sh não semeia o slug do canuto em templates"
+fi
+if grep -A3 'if \[ ! -f "\$CLAUDE_MD" \]' "$FRAMEWORK_DIR/install.sh" | grep -q 'download "CLAUDE.md"'; then
+  fail "merge_claude_md volta a baixar o CLAUDE.md do repo canuto (regressão de poluição)"
+else
+  pass "merge_claude_md gera template limpo (não baixa CLAUDE.md do canuto)"
+fi
+
+# 11c. Sync de distribuição: todo skill ativo no repo precisa estar em
+# FRAMEWORK_FILES/INSTALL_ONLY_FILES (o drift de 30 arquivos de 2026-07 não volta)
+SHIPPED_LIST=$(awk '/^FRAMEWORK_FILES=\(/,/^\)/' "$FRAMEWORK_DIR/install.sh"; \
+               awk '/^INSTALL_ONLY_FILES=\(/,/^\)/' "$FRAMEWORK_DIR/install.sh")
+UNSHIPPED=()
+while IFS= read -r skill_file; do
+  rel="${skill_file#"$FRAMEWORK_DIR"/}"
+  base=$(basename "$rel")
+  # CLAUDE.md dentro de skills são cache do claude-mem, não distribuíveis
+  [ "$base" = "CLAUDE.md" ] && continue
+  if ! printf '%s' "$SHIPPED_LIST" | grep -qF "\"$rel\""; then
+    UNSHIPPED+=("$rel")
+  fi
+done < <(find "$AGENTS_DIR/skills" -name '*.md' -not -path '*/_archive/*' 2>/dev/null)
+if [ ${#UNSHIPPED[@]} -eq 0 ]; then
+  pass "todos os skills ativos estão na lista de distribuição do install.sh"
+else
+  fail "skills no repo mas fora de FRAMEWORK_FILES: ${UNSHIPPED[*]:0:5} (${#UNSHIPPED[@]} total)"
+fi
+
+# 11d. Toda entrada de FRAMEWORK_FILES existe no repo (lista não aponta pro vazio)
+MISSING_ENTRIES=()
+while IFS= read -r entry; do
+  [ -n "$entry" ] || continue
+  [ -e "$FRAMEWORK_DIR/$entry" ] || MISSING_ENTRIES+=("$entry")
+done < <(printf '%s\n' "$SHIPPED_LIST" | grep -o '"[^"]*"' | tr -d '"')
+if [ ${#MISSING_ENTRIES[@]} -eq 0 ]; then
+  pass "todas as entradas de FRAMEWORK_FILES/INSTALL_ONLY_FILES existem no repo"
+else
+  fail "entradas de distribuição sem arquivo: ${MISSING_ENTRIES[*]:0:5}"
+fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════

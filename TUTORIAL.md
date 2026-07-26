@@ -100,17 +100,17 @@ Open the project in Claude. Maestro should:
 The normal flow is:
 
 ```text
-Maestro -> Architect -> Coder -> Tester -> Reviewer
-                              -> Debugger -> Coder -> Tester
+Maestro -> Architect -> Coder -> Reviewer
+                          |
+                          -> /test ou /fix quando QA/debug dedicado for necessário
 ```
 
 Use this pattern:
 
 - Architect plans the smallest coherent change.
-- Coder implements and reports changed files.
-- Tester validates behavior and edge cases.
-- Debugger investigates concrete failures.
+- Coder implements, writes tests in the same spawn, and reports changed files.
 - Reviewer checks risk, tests, and PR readiness.
+- `/test` valida comportamento e edge cases; `/fix` investiga falhas concretas (substituem as personas Tester/Debugger, aposentadas em 2026-06-11).
 - Maestro coordinates handoffs and escalations.
 
 ## 8. Prevent Rework
