@@ -54,12 +54,21 @@ Only use when the user explicitly approves and the Obsidian/Canuto bridge is ver
    - `.canuto/vault` convention
    - project config, if present
 4. Validate that every target is inside the intended vault/project.
-5. Show a compact preview:
+5. Classifique cada escrita pela **fronteira de tiers** (ver
+   `continuous-learning` §Two Tiers):
+   - **Tier hipótese** (sessions/, pending/, metrics/, instinct candidates
+     `confidence: low`): escreva direto e mostre o resumo do que foi salvo —
+     não peça aprovação.
+   - **Tier curado** (decisions/, promoções de instinct, stack.md,
+     global-instincts/, qualquer escrita fora do escopo do projeto): preview
+     + aprovação explícita, sempre.
+6. Show a compact preview (obrigatório para tier curado; informativo para
+   tier hipótese):
    - target path
    - action: create, append, update
    - 1-3 line content summary
-6. Ask for approval before queueing or writing.
-7. If the bridge is unavailable, keep the item queued and record the reason.
+7. Ask for approval before queueing or writing **tier curado**.
+8. If the bridge is unavailable, keep the item queued and record the reason.
 
 ---
 
@@ -86,7 +95,9 @@ Only use when the user explicitly approves and the Obsidian/Canuto bridge is ver
 
 ## Guardrails
 
-- Preview mode is the default.
+- Preview mode is the default **para tier curado**. Tier hipótese grava
+  direto — o gate total foi medido (2026-06/07) e o resultado era nada ser
+  escrito: o vault do próprio framework ficou 7 semanas sem nota de sessão.
 - Never write secrets, raw tokens, private IDs, or full session logs to the vault.
 - Never write outside the resolved vault/project directory.
 - Never require Obsidian Local REST API for read-only work.

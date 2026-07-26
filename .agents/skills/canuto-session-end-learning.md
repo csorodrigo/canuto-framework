@@ -100,7 +100,10 @@ Good instinct: "For dashboard date filters, test timezone boundaries with a fixe
 
 ## Guardrails
 
-- Never silently write to Obsidian, the Canuto vault, or external memory.
+- **Fronteira de tiers** (ver `continuous-learning` §Two Tiers): tier
+  hipótese (session note, pending, metrics, instinct candidates) grava
+  direto — anuncie o que foi salvo. Tier curado (decisions, promoções,
+  stack rules, global) nunca é escrito sem aprovação explícita.
 - Never record vague pending items. Pending tasks must be directly actionable.
 - Never fabricate metrics. Use `N/A` when not measured.
 - Do not duplicate an existing decision or pending item. Reference it instead.

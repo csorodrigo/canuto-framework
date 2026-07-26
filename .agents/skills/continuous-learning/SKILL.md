@@ -3,8 +3,8 @@ name: continuous-learning
 description: Extract reusable project instincts from session outcomes and reinforce them over time.
 shortDescription: Extract, store, and evolve reusable patterns (instincts) from session experience.
 usedBy: [maestro, reviewer, coder]
-version: 1.2.0
-lastUpdated: 2026-03-23
+version: 1.3.0
+lastUpdated: 2026-07-26
 copyright: Rodrigo Canuto © 2026.
 evals:
   - prompt: "session is ending, extract any instincts from what we learned today"
@@ -53,6 +53,21 @@ A reusable pattern learned from experience. Each instinct has:
 | **Confidence** | `low` (1 occurrence) → `medium` (2-3) → `high` (4+) |
 | **Category** | `code-pattern`, `architecture`, `testing`, `workflow`, `debugging`, `design` |
 | **Applied** | Count of times this instinct influenced a decision |
+
+### Two Tiers (v1.3 — absorvido do edge-of-chaos, ADR-0006 do canuto)
+
+A memória tem dois tiers com regras de escrita **diferentes**:
+
+| Tier | O que é | Escrita |
+|---|---|---|
+| **Hipótese** | instinct candidates (`confidence: low`), session notes, pending, metrics | **Automática** — barata, reversível, arquivável por aging. Gravar sem pedir. |
+| **Curado** | promoção a `medium`/`high`, decisions, regras em `stack.md`, global instincts | **Só com aprovação humana** — carrega autoridade e é exento de aging. |
+
+A fronteira É a guarda de segurança (a "falha Zep" do edge): extração
+automática **nunca** escreve no tier curado; um candidato pode existir aos
+montes como hipótese, mas só o humano promove. O erro do modelo antigo era
+gatear TUDO — resultado medido: nada era escrito e o vault parava
+(sessions/ do próprio framework congelou por 7 semanas em 2026).
 
 ### Confidence Scoring
 
@@ -163,23 +178,30 @@ When an instinct reaches `high` confidence and has been applied 5+ times, Maestr
 
 → **Full promotion workflow** (steps, global instinct frontmatter, promotion tracking): read `references/instinct-promotion.md`
 
-### Pruning Instincts
+### Pruning Instincts (aging mecânico)
 
-Instincts with `low` confidence not seen in 5+ sessions:
+O tier hipótese envelhece **mecanicamente** — não depende de o Maestro
+lembrar (`.agents/tools/instinct-aging.sh`, rodável via heartbeat):
 
-1. At session start, Maestro notes:
-   ```
-   Stale instincts (low confidence, not seen in 5+ sessions): I-004, I-008
-   Prune them? [Y/n]
-   ```
-2. On prune: set `status: pruned` in frontmatter (keep for history, stops appearing in active views).
+```bash
+bash .agents/tools/instinct-aging.sh --dry-run   # lista candidatos
+bash .agents/tools/instinct-aging.sh --apply     # low sem uso >30d → status: archived
+```
+
+Regras: nunca deleta (`status: archived` preserva histórico); tier curado
+(medium/high) é **exento** — prune de curados continua decisão humana com
+`status: pruned`. Cada arquivamento gera evento `INSTINCT_ARCHIVED` no log.
 
 ---
 
 ## Guardrails
 
-- **Never auto-save instincts.** Always present to user and wait for approval.
-- **Max 30 active instincts.** If the list grows beyond 30, trigger a pruning session.
+- **Tier hipótese grava direto; tier curado só com aprovação.** Candidates
+  (`confidence: low`) são salvos automaticamente no vault ao fim da sessão —
+  apresente o resumo do que foi salvo, não um pedido de permissão. Promoção
+  (medium/high, decision, stack rule, global) SEMPRE espera aprovação
+  explícita.
+- **Max 30 active instincts.** If the list grows beyond 30, trigger a pruning session (o aging mecânico ajuda a manter o teto).
 - **Instincts are project-specific.** They do not transfer between projects automatically.
 - **Confidence only goes up via real observations.** Never manually inflate confidence.
 - **Don't duplicate skills.** If a pattern is already covered by a skill, reference the skill instead.
