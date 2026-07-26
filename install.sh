@@ -2105,7 +2105,11 @@ PYEOF
 }
 
 repair_runtime() {
-  setup_deps || return 1
+  # Dependência ausente não pode pular os reparos locais (chmod, merge de
+  # CLAUDE.md, bootstrap de contexto, hooks): o rc de setup_deps é lembrado
+  # e reportado no RETORNO, depois de reparar tudo que não depende dela.
+  local deps_rc=0
+  setup_deps || deps_rc=1
   setup_local_script_permissions
   merge_claude_md
   merge_agents_md
@@ -2128,7 +2132,7 @@ repair_runtime() {
   if [ -f ".gitignore" ] && ! grep -q ".agents/tmp/" ".gitignore" 2>/dev/null; then
     echo ".agents/tmp/" >> ".gitignore"
   fi
-  return 0
+  return "$deps_rc"
 }
 
 # ── setup_gstack ─────────────────────────────────────────────────────────────
