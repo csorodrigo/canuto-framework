@@ -83,8 +83,7 @@ Detect broken or missing framework components before they silently degrade sessi
 
 ### Obsidian Skills
 - [ ] `.agents/skills/obsidian-markdown.md` exists (flat file, not in subdirectory).
-- [ ] `.agents/skills/obsidian-bases.md` exists (flat file, not in subdirectory).
-- [ ] `.agents/skills/json-canvas.md` exists (flat file, not in subdirectory).
+- [ ] `.agents/skills/obsidian-markdown.md` exists (obsidian-bases/json-canvas foram arquivados 2026-07-26 — os .base/.canvas do vault continuam funcionando no app Obsidian sem os skills).
 - [ ] `.agents/skills/mcp-obsidian.md` exists.
 
 ### Legacy Check
@@ -116,7 +115,7 @@ Detect broken or missing framework components before they silently degrade sessi
 - [ ] `codex mcp get obsidian-vault --json` includes `OBSIDIAN_API_KEY` and `OBSIDIAN_BASE_URL`.
 - [ ] Context preload assets exist (`.context.md`, `docs/FEATURE-MAP.md`) or are reported as warnings.
 
-### CCB Plugin (Optional — only if `.agents/plugins/ccb/` exists)
+### CCB Plugin (arquivado 2026-07-26 — só se restaurado de `.agents/plugins/_archive/ccb/`)
 - [ ] `ccb` command available in PATH (`which ccb`).
 - [ ] `ask` command available in PATH (`which ask`).
 - [ ] `pend` command available in PATH (`which pend`).

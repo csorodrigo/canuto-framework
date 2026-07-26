@@ -103,7 +103,6 @@ CORE_SKILLS=(
   session-goals
   runtime-flags
   mcp-obsidian
-  plugin-system
   vault-maintenance
   research
 )

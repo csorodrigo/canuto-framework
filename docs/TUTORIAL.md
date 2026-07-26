@@ -373,15 +373,15 @@ Estas skills podem ser usadas automaticamente pelo Maestro quando o problema ped
 
 #### 1. Workflow, planejamento e pesquisa
 
-`adr`, `api-design`, `api-docs-fetch`, `auto-analysis`, `cli-usage`, `defuddle`, `git-workflow`, `parallel-impl`, `plan-second-opinion`, `pr-description`, `product-review`, `research`, `session-goals`, `skill-creator`, `squads`
+`api-design`, `auto-analysis`, `defuddle`, `pr-description`, `research`, `session-goals`, `skill-creator` (arquivados 2026-06-11/2026-07-26: adr, api-docs-fetch, cli-usage, git-workflow, parallel-impl, plan-second-opinion, product-review, squads)
 
 #### 2. Qualidade, seguranca e governanca
 
-`absence-reporting`, `audit`, `audit-trail`, `budget-controls`, `competition`, `convergence-detection`, `cost-routing`, `coverage-tracking`, `cross-persona-flags`, `governance`, `headless-validation`, `health-check`, `heartbeat`, `lazy-opus-review`, `security-practices`, `skill-check-protocol`, `smart-token-metering`, `stack-lock`, `stuck-detection`, `verification-gates`
+`absence-reporting`, `audit`, `audit-trail`, `budget-controls`, `convergence-detection`, `cost-routing`, `coverage-tracking`, `cross-persona-flags`, `event-log`, `governance`, `health-check`, `heartbeat`, `security-practices`, `skill-check-protocol`, `stuck-detection`, `verification-gates`
 
 #### 3. Contexto, memoria e Obsidian
 
-`context-digest`, `context-preload`, `json-canvas`, `knowledge-ingest`, `mcp-obsidian`, `metrics`, `multi-provider`, `obsidian-bases`, `obsidian-cli`, `obsidian-markdown`, `plugin-system`, `runtime-flags`, `vault-maintenance`, `vault-sync`
+`knowledge-ingest`, `mcp-obsidian`, `metrics`, `multi-provider`, `obsidian-markdown`, `runtime-flags`, `vault-maintenance`, `vault-sync`
 
 #### 4. Frontend, design e UX
 

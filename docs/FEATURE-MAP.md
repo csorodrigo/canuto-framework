@@ -19,7 +19,7 @@
 | Claude MCP back-delegation | partial | `.agents/tools/claude-agent-mcp.py`, `.agents/tools/claude-architect.sh`, `.agents/tools/claude-reviewer.sh`, `.agents/hooks/install.sh` | Lets Codex Maestro call Claude Opus/Sonnet through MCP when `ANTHROPIC_API_KEY` is configured |
 | JSON health output | implemented | `install.sh --test --json`, `.agents/tools/codex-health-check.sh --json` | Machine-readable diagnostics for CI and dashboards |
 | Context bootstrap | implemented | `.context.md`, `docs/FEATURE-MAP.md`, `.agents/vault/digests/00-bootstrap-digest.md` | Created automatically when missing |
-| Passive hooks | implemented | `.agents/hooks/` | Session save, pre-compact save, plan review, Codex pretool guard |
+| Passive hooks | implemented | `.agents/hooks/` | Session save, pre-compact save, Codex pretool guard, event log, gates de PR/delegação (plan-review aposentado 2026-06-11: 0 firings) |
 | CLAUDE examples | implemented | `docs/CLAUDE-EXAMPLES.md` | Reference setups for common project types |
 | Native Codex MCP auto-registration | partial | `install.sh`, `setup_codex_mcps` | Works when Codex CLI + required creds/tools are available |
 | Obsidian vault integration | partial | `setup_obsidian_mcp`, `setup_codex_mcps` | Fully automatic if API key is already available; otherwise degrades gracefully |

@@ -77,12 +77,12 @@ These are common excuses agents give for skipping the skill check. All of them a
 | New API endpoint | `api-design` |
 | UI component | `frontend-implementation`, `frontend-design` |
 | Migration or schema change | `supabase-migration` (if applicable) |
-| Adding a dependency | `stack-lock` |
+| Adding a dependency | `_archive/stack-lock` (arquivado) |
 | Security concern | `security-practices` |
 | Git operations | `git-workflow` |
-| CLI usage | `cli-usage` |
+| CLI usage | `_archive/cli-usage` (arquivado) |
 | Documentation update | `context-maintenance` |
-| Plugin or extension work | `plugin-system` |
+| Plugin or extension work | `_archive/plugin-system` (arquivado) |
 | Multi-provider delegation | `multi-provider` |
 | Metrics or observability | `metrics`, `audit-trail` |
 | Research task | `research` |

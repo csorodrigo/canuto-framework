@@ -24,7 +24,6 @@ These skills ship with every install and update automatically.
 | `colorize` | BM25 over curated palettes → WCAG-compliant semantic token sets | design, color |
 | `cost-routing` | Provider routing matrix: what runs on Claude inline vs Codex spawn | cost-management, orchestration |
 | `design-consultation` | Generate a full design system → `design-system/MASTER.md` | design |
-| `cli-usage` | How to safely use CLI commands and scripts | devops |
 | `context-maintenance` | How to maintain `.context.md`, `FEATURE-MAP.md`, and Repo Index (evaluate-repo pipeline) | documentation, indexation |
 | `continuous-learning` | Extract, store, and evolve reusable patterns (instincts) from session experience | learning, memory |
 | `convergence-detection` | Detect when multiple personas independently reach the same conclusion | observability |
@@ -35,7 +34,6 @@ These skills ship with every install and update automatically.
 | `experiment-loop` | Systematic experiment loops — change, test, measure, keep/discard, repeat | optimization, experimentation |
 | `frontend-design` | Visual design consistency with tunable design knobs (variance, motion, density) | design, frontend |
 | `frontend-implementation` | How to implement frontend features | frontend |
-| `git-workflow` | Branching, commits, and PR conventions | workflow |
 | `governance` | Approval gates for high-impact actions (deploy, migration, breaking changes) | governance |
 | `health-check` | Diagnose framework setup integrity | diagnostics |
 | `canuto-project-doctor` | Diagnose setup, memory coverage, stale context, and framework drift | diagnostics |
@@ -44,27 +42,20 @@ These skills ship with every install and update automatically.
 | `canuto-pending-triage` | Deduplicate and prioritize pending tasks across vault notes and local memory | productivity, memory |
 | `obsidian-writeback-queue` | Stage safe Obsidian/Canuto vault write-back proposals with approval and offline fallback | obsidian, memory |
 | `heartbeat` | Scheduled autonomous activation — single-shot runner with mechanical post-gate | orchestration, autonomy |
-| `json-canvas` | JSON Canvas: visual maps and flowcharts (.canvas files) | obsidian, visualization |
 | `knowledge-ingest` | Ingest external sources (videos, articles, PDFs, meeting transcripts) into structured vault notes | ingestion, knowledge, memory |
 | `mcp-obsidian` | How the framework uses MCP to interact with the vault (+ semantic search, multi-MCP connectors) | obsidian, mcp, memory |
 | `metrics` | Quality, velocity, compliance, and rework tracking | analytics |
 | `monitor` | Long-running monitoring profiles with alert rules | observability |
 | `multi-provider` | How Maestro delegates to Claude (tier-1) and Codex (tier-2) | orchestration |
-| `obsidian-bases` | Obsidian Bases: database views over notes (.base files) | obsidian, queries |
-| `obsidian-cli` | Interact with Obsidian vault via CLI | obsidian, cli |
 | `obsidian-markdown` | Obsidian Flavored Markdown: wikilinks, embeds, callouts, properties, tags | obsidian, markdown |
-| `plugin-system` | How to create and manage opt-in plugins | extensibility |
 | `pr-description` | Auto-generate PR descriptions after review | workflow |
 | `research` | Structured investigation workflow with community intelligence (Reddit, HN, X), codebase scan, and vault lookup | research, planning |
 | `review` | Manual entry-point for the diff-router (`--auto/--small/--large/--ui/--security/...`) | review, quality |
 | `runtime-flags` | Session-scoped behavioral overrides (FAST_MODE, STRICT_MODE, etc.) | configuration |
 | `security-practices` | Rules for secrets, env vars, and security hygiene | security |
 | `session-goals` | Track session goals explicitly with continuation modes | productivity |
-| `session-reset` | Context compaction checkpoint for long sessions | context-management |
 | `skill-check-protocol` | The 1% Rule + red-flag rationalizations for skill activation | meta, compliance |
 | `skill-creator` | 7-phase skill authoring workflow | meta, authoring |
-| `squads` | Parallel domain-based workstreams | orchestration |
-| `stack-lock` | Prevent library drift via approved stack | governance, dependencies |
 | `stuck-detection` | Detect fix→implement→re-test loops without progress; escalate | quality, observability |
 | `trace-analysis` | Session-end trace analysis: playbook gaps, instinct candidates, routing misfires | learning, observability |
 | `typeset` | BM25 over font pairings → heading+body + Tailwind config | design, typography |
@@ -93,6 +84,16 @@ Os skills abaixo foram movidos para `.agents/skills/_archive/` em 2026-06-11
 `spreadsheet-delivery-check`, `frontend-visual-qa`, `codex-*` (11 wrappers),
 `context-preload`, `context-digest`, `context-health`, `smart-token-metering`,
 `lazy-opus-review`, `competition`, `parallel-impl`, `headless-validation`, `health`.
+
+Arquivados em **2026-07-26** (grafo de invocação: zero caminho real de invocação
+— nenhuma persona, hook, CLAUDE.md ou skill de entrada os citava):
+`obsidian-cli`, `squads`, `session-reset` (slash nunca era instalado),
+`json-canvas`, `obsidian-bases`, `cli-usage`, `git-workflow`, `stack-lock`,
+`plugin-system` (mecanismo de descoberta de plugins nunca foi implementado —
+plugins `ccb`/`notebooklm`/`example-ci-status` movidos para
+`.agents/plugins/_archive/`). Hooks aposentados: `cleanup-tmp.sh`,
+`validate-config.sh`. Tools: `logging.sh`, `env-bitwarden-sync.sh`
+(→ `.agents/tools/_archive/`).
 
 ---
 
