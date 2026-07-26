@@ -2,7 +2,20 @@
 
 Personal multi-agent framework for AI-assisted development. Claude-first by default, Codex-maestro when you are talking directly to Codex. Obsidian-native memory.
 
-This release keeps the v1.6 Obsidian-native runtime and adds a sharper learning-loop layer: project diagnosis, rework detection, session-end learning, pending triage, and safe vault write-back preview. It also adds optional QA skills for dashboards, scrapers, routing, spreadsheets, and frontend visual checks.
+This release keeps the v1.6 Obsidian-native runtime and adds a sharper learning-loop layer: project diagnosis, rework detection, session-end learning, pending triage, and safe vault write-back preview.
+
+## O que mudou em 2026-07 (absorção edge-of-chaos)
+
+Camada mecânica nova — contratos que sobrevivem porque são código, não prosa:
+
+- **Event log append-only** por projeto (`<vault>/events/log.jsonl`) escrito pelos hooks — fonte de verdade dos eventos de sessão. Notas de auditoria derivam dele, nunca o contrário. ([ADR-0001](docs/adr/0001-event-log-fonte-de-verdade.md))
+- **Gates fail-closed nas costuras**: `gh pr create` roda os testes antes (bypass `CANUTO_SKIP_PR_GATE=1` existe, mas é registrado); toda delegação Codex é verificada pós-execução (artefato existe? não-vazio? recente?); o fim de sessão cobra CLOSEOUT com evidência. ([ADR-0002](docs/adr/0002-gates-fail-closed-nas-costuras.md))
+- **Heartbeats single-shot**: tarefas agendadas (`.agents/heartbeats/*.md`) rodam via cron/launchd com post-gate mecânico — sem retry envelope, o próximo tick É o retry. ([ADR-0004](docs/adr/0004-heartbeat-single-shot.md))
+- **Memória em dois tiers**: tier hipótese grava sozinho (session notes, metrics, instinct candidates `confidence: low`); tier curado exige aprovação humana (promoções, decisions). Instincts frios (low, >30d sem uso) são arquivados automaticamente — nunca deletados. ([ADR-0005](docs/adr/0005-memoria-em-dois-tiers.md))
+- **Revisor cego** (`.claude/agents/blind-reviewer.md`): segunda opinião com muro mecânico — só Read/Grep/Glob, sem contexto da sessão. Devolve strikes, nunca reescrita. ([ADR-0006](docs/adr/0006-revisor-cego-muro-mecanico.md))
+- **Cegueira de identidade**: o repositório do framework não carrega slug/paths de nenhuma máquina específica; um grep-gate no `test-framework.sh` falha o build se literais de identidade vazarem. ([ADR-0003](docs/adr/0003-cegueira-de-identidade-no-genotipo.md))
+
+Decisões completas (com alternativas rejeitadas e porquê): [`docs/adr/`](docs/adr/).
 
 ## Documentation
 
@@ -42,8 +55,6 @@ This release keeps the v1.6 Obsidian-native runtime and adds a sharper learning-
       SKILL.md                — Extract reusable instincts from session experience.
     frontend-design/
       SKILL.md                — Visual design principles, knobs, and LLM bias correction.
-    api-docs-fetch.md         — Fetch current API docs via Context Hub before coding.
-    brand-bootstrap.md        — Extract brand assets from URLs via OpenBrand.
     obsidian-markdown.md      — Wikilinks, embeds, callouts, properties, tags.
     mcp-obsidian.md           — How the framework uses MCP to interact with the vault.
     defuddle.md               — Extract clean markdown from web pages.
@@ -55,21 +66,35 @@ This release keeps the v1.6 Obsidian-native runtime and adds a sharper learning-
     audit-trail.md            — Immutable log of session events.
     runtime-flags.md          — Session-scoped behavioral overrides.
     convergence-detection.md  — Multi-persona agreement detection.
-    heartbeat.md              — Foundation for autonomous agent activation.
     browser-qa.md             — When/how to use /qa + /browse (gstack) in QA flow.
-    product-review.md         — When/how to run /office-hours for L/XL tasks.
+    _archive/                 — Skills aposentados (auditorias 2026-06-11 e 2026-07-26). Restaurar: git mv de volta.
   mcp/
     server.json         — MCP server config template (obsidian-mcp-server).
     setup.md            — Setup guide for Obsidian + MCP integration.
   hooks/
-    session-save.sh     — Auto-backup vault on Stop.
-    session-load.sh     — Load session context on start.
-    pre-compact-save.sh — Save context before token compaction.
+    session-save.sh          — Auto-backup vault on Stop + gate de CLOSEOUT (avisa se o dia fechou sem evento).
+    session-load.sh          — Load session context on start.
+    pre-compact-save.sh      — Save context before token compaction.
+    pre-pr-bash-gate.sh      — PreToolUse: intercepta `gh pr create` e roda os testes antes (fail-closed).
+    postdelegate-verify.sh   — PostToolUse: verifica artefato de toda delegação Codex (existe/não-vazio/recente).
+    require-tests-for-pr.sh  — Gate de testes compartilhado pelos dois caminhos de PR (MCP e gh CLI).
+    codex-pretool-guard.sh   — Guarda de pré-commit para delegações Codex.
+    settings-snippet.json    — Registro dos hooks para ~/.claude/settings.json (aplicado por hooks/install.sh).
   tools/
+    event-log.sh        — Append/tail do event log por projeto (jsonl, flock, nunca falha o caller).
+    heartbeat-run.sh    — Runner single-shot de heartbeats + --install-cron/--install-launchd/--uninstall.
+    instinct-aging.sh   — Arquiva instincts frios (low, >30d) — nunca deleta. --dry-run por padrão.
+    canuto-memory.sh    — Resolução canônica de slug e paths do vault.
     codex-maestro.sh    — Launch direct Codex runtime with the `maestro` profile.
     vault-sync.sh       — Flush pending sync notes into the active vault backend.
+  heartbeats/
+    weekly-maintenance.md — Task semanal: pending triage + instinct aging + digest.
+    usage-audit.md        — Task mensal: auditoria de uso real do framework.
   plugins/_archive/     — Plugins arquivados 2026-07-26 (mecanismo de descoberta nunca foi implementado).
   SPEC.md               — Full specification and design decisions.
+
+docs/adr/               — Architecture Decision Records (contexto, opções rejeitadas e porquê, consequências).
+.claude/agents/blind-reviewer.md — Subagent revisor cego (só Read/Grep/Glob).
 
 ~/.canuto/vault/          — Global Obsidian vault (one for all projects)
   projects/
@@ -163,12 +188,11 @@ bash test-framework.sh
 
 ### Optional skill install
 
-```bash
-bash install.sh --skill adr
-bash install.sh --skill adr --skill session-goals
-bash install.sh --skill dashboard-regression-guard
-bash install.sh --skill frontend-visual-qa
-```
+Desde 2026-07-26 todos os skills ativos são distribuídos por default — não há
+skills opcionais no momento. Skills aposentados vivem em
+`.agents/skills/_archive/` (restaurar: `git mv` de volta + re-registrar no
+`registry.md`). O mecanismo `--skill <name>` continua funcionando para skills
+futuros ou da comunidade.
 
 ### One-time migration from v1.5 (flat-file memory) to v1.6 (Obsidian vault)
 
@@ -180,7 +204,7 @@ curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/in
 
 | Passive after install | Explicitly ask/run |
 |-----------------------|--------------------|
-| Maestro briefing, normal persona flow, session-save hook, pre-compact-save hook, plan-review hook, Codex pretool guard, instinct lookup, project-doctor on suspicious setup, rework detector on repeated loops, session-end learning, write-back preview before vault writes | `bash install.sh --update`, `bash install.sh --repair`, `bash install.sh --doctor`, `"health check"`, `"triage pending"`, runtime flags like `set FAST_MODE`, slash commands like `/office-hours`, direct skill requests like `"use a skill research"` |
+| Maestro briefing, normal persona flow, session-save hook (+ gate de CLOSEOUT), pre-compact-save hook, Codex pretool guard, event log escrito pelos hooks, gate de PR em `gh pr create`, verificação pós-delegação Codex, tier hipótese da memória (auto-grava e anuncia), instinct lookup, project-doctor on suspicious setup, rework detector on repeated loops, session-end learning, write-back preview before curated vault writes | `bash install.sh --update`, `bash install.sh --repair`, `bash install.sh --doctor`, agendar heartbeats (`bash .agents/tools/heartbeat-run.sh --install-cron/--install-launchd`), `"health check"`, `"triage pending"`, co-review com `blind-reviewer`, runtime flags like `set FAST_MODE`, slash commands like `/office-hours`, direct skill requests like `"use a skill research"` |
 
 ### New project via GitHub template
 
@@ -225,12 +249,13 @@ Skills no Canuto nao sao daemons. Elas sao playbooks que Maestro/personas chamam
 | `canuto-rework-detector` | Passiva condicional | Antes de continuar quando houver retry, review loop, stale context, dirty-state ou tarefa repetida | Pode pausar implementacao para replanejar |
 | `canuto-session-end-learning` | Passiva obrigatoria | No encerramento da sessao, antes do resumo final | Propõe memoria, metricas e candidate instincts |
 | `canuto-pending-triage` | Passiva condicional | Quando pending no vault acumular duplicatas, itens vagos ou backlog grande; tambem por pedido explicito | Nunca apaga pendencia sem aprovacao |
-| `obsidian-writeback-queue` | Passiva com gate ativo | Depois de session learning ou pending triage quando houver proposta de escrever no vault | Preview por padrao; escrita viva so com aprovacao |
-| `dashboard-regression-guard` | Ativa opcional | Instalada e chamada em dashboards, BI, admin panels e relatorios visuais | Foca fixtures, totais, filtros e timezone |
-| `scraper-resilience` | Ativa opcional | Instalada e chamada em scrapers, collectors e parsers frageis | Foca fixture, selector drift e retries limitados |
-| `route-optimizer-qa` | Ativa opcional | Instalada e chamada em roteirizacao, logistica e geocoding | Exige metricas before/after |
-| `spreadsheet-delivery-check` | Ativa opcional | Instalada e chamada em entregas `.xlsx`, `.xls`, `.csv` e exports | Reabre arquivo e procura erro de formula |
-| `frontend-visual-qa` | Ativa opcional | Instalada e chamada em web apps, landing pages, jogos e UIs interativas | Exige browser real quando visual importa |
+| `obsidian-writeback-queue` | Passiva com gate ativo | Depois de session learning ou pending triage quando houver proposta de escrever no tier curado do vault | Preview por padrao; escrita viva so com aprovacao. Tier hipotese (session notes, metrics, instinct candidates) grava direto e anuncia |
+| `event-log` | Passiva mecanica | Hooks escrevem sozinhos (SESSION, GATE, DELEGATION, HEARTBEAT, CLOSEOUT) | Append-only; correcao = novo evento, nunca edicao |
+| `heartbeat` | Agendada | Cron/launchd chama `heartbeat-run.sh <task>` | Single-shot + post-gate; sem retry envelope |
+
+Skills de QA opcionais antigos (`dashboard-regression-guard`, `scraper-resilience`,
+`route-optimizer-qa`, `spreadsheet-delivery-check`, `frontend-visual-qa`) foram
+arquivados em 2026-06-11 — restauraveis de `.agents/skills/_archive/`.
 
 Passiva nao significa silenciosa: a persona deve explicar que esta usando a skill e resumir a evidencia. Ativa significa que a skill entra por tipo de tarefa, por instalacao opcional com `--skill`, ou por pedido direto.
 
@@ -268,9 +293,9 @@ You are my coding orchestrator for this repository.
 - When in doubt, ask questions instead of guessing.
 
 ## Memory System
-- Global Obsidian vault at `~/.canuto/vault/`
-- MCP server (obsidian-mcp-server) required for vault access
-- See `.agents/mcp/setup.md` for configuration
+- Caminho canônico de leitura/escrita: filesystem direto no vault global (`~/.canuto/vault/projects/<slug>/`). Resolução de paths via `source .agents/tools/canuto-memory.sh`
+- Event log append-only por projeto em `<vault>/events/log.jsonl` — escrito pelos hooks, fonte de verdade dos eventos de sessão
+- MCP obsidian-vault é opcional (filesystem é o caminho real); see `.agents/mcp/setup.md`
 
 ## On Session Start
 1. Query vault via MCP: latest session note, pending tasks, high-confidence instincts
@@ -314,9 +339,15 @@ You are my coding orchestrator for this repository.
 
 **LLM bias correction**: Regras anti-padrao que previnem UIs genericas de AI.
 
-**API docs fetch**: Busca docs atualizadas via Context Hub antes de codificar integracoes.
+**Event log**: `<vault>/events/log.jsonl` append-only por projeto, escrito pelos hooks. Projecoes (notas, digests, metricas) derivam dele. `bash .agents/tools/event-log.sh tail 20` mostra os ultimos eventos.
 
-**Brand bootstrap**: Extrai cores, logos e brand name de URLs via OpenBrand para popular `design/profile.md` automaticamente.
+**Gates fail-closed**: PR sem testes nao nasce (`gh pr create` interceptado); delegacao sem artefato grita; dia sem CLOSEOUT gera aviso com evidencia. Bypass existe, mas deixa rastro no log.
+
+**Heartbeat**: Ativacao autonoma agendada. `bash .agents/tools/heartbeat-run.sh --install-cron "0 9 * * 1" weekly-maintenance` (Linux) ou `--install-launchd 604800 weekly-maintenance` (macOS). O digest em `.agents/vault/digests/` e a prova de execucao.
+
+**Memoria em dois tiers**: hipotese (auto-grava, anuncia) vs curada (aprovacao humana). `instinct-aging.sh` arquiva candidatos frios apos 30 dias — nunca deleta.
+
+**Revisor cego**: subagent `blind-reviewer` com só Read/Grep/Glob — segunda opiniao sem contaminacao do contexto da sessao. Strikes e veredito, nunca reescrita.
 
 **Absence reporting**: Personas reportam o que buscaram e NAO encontraram.
 
