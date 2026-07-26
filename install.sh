@@ -628,6 +628,7 @@ FRAMEWORK_FILES=(
 
 INSTALL_ONLY_FILES=(
   ".agents/heartbeats/weekly-maintenance.md"
+  ".agents/heartbeats/usage-audit.md"
   ".agents/vault/_index.md"
   ".agents/vault/.obsidian/app.json"
   ".agents/vault/.obsidian/community-plugins.json"
