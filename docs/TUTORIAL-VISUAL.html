@@ -663,7 +663,7 @@ curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/in
           <div class="card" style="background: linear-gradient(135deg, #fff1eb, #f5ddd3);">
             <div class="kicker" style="color: #a84b2d; background: rgba(198,93,58,0.1); border-color: rgba(198,93,58,0.15);">Codex direto via CLI</div>
             <ul class="clean">
-              <li><strong>Runtime direto</strong> — <code>bash .agents/tools/codex-maestro.sh</code> sobe o Codex como Maestro com profile <code>maestro</code> (alvo <code>gpt-5.5</code> com reasoning: xhigh).</li>
+              <li><strong>Runtime direto</strong> — <code>bash .agents/tools/codex-maestro.sh</code> sobe o Codex como Maestro no role <code>maestro</code> (modelo e effort vêm de <code>.agents/config/models.yaml</code>).</li>
               <li><strong>Tasks M e L</strong> — Architect gera <code>context-package.md</code>, chama <code>codex exec --profile coder</code>.</li>
               <li><strong>Tasks paralelas</strong> — multiplas chamadas <code>codex exec --profile coder</code> com context package por agente.</li>
               <li><strong>Pre-commit gate</strong> — <code>codex-pretool-guard.sh</code> dispara o <em>reviewer path</em> do Codex em todo <code>git commit</code> e explicita quando entra em fallback.</li>
@@ -686,7 +686,7 @@ curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/in
 
             <rect x="248" y="20" width="190" height="86" rx="18" fill="#fff1eb" stroke="#ddb6a9"/>
             <text x="272" y="52" fill="#a84b2d" font-size="17" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="800">Codex</text>
-            <text x="272" y="74" fill="#a84b2d" font-size="14" font-family="Avenir Next, Segoe UI, sans-serif">Coder (gpt-5.5, high)</text>
+            <text x="272" y="74" fill="#a84b2d" font-size="14" font-family="Avenir Next, Segoe UI, sans-serif">Coder (role coder)</text>
             <text x="272" y="95" fill="#7f5b50" font-size="12" font-family="Avenir Next, Segoe UI, sans-serif">escreve codigo no filesystem</text>
 
             <path d="M438 63 L486 63" stroke="#7d8c8f" stroke-width="3" stroke-linecap="round"/>
@@ -714,7 +714,7 @@ curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/in
 
         <div class="badge-row" style="margin-top: 14px;">
           <span class="badge" style="background:rgba(15,118,110,0.1); color:#145d57; border-color:rgba(15,118,110,0.15);">Claude session = Opus continua como Maestro</span>
-          <span class="badge" style="background:rgba(198,93,58,0.1); color:#a84b2d; border-color:rgba(198,93,58,0.15);">Codex direto = profile maestro (gpt-5.5, xhigh)</span>
+          <span class="badge" style="background:rgba(198,93,58,0.1); color:#a84b2d; border-color:rgba(198,93,58,0.15);">Codex direto = role maestro</span>
           <span class="badge">context-package.md + handoff envelope persistido</span>
           <span class="badge">codex-pretool-guard intercepta todo git commit automaticamente</span>
         </div>
