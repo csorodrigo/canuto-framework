@@ -28,6 +28,14 @@ else
   canuto_resolve_memory_backend() { printf 'none\t\n'; }
 fi
 
+EVENT_LIB="$ROOT_DIR/.agents/tools/event-log.sh"
+if [ -f "$EVENT_LIB" ]; then
+  # shellcheck source=/dev/null
+  source "$EVENT_LIB"
+else
+  canuto_event_append() { return 0; }
+fi
+
 PROJECT_DIR=$(canuto_project_dir "$PROJECT_DIR")
 PROJECT_SLUG=$(canuto_project_slug "$PROJECT_DIR")
 CACHE_DIR=$(canuto_cache_dir "$PROJECT_DIR")
@@ -43,6 +51,19 @@ VAULT_AVAILABLE=false
 if [ "$BACKEND_KIND" = "global" ] || [ "$BACKEND_KIND" = "local" ]; then
   VAULT_AVAILABLE=true
   VAULT_DIR="$BACKEND_DIR"
+fi
+
+# ── Event log: SESSION_END é mecânico, nunca depende do agente ─────────────
+canuto_event_append SESSION_END actor=hook backend="$BACKEND_KIND" || true
+
+# ── Gate de closeout (fail-closed informativo, padrão edge "verify at exit"):
+# se o agente não registrou CLOSEOUT hoje, o aviso sai com evidência concreta.
+EVENT_LOG_PATH=""
+command -v canuto_event_log_path >/dev/null 2>&1 && EVENT_LOG_PATH=$(canuto_event_log_path "$PROJECT_DIR") || true
+CLOSEOUT_TODAY=0
+if [ -n "$EVENT_LOG_PATH" ] && [ -f "$EVENT_LOG_PATH" ]; then
+  CLOSEOUT_TODAY=$(grep '"event":"CLOSEOUT"' "$EVENT_LOG_PATH" 2>/dev/null \
+    | grep -c "\"ts\":\"$(date -u +%Y-%m-%d)" 2>/dev/null) || CLOSEOUT_TODAY=0
 fi
 
 # ── Fallback: save to pending-sync if vault unavailable ───────────────────
@@ -139,8 +160,14 @@ echo "  Canuto — Session State Saved"
 echo "════════════════════════════════════════"
 echo "  Snapshot: $VAULT_DIR/.snapshots/$TIMESTAMP"
 echo ""
-echo "  Reminder: If the Maestro did not finalize"
-echo "  the session note, pending tasks, and metrics,"
-echo "  the backup above can be used to recover state."
+if [ "${CLOSEOUT_TODAY:-0}" = "0" ] || [ -z "${CLOSEOUT_TODAY:-}" ]; then
+  echo "  ⚠ GATE: nenhum evento CLOSEOUT registrado hoje em"
+  echo "  ${EVENT_LOG_PATH:-events/log.jsonl}."
+  echo "  A sessão está fechando SEM closeout do learning loop."
+  echo "  Rode canuto-session-end-learning e registre com:"
+  echo "  bash .agents/tools/event-log.sh append CLOSEOUT actor=maestro"
+else
+  echo "  ✓ CLOSEOUT registrado hoje ($CLOSEOUT_TODAY evento(s)) — learning loop ok."
+fi
 echo "════════════════════════════════════════"
 echo ""

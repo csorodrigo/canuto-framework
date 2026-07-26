@@ -35,12 +35,22 @@ else
   canuto_resolve_memory_backend() { printf 'none\t'; }
 fi
 
+EVENT_LIB="$ROOT_DIR/.agents/tools/event-log.sh"
+if [ -f "$EVENT_LIB" ]; then
+  # shellcheck source=/dev/null
+  source "$EVENT_LIB"
+else
+  canuto_event_append() { return 0; }
+fi
+
 PROJECT_DIR=$(canuto_project_dir "$PROJECT_DIR")
 PROJECT_SLUG=$(canuto_project_slug "$PROJECT_DIR")
 BACKEND_KIND=""
 BACKEND_DIR=""
 
 IFS=$'\t' read -r BACKEND_KIND BACKEND_DIR < <(canuto_resolve_memory_backend "$PROJECT_DIR")
+
+canuto_event_append PRE_COMPACT actor=hook backend="$BACKEND_KIND" || true
 
 if [ "$BACKEND_KIND" = "none" ]; then
   exit 0

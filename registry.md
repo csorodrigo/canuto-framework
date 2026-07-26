@@ -31,6 +31,7 @@ These skills ship with every install and update automatically.
 | `coverage-tracking` | Track exploration depth across personas, areas, and concerns for M/L tasks | observability |
 | `cross-persona-flags` | Outbound flags between personas for lateral discovery via Maestro | orchestration |
 | `defuddle` | Extract clean markdown from web pages (token-efficient) | web, ingestion |
+| `event-log` | Append-only per-project event log written by hooks — source of truth for session events | observability, memory |
 | `experiment-loop` | Systematic experiment loops — change, test, measure, keep/discard, repeat | optimization, experimentation |
 | `frontend-design` | Visual design consistency with tunable design knobs (variance, motion, density) | design, frontend |
 | `frontend-implementation` | How to implement frontend features | frontend |

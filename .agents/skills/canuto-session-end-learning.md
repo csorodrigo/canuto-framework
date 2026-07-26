@@ -31,13 +31,20 @@ Run at session end, before the final summary, and after any task with:
 4. Extract decisions that future sessions must know.
 5. Extract rework and error signals.
 6. Extract candidate instincts: short reusable lessons that reduce future mistakes.
-7. Build a write plan:
-   - `.agents/memory/last-session.md`
-   - `.agents/memory/pending.md`
-   - `.agents/memory/decisions.md`
-   - `.agents/memory/metrics.md`
-   - Canuto vault `projects/<slug>/...` if configured and approved
-8. Ask for approval before writing outside the normal session memory flow.
+7. Build a write plan (vault resolvido por `canuto-memory.sh`; layout legado
+   `.agents/memory/*.md` só se o backend for `legacy`):
+   - `projects/<slug>/sessions/YYYY-MM-DD.md`
+   - `projects/<slug>/pending/`
+   - `projects/<slug>/decisions/`
+   - `projects/<slug>/metrics/`
+8. Ask for approval before writing outside the normal session memory flow
+   (ver fronteira de tiers em `continuous-learning` — tier hipótese grava
+   direto, tier curado pede aprovação).
+9. **Registre o closeout no event log** (obrigatório — o hook Stop verifica
+   mecanicamente e avisa se faltar):
+   ```bash
+   bash .agents/tools/event-log.sh append CLOSEOUT actor=maestro summary="<3-8 palavras>"
+   ```
 
 ---
 

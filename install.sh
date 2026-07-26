@@ -613,6 +613,9 @@ FRAMEWORK_FILES=(
   ".agents/skills/typeset.md"
   ".agents/skills/vault-maintenance.md"
   ".agents/skills/verification-gates.md"
+  # Event log (absorção edge-of-chaos, Fase 1 — ADR-0001)
+  ".agents/skills/event-log.md"
+  ".agents/tools/event-log.sh"
 )
 
 INSTALL_ONLY_FILES=(
