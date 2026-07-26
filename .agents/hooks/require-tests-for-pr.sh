@@ -7,6 +7,17 @@ set -euo pipefail
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/../tools/event-log.sh" ]; then
+  # shellcheck source=../tools/event-log.sh
+  . "$SCRIPT_DIR/../tools/event-log.sh"
+elif [ -f "$PROJECT_DIR/.agents/tools/event-log.sh" ]; then
+  # shellcheck source=/dev/null
+  . "$PROJECT_DIR/.agents/tools/event-log.sh"
+else
+  canuto_event_append() { return 0; }
+fi
+
 run_tests() {
   if [[ -f "$PROJECT_DIR/test-framework.sh" ]]; then
     bash "$PROJECT_DIR/test-framework.sh" 2>&1 | tail -20
@@ -24,8 +35,10 @@ run_tests() {
 }
 
 if ! run_tests; then
+  canuto_event_append GATE actor=hook gate=pr-tests verdict=fail via=mcp || true
   echo "Tests are failing. Fix all test failures before creating a PR." >&2
   exit 2
 fi
 
+canuto_event_append GATE actor=hook gate=pr-tests verdict=pass via=mcp || true
 exit 0

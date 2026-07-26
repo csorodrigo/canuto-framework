@@ -32,6 +32,9 @@
 _CANUTO_EVENT_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if ! command -v canuto_project_dir >/dev/null 2>&1; then
+  # canuto-memory.sh liga `set -euo pipefail`; um source não pode mudar as
+  # opções do hook chamador — captura e restaura.
+  _canuto_prev_opts="$-"
   if [ -f "$_CANUTO_EVENT_LIB_DIR/canuto-memory.sh" ]; then
     # shellcheck source=canuto-memory.sh
     source "$_CANUTO_EVENT_LIB_DIR/canuto-memory.sh"
@@ -39,6 +42,9 @@ if ! command -v canuto_project_dir >/dev/null 2>&1; then
     # shellcheck source=/dev/null
     source "$CLAUDE_PROJECT_DIR/.agents/tools/canuto-memory.sh"
   fi
+  case "$_canuto_prev_opts" in *e*) : ;; *) set +e ;; esac
+  case "$_canuto_prev_opts" in *u*) : ;; *) set +u ;; esac
+  unset _canuto_prev_opts
 fi
 
 # Resolve o caminho do log. Nunca imprime vazio: sempre há um destino.
