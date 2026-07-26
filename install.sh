@@ -619,6 +619,11 @@ FRAMEWORK_FILES=(
   # Heartbeat v1 (absorção edge-of-chaos, Fase 4 — ADR-0004)
   ".agents/tools/heartbeat-run.sh"
   ".agents/tools/instinct-aging.sh"
+  # Revisor cego com muro mecânico (ADR-0006)
+  ".claude/agents/blind-reviewer.md"
+  # Novos gates fail-closed (ADR-0002)
+  ".agents/hooks/pre-pr-bash-gate.sh"
+  ".agents/hooks/postdelegate-verify.sh"
 )
 
 INSTALL_ONLY_FILES=(

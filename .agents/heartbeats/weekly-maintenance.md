@@ -22,4 +22,5 @@ single-shot, sem usuário presente). Tarefa de manutenção semanal:
 
 Regras: não faça git push, não crie PRs, não instale nada, não escreva fora
 do vault do projeto (CONTRACT do heartbeat: ler, absorver, entregar
-conhecimento para ler — nunca agir no mundo sem aprovação; ver ADR-0005).
+conhecimento para ler — nunca agir no mundo sem aprovação; ver
+docs/adr/0004-heartbeat-single-shot.md).
