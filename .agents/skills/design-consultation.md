@@ -14,7 +14,7 @@ copyright: Rodrigo Canuto © 2026.
 
 **Not for:**
 - Projects with an established `design-profile.md` (use `frontend-design` instead)
-- Extracting brand from an existing website (use `brand-bootstrap` instead)
+- Extracting brand from an existing website (padrão arquivado em `_archive/brand-bootstrap.md`)
 - Quick color or typography tweaks (use `/colorize` or `/typeset` instead)
 
 ---
@@ -23,7 +23,7 @@ copyright: Rodrigo Canuto © 2026.
 
 Generate a complete, opinionated design system recommendation from natural language requirements. Uses BM25 search over a curated database to match product type → style → color palette → typography → stack-specific guidelines. Output persists to `design-system/MASTER.md` for hierarchical retrieval by all personas.
 
-Works alongside `brand-bootstrap` (provides extracted colors) and `frontend-design` (consumes the generated profile for implementation decisions).
+Works alongside `frontend-design` (consumes the generated profile for implementation decisions). Extração automática de brand era papel do `brand-bootstrap` (arquivado).
 
 ---
 

@@ -581,6 +581,38 @@ FRAMEWORK_FILES=(
   # Codex fallback persona (distributed to every project on update)
   "CODEX.md"
   ".agents/templates/CODEX.md"
+  # Learning-loop, QA and design skills (sync 2026-07-26 — previously in the
+  # repo but never distributed; test-framework.sh now enforces this list stays
+  # in sync with .agents/skills/)
+  ".agents/skills/adaptive-routing/SKILL.md"
+  ".agents/skills/audit.md"
+  ".agents/skills/auto-analysis.md"
+  ".agents/skills/co-review/references/modes.md"
+  ".agents/skills/colorize.md"
+  ".agents/skills/design-consultation.md"
+  ".agents/skills/experiment-loop/SKILL.md"
+  ".agents/skills/experiment-loop/references/auto-triggers.md"
+  ".agents/skills/experiment-loop/references/use-cases-and-examples.md"
+  ".agents/skills/experiment-loop/references/vault-schema.md"
+  ".agents/skills/knowledge-ingest.md"
+  ".agents/skills/monitor/SKILL.md"
+  ".agents/skills/monitor/references/alert-rules.md"
+  ".agents/skills/monitor/references/integration-schema.md"
+  ".agents/skills/monitor/references/profiles.md"
+  ".agents/skills/research.md"
+  ".agents/skills/review.md"
+  ".agents/skills/session-reset/SKILL.md"
+  ".agents/skills/skill-check-protocol.md"
+  ".agents/skills/skill-creator.md"
+  ".agents/skills/stuck-detection.md"
+  ".agents/skills/trace-analysis/SKILL.md"
+  ".agents/skills/trace-analysis/references/blind-spot-generator.md"
+  ".agents/skills/trace-analysis/references/digest-schema.md"
+  ".agents/skills/trace-analysis/references/improvement-patterns.md"
+  ".agents/skills/trace-analysis/references/skill-proposer.md"
+  ".agents/skills/typeset.md"
+  ".agents/skills/vault-maintenance.md"
+  ".agents/skills/verification-gates.md"
 )
 
 INSTALL_ONLY_FILES=(
@@ -647,12 +679,22 @@ VAULT_DIRS=(
 # inside existing sections. Safe to run multiple times (idempotent).
 merge_claude_md() {
   if [ ! -f "$CLAUDE_MD" ]; then
-    download "CLAUDE.md" "$CLAUDE_MD"
-    ok "$CLAUDE_MD created"
-    return
+    # Generate a clean template. NEVER download the framework repo's own
+    # CLAUDE.md here: it carries canuto-specific settings (project-slug,
+    # providers, memory paths) and polluted every fresh install with the
+    # canuto slug, colliding vault memory across projects
+    # (2026-04-17 audit follow-up #1). project-slug is intentionally omitted:
+    # canuto-memory.sh falls back to the project directory basename.
+    cat > "$CLAUDE_MD" << 'HEADER'
+# Project AI Setup
+
+You are my coding orchestrator for this repository.
+HEADER
+    ok "$CLAUDE_MD created (clean template — project-slug defaults to the directory name)"
+  else
+    log "$CLAUDE_MD already exists — checking for missing sections and rules..."
   fi
 
-  log "$CLAUDE_MD already exists — checking for missing sections and rules..."
   local appended=0
 
   # ── Section: ## Framework ──────────────────────────────────────────────

@@ -33,9 +33,10 @@ Canonical model reference: `.agents/config/models.yaml` (human-readable; keep
 - When in doubt, ask questions instead of guessing.
 
 ## Memory System
-- Caminho canônico de leitura/escrita: `rtk node ~/.canuto/bin/canuto-brain.mjs brief|closeout|learn|rework` (vault global em `~/.canuto/vault/`, escopo `projects/<slug>/`)
+- Caminho canônico de leitura/escrita: filesystem direto no vault global (`~/.canuto/vault/projects/<slug>/`). Resolução de paths via `source .agents/tools/canuto-memory.sh` (`canuto_project_slug`, `canuto_global_vault_dir`, `canuto_local_vault_dir`)
+- Event log append-only por projeto em `<vault>/events/log.jsonl` — escrito pelos hooks, fonte de verdade dos eventos de sessão; ver skill `event-log`
 - Vault Obsidian local em `.agents/vault/` (notas do próprio framework)
-- MCP obsidian-vault é **opcional** (auditoria 2026-06-10: 0 chamadas em 200 sessões — canuto-brain é o caminho real); see `.agents/mcp/setup.md`
+- MCP obsidian-vault é **opcional** (auditoria 2026-06-10: 0 chamadas em 200 sessões — filesystem é o caminho real); see `.agents/mcp/setup.md`
 - Atomized notes: sessions/, decisions/, instincts/, pending/, audit/, metrics/
 - Database views: bases/*.base
 - Visual maps: canvas/*.canvas

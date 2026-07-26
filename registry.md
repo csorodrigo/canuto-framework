@@ -13,11 +13,17 @@ These skills ship with every install and update automatically.
 | Name | Description | Tags |
 |------|-------------|------|
 | `absence-reporting` | Personas report what they searched and did NOT find, eliminating silence ambiguity | observability |
+| `adaptive-routing` | Adjust provider routing based on observed reliability signals | orchestration, routing |
 | `api-design` | How to design and evolve HTTP/JSON APIs | backend |
-| `api-docs-fetch` | Fetch current API/SDK docs via Context Hub (chub) before coding — prevents hallucination | documentation, api |
+| `audit` | Multi-dimensional UI quality scan (a11y, UX guidelines, interaction states, responsiveness) | design, quality |
 | `audit-trail` | Immutable append-only log of all significant session events | observability |
-| `brand-bootstrap` | Extract brand identity from existing websites | design, branding |
+| `auto-analysis` | Deep project scan + cross-project vault intelligence | analytics, onboarding |
+| `browser-qa` | Real-browser QA via gstack + authenticated data extraction via Chrome DevTools MCP | testing, quality, scraping |
 | `budget-controls` | Token/cost budgets per persona and session with advisory warnings | cost-management |
+| `co-review` | Cross-model plan review gate for M/L tasks | review, orchestration |
+| `colorize` | BM25 over curated palettes → WCAG-compliant semantic token sets | design, color |
+| `cost-routing` | Provider routing matrix: what runs on Claude inline vs Codex spawn | cost-management, orchestration |
+| `design-consultation` | Generate a full design system → `design-system/MASTER.md` | design |
 | `cli-usage` | How to safely use CLI commands and scripts | devops |
 | `context-maintenance` | How to maintain `.context.md`, `FEATURE-MAP.md`, and Repo Index (evaluate-repo pipeline) | documentation, indexation |
 | `continuous-learning` | Extract, store, and evolve reusable patterns (instincts) from session experience | learning, memory |
@@ -41,19 +47,29 @@ These skills ship with every install and update automatically.
 | `knowledge-ingest` | Ingest external sources (videos, articles, PDFs, meeting transcripts) into structured vault notes | ingestion, knowledge, memory |
 | `mcp-obsidian` | How the framework uses MCP to interact with the vault (+ semantic search, multi-MCP connectors) | obsidian, mcp, memory |
 | `metrics` | Quality, velocity, compliance, and rework tracking | analytics |
+| `monitor` | Long-running monitoring profiles with alert rules | observability |
 | `multi-provider` | How Maestro delegates to Claude (tier-1) and Codex (tier-2) | orchestration |
 | `obsidian-bases` | Obsidian Bases: database views over notes (.base files) | obsidian, queries |
 | `obsidian-cli` | Interact with Obsidian vault via CLI | obsidian, cli |
 | `obsidian-markdown` | Obsidian Flavored Markdown: wikilinks, embeds, callouts, properties, tags | obsidian, markdown |
-| `plan-second-opinion` | Legacy planning reference for hook-triggered Codex review flows | planning, review, compatibility |
 | `plugin-system` | How to create and manage opt-in plugins | extensibility |
 | `pr-description` | Auto-generate PR descriptions after review | workflow |
 | `research` | Structured investigation workflow with community intelligence (Reddit, HN, X), codebase scan, and vault lookup | research, planning |
+| `review` | Manual entry-point for the diff-router (`--auto/--small/--large/--ui/--security/...`) | review, quality |
 | `runtime-flags` | Session-scoped behavioral overrides (FAST_MODE, STRICT_MODE, etc.) | configuration |
 | `security-practices` | Rules for secrets, env vars, and security hygiene | security |
+| `session-goals` | Track session goals explicitly with continuation modes | productivity |
+| `session-reset` | Context compaction checkpoint for long sessions | context-management |
+| `skill-check-protocol` | The 1% Rule + red-flag rationalizations for skill activation | meta, compliance |
+| `skill-creator` | 7-phase skill authoring workflow | meta, authoring |
 | `squads` | Parallel domain-based workstreams | orchestration |
 | `stack-lock` | Prevent library drift via approved stack | governance, dependencies |
+| `stuck-detection` | Detect fix→implement→re-test loops without progress; escalate | quality, observability |
+| `trace-analysis` | Session-end trace analysis: playbook gaps, instinct candidates, routing misfires | learning, observability |
+| `typeset` | BM25 over font pairings → heading+body + Tailwind config | design, typography |
+| `vault-maintenance` | Periodic vault cleanup — archives old sessions, aggregates metrics/audits | maintenance, vault |
 | `vault-sync` | Flush offline pending-sync entries back into vault or legacy memory | obsidian, memory, offline |
+| `verification-gates` | Anti-fabrication: raw command output required for any test/verification claim | quality, compliance |
 
 ---
 
@@ -63,15 +79,19 @@ Useful in specific project types. Install with `bash install.sh --skill <name>`.
 
 | Name | Description | Best for | Tags |
 |------|-------------|----------|------|
-| `session-goals` | Track session goals explicitly in a separate skill file | Teams or highly structured workflows | productivity |
-| `adr` | Architecture Decision Records | Long-lived projects with multiple contributors | architecture |
-| `product-review` | When/how to run /office-hours + /plan-ceo-review before Architect on L/XL features | Product-heavy projects, new features with uncertain scope | product, planning |
-| `browser-qa` | Real-browser QA via gstack + authenticated data extraction via Chrome DevTools MCP | Projects with web frontends, critical user flows | testing, quality, scraping |
-| `dashboard-regression-guard` | Dashboard fixtures, totals, filters, timezone checks, and visual smoke tests | Analytics/admin/reporting dashboards | frontend, qa |
-| `scraper-resilience` | Scraper fixtures, selector drift detection, bounded retries, and failure classification | Scrapers and data collectors | scraper, qa |
-| `route-optimizer-qa` | Route optimization fixtures, geocoding checks, invalid-address handling, and before/after metrics | Logistics and routing projects | routing, qa |
-| `spreadsheet-delivery-check` | Validate spreadsheet deliverables for formulas, expected sheets, totals, formatting, and openability | XLSX/CSV/reporting exports | spreadsheet, qa |
-| `frontend-visual-qa` | Browser-based visual QA for responsive layouts, console errors, overflow, and interactions | Web apps and interactive UI | frontend, qa |
+| *(nenhum no momento — todos os skills ativos são distribuídos por default desde 2026-07-26)* | | | |
+
+### Archived Skills
+
+Os skills abaixo foram movidos para `.agents/skills/_archive/` em 2026-06-11
+(auditoria de 200 sessões: 0 leituras em runtime). Para restaurar:
+`git mv .agents/skills/_archive/<name>.md .agents/skills/` e re-registrar aqui.
+
+`adr`, `api-docs-fetch`, `brand-bootstrap`, `product-review`, `plan-second-opinion`,
+`dashboard-regression-guard`, `scraper-resilience`, `route-optimizer-qa`,
+`spreadsheet-delivery-check`, `frontend-visual-qa`, `codex-*` (11 wrappers),
+`context-preload`, `context-digest`, `context-health`, `smart-token-metering`,
+`lazy-opus-review`, `competition`, `parallel-impl`, `headless-validation`, `health`.
 
 ---
 

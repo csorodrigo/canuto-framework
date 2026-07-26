@@ -188,6 +188,6 @@ Use these skills when the task requires deeper domain expertise beyond this skil
 | `colorize` | Color scheme is monochromatic, uses raw hex, or needs a semantic token set (primary/accent/background) for a specific product type or mood |
 | `typeset` | Typography hierarchy is inconsistent, uses default fonts, or needs a validated heading+body pairing with Google Fonts URL and Tailwind config |
 | `audit` | Pre-ship UI review — structured a11y checklist, UX guideline lookup (99 guidelines), and pre-delivery checklist with CRITICAL/HIGH/MEDIUM/LOW severity |
-| `brand-bootstrap` | Existing brand website provided as reference; extract colors + logos automatically |
+| `_archive/brand-bootstrap` (arquivado) | Existing brand website provided as reference; extração manual ou restaurar o skill |
 
 These skills use `.agents/tools/design-search/` (BM25 search engine over curated design CSVs). Python 3 required.

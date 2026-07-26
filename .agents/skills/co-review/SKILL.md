@@ -155,7 +155,7 @@ If `codex` CLI is missing or fails:
 
 ## Compatibility
 
-`plan-second-opinion.md` remains the legacy planning reference. The hook `plan-review.sh` was retired on 2026-06-11; Maestro triggers this skill explicitly for M/L plan review.
+`_archive/plan-second-opinion.md` remains the legacy planning reference (arquivado 2026-06-11). The hook `plan-review.sh` was retired on 2026-06-11; Maestro triggers this skill explicitly for M/L plan review.
 
 ## Mode 4: Auto-Review on Commit (Pre-Commit Gate)
 

@@ -17,11 +17,10 @@ This release keeps the v1.6 Obsidian-native runtime and adds a sharper learning-
   personas/
     maestro.md          — Orchestrator. Manages session lifecycle and delegates.
     architect.md        — Planner. Turns ideas into structured, executable plans.
-    coder.md            — Implementer. Writes code following the Architect's plan.
-    tester.md           — QA. Focuses on edge cases, error scenarios, coverage gaps.
-    debugger.md         — Diagnostician. Investigates test failures and root causes.
+    coder.md            — Implementer. Writes code + tests following the Architect's plan.
     reviewer.md         — Quality gate. Reviews code + generates PR descriptions.
     contextualizer.md   — Knowledge engine. Scans code and maintains context files.
+    _archive/           — tester.md e debugger.md (aposentados 2026-06-11: /test e /fix cobrem os fluxos).
   skills/
     context-maintenance/
       SKILL.md                — How to maintain .context.md and FEATURE-MAP.md.
@@ -214,7 +213,7 @@ O runtime grava handoffs persistidos em `projects/{nome}/handoffs/`. Se a sessao
 Apos a instalacao, abra o projeto em Claude ou inicie o runtime direto do Codex com `bash .agents/tools/codex-maestro.sh`. O Maestro conduz este ciclo:
 
 1. **Bootstrap**: carrega `CLAUDE.md`, personas, skills, vault, context package e projeto ativo.
-2. **Session start**: consulta o vault via CLI `canuto-brain`, carrega latest session, pending tasks, instincts e stale-context signals. Se setup/memoria/contexto parecerem suspeitos, roda `canuto-project-doctor`.
+2. **Session start**: consulta o vault direto no filesystem (paths resolvidos por `.agents/tools/canuto-memory.sh`), carrega latest session, pending tasks, instincts e stale-context signals. Se setup/memoria/contexto parecerem suspeitos, roda `canuto-project-doctor`.
 3. **Planejamento**: limita objetivos da sessao, detecta estilo do projeto e escolhe personas/skills relevantes.
 4. **Execucao**: Architect, Coder e Reviewer trabalham no fluxo minimo valido; Coder escreve os testes no mesmo spawn e `/test` ou `/fix` entram quando a task exige QA/debugging dedicado. `canuto-rework-detector` entra quando houver retry loop, review loop, teste repetido ou pendencia recorrente.
 5. **QA e review**: Reviewer valida risco, testes, handoffs, PR readiness e, quando aplicavel, skills opcionais de dominio.
