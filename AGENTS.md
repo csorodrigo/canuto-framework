@@ -18,8 +18,10 @@
 - **obsidian-vault**: Read/write vault notes at ~/.canuto/vault/ for project memory
 - **ast-grep**: Structural code search — use for finding patterns, symbols, callers
 - **playwright**: Browser automation — navigate, click, fill, screenshot, assert
-- **claude-architect**: Delegate planning/architecture to Claude Opus — `mcp__claude-architect__spawn_agent`
-- **claude-reviewer**: Cross-model code review via Claude Sonnet — `mcp__claude-reviewer__spawn_agent`
+- **claude-architect**: Delega planejamento/arquitetura a Claude — `mcp__claude-architect__spawn_agent`
+- **claude-reviewer**: Review cross-model via Claude — `mcp__claude-reviewer__spawn_agent`
+  - Modelo por alias (`fable`/`opus`), definido em `.agents/tools/claude-agent-mcp.py`
+    (`MODE_DEFAULTS`), com `--fallback-model` automático. Não pinar versão.
   - Use for bias-free review: Codex implements → Claude reviews (or vice-versa)
   - Same interface as `codex-reviewer`: pass diff between `--- CHANGES START/END ---` delimiters
 
@@ -35,20 +37,37 @@ bash .agents/tools/vault-bridge.sh search <query>
 - Imports use the project's alias paths (check tsconfig.json or package.json)
 - Test files go next to source files or in the nearest tests/ directory
 
-## Codex Profiles
+## Codex Roles
 
-Available profiles in `~/.codex/config.toml` — use when spawned with `--profile`:
+**Modelo e effort NÃO são declarados aqui.** Fonte única: `.agents/config/models.yaml`
+— é o arquivo que o wrapper realmente lê. Duplicar versão em doc é como a
+defasagem começa (esta tabela dizia `gpt-5.5` até 2026-07-26, enquanto o real
+já era gpt-5.6).
 
-| Profile | Model | Reasoning | Use For |
-|---------|-------|-----------|---------|
-| `coder` | gpt-5.5 | high | Standard code generation |
-| `maestro` | gpt-5.5 | xhigh | Direct Codex runtime orchestration |
-| `reviewer` | gpt-5.5 | high | Deep code review, security audit |
-| `architect` | gpt-5.5 | xhigh | Architecture, complex reasoning |
-| `fast` | gpt-5.5 | high | Quick edits, formatting, docs |
+| Role | Use For |
+|------|---------|
+| `coder` | Geração de código, refactor, edits multi-arquivo |
+| `reviewer` | Review de código e plano (roda read-only) |
+| `architect` | Arquitetura, decomposição complexa |
+| `maestro` | Orquestração em runtime Codex direto |
+| `fast` | Edits rápidos, formatação, docs (tier mais barato) |
 
-- Claude sessions keep Claude Opus as Maestro.
-- Direct Codex sessions should use `bash .agents/tools/codex-maestro.sh` or `codex --profile maestro`.
+Caminho canônico:
+
+```bash
+~/.codex/bin/codex-delegate.sh <role> <task-file> <out-file>
+```
+
+- **`--profile` não é lido pelo wrapper.** Vale para `codex exec` cru e para o
+  app Desktop, via `~/.codex/<role>.config.toml` (perfis v2) — **não** pelos
+  blocos `[profiles.*]` de `config.toml`, que o codex-cli 0.135+ ignora.
+  Exceção viva: `codex-pretool-guard.sh` usa `--profile fast` no tier degradado
+  do review de pre-commit.
+- **Nunca use `-q`** (removido no codex-cli 0.135 — causava falha instantânea).
+- Nunca `codex exec` cru para trabalho de coder: omite `-s` e herda
+  `sandbox_mode="danger-full-access"` + `approval_policy="never"`.
+- Sessões Claude mantêm Claude como Maestro (alias `fable`, fallback `opus`).
+- Sessões Codex diretas: `bash .agents/tools/codex-maestro.sh`.
 
 ## Anti-Patterns
 - Do NOT create README.md, documentation files, or CHANGELOG entries

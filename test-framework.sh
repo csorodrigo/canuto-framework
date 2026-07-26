@@ -407,6 +407,29 @@ if [ -f "$FRAMEWORK_DIR/install.sh" ]; then
       fail "install.sh missing expected dependency coverage: $pattern"
     fi
   done
+
+  canonical_line=$(grep -n 'local CANONICAL_MODEL=' "$FRAMEWORK_DIR/install.sh" | head -1 | cut -d: -f1)
+  config_branch_line=$(grep -n 'if \[ ! -f "$config_toml" \]' "$FRAMEWORK_DIR/install.sh" | head -1 | cut -d: -f1)
+  if [ -n "$canonical_line" ] && [ -n "$config_branch_line" ] && [ "$canonical_line" -lt "$config_branch_line" ]; then
+    pass "install.sh defines canonical model before fresh-config branch"
+  else
+    fail "install.sh may use an unbound canonical model on fresh install"
+  fi
+
+  if grep -qF 'Merged per-role profiles v2' "$FRAMEWORK_DIR/install.sh" \
+    && ! grep -qF '> "$HOME/.codex/${role}.config.toml"' "$FRAMEWORK_DIR/install.sh"; then
+    pass "install.sh preserves existing per-role profile settings"
+  else
+    fail "install.sh still truncates existing per-role profile settings"
+  fi
+
+  for role in architect maestro; do
+    if grep -Eq "^[[:space:]]{2}${role}:.*effort:[[:space:]]*xhigh" "$AGENTS_DIR/config/models.yaml"; then
+      pass "$role uses wrapper-compatible xhigh effort"
+    else
+      fail "$role uses an effort unsupported by released wrappers"
+    fi
+  done
 else
   fail "install.sh not found"
 fi

@@ -30,12 +30,21 @@ Enable the Maestro to orchestrate multiple AI providers for different personas, 
 
 | Tier | Role | Default Provider | Model | Invocation | Can Delegate? |
 |------|------|-----------------|-------|------------|---------------|
-| tier-1 | Strategic (Maestro, Architect, Contextualizer) | Active runtime (`claude` by default, `codex` in direct Codex sessions) | opus 4.7 (xhigh) | — (native) | No — stays on the active runtime |
-| tier-2 | Coder | Codex | gpt-5.5 (reasoning: high) | `codex exec --profile coder` | Yes — writes code in filesystem |
-| tier-2 | Reviewer | Codex | gpt-5.5 (reasoning: high) | `codex exec --profile reviewer` | Yes — deep self-review (cross-model) |
-| tier-2 | Architect (deep reasoning) | Codex | gpt-5.5 (reasoning: xhigh) | `codex exec --profile architect` | Yes — for heavy decomposition or escalations |
-| tier-1-delegate | Architect back-delegation (Codex runtime only) | Claude Opus | claude-opus-4-7 | optional `mcp__claude-architect__spawn_agent` | Optional — Codex-Maestro calls Opus when Claude reasoning is required |
-| tier-2 | Reviewer (cross-model, Codex runtime) | Claude Sonnet | claude-sonnet-4-6 | optional `mcp__claude-reviewer__spawn_agent` | Yes — bias-free review: Codex implements → Claude reviews |
+> **Não pinar modelo nesta tabela.** A fonte única é `.agents/config/models.yaml`
+> — é o arquivo que o wrapper realmente lê. Duplicar versão aqui é como a
+> defasagem começa: até 2026-07-26 esta tabela dizia `gpt-5.5` e `opus 4.7`
+> enquanto a sessão rodava Opus 5 e o Codex já estava em gpt-5.6. A coluna
+> "Model" abaixo aponta para o role, não para uma versão.
+
+| Tier | Role | Default Provider | Model (via models.yaml) | Invocation | Can Delegate? |
+|------|------|-----------------|-------|------------|---------------|
+| tier-1 | Strategic (Maestro, Architect, Contextualizer) | Active runtime (`claude` by default, `codex` in direct Codex sessions) | alias `fable`, fallback `opus` | — (native) | No — stays on the active runtime |
+| tier-2 | Coder | Codex | role `coder` | `codex-delegate.sh coder <task> <out>` | Yes — writes code in filesystem |
+| tier-2 | Reviewer | Codex | role `reviewer` (read-only) | `codex-delegate.sh reviewer <task> <out>` | Yes — deep review (cross-model vs Claude) |
+| tier-2 | Architect (deep reasoning) | Codex | role `architect` | `codex-delegate.sh architect <task> <out>` | Yes — for heavy decomposition or escalations |
+| tier-2 | Mechanical / docs | Codex | role `fast` | `codex-delegate.sh fast <task> <out>` | Yes — tier nano, trabalho simples |
+| tier-1-delegate | Architect back-delegation (Codex runtime only) | Claude | alias `fable` → `opus,sonnet` | optional `mcp__claude-architect__spawn_agent` | Optional — Codex-Maestro chama Claude quando precisa desse raciocínio |
+| tier-2 | Reviewer (cross-model, Codex runtime) | Claude | alias `opus` → `sonnet` | optional `mcp__claude-reviewer__spawn_agent` | Yes — bias-free review: Codex implementa → Claude revisa |
 
 ---
 
@@ -73,9 +82,11 @@ When Maestro delegates to a tier-2 persona:
 
 3. **Spawn Codex via CLI**:
    ```bash
-   codex exec --color never -q --profile coder \
-     --output-last-message /tmp/codex-result-$$.md \
-     "Read .agents/tmp/context-package.md for full task context. Implement per plan."
+   cat > /tmp/codex-task-$$.md <<'PROMPT'
+   Read .agents/tmp/context-package.md for full task context. Implement per plan.
+   PROMPT
+
+   ~/.codex/bin/codex-delegate.sh coder /tmp/codex-task-$$.md /tmp/codex-result-$$.md
    ```
 
 4. **Codex writes code directly in filesystem** (gpt-5.5 (reasoning: high)).

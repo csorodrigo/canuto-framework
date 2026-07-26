@@ -10,11 +10,16 @@
 
 ### Provider and role
 
-- Claude runtime: Claude Opus remains Maestro.
-- Direct Codex runtime: Codex becomes Maestro for this session.
+- Claude runtime: Claude segue como Maestro (alias `fable`, fallback `opus`).
+- Direct Codex runtime: Codex vira Maestro nesta sessão.
 - Preferred launcher: `bash .agents/tools/codex-maestro.sh`
-- Equivalent CLI: `codex --profile maestro`
-- The `maestro` profile uses `gpt-5.5` with reasoning: xhigh via the architect profile and does not redefine `coder`, `reviewer`, `architect`, or `fast`.
+- Equivalent CLI: `codex --profile maestro` (lê `~/.codex/maestro.config.toml`,
+  perfil v2 — **não** o bloco `[profiles.maestro]` de `config.toml`, que o
+  codex-cli 0.135+ ignora).
+- Modelo e effort do role `maestro` vêm de `.agents/config/models.yaml`. Não
+  pinar versão nesta doc — dizia `gpt-5.5 via the architect profile` até
+  2026-07-26, que era duas coisas erradas: modelo defasado e um encadeamento de
+  perfis que não existe.
 
 ### Memory resolution order
 

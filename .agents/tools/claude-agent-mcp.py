@@ -17,13 +17,26 @@ from mcp.server.fastmcp import Context, FastMCP
 MAX_RETRIES = 3
 RETRY_BASE_DELAY = 2.0
 
+# ALIAS, nao versao fixa. `claude --model` aceita "fable"/"opus"/"sonnet" como
+# "an alias for the latest model" (claude --help). Pinar versao e exatamente o
+# que apodrece: ate 2026-07-26 isto pinava claude-opus-4-7 e claude-sonnet-4-6,
+# ambos defasados, enquanto a sessao ja rodava Opus 5. Alias resolve para o mais
+# recente sozinho, inclusive modelos lancados depois desta linha.
 MODE_DEFAULTS = {
-    "architect": "claude-opus-4-7",
-    "reviewer": "claude-sonnet-4-6",
+    "architect": "fable",
+    "reviewer": "opus",
+}
+
+# `--fallback-model` e nativo: "automatic fallback ... when the default model is
+# overloaded or not available. Accepts a comma-separated list to try each in
+# order." So funciona com --print, que e o caso aqui (-p em _build_claude_cmd).
+MODE_FALLBACKS = {
+    "architect": "opus,sonnet",
+    "reviewer": "sonnet",
 }
 
 ARCHITECT_SYSTEM_PROMPT = (
-    "You are Claude Opus acting as Architect in a multi-agent AI framework. "
+    "You are acting as Architect in a multi-agent AI framework. "
     "Respond with structured plans and analysis only. Be concise and direct."
 )
 
@@ -107,6 +120,10 @@ def _build_claude_cmd(*, claude_exec: str, config: ServerConfig) -> list[str]:
         "--permission-mode",
         "auto",
     ]
+
+    fallback = MODE_FALLBACKS.get(config.mode)
+    if fallback:
+        cmd.extend(["--fallback-model", fallback])
 
     if config.mode == "architect":
         cmd.extend(["--append-system-prompt", ARCHITECT_SYSTEM_PROMPT])
