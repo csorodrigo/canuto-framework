@@ -473,7 +473,7 @@ runtime: codex
 # OFFLINE_SYNC — acme
 
 Synced from:
-\`/Users/rodrigooliveira/conductor/workspaces/acme/recife/.agents/.cache/pending-sync/2026-03-29_200757-session-marker.md\`
+\`/Users/dev/conductor/workspaces/acme/recife/.agents/.cache/pending-sync/2026-03-29_200757-session-marker.md\`
 
 ## Original Payload
 

@@ -3629,9 +3629,18 @@ function defaultOutputDir(cwd = process.cwd()) {
   return path.join(cwd, '.context', 'audits', `canuto-session-audit-${stamp}`);
 }
 
+function defaultWorkspacesRoot() {
+  // Nunca um path de desenvolvedor hardcoded (grep-gate no test-framework):
+  // env CANUTO_WORKSPACES_ROOT > ~/conductor/workspaces > '' (desabilitado).
+  if (process.env.CANUTO_WORKSPACES_ROOT) return process.env.CANUTO_WORKSPACES_ROOT;
+  const conductorDefault = path.join(os.homedir(), 'conductor', 'workspaces');
+  if (fs.existsSync(conductorDefault)) return conductorDefault;
+  return '';
+}
+
 function parseArgs(argv, cwd = process.cwd()) {
   const args = {
-    workspacesRoot: '/Users/rodrigooliveira/conductor/workspaces',
+    workspacesRoot: defaultWorkspacesRoot(),
     vaultRoot: '~/.canuto/vault/projects',
     codexLogRoots: ['~/.codex/sessions', '~/.codex/archived_sessions'],
     claudeProjectsRoot: DEFAULT_CLAUDE_PROJECTS_ROOT,

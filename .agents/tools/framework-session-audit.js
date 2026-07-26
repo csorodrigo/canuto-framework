@@ -12,7 +12,7 @@ function printHelp() {
 
 Usage:
   node .agents/tools/framework-session-audit.js \\
-    --workspaces-root /Users/rodrigooliveira/conductor/workspaces \\
+    --workspaces-root ~/conductor/workspaces \\
     --vault-root ~/.canuto/vault/projects \\
     --codex-log-roots ~/.codex/sessions ~/.codex/archived_sessions \\
     --claude-projects-root ~/.claude/projects \\
