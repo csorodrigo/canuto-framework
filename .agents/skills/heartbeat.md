@@ -1,173 +1,93 @@
-shortDescription: Pattern for scheduled agent activation in autonomous multi-agent setups.
+shortDescription: Scheduled autonomous activation — single-shot runner with mechanical post-gate (real since v1.7).
 usedBy: [maestro]
-version: 1.0.0
-lastUpdated: 2026-03-18
+version: 2.0.0
+lastUpdated: 2026-07-26
 copyright: Rodrigo Canuto © 2026.
-inspiration: Paperclip — heartbeat-based agent activation with scheduled wake-ups instead of continuous polling.
+inspiration: edge-of-chaos heartbeat (ADR-0003 de lá) — single-shot sem envelope, post-gate que confere o artefato; ver docs/adr/0004-heartbeat-single-shot.md.
 
 ## When to Use
 
 **Triggers:**
-- Future multi-agent autonomous setups where agents run independently
-- CI/CD pipeline integration where agents check for work periodically
-- Monitoring workflows where agents wake up on schedule to verify system health
+- Manutenção periódica sem humano presente (triagem de pendings, aging de instincts, digest semanal)
+- Monitoramento agendado (auditoria de sessões, saúde do framework)
 - User asks: `"set up a heartbeat"`, `"schedule a check"`, `"periodic review"`
 
 **Not for:**
-- Standard interactive sessions (Canuto is session-based by default)
-- One-off tasks (use normal Maestro routing)
+- Sessões interativas normais (Canuto é session-based por default)
+- Tarefas one-off (roteamento normal do Maestro)
+- Qualquer ação com efeito no mundo (push, PR, deploy) — CONTRACT abaixo
 
 ---
 
-## Purpose
+## How It Works (implementado — não é mais "future")
 
-In interactive sessions, Maestro orchestrates work in real-time. But for **autonomous workflows** — CI monitoring, periodic code review, dependency updates — agents need a different model: wake up on schedule, check for work, execute if needed, go back to sleep.
+```
+cron/launchd → heartbeat-run.sh <task> → CLI single-shot (claude -p | codex exec)
+             → post-gate mecânico (rc + expect_output tocado nesta execução)
+             → evento HEARTBEAT no event log → fim
+```
 
-The heartbeat pattern provides this foundation, enabling future evolution from session-based to autonomous orchestration.
+Princípios (absorvidos do edge-of-chaos):
+- **Single-shot, sem retry, sem envelope.** Falhou → registrado no log; o
+  próximo tick tenta de novo. Complexidade de relançamento não existe.
+- **Exit 0 não prova nada.** O post-gate verifica que o artefato esperado
+  (`expect_output`) existe, não está vazio e foi modificado nesta execução.
+- **Foreground only.** Em modo headless o processo morre no fim do turno —
+  nada roda em background (lei do turno).
+- **Cadência é o único dial de custo.** Um heartbeat roda sempre a task
+  completa; para gastar menos, rode menos vezes.
 
+## Defining Tasks
+
+Um arquivo por task em `.agents/heartbeats/<name>.md`:
+
+```markdown
 ---
-
-## Concepts
-
-### Heartbeat
-
-A scheduled wake-up signal that triggers an agent to check for work:
-
-```
-Heartbeat: every 30m
-Agent: Coder
-Action: Check if new commits have tests, run test suite if commits found
-```
-
-### Heartbeat Config
-
-Defined in `.agents/heartbeats.yml` (future) or manually triggered:
-
-```yaml
-heartbeats:
-  - name: test-watcher
-    agent: coder
-    interval: 30m
-    trigger: new-commits-without-tests
-    action: run-tests-and-report
-
-  - name: dependency-checker
-    agent: architect
-    interval: weekly
-    trigger: outdated-dependencies
-    action: propose-updates
-
-  - name: context-freshness
-    agent: contextualizer
-    interval: daily
-    trigger: stale-context-files
-    action: update-context
-```
-
-### Heartbeat Lifecycle
-
-```
-Sleep → Wake (heartbeat) → Check (is there work?) → Execute (if yes) → Report → Sleep
-```
-
-Key principle: **agents don't run continuously**. They wake, check, act, sleep. This keeps costs predictable.
-
-### Cost Control
-
-Each heartbeat has a token budget:
-- If the check phase finds no work → minimal cost (~100 tokens)
-- If work is found → budget for the execution phase (per budget-controls skill)
-- If budget is exceeded → skip this heartbeat, report, try next cycle
-
+timeout: 900                 # segundos (default 600)
+cli: claude                  # claude | codex
+permission_mode: acceptEdits # para claude -p
+expect_output: .agents/vault/digests/heartbeat-<name>.md
 ---
-
-## Procedure
-
-### Manual Heartbeat (Current)
-
-Until autonomous tooling is available, heartbeats can be simulated manually:
-
-1. User requests a periodic check:
-   ```
-   "Check for stale contexts every time I start a session"
-   ```
-
-2. Maestro adds to session-start routine:
-   ```
-   [Heartbeat: context-freshness] Checking for stale .context.md files...
-   Result: 2 stale files found (src/api/, src/auth/)
-   Action: Queue Contextualizer update
-   ```
-
-3. Log in audit trail:
-   ```
-   #### [2026-03-18 10:01] HEARTBEAT — context-freshness check
-   - **Result:** 2 stale files detected
-   - **Action:** Contextualizer update queued
-   ```
-
-### Autonomous Heartbeat (Future)
-
-When multi-agent infrastructure is available:
-
-1. Configure heartbeats in `.agents/heartbeats.yml`
-2. External scheduler (cron, CI) triggers the heartbeat
-3. Agent wakes, checks trigger condition
-4. If triggered: executes action within budget
-5. Reports results (PR comment, Slack, log file)
-6. Goes back to sleep
-
-### Built-in Heartbeat Patterns
-
-| Pattern | Agent | Interval | Trigger | Action |
-|---------|-------|----------|---------|--------|
-| `test-watcher` | Coder | Per commit | New code without tests | Run test suite |
-| `dependency-checker` | Architect | Weekly | Outdated deps | Propose updates |
-| `context-freshness` | Contextualizer | Per session | Stale .context.md | Update context |
-| `security-scan` | Reviewer | Weekly | Known vulnerabilities | Report findings |
-| `metric-review` | Maestro | Monthly | Accumulated metrics | Trend analysis |
-
----
-
-## Examples
-
-### ✅ Good — session-start heartbeat check
-
-```
-[Heartbeat: context-freshness] Checking for stale .context.md files...
-- src/api/.context.md — last updated 2026-03-15, 4 files changed since → STALE
-- src/auth/.context.md — last updated 2026-03-17, 0 files changed → FRESH
-- src/ui/.context.md — last updated 2026-03-10, 12 files changed → STALE
-
-Action: Queue Contextualizer update for src/api/ and src/ui/
+<prompt completo e standalone — a sessão nasce do zero, sem contexto>
 ```
 
-### ✅ Good — heartbeat with no work found
+Escreva o prompt como instrução completa: a sessão heartbeat não tem
+histórico. Exemplo real: `.agents/heartbeats/weekly-maintenance.md`.
 
+## Running & Scheduling
+
+```bash
+bash .agents/tools/heartbeat-run.sh --list
+bash .agents/tools/heartbeat-run.sh --dry-run weekly-maintenance
+bash .agents/tools/heartbeat-run.sh weekly-maintenance          # roda agora
+
+# agendar (SEMPRE opt-in explícito — gate de governança):
+bash .agents/tools/heartbeat-run.sh --install-cron "0 9 * * 1" weekly-maintenance   # Linux
+bash .agents/tools/heartbeat-run.sh --install-launchd 604800 weekly-maintenance     # macOS
+bash .agents/tools/heartbeat-run.sh --uninstall weekly-maintenance
 ```
-[Heartbeat: test-watcher] Checking for untested commits...
-Result: All recent commits have associated test changes. No action needed.
-Cost: ~100 tokens (check only)
-```
 
-### ❌ Bad — continuous polling
+Logs por task em `.agents/.cache/heartbeat-<task>.log`; veredito de cada
+execução no event log (`bash .agents/tools/event-log.sh tail 20`).
 
-```
-Checking for updates... (every 5 seconds)
-Checking for updates...
-Checking for updates...
-```
+## CONTRACT — teto de autonomia
 
-This is bad because: heartbeats are scheduled, not polled. Continuous checking wastes resources and provides no value.
+Absorvido do edge-of-chaos (C1): o heartbeat **lê, absorve e entrega
+conhecimento para ler**. Ele NÃO age no mundo:
 
----
+- ❌ git push, PR, deploy, instalação de dependências
+- ❌ escrita fora do vault do projeto e de `.agents/.cache/`
+- ❌ mudar configuração do framework ou do usuário
+- ✅ ler código/log/vault, triagem, digest, proposta de ação para a
+  próxima sessão humana
 
-## Guardrails
+Agir no mundo exige aprovação explícita numa sessão interativa — nunca uma
+decisão autônoma de heartbeat.
 
-- **Heartbeats are opt-in.** The framework is session-based by default. Heartbeats are for users who want autonomous capabilities.
-- **Every heartbeat has a budget.** No open-ended execution.
-- **Check before acting.** The check phase should be cheap (~100 tokens). Only spend on execution if work is found.
-- **Log all heartbeat results.** Even "no work found" gets logged in the audit trail.
-- **Don't overlap heartbeats.** If a heartbeat is still running when the next cycle triggers, skip the new cycle.
-- **Manual heartbeats are first-class.** Until autonomous tooling exists, session-start checks are the primary implementation.
-- **This is a future-facing skill.** Most of the autonomous patterns here await tooling support. The manual patterns work today.
+## Anti-Patterns — DO NOT
+
+- ❌ Instalar agendamento sem o usuário pedir (o install.sh nunca agenda)
+- ❌ Retry/backoff dentro do runner (o próximo tick é o retry)
+- ❌ Task sem `expect_output` fazendo trabalho que produz artefato (post-gate cego)
+- ❌ Prompt que assume contexto de sessão anterior (heartbeat nasce do zero)
+- ❌ `permission_mode: bypassPermissions` sem necessidade concreta documentada na task

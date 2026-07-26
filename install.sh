@@ -616,9 +616,13 @@ FRAMEWORK_FILES=(
   # Event log (absorção edge-of-chaos, Fase 1 — ADR-0001)
   ".agents/skills/event-log.md"
   ".agents/tools/event-log.sh"
+  # Heartbeat v1 (absorção edge-of-chaos, Fase 4 — ADR-0004)
+  ".agents/tools/heartbeat-run.sh"
+  ".agents/tools/instinct-aging.sh"
 )
 
 INSTALL_ONLY_FILES=(
+  ".agents/heartbeats/weekly-maintenance.md"
   ".agents/vault/_index.md"
   ".agents/vault/.obsidian/app.json"
   ".agents/vault/.obsidian/community-plugins.json"

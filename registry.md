@@ -43,7 +43,7 @@ These skills ship with every install and update automatically.
 | `canuto-rework-detector` | Detect retry loops, review loops, stale assumptions, and repeated failed approaches | quality, memory |
 | `canuto-pending-triage` | Deduplicate and prioritize pending tasks across vault notes and local memory | productivity, memory |
 | `obsidian-writeback-queue` | Stage safe Obsidian/Canuto vault write-back proposals with approval and offline fallback | obsidian, memory |
-| `heartbeat` | Foundation for scheduled agent activation in autonomous setups | orchestration, future |
+| `heartbeat` | Scheduled autonomous activation — single-shot runner with mechanical post-gate | orchestration, autonomy |
 | `json-canvas` | JSON Canvas: visual maps and flowcharts (.canvas files) | obsidian, visualization |
 | `knowledge-ingest` | Ingest external sources (videos, articles, PDFs, meeting transcripts) into structured vault notes | ingestion, knowledge, memory |
 | `mcp-obsidian` | How the framework uses MCP to interact with the vault (+ semantic search, multi-MCP connectors) | obsidian, mcp, memory |

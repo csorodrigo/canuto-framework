@@ -1,0 +1,2 @@
+{"ts":"2026-07-26T21:51:04Z","event":"HEARTBEAT","project":"canuto-framework-v1","session":"","actor":"heartbeat","task":"nao-existe","verdict":"no-task"}
+{"ts":"2026-07-26T21:51:28Z","event":"HEARTBEAT","project":"canuto-framework-v1","session":"","actor":"heartbeat","task":"zz-test","cli":"claude","rc":"0","verdict":"missing-output","reason":"esperado e ausente: .agents/.cache/hb-test-output.md"}
