@@ -54,7 +54,7 @@ A reusable pattern learned from experience. Each instinct has:
 | **Category** | `code-pattern`, `architecture`, `testing`, `workflow`, `debugging`, `design` |
 | **Applied** | Count of times this instinct influenced a decision |
 
-### Two Tiers (v1.3 — absorvido do edge-of-chaos, ADR-0006 do canuto)
+### Two Tiers (v1.3 — absorvido do edge-of-chaos, ADR-0005 do canuto)
 
 A memória tem dois tiers com regras de escrita **diferentes**:
 

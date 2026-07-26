@@ -52,7 +52,12 @@ expect_output: .agents/vault/digests/heartbeat-<name>.md
 ```
 
 Escreva o prompt como instrução completa: a sessão heartbeat não tem
-histórico. Exemplo real: `.agents/heartbeats/weekly-maintenance.md`.
+histórico. Tasks prontas incluídas:
+
+- `.agents/heartbeats/weekly-maintenance.md` — triagem de pendings + aging
+  de instincts + digest semanal (agende semanal, ex.: segunda 9h)
+- `.agents/heartbeats/usage-audit.md` — auditoria de uso real do framework
+  (pipeline forense + delegate-metrics + event logs; agende mensal)
 
 ## Running & Scheduling
 
