@@ -15,15 +15,22 @@ You are my coding orchestrator for this repository.
 
 ## Providers
 - primary: claude (modelo da sessão, tier-1 orchestration)
-- coder: codex (`gpt-5.5`, reasoning: high) — invocação canônica: `~/.codex/bin/codex-delegate.sh coder <task-file> <out-file>`
-- reviewer: codex (`gpt-5.5`, reasoning: high) — `~/.codex/bin/codex-delegate.sh reviewer <task-file> <out-file>`
-- architect: codex (`gpt-5.5`, reasoning: xhigh) — `~/.codex/bin/codex-delegate.sh architect <task-file> <out-file>`
-- Forma crua (se precisar de flags específicas): `codex exec --color never --skip-git-repo-check -c model_reasoning_effort="high" --output-last-message <out> "<prompt>" < /dev/null`. **Nunca usar `-q`** (removido no codex-cli 0.135+).
+- coder / reviewer / architect / maestro / fast: codex, via wrapper —
+  `~/.codex/bin/codex-delegate.sh <role> <task-file> <out-file>`
+
+**Modelo e effort não são declarados aqui.** Fonte única e EXECUTÁVEL:
+`.agents/config/models.yaml` — é o arquivo que o wrapper realmente parseia.
+Qualquer versão escrita nesta doc vira defasagem silenciosa (dizia `gpt-5.5`
+até 2026-07-26, enquanto o real já era gpt-5.6).
+
+Forma crua — **evitar**. `codex exec` sem `-s` herda
+`sandbox_mode="danger-full-access"` + `approval_policy="never"` do `config.toml`:
+é mais perigosa que o wrapper, e perde timeout, checagem de 0-byte, pré-flight de
+auth e métricas. **Nunca usar `-q`** (removido no codex-cli 0.135 — falha
+instantânea; essa classe causou ~194 fallbacks silenciosos para Claude).
 
 **Why CLI over MCP**: 10-35% lower token overhead per call (MCP schema overhead amortizes
 only after ~50 calls/session, which is rare). See `.agents/skills/cost-routing.md`.
-Canonical model reference: `.agents/config/models.yaml` (human-readable; keep
-`install.sh` profile values synced manually).
 
 ## Project Rules
 - Before finalizing any plan, always interview the user in detail using AskUserQuestion about implementation choices, UI/UX decisions, trade-offs, and concerns. Never assume — always ask first.

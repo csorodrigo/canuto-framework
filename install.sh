@@ -1353,6 +1353,7 @@ setup_obsidian_mcp() {
 # .agents/skills/cost-routing.md for rationale (10-35% lower token overhead per call).
 setup_codex() {
   local config_toml="$HOME/.codex/config.toml"
+  local CANONICAL_MODEL="gpt-5.6-sol"
 
   log "Setting up Codex CLI integration..."
 
@@ -1401,38 +1402,24 @@ setup_codex() {
   # ── Configure config.toml with profiles ──────────────────────────────────
   mkdir -p "$HOME/.codex"
   if [ ! -f "$config_toml" ]; then
+    # NÃO pinar `model` no top-level: isso sobrescreve a escolha global do
+    # usuário. Até 2026-07-26 este heredoc gravava model = "gpt-5.5", ou seja,
+    # uma instalação nova REBAIXAVA o modelo global da máquina.
+    # NÃO gravar blocos [profiles.*]: o codex-cli 0.135+ não os lê mais
+    # (semântica v2 lê ~/.codex/<role>.config.toml). Eram config morta.
     cat > "$config_toml" << 'TOMLEOF'
 personality = "pragmatic"
-model = "gpt-5.5"
-model_reasoning_effort = "high"
-
-[profiles.coder]
-model = "gpt-5.5"
-model_reasoning_effort = "high"
-
-[profiles.maestro]
-model = "gpt-5.5"
-model_reasoning_effort = "xhigh"
-
-[profiles.reviewer]
-model = "gpt-5.5"
-model_reasoning_effort = "high"
-
-[profiles.architect]
-model = "gpt-5.5"
-model_reasoning_effort = "xhigh"
-
-[profiles.fast]
-model = "gpt-5.5"
-model_reasoning_effort = "high"
 TOMLEOF
-    ok "Created $config_toml with profiles (coder, maestro, reviewer, architect, fast)"
+    ok "Created $config_toml (sem pin de modelo — a escolha global é do usuário)"
   else
     # Patch-merge: add missing profiles AND update existing model/reasoning_effort
     # to the canonical hardcoded values below. Keep .agents/config/models.yaml
     # in sync manually when bumping model versions.
     local patched=false
-    local CANONICAL_MODEL="gpt-5.5"
+    # Fonte de verdade do caminho de delegação é .agents/config/models.yaml,
+    # não este valor. Isto só alcança os blocos [profiles.*] legados que o
+    # codex-cli 0.135+ já não lê — mantido apenas para não deixar valor
+    # defasado em config.toml de máquinas antigas.
     for profile in coder maestro reviewer architect fast; do
       local effort
       case "$profile" in
@@ -1490,6 +1477,64 @@ TOMLEOF
       ok "config.toml profiles already on canonical model"
     fi
   fi
+
+  # ── Perfis v2: ~/.codex/<role>.config.toml ────────────────────────────────
+  # ESTES são o caminho vivo do `--profile` no codex-cli 0.135+. Não confundir
+  # com os blocos [profiles.*] acima (mortos). Consumidores reais hoje:
+  #   - `codex exec --profile <role>` cru e o app Desktop
+  #   - codex-pretool-guard.sh:431, que usa `--profile fast` no tier degradado
+  #     do review de pre-commit -> por isso `fast` fica num modelo capaz, não no
+  #     tier nano: review degradado ainda é review.
+  # O caminho do WRAPPER (codex-delegate.sh) ignora tudo isto e lê
+  # .agents/config/models.yaml. Os dois precisam ficar coerentes.
+  local role effort
+  for role in coder reviewer architect maestro fast; do
+    case "$role" in
+      architect|maestro) effort="xhigh" ;;
+      coder|reviewer)    effort="xhigh" ;;
+      fast)              effort="low" ;;
+    esac
+    local role_config="$HOME/.codex/${role}.config.toml"
+    if [ ! -f "$role_config" ]; then
+      printf 'model = "%s"\nmodel_reasoning_effort = "%s"\n' \
+        "$CANONICAL_MODEL" "$effort" > "$role_config"
+      continue
+    fi
+
+    local tmp_role_config
+    tmp_role_config=$(mktemp)
+    awk -v model="$CANONICAL_MODEL" -v effort="$effort" '
+      BEGIN { in_top_level = 1; model_written = 0; effort_written = 0 }
+      function write_missing() {
+        if (!model_written) print "model = \"" model "\""
+        if (!effort_written) print "model_reasoning_effort = \"" effort "\""
+      }
+      in_top_level && /^\[/ {
+        write_missing()
+        in_top_level = 0
+      }
+      in_top_level && /^model[[:space:]]*=/ {
+        print "model = \"" model "\""
+        model_written = 1
+        next
+      }
+      in_top_level && /^model_reasoning_effort[[:space:]]*=/ {
+        print "model_reasoning_effort = \"" effort "\""
+        effort_written = 1
+        next
+      }
+      { print }
+      END {
+        if (in_top_level) write_missing()
+      }
+    ' "$role_config" > "$tmp_role_config"
+    if ! cmp -s "$role_config" "$tmp_role_config"; then
+      mv "$tmp_role_config" "$role_config"
+    else
+      rm -f "$tmp_role_config"
+    fi
+  done
+  ok "Merged per-role profiles v2: ~/.codex/{coder,reviewer,architect,maestro,fast}.config.toml"
 
   # ── Add project trust (Conductor-aware) ──────────────────────────────────
   local project_dir
@@ -1675,19 +1720,24 @@ bash .agents/tools/vault-bridge.sh search <query>
 
 ## Codex Profiles
 
-Available profiles in \`~/.codex/config.toml\` — use when spawned with \`--profile\`:
+**Modelo e effort NÃO são declarados aqui.** A fonte única é
+\`.agents/config/models.yaml\` — é o arquivo que o wrapper realmente lê.
+Duplicar a versão numa tabela de doc é como a defasagem começa.
 
-| Profile | Model | Reasoning | Use For |
-|---------|-------|-----------|---------|
-| \`coder\` | gpt-5.5 | high | Standard code generation |
-| \`maestro\` | gpt-5.5 | xhigh | Direct Codex runtime orchestration |
-| \`reviewer\` | gpt-5.5 | high | Deep code review, security audit |
-| \`architect\` | gpt-5.5 | xhigh | Architecture, complex reasoning |
-| \`fast\` | gpt-5.5 | high | Quick edits, formatting, docs |
+| Role | Use For |
+|------|---------|
+| \`coder\` | Geração de código, refactor, edits multi-arquivo |
+| \`reviewer\` | Review de código e plano (roda read-only) |
+| \`architect\` | Arquitetura, decomposição complexa |
+| \`maestro\` | Orquestração em runtime Codex direto |
+| \`fast\` | Edits rápidos, formatação, docs (tier mais barato) |
 
-- Claude sessions keep Claude Opus as Maestro.
-- Direct Codex sessions should use `bash .agents/tools/codex-maestro.sh` or `codex --profile maestro`.
-- All profiles use `gpt-5.5`; reasoning effort is the dimension that varies (high/xhigh).
+- Caminho canônico de delegação: \`~/.codex/bin/codex-delegate.sh <role> <task> <out>\`.
+- \`--profile\` não é lido pelo wrapper. Vale para \`codex exec\` cru e para o app
+  Desktop, via \`~/.codex/<role>.config.toml\` (perfis v2) — **não** pelos blocos
+  \`[profiles.*]\` de \`config.toml\`, que o codex-cli 0.135+ ignora.
+- Nunca use \`-q\` (removido no codex-cli 0.135).
+- Sessões Claude mantêm Claude como Maestro (alias \`fable\`, fallback \`opus\`).
 
 ## Anti-Patterns
 - Do NOT create README.md, documentation files, or CHANGELOG entries
@@ -1714,19 +1764,24 @@ MCPPATCH
 
 ## Codex Profiles
 
-Available profiles in `~/.codex/config.toml` — use when spawned with `--profile`:
+**Modelo e effort NÃO são declarados aqui.** A fonte única é
+`.agents/config/models.yaml` — é o arquivo que o wrapper realmente lê.
+Duplicar a versão numa tabela de doc é como a defasagem começa.
 
-| Profile | Model | Reasoning | Use For |
-|---------|-------|-----------|---------|
-| `coder` | gpt-5.5 | high | Standard code generation |
-| `maestro` | gpt-5.5 | xhigh | Direct Codex runtime orchestration |
-| `reviewer` | gpt-5.5 | high | Deep code review, security audit |
-| `architect` | gpt-5.5 | xhigh | Architecture, complex reasoning |
-| `fast` | gpt-5.5 | high | Quick edits, formatting, docs |
+| Role | Use For |
+|------|---------|
+| `coder` | Geração de código, refactor, edits multi-arquivo |
+| `reviewer` | Review de código e plano (roda read-only) |
+| `architect` | Arquitetura, decomposição complexa |
+| `maestro` | Orquestração em runtime Codex direto |
+| `fast` | Edits rápidos, formatação, docs (tier mais barato) |
 
-- Claude sessions keep Claude Opus as Maestro.
-- Direct Codex sessions should use `bash .agents/tools/codex-maestro.sh` or `codex --profile maestro`.
-- All profiles use `gpt-5.5`; reasoning effort is the dimension that varies (high/xhigh).
+- Caminho canônico de delegação: `~/.codex/bin/codex-delegate.sh <role> <task> <out>`.
+- `--profile` não é lido pelo wrapper. Vale para `codex exec` cru e para o app
+  Desktop, via `~/.codex/<role>.config.toml` (perfis v2) — **não** pelos blocos
+  `[profiles.*]` de `config.toml`, que o codex-cli 0.135+ ignora.
+- Nunca use `-q` (removido no codex-cli 0.135).
+- Sessões Claude mantêm Claude como Maestro (alias `fable`, fallback `opus`).
 PROFILEPATCH
       patched=true
     fi
@@ -1746,10 +1801,11 @@ VAULTPATCH
       cat >> "$agents_md" << 'RUNTIMEPATCH'
 
 ## Codex Runtime
-- Claude sessions keep Claude Opus as Maestro.
-- Direct Codex sessions should use `bash .agents/tools/codex-maestro.sh` or `codex --profile maestro`.
-- The `maestro` profile is runtime-specific and does not redefine `coder`, `reviewer`, `architect`, or `fast`.
-- All profiles use `gpt-5.5`; reasoning effort is the dimension that varies (high/xhigh).
+- Sessões Claude mantêm Claude como Maestro (alias `fable`, fallback `opus`).
+- Sessões Codex diretas: `bash .agents/tools/codex-maestro.sh` ou `codex --profile maestro`.
+- O perfil `maestro` é runtime-specific e não redefine `coder`, `reviewer`, `architect` ou `fast`.
+- Modelo e effort vêm de `.agents/config/models.yaml`, não desta doc. Não pinar
+  versão aqui — foi assim que a tabela anterior ficou 2 releases atrás do real.
 RUNTIMEPATCH
       patched=true
     fi

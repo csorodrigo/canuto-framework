@@ -1,104 +1,171 @@
-# Canuto Framework — Reference Document for Canonical Model Versions
+# Canuto Framework — Canonical Model Routing
 #
-# Status: this file is a HUMAN-READABLE REFERENCE. It is NOT automatically
-# read by install.sh at runtime (the model values in install.sh are still
-# hardcoded — see install.sh:1432-1457 for the canonical values that ship).
-# Skills also embed model names inline rather than reading via placeholder.
+# ⚠️ FORMATO É LOAD-BEARING, NÃO ESTÉTICO.
+# `~/.codex/bin/codex-delegate.sh` parseia este arquivo com grep+sed em bash
+# (não há `yq`). O parser exige, POR ROLE:
+#   - flow-style numa única linha:  `  <role>: { chave: valor, ... }`
+#   - indentação de EXATAMENTE 2 espaços
+#   - a chave de esforço chamada `effort` (NÃO `reasoning`)
+# Ver codex-delegate.sh:103-118 (models_yaml_get) e :116-119 (leitura).
 #
-# Why it exists anyway:
-#   - Single place to read "what model are we on right now"
-#   - Reference doc when bumping versions across the framework (manual sweep)
-#   - Future: a render script could substitute {{coder.model}} placeholders;
-#     not implemented in this version.
+# Histórico (por que este aviso existe): até 2026-07-26 este arquivo estava em
+# block-style aninhado e usava a chave `reasoning:`. Resultado: o parser não
+# casava NENHUM role, `yaml_model` vinha vazio e todo role caía no default
+# embutido `gpt-5.5` (codex-delegate.sh:48). As 211 delegações registradas em
+# ~/.codex/delegate-metrics.jsonl (18–26/jul/2026) saíram 100% como gpt-5.5,
+# enquanto ~/.codex/config.toml já estava em gpt-5.6-sol. Este arquivo nunca
+# influenciou uma única delegação. Se você reformatar para block-style,
+# ele volta a ser decorativo — e silenciosamente.
 #
-# Update procedure (manual until substitution pipeline lands):
-#   1. Bump model/effort below + bump `last-updated`
-#   2. Match install.sh:1432-1457 (TOML heredoc) to the new values
-#   3. Match install.sh:1462-1474 (awk-based update of existing config.toml)
-#      to the new canonical values
-#   4. Grep+replace skill docs / health-check for old version → new version
-#   5. Run: bash install.sh --doctor + bash .agents/tools/codex-health-check.sh
+# Teste de regressão (deve imprimir uma linha por role):
+#   for r in coder reviewer architect maestro fast; do
+#     grep -E "^[[:space:]]{2}${r}:[[:space:]]*\{" .agents/config/models.yaml || echo "QUEBRADO: $r"
+#   done
+
+last-updated: 2026-07-26
+
+# ── Precedência efetiva (codex-delegate.sh) ──────────────────────────────────
+#   model:   CODEX_DELEGATE_MODEL    > este arquivo > gpt-5.5 (hardcoded)
+#   effort:  (sem env var)           > este arquivo > high/xhigh por role
+#   timeout: CODEX_DELEGATE_TIMEOUT  > este arquivo > 1800 (coder/architect/maestro) | 900
+#   sandbox: CODEX_DELEGATE_SANDBOX  > este arquivo > read-only (reviewer) | workspace-write
+# Não existe CODEX_DELEGATE_EFFORT. Effort só entra por este arquivo.
+
+# ── Codex (tier-2: implementação e review) ───────────────────────────────────
+# GPT-5.6 é uma FAMÍLIA DE 3 TIERS, não um modelo. Fonte: o registry que o
+# próprio CLI baixa — ~/.codex/models_cache.json (fetched 2026-07-26, client
+# 0.146.0). Não é documentação, é a lista de capacidade que o CLI usa:
 #
-# Naming convention: <role> at top level = the canonical reference for that
-# Canuto persona role.
+#   tier   descrição (verbatim)                        prio  tool_mode        efforts
+#   sol    "Latest frontier agentic coding model."       1   code_mode        low..max + ultra
+#   terra  "Balanced agentic coding model..."            2   code_mode_only   low..max + ultra
+#   luna   "Fast and affordable agentic coding model."   3   code_mode_only   low..max (sem ultra)
+#
+# Benchmark (AA Coding Agent Index v1.1): sol 80 · terra 77.4 · luna 74.6.
+# SWE-Bench Pro: 64.6% · 63.4% · 62.7%. Preço API /1M in: $5 · $2.50 · $1.
+# Ou seja: ~2pp de qualidade entre sol e luna contra 5× de preço.
+#
+# luna é o tier NANO — sucessor do gpt-5.4-mini no mapa de upgrade do registry,
+# não do modelo frontier. Por isso ele fica só em `fast`.
+#
+# ⚠️ CORREÇÃO DE INVERSÃO NA SUA CONFIG: ~/.codex/coder.config.toml aponta o
+# coder para luna (tier mais fraco) em xhigh — pagando latência de raciocínio
+# profundo no pior modelo. Invertido em relação à intenção. É config morta
+# (wrapper nunca passa --profile), então não causava dano; mas não replique.
+#
+# ⚠️ CORREÇÃO DE UMA AFIRMAÇÃO ERRADA MINHA (2026-07-26): eu havia escrito aqui
+# que os 6 MODEL_UNAVAILABLE vinham de pinar modelo não-verificado. FALSO, e a
+# medição desmente: codex-delegate.sh:353 classifica MODEL_UNAVAILABLE por
+# substring ingênua — log contém "model" E contém "unavailable" em qualquer
+# posição. Não existe texto de erro correspondente nos rollouts de sessão, e 2
+# dos 6 têm rc=0. São FALSOS POSITIVOS do classificador, não indisponibilidade.
+# E gpt-5.5 NÃO está deprecado: visibility=list, upgrade=null, sem data de
+# sunset (quem está morrendo é gpt-5.4/5.4-mini). Causa medida > causa deduzida.
+#
+# Timeouts calibrados pelos p90 medidos, não por chute:
+#   coder     p50 565  p90 1334  max 1784  → 4 TIMEOUT no teto de 1800  → 2700
+#   reviewer  p50 261  p90  516  max  770  → 2 TIMEOUT no teto de  900  → 1200
+#   architect p50 567  p90  968  max 1055  → 1 TIMEOUT no teto de 1800  → 2400
+# Atenção ao acoplamento: subir effort aumenta duração. Se subir effort, suba
+# o timeout no mesmo commit ou a taxa de TIMEOUT volta.
+roles:
+  coder:     { model: gpt-5.6-sol,  effort: xhigh, timeout: 2700, sandbox: workspace-write }
+  reviewer:  { model: gpt-5.6-sol,  effort: xhigh, timeout: 1200, sandbox: read-only }
+  architect: { model: gpt-5.6-sol,  effort: xhigh, timeout: 2400, sandbox: workspace-write }
+  maestro:   { model: gpt-5.6-sol,  effort: xhigh, timeout: 1800, sandbox: workspace-write }
+  fast:      { model: gpt-5.6-luna, effort: low,   timeout: 900,  sandbox: workspace-write }
 
-last-updated: 2026-06-10
+# Por que sol em quase tudo: só sol tem `tool_mode: code_mode` (terra/luna são
+# `code_mode_only`) e lidera todos os benchmarks de coding. `fast` é o único
+# slot desenhado para luna — trabalho mecânico, docs, formatação.
+# Se custo apertar, o degrau é `terra` (não luna) para coder/reviewer:
+# 77.4 vs 80 no índice, metade do preço, e mantém `ultra` + multi_agent v2.
+#
+# CONTRA-SINAL sobre effort alto, registrado para a decisão ser informada: o
+# default_reasoning_level do sol no registry é `low`, e a mensagem do próprio
+# OpenAI diz "Sol is highly capable at lower reasoning efforts — try starting
+# lower, then turn it up for harder jobs"; o guia de migração recomenda testar
+# UM nível ABAIXO do que você usava no gpt-5.5. Ficou `xhigh` em
+# architect/maestro porque planejamento é correctness-critical sem exigir uma
+# extensão local não distribuída do wrapper.
+#
+# `ultra` (sol/terra apenas) NÃO está aqui de propósito: é "maximum reasoning
+# with automatic task delegation" (multi-agente client-side), não aparece como
+# effort na API, nunca foi exercitado nesta máquina, e config.toml:627
+# (enabled-reasoning-efforts) o omite — então o picker do Desktop não o alcança.
+# Não pinar sem testar.
+#
+# gpt-5.5 NÃO suporta `max` (só low..xhigh). Qualquer `max` pinado na era 5.5
+# era no-op silencioso: o CLI registra o effort pedido sem validar contra o
+# modelo. luna suporta max (1102 turns reais medidos); sol também (27944).
 
-# CLI compatibility (verified on codex-cli 0.139):
-#   - `-q` was REMOVED in 0.135 — any command carrying it fails.
-#   - `--profile <name>` now reads ~/.codex/<name>.config.toml (v2 semantics);
-#     the legacy [profiles.*] block in config.toml is no longer read.
-#   - Canonical invocation is the wrapper: ~/.codex/bin/codex-delegate.sh <role> <task> <out>
-#     (handles stdin-hang, sandbox, timeout, 0-byte check, auth pre-flight).
-#     The cli-invocation strings below are the raw equivalents.
+# O Codex CLI aceita `max`, mas o wrapper global não é versionado nem instalado
+# por este repo. Por isso nenhum role canônico usa `max`: consumidores com o
+# wrapper publicado anteriormente ainda validam apenas `high|xhigh`. Só elevar
+# para `max` depois que a compatibilidade do wrapper fizer parte do instalador.
 
-# --- Coder profile (default executor for tier-2 implementation) ---
-coder:
-  provider: codex
-  model: gpt-5.5
-  reasoning: high
-  use-for: "Standard code generation, refactor, multi-file edits"
-  cli-invocation: "codex exec --color never --profile coder"
+# ── Claude (tier-1: orquestração e decisão) ──────────────────────────────────
+# Use ALIAS, não versão fixa. `claude --model` aceita `fable`/`opus`/`sonnet`
+# como "alias for the latest model" (claude --help). Pinar versão é justamente
+# o que apodrece: este arquivo pinava claude-opus-4-7 e claude-sonnet-4-6,
+# ambos defasados, enquanto a sessão já rodava Opus 5.
+# Alias resolve para o mais recente sozinho — inclusive modelos lançados depois
+# desta linha ser escrita.
+claude:
+  maestro:   { model: fable, fallback: opus,        notes: "sessão interativa; fallback é manual — ver abaixo" }
+  architect: { model: fable, fallback: opus,        notes: "spawn headless (-p) — fallback automático funciona" }
+  reviewer:  { model: opus,  fallback: sonnet,      notes: "cross-model vs Codex; spawn headless" }
+  cheap:     { model: sonnet, fallback: haiku,      notes: "subagentes, varredura, trabalho mecânico" }
 
-# --- Reviewer profile (peer review of plan and code) ---
-reviewer:
-  provider: codex
-  model: gpt-5.5
-  reasoning: high
-  use-for: "Plan review, code review, security audit"
-  cli-invocation: "codex exec --color never --profile reviewer"
+# `--fallback-model` é nativo do claude CLI: "Enable automatic fallback to
+# specified model(s) when the default model is overloaded or not available.
+# Accepts a comma-separated list to try each in order. Re-tries the primary at
+# the start of each user turn."
+#   RESSALVA: "(only works with --print)". Vale para spawn headless
+#   (architect/reviewer/cheap). NÃO vale para a sessão interativa do Maestro —
+#   lá a troca é manual via /model. Não prometa fallback automático no Maestro.
+#
+# Não confundir com o parâmetro `fallbacks` da API do Fable 5: aquele cobre
+# refusal de classificador de segurança, não indisponibilidade nem quota.
+#
+# haiku NÃO aceita o parâmetro de effort — erra se receber. Só o use no tier
+# `cheap` e sem effort.
 
-# --- Architect profile (deep planning, complex reasoning) ---
-architect:
-  provider: codex
-  model: gpt-5.5
-  reasoning: xhigh
-  use-for: "Architecture, complex decomposition, novel problems"
-  cli-invocation: "codex exec --color never --profile architect"
+# ── Onde o ID de modelo Claude realmente vira chamada ────────────────────────
+# .agents/tools/claude-agent-mcp.py:21-22 (MODE_DEFAULTS) → passado via --model
+# em :103-104. Existe uma cópia GLOBAL em ~/.claude/scripts/claude-agent-mcp.py
+# que é a que .agents/tools/claude-reviewer.sh:17 realmente executa.
+# As duas precisam ficar em sincronia.
 
-# --- Maestro profile (Codex-runtime orchestration only; Claude Opus is default Maestro) ---
-maestro:
-  provider: codex
-  model: gpt-5.5
-  reasoning: xhigh
-  use-for: "Direct Codex runtime sessions only — Claude Opus is default Maestro"
-  cli-invocation: "codex --profile maestro"
-
-# --- Fast profile (quick edits, formatting, docs) ---
-fast:
-  provider: codex
-  model: gpt-5.5
-  reasoning: high
-  use-for: "Quick edits, formatting, documentation"
-  cli-invocation: "codex exec --color never --profile fast"
-
-# --- Tier-1 (Maestro + Architect when Claude is the active runtime) ---
-primary:
-  provider: anthropic
-  model: claude-opus-4-7
-  reasoning: xhigh
-  use-for: "Tier-1 orchestration: Maestro, Architect, user-facing decisions"
-  cli-invocation: null  # Native Claude Code session, no spawn
-
-# --- Cross-model reviewer (only used in Codex-runtime sessions) ---
-claude-reviewer:
-  provider: anthropic
-  model: claude-sonnet-4-6
-  reasoning: max
-  use-for: "Cross-model review when Codex implements (bias-free)"
-  cli-invocation: null  # Spawned via mcp__claude-reviewer when present
-
-# --- Routing notes ---
-notes:
+# ── Roteamento por tamanho ───────────────────────────────────────────────────
+routing:
   delegation: |
-    Tasks XS/S: Claude (primary) implements directly — CLI/MCP overhead not justified.
-    Tasks M/L: Claude delegates to coder via `codex exec` (CLI direct, no MCP).
-    Why CLI over MCP: 10-35% lower token overhead per call. See cost-routing.md.
-  reasoning-levels: |
-    high  = standard reasoning (5K-10K thinking tokens equivalent)
-    xhigh = deep reasoning (10K-20K thinking tokens equivalent)
-    max   = maximum (20K+ tokens; Claude only)
-  fallback-chain: |
-    coder fails  → retry with reviewer profile (deeper reasoning)
-    reviewer fails → escalate to architect profile (xhigh)
-    architect fails → Claude implements directly + log incident
+    XS/S: Claude (sessão) implementa direto — o overhead de spawn não se paga.
+    M/L:  delegar ao Codex via wrapper:
+            ~/.codex/bin/codex-delegate.sh <role> <task-file> <out-file>
+    Nunca `codex exec` cru para trabalho de coder: a forma crua omite `-s` e
+    herda sandbox_mode="danger-full-access" + approval_policy="never" do
+    config.toml — ou seja, é ESTRITAMENTE mais perigosa que o wrapper, além de
+    perder timeout, checagem de 0-byte, pré-flight de auth e métricas.
+    `--profile` está morto NO WRAPPER (ele nunca o passa) e o codex-cli 0.135+
+    não lê mais os blocos [profiles.*] de config.toml (semântica v2 lê
+    ~/.codex/<role>.config.toml). Exceção real, não generalize: o hook
+    codex-pretool-guard.sh:431 AINDA usa `--profile fast` no tier degradado do
+    review de pre-commit. Ou seja: "--profile nunca é usado" é verdade do
+    wrapper e FALSO do reviewer de pre-commit.
+    Nunca use `-q` (removido no codex-cli 0.135). O `-q` sozinho causou ~194
+    fallbacks silenciosos para Claude quando a 0.135 saiu — o comando falhava
+    instantaneamente e a arquitetura de delegação virava enfeite.
+  failure-detection: |
+    Falha = `result != "OK"` em ~/.codex/delegate-metrics.jsonl **E TAMBÉM**
+    `bytes > 0`. As duas condições, porque nenhuma sozinha é suficiente:
+      - `rc` mente: 4 runs têm rc:0 com result != OK (3 MODEL_UNAVAILABLE,
+        1 EMPTY_OUTPUT). Nunca use rc como predicado.
+      - `result` mente: 2 runs têm result:"OK" com bytes:0 e duração de 1s e 3s
+        — morreram na hora e foram registrados como OK.
+    TIMEOUT não significa "nada foi feito": o Codex frequentemente edita e morre
+    na validação (6 dos 7 timeouts têm reason=deadline_exceeded_partial_rescued).
+    Antes de re-delegar: procure o parcial resgatado (<out>.partial.md) e rode
+    `git status --short` + `git diff --stat`. Falha de captura ≠ falha de
+    execução — já houve spawn devolvendo result vazio após fazer TODAS as
+    edições corretamente. Nunca afirme "o Codex validou" após TIMEOUT.
