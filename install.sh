@@ -386,16 +386,20 @@ download() {
 
   if [ -n "$SOURCE_DIR" ] && [ -f "$SOURCE_DIR/$remote_path" ]; then
     cp "$SOURCE_DIR/$remote_path" "$local_path"
-    return 0
-  fi
-
-  if command -v curl > /dev/null 2>&1; then
+  elif command -v curl > /dev/null 2>&1; then
     curl -fsSL "$REPO_URL/$remote_path" -o "$local_path"
   elif command -v wget > /dev/null 2>&1; then
     wget -q "$REPO_URL/$remote_path" -O "$local_path"
   else
     error "Neither curl nor wget found. Install one and retry."
   fi
+
+  # Exec bit é parte da distribuição: curl/wget sempre gravam 644, e o chmod
+  # do repair_runtime não roda quando setup_deps falha (fail-open silencioso
+  # que deixava gates e heartbeats não-executáveis no consumidor).
+  case "$local_path" in
+    *.sh) chmod +x "$local_path" 2>/dev/null || true ;;
+  esac
 }
 
 # Fetch helper (returns content, no write)
@@ -3322,7 +3326,13 @@ if [ "$MODE" = "update" ]; then
     fi
   done
 
-  repair_runtime
+  # No modo update, dependência ausente não pode abortar o fluxo inteiro
+  # (set -e + return 1 do setup_deps matava merge de CLAUDE.md, registro de
+  # hooks e validação — atualização pela metade sem aviso). Falha dura de
+  # ambiente continua sendo papel do --doctor.
+  if ! repair_runtime; then
+    warn "Runtime repair incompleto (dependência ausente?). Arquivos já foram atualizados; rode 'bash install.sh --doctor' para completar o ambiente."
+  fi
 
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""

@@ -69,6 +69,27 @@ Caminho canônico:
 - Sessões Claude mantêm Claude como Maestro (alias `fable`, fallback `opus`).
 - Sessões Codex diretas: `bash .agents/tools/codex-maestro.sh`.
 
+## Contrato de Eventos e Gates (sessões Codex diretas)
+
+Os hooks de gate (`pre-pr-bash-gate.sh`, `postdelegate-verify.sh`, cobrança de
+CLOSEOUT no Stop) são hooks do **Claude Code** — eles NÃO disparam em sessão
+Codex direta. Nessas sessões, o contrato vale por disciplina e você o cumpre
+manualmente com as mesmas ferramentas (são shell puro, runtime-agnóstico):
+
+- **Antes de criar QUALQUER PR**: `bash .agents/hooks/require-tests-for-pr.sh`
+  — se falhar, o PR não nasce. Sem exceção silenciosa; pressa consciente é
+  registrada: `bash .agents/tools/event-log.sh append GATE gate=pr verdict=skipped actor=codex`.
+- **Ao encerrar a sessão**: rode o fluxo de session-end-learning e registre
+  `bash .agents/tools/event-log.sh append CLOSEOUT actor=codex-maestro summary="<3-8 palavras>"`.
+  Dia trabalhado sem CLOSEOUT = learning loop morto — o gate do lado Claude
+  vai apontar a ausência.
+- **Eventos significativos** (delegação interna, gate, decisão): registre com
+  `event-log.sh append` — o log é a fonte de verdade compartilhada entre os
+  dois runtimes; notas são projeções.
+- **Memória**: tier hipótese (session notes, metrics, instinct candidates com
+  `confidence: low`) grava direto e anuncia; tier curado (promoções de
+  instinct, decisions, regras) exige aprovação humana explícita.
+
 ## Anti-Patterns
 - Do NOT create README.md, documentation files, or CHANGELOG entries
 - Do NOT refactor unrelated code
