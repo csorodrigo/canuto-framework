@@ -60,5 +60,5 @@
 
 ## Ferramentas de Agente (opcionais)
 <!-- Ferramentas CLI que os agentes podem usar durante o desenvolvimento -->
-- [x] Context Hub (`npm install -g @aisuite/chub`) — docs de API atualizadas para evitar hallucination
-- [x] OpenBrand (`npx -y openbrand-mcp` ou `npm add openbrand`) — extração de assets de marca via URL
+- [ ] Context Hub (`npm install -g @aisuite/chub`) — docs de API atualizadas; MCP removido do seed em 2026-07-27 (skill `api-docs-fetch` arquivado — re-adicione com `claude mcp add` se voltar a usar)
+- [ ] OpenBrand (`npx -y openbrand-mcp` ou `npm add openbrand`) — extração de assets de marca; MCP removido do seed em 2026-07-27 (skill `brand-bootstrap` arquivado — re-adicione com `claude mcp add` se voltar a usar)

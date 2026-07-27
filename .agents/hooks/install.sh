@@ -145,8 +145,13 @@ else
   echo "   ⚠️  settings-snippet.json não encontrado — pulando MCP setup."
 fi
 
-# Cleanup: remove legacy codex-* MCP entries (retired on 2026-04-29).
-# Maestro now invokes Codex via `codex exec --profile <name>` directly.
+# Cleanup: remove MCP entries que não pertencem ao settings.json do Claude.
+# - codex-* (retired 2026-04-29): Maestro invoca Codex via `codex exec` direto.
+# - claude-architect / claude-reviewer (2026-07-27): wrappers de back-delegation
+#   Codex→Claude — só fazem sentido registrados NO CODEX. Numa sessão Claude
+#   eram dois servidores MCP mortos subindo a cada startup.
+# - openbrand / context-hub (2026-07-27): únicos consumidores são skills em
+#   _archive/. Re-adicione com `claude mcp add` se voltar a usar.
 if [ -f "$SETTINGS_FILE" ]; then
   CLEANED=$(jq '
     if .mcpServers then
@@ -154,12 +159,16 @@ if [ -f "$SETTINGS_FILE" ]; then
         del(.["codex-coder"])
         | del(.["codex-reviewer"])
         | del(.["codex-maestro"])
+        | del(.["claude-architect"])
+        | del(.["claude-reviewer"])
+        | del(.["openbrand"])
+        | del(.["context-hub"])
       )
     else . end
   ' "$SETTINGS_FILE")
   if [ -n "$CLEANED" ] && ! cmp -s <(echo "$CLEANED") "$SETTINGS_FILE"; then
     echo "$CLEANED" > "$SETTINGS_FILE"
-    echo "   ✅ Removidas entradas legacy codex-* do settings.json (Codex agora via CLI)"
+    echo "   ✅ settings.json enxugado: removidos MCPs Codex-only e sem consumidor"
   fi
 fi
 
@@ -175,22 +184,13 @@ for script in claude-agent-mcp.py claude-architect.sh claude-reviewer.sh; do
   fi
 done
 
-if [ -f "$SETTINGS_FILE" ]; then
-  MERGED=$(jq \
-    --arg arch "$SCRIPTS_DIR/claude-architect.sh" \
-    --arg rev "$SCRIPTS_DIR/claude-reviewer.sh" \
-    '
-      .mcpServers["claude-architect"] = {"command": $arch, "type": "stdio"}
-      | .mcpServers["claude-reviewer"] = {"command": $rev, "type": "stdio"}
-    ' "$SETTINGS_FILE")
-  echo "$MERGED" > "$SETTINGS_FILE"
-  echo "   ✅ claude-architect, claude-reviewer → ~/.claude/settings.json"
-fi
+# claude-architect/claude-reviewer NÃO são registrados no settings.json do
+# Claude: são wrappers de back-delegation usados apenas quando o Codex é o
+# runtime ativo. Os arquivos ficam em ~/.claude/scripts/ (copiados acima) e o
+# registro acontece só no `codex mcp` (seção seguinte).
 
 echo "   ✅ MCP servers adicionais:"
 echo "      - ast-grep (análise AST)"
-echo "      - openbrand (extração de assets de marca)"
-echo "      - context-hub (docs de API atualizadas)"
 
 echo ""
 echo "✅ Hooks e MCP instalados."
@@ -204,28 +204,67 @@ echo "🔄 Sincronizando MCPs no Codex CLI..."
 if ! command -v codex &> /dev/null; then
   echo "   ⚠️  codex CLI não encontrado — pulando sync. Re-rode após instalar codex."
 else
-  _codex_mcp_add() {
+  # Refresh idempotente: remove-then-add corrige entrada existente apontando
+  # para caminho antigo/inexistente (causa do "MCP client failed to start:
+  # No such file or directory" no startup do Codex).
+  _codex_mcp_refresh() {
     local name="$1"; shift
+    codex mcp remove "$name" >/dev/null 2>&1 || true
     if codex mcp add "$name" "$@" 2>/dev/null; then
       echo "   ✅ $name"
     else
-      echo "   ↩️  $name (já existia ou falhou — ignore se já configurado)"
+      echo "   ⚠️  $name — codex mcp add falhou (diagnóstico: codex mcp list)"
     fi
   }
 
   # Codex sub-agents (codex-coder, codex-reviewer, codex-maestro) were retired
   # on 2026-04-29 — Maestro now invokes Codex via `codex exec --profile <name>` directly.
   # Cleanup any stale registrations.
+  # codex-cli atual retorna 0 mesmo quando o servidor não existe ("No MCP
+  # server named ..."), então o sucesso é detectado pela mensagem, não pelo rc.
   for legacy in codex-coder codex-reviewer codex-maestro; do
-    if codex mcp remove "$legacy" 2>/dev/null; then
-      echo "   🧹 Removed legacy MCP: $legacy"
-    fi
+    LEGACY_OUT=$(codex mcp remove "$legacy" 2>/dev/null || true)
+    case "$LEGACY_OUT" in
+      ""|*"No MCP server"*) : ;;
+      *) echo "   🧹 Removed legacy MCP: $legacy" ;;
+    esac
   done
 
-  # Claude MCPs (subscription-based, no API key required) — useful when Codex is
-  # the active runtime and needs to back-delegate to Claude.
-  _codex_mcp_add claude-architect -- "$SCRIPTS_DIR/claude-architect.sh"
-  _codex_mcp_add claude-reviewer  -- "$SCRIPTS_DIR/claude-reviewer.sh"
+  # Claude MCPs (subscription-based, no API key required) — back-delegation
+  # Codex→Claude, registrados SÓ aqui (nunca no settings.json do Claude).
+  # Os wrappers executam via `uvx` (codex-as-mcp): sem uvx, o servidor morre
+  # no startup com "No such file or directory" — pré-flight obrigatório.
+  if ! command -v uvx &> /dev/null; then
+    echo "   ⚠️  uvx não encontrado — removendo/pulando claude-architect e claude-reviewer."
+    echo "      Instale com: brew install uv   (depois re-rode este script)"
+    codex mcp remove claude-architect >/dev/null 2>&1 || true
+    codex mcp remove claude-reviewer  >/dev/null 2>&1 || true
+  elif [ ! -x "$SCRIPTS_DIR/claude-architect.sh" ] || [ ! -x "$SCRIPTS_DIR/claude-reviewer.sh" ]; then
+    echo "   ⚠️  wrappers ausentes em $SCRIPTS_DIR — registro no Codex pulado."
+  else
+    _codex_mcp_refresh claude-architect -- "$SCRIPTS_DIR/claude-architect.sh"
+    _codex_mcp_refresh claude-reviewer  -- "$SCRIPTS_DIR/claude-reviewer.sh"
+  fi
 
   echo "   ℹ️  Verifique com: codex mcp list"
+fi
+
+# ── Codex hooks.json: normaliza timeouts de SessionEnd ──────────────────────
+# codex-cli limita SessionEnd a 3s e emite "clamping SessionEnd hook timeout"
+# no startup quando o valor configurado é maior. Normalizar aqui silencia o
+# warning sem mudar comportamento (o clamp aconteceria de qualquer forma).
+CODEX_HOOKS_JSON="$HOME/.codex/hooks.json"
+if [ -f "$CODEX_HOOKS_JSON" ]; then
+  NORMALIZED=$(jq '
+    def clamp_se: walk(
+      if type == "object" and ((.timeout? | type) == "number") and .timeout > 3
+      then .timeout = 3 else . end);
+    if .SessionEnd? then .SessionEnd |= clamp_se else . end
+    | if ((.hooks? // {}) | has("SessionEnd")) then .hooks.SessionEnd |= clamp_se else . end
+  ' "$CODEX_HOOKS_JSON" 2>/dev/null || true)
+  if [ -n "$NORMALIZED" ] && ! cmp -s <(echo "$NORMALIZED") "$CODEX_HOOKS_JSON"; then
+    cp "$CODEX_HOOKS_JSON" "$CODEX_HOOKS_JSON.bak.$(date +%s)"
+    echo "$NORMALIZED" > "$CODEX_HOOKS_JSON"
+    echo "   ✅ ~/.codex/hooks.json: timeout de SessionEnd normalizado para ≤3s"
+  fi
 fi

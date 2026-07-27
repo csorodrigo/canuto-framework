@@ -369,14 +369,14 @@ You are my coding orchestrator for this repository.
 
 ## MCP Servers
 
-| Server | Comando | Funcao |
-|--------|---------|--------|
-| obsidian-mcp-server | `npx obsidian-mcp-server` | Leitura/escrita do vault via Obsidian Local REST API |
-| ast-grep | `npx -y @ast-grep/mcp` | Analise AST do codebase |
-| openbrand | `npx -y openbrand-mcp` | Extracao de assets de marca via URL |
-| context-hub | `npx -y @aisuite/chub-mcp` | Docs de API atualizadas |
+| Server | Comando | Onde | Funcao |
+|--------|---------|------|--------|
+| obsidian-mcp-server | `npx obsidian-mcp-server` | opcional (Claude e Codex) | Leitura/escrita do vault via Obsidian Local REST API — filesystem direto e o caminho real |
+| ast-grep | `npx -y @ast-grep/mcp` | Claude + Codex | Analise AST do codebase |
+| playwright | `npx -y @anthropic-ai/mcp-server-playwright` | Codex | Automacao de browser para agentes Codex |
+| claude-architect / claude-reviewer | `~/.claude/scripts/claude-*.sh` (via `uvx` codex-as-mcp) | **so Codex** | Back-delegation Codex→Claude — nunca registrados no settings.json do Claude (numa sessao Claude seriam servidores mortos) |
 
-Configurados automaticamente pelo `install.sh` em `~/.claude/settings.json`.
+Configurados automaticamente por `install.sh` + `.agents/hooks/install.sh`. Removidos em 2026-07-27: `openbrand` e `context-hub` (unicos consumidores eram skills em `_archive/`; re-adicione com `claude mcp add` se voltar a usar).
 
 ## Global Skills (~/.claude/skills/)
 
