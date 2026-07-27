@@ -380,20 +380,6 @@ if [ -f "$FRAMEWORK_DIR/install.sh" ]; then
     '--test)    MODE="test"'
     '--repair)  MODE="repair"'
     '--doctor|--health) MODE="doctor"'
-    'ensure_brew_formula git git "git"'
-    'ensure_brew_formula curl curl "curl"'
-    'ensure_brew_formula wget wget "wget"'
-    'ensure_brew_formula jq jq "jq"'
-    'ensure_brew_formula node node "node/npm/npx"'
-    'ensure_brew_formula python3 python "python3"'
-    'ensure_brew_formula uvx uv "uv/uvx"'
-    'ensure_brew_formula sg ast-grep "ast-grep"'
-    'ensure_brew_formula rg ripgrep "ripgrep"'
-    'ensure_brew_formula rtk rtk "rtk"'
-    'ensure_brew_formula bun oven-sh/bun/bun "bun"'
-    'ensure_brew_formula gh gh "GitHub CLI"'
-    'ensure_brew_cask gcloud gcloud-cli "Google Cloud CLI"'
-    'ensure_npm_global codex "@openai/codex@latest" "Codex CLI"'
     'rtk init -g --auto-patch'
     'rtk init -g --codex'
     '--deps-only|--deps'
@@ -404,6 +390,49 @@ if [ -f "$FRAMEWORK_DIR/install.sh" ]; then
       pass "install.sh covers: $pattern"
     else
       fail "install.sh missing expected dependency coverage: $pattern"
+    fi
+  done
+
+  # Cobertura de dependências por FERRAMENTA, não pela string da chamada.
+  # Antes esta lista continha as linhas literais `ensure_brew_formula ...`, o
+  # que amarrava o teste ao gerenciador de pacotes: ao ensinar o instalador a
+  # usar apt/dnf na VPS, 13 testes quebraram sem nenhuma dependência ter
+  # deixado de ser coberta. O que importa é a ferramenta aparecer no bloco.
+  INSTALL_REQUIRED_TOOLS=(git curl wget jq node python3 rg codex)
+  INSTALL_OPTIONAL_TOOLS=(gh bun rtk)
+
+  for tool in "${INSTALL_REQUIRED_TOOLS[@]}"; do
+    if grep -qE "^\s*ensure_dep\s+$tool\s" "$FRAMEWORK_DIR/install.sh" 2>/dev/null; then
+      pass "install.sh cobre dependência obrigatória: $tool"
+    else
+      fail "install.sh missing expected dependency coverage: $tool"
+    fi
+  done
+
+  for tool in "${INSTALL_OPTIONAL_TOOLS[@]}"; do
+    if grep -qE "^\s*ensure_dep\s+$tool\s.*\sopt\s*$" "$FRAMEWORK_DIR/install.sh" 2>/dev/null; then
+      pass "install.sh cobre dependência opcional: $tool"
+    else
+      fail "install.sh should cover $tool as optional (sem caminho de instalação fora do brew)"
+    fi
+  done
+
+  # uv e ast-grep têm helper próprio (instalador oficial da Astral / colisão do
+  # `sg` com o shadow em Linux), então não aparecem como ensure_dep no bloco.
+  for helper in ensure_uv ensure_astgrep; do
+    if grep -qE "^\s*$helper\s*$" "$FRAMEWORK_DIR/install.sh" 2>/dev/null; then
+      pass "install.sh chama $helper"
+    else
+      fail "install.sh missing expected dependency coverage: $helper"
+    fi
+  done
+
+  # Multi-gerenciador: o instalador não pode voltar a exigir Homebrew.
+  for marker in 'PKG_MGR="apt"' 'PKG_MGR="dnf"' 'dep_present'; do
+    if grep -qF -- "$marker" "$FRAMEWORK_DIR/install.sh" 2>/dev/null; then
+      pass "install.sh mantém suporte multi-gerenciador: $marker"
+    else
+      fail "install.sh perdeu suporte multi-gerenciador: $marker"
     fi
   done
 

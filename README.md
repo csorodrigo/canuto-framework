@@ -90,6 +90,11 @@ Decisões completas (com alternativas rejeitadas e porquê): [`docs/adr/`](docs/
   heartbeats/
     weekly-maintenance.md — Task semanal: pending triage + instinct aging + digest.
     usage-audit.md        — Task mensal: auditoria de uso real do framework.
+  vps/                  — Infra que roda NA VPS, não em projeto (fora de FRAMEWORK_FILES de propósito).
+    runner-setup.sh       — GitHub Actions self-hosted runner via systemd (só repo privado).
+    vault-remote-setup.sh — Vault oficial na VPS + Mac como espelho (nunca destrutivo).
+    signoz-setup.sh       — SigNoz com bind privado e descoberta de serviços por release.
+    uptime-kuma-setup.sh  — Uptime dos apps em produção.
   plugins/_archive/     — Plugins arquivados 2026-07-26 (mecanismo de descoberta nunca foi implementado).
   SPEC.md               — Full specification and design decisions.
 
@@ -145,6 +150,15 @@ Exemplos de `CLAUDE.md`: [docs/CLAUDE-EXAMPLES.md](docs/CLAUDE-EXAMPLES.md)
 cd my-project
 curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash
 ```
+
+Roda em **macOS e Linux**. Sem Homebrew (VPS), o instalador usa `apt`/`dnf` e
+trata `rtk`, `bun` e `gcloud` como opcionais — eles não têm caminho de instalação
+fora do brew e não são necessários para o framework funcionar.
+
+### Infraestrutura na VPS
+
+CI self-hosted (sem cota de Actions), vault oficial fora do Mac, uptime e
+telemetria: [`.agents/vps/README.md`](.agents/vps/README.md).
 
 To view the visual guide locally:
 

@@ -7,10 +7,12 @@ set -euo pipefail
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 ROOT_DIR="$(cd "$PROJECT_DIR" && git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
-PASS=0 FAIL=0
+PASS=0 FAIL=0 SKIP=0
 
 pass() { PASS=$((PASS + 1)); printf '  \033[32mPASS\033[0m  %s\n' "$1"; }
 fail() { FAIL=$((FAIL + 1)); printf '  \033[31mFAIL\033[0m  %s\n' "$1"; }
+# skip não entra na contagem: é ausência esperada, não defeito nem aprovação.
+skip() { SKIP=$((SKIP + 1)); printf '  \033[33mSKIP\033[0m  %s\n' "$1"; }
 
 echo "Canuto Framework Smoke Tests"
 echo "============================="
@@ -76,6 +78,10 @@ else
 fi
 
 # ── 5. Config validation ────────────────────────────────────────────────
+# validate-config.sh foi aposentado em 2026-07-26 (zero referências — ver
+# .agents/hooks/_retired/README.md). O teste continuou exigindo o arquivo e
+# ficou vermelho permanente: suíte que sempre falha é suíte que ninguém lê.
+# Se um dia o hook voltar de _retired/, este bloco volta a exercitá-lo.
 echo ""
 echo "## Config Validation"
 if [ -f "$ROOT_DIR/.agents/hooks/validate-config.sh" ]; then
@@ -85,7 +91,7 @@ if [ -f "$ROOT_DIR/.agents/hooks/validate-config.sh" ]; then
     fail "config validation failed"
   fi
 else
-  fail "validate-config.sh not found"
+  skip "validate-config.sh aposentado (2026-07-26) — nada a validar"
 fi
 
 # ── 6. codex-common.sh sourceable ────────────────────────────────────────
@@ -176,10 +182,12 @@ done
 # ── Summary ──────────────────────────────────────────────────────────────
 echo ""
 echo "============================="
+SKIP_NOTE=""
+[ "$SKIP" -gt 0 ] && SKIP_NOTE=", $SKIP skipped"
 if [ "$FAIL" -gt 0 ]; then
-  printf '\033[31m%d FAILED\033[0m, %d passed\n' "$FAIL" "$PASS"
+  printf '\033[31m%d FAILED\033[0m, %d passed%s\n' "$FAIL" "$PASS" "$SKIP_NOTE"
   exit 1
 else
-  printf '\033[32mALL %d PASSED\033[0m\n' "$PASS"
+  printf '\033[32mALL %d PASSED\033[0m%s\n' "$PASS" "$SKIP_NOTE"
   exit 0
 fi

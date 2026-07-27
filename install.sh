@@ -168,6 +168,180 @@ setup_deps() {
     fi
   }
 
+  # ── Gerenciador de pacotes: brew (macOS) ou apt/dnf (Linux/VPS) ────────────
+  # O framework roda onde a sessão roda. Com desenvolvimento migrando para VPS
+  # Linux, exigir Homebrew tornaria o instalador inutilizável lá. Mesma lista
+  # de dependências, gerenciador detectado em runtime.
+  PKG_MGR="none"
+  SUDO=""
+  APT_UPDATED=false
+
+  detect_sudo() {
+    if [ "$(id -u)" -eq 0 ]; then
+      SUDO=""
+    elif command -v sudo >/dev/null 2>&1; then
+      SUDO="sudo"
+    else
+      SUDO="__none__"
+    fi
+  }
+
+  detect_pkg_mgr() {
+    if command -v brew >/dev/null 2>&1; then
+      PKG_MGR="brew"; has_brew=true
+      ok "brew $(brew --version 2>/dev/null | head -1) already installed"
+      return 0
+    fi
+
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+      ensure_homebrew
+      [ "$has_brew" = true ] && PKG_MGR="brew"
+      return 0
+    fi
+
+    detect_sudo
+    if command -v apt-get >/dev/null 2>&1; then
+      PKG_MGR="apt"
+    elif command -v dnf >/dev/null 2>&1; then
+      PKG_MGR="dnf"
+    else
+      PKG_MGR="none"
+      fail_dep "No supported package manager found (brew/apt/dnf). Install the tools below manually."
+      return 0
+    fi
+
+    if [ "$SUDO" = "__none__" ]; then
+      warn "$PKG_MGR detected but this user is not root and sudo is unavailable — packages must be installed manually."
+    else
+      ok "Package manager: $PKG_MGR${SUDO:+ (via sudo)}"
+    fi
+  }
+
+  pkg_install() {
+    # pkg_install <brew_formula|-> <linux_pkg|->  (dnf reusa o nome do apt)
+    local brew_formula="$1" linux_pkg="$2"
+
+    case "$PKG_MGR" in
+      brew)
+        [ "$brew_formula" = "-" ] && return 1
+        brew install "$brew_formula" || return 1
+        add_brew_formula_path "$brew_formula"
+        ;;
+      apt)
+        [ "$linux_pkg" = "-" ] && return 1
+        [ "$SUDO" = "__none__" ] && return 1
+        if [ "$APT_UPDATED" != true ]; then
+          ${SUDO:+$SUDO} apt-get update -qq >/dev/null 2>&1 || true
+          APT_UPDATED=true
+        fi
+        DEBIAN_FRONTEND=noninteractive ${SUDO:+$SUDO} apt-get install -y -qq "$linux_pkg" >/dev/null 2>&1 || return 1
+        ;;
+      dnf)
+        [ "$linux_pkg" = "-" ] && return 1
+        [ "$SUDO" = "__none__" ] && return 1
+        ${SUDO:+$SUDO} dnf install -y "$linux_pkg" >/dev/null 2>&1 || return 1
+        ;;
+      *) return 1 ;;
+    esac
+  }
+
+  dep_present() {
+    # dep_present <cmd> — existe no PATH E é realmente a ferramenta esperada.
+    local cmd="$1"
+    command -v "$cmd" >/dev/null 2>&1 || return 1
+
+    # `sg` em Linux é o set-group do shadow (/usr/bin/sg), homônimo do alias
+    # do ast-grep. Sem esta checagem o instalador reporta ast-grep OK e o MCP
+    # quebra silenciosamente na VPS.
+    if [ "$cmd" = "sg" ]; then
+      "$cmd" --version 2>&1 | grep -qi "ast-grep" || return 1
+    fi
+    return 0
+  }
+
+  ensure_dep() {
+    # ensure_dep <cmd> <label> <brew|-> <linux_pkg|-> <npm_pkg|-> <req|opt>
+    local cmd="$1" label="$2" brew_formula="$3" linux_pkg="$4" npm_pkg="$5" need="${6:-req}"
+
+    if dep_present "$cmd"; then
+      ok "$label available: $(command -v "$cmd")"
+      return 0
+    fi
+
+    # Só anuncia o gerenciador que de fato será tentado — "Installing rtk via
+    # apt" seguido de um skip silencioso é ruído que parece erro.
+    local mgr_pkg="-"
+    case "$PKG_MGR" in
+      brew) mgr_pkg="$brew_formula" ;;
+      apt|dnf) mgr_pkg="$linux_pkg" ;;
+    esac
+    if [ "$mgr_pkg" != "-" ]; then
+      log "Installing $label via $PKG_MGR: $mgr_pkg"
+      pkg_install "$brew_formula" "$linux_pkg" || true
+    fi
+
+    if ! dep_present "$cmd" && [ "$npm_pkg" != "-" ] && command -v npm >/dev/null 2>&1; then
+      log "Installing $label via npm: npm install -g $npm_pkg"
+      npm install -g "$npm_pkg" >/dev/null 2>&1 || true
+    fi
+
+    if dep_present "$cmd"; then
+      ok "$label installed: $(command -v "$cmd")"
+      return 0
+    fi
+
+    local hint="Install manually"
+    [ "$brew_formula" != "-" ] && hint="brew install $brew_formula"
+    [ "$PKG_MGR" = "apt" ] && [ "$linux_pkg" != "-" ] && hint="apt-get install $linux_pkg"
+    [ "$PKG_MGR" = "dnf" ] && [ "$linux_pkg" != "-" ] && hint="dnf install $linux_pkg"
+    [ "$npm_pkg" != "-" ] && hint="$hint  (ou: npm install -g $npm_pkg)"
+
+    if [ "$need" = "opt" ]; then
+      warn "$label not installed (optional). To enable it: $hint"
+      return 0
+    fi
+    fail_dep "$label missing. $hint"
+  }
+
+  ensure_astgrep() {
+    # ast-grep expõe `ast-grep` e o alias `sg`. Em Linux o alias colide com o
+    # shadow, então o binário canônico é o que vale.
+    if dep_present ast-grep || dep_present sg; then
+      ok "ast-grep available: $(command -v ast-grep 2>/dev/null || command -v sg)"
+      return 0
+    fi
+    ensure_dep ast-grep "ast-grep" ast-grep - @ast-grep/cli req
+  }
+
+  ensure_uv() {
+    if dep_present uv && dep_present uvx; then
+      ok "uv/uvx available: $(command -v uv)"
+      return 0
+    fi
+
+    if [ "$PKG_MGR" = "brew" ]; then
+      pkg_install uv - || true
+    fi
+
+    # Fora do brew, o caminho oficial do uv é o instalador da Astral: uv não
+    # está nos repositórios do Ubuntu 24.04 e pip é bloqueado por PEP 668.
+    if ! dep_present uv && command -v curl >/dev/null 2>&1; then
+      log "Installing uv via installer oficial (astral.sh)..."
+      curl -LsSf https://astral.sh/uv/install.sh 2>/dev/null | sh >/dev/null 2>&1 || true
+      for candidate in "$HOME/.local/bin" "$HOME/.cargo/bin"; do
+        if [ -x "$candidate/uv" ]; then
+          case ":$PATH:" in *":$candidate:"*) ;; *) export PATH="$candidate:$PATH" ;; esac
+        fi
+      done
+    fi
+
+    if dep_present uv && dep_present uvx; then
+      ok "uv/uvx installed: $(command -v uv)"
+    else
+      fail_dep "uv/uvx missing. Install with: curl -LsSf https://astral.sh/uv/install.sh | sh   (macOS: brew install uv)"
+    fi
+  }
+
   ensure_command() {
     local command_name="$1"
     local install_hint="$2"
@@ -177,39 +351,6 @@ setup_deps() {
       ok "$label available: $(command -v "$command_name")"
     else
       fail_dep "$label missing. $install_hint"
-    fi
-  }
-
-  ensure_brew_formula() {
-    local command_name="$1"
-    local formula="$2"
-    local label="$3"
-
-    if command -v "$command_name" >/dev/null 2>&1; then
-      ok "$label already installed: $(command -v "$command_name")"
-      return 0
-    fi
-
-    if [ "$has_brew" != true ]; then
-      fail_dep "$label missing. Install manually or install Homebrew, then run: brew install $formula"
-      return 0
-    fi
-
-    log "Installing $label via Homebrew: brew install $formula"
-    if brew install "$formula"; then
-      add_brew_formula_path "$formula"
-      if command -v "$command_name" >/dev/null 2>&1; then
-        ok "$label installed: $(command -v "$command_name")"
-      else
-        fail_dep "$label installed via Homebrew, but '$command_name' is still not on PATH."
-      fi
-    else
-      add_brew_formula_path "$formula"
-      if command -v "$command_name" >/dev/null 2>&1; then
-        ok "$label available after Homebrew check: $(command -v "$command_name")"
-      else
-        fail_dep "Failed to install $label. Retry manually with: brew install $formula"
-      fi
     fi
   }
 
@@ -241,33 +382,6 @@ setup_deps() {
       else
         fail_dep "Failed to install $label. Retry manually with: brew install --cask $cask"
       fi
-    fi
-  }
-
-  ensure_npm_global() {
-    local command_name="$1"
-    local package="$2"
-    local label="$3"
-
-    if command -v "$command_name" >/dev/null 2>&1; then
-      ok "$label already installed: $(command -v "$command_name")"
-      return 0
-    fi
-
-    if ! command -v npm >/dev/null 2>&1; then
-      fail_dep "$label missing and npm is unavailable. Install Node.js/npm first."
-      return 0
-    fi
-
-    log "Installing $label globally via npm: npm install -g $package"
-    if npm install -g "$package"; then
-      if command -v "$command_name" >/dev/null 2>&1; then
-        ok "$label installed: $(command -v "$command_name")"
-      else
-        fail_dep "$label installed via npm, but '$command_name' is still not on PATH."
-      fi
-    else
-      fail_dep "Failed to install $label. Retry manually with: npm install -g $package"
     fi
   }
 
@@ -338,26 +452,39 @@ setup_deps() {
     fi
   }
 
-  ensure_homebrew
+  detect_pkg_mgr
 
-  ensure_brew_formula git git "git"
-  ensure_brew_formula curl curl "curl"
-  ensure_brew_formula wget wget "wget"
-  ensure_brew_formula jq jq "jq"
-  ensure_brew_formula node node "node/npm/npx"
-  ensure_command npm "Install with: brew install node" "npm"
-  ensure_command npx "Install with: brew install node" "npx"
-  ensure_brew_formula python3 python "python3"
-  ensure_brew_formula uvx uv "uv/uvx"
-  ensure_command uv "Install with: brew install uv" "uv"
-  ensure_brew_formula sg ast-grep "ast-grep"
-  ensure_brew_formula rg ripgrep "ripgrep"
-  ensure_brew_formula rtk rtk "rtk"
-  ensure_brew_formula bun oven-sh/bun/bun "bun"
-  ensure_brew_formula gh gh "GitHub CLI"
-  ensure_brew_cask gcloud gcloud-cli "Google Cloud CLI"
-  ensure_npm_global codex "@openai/codex@latest" "Codex CLI"
-  setup_rtk
+  #          cmd      label            brew            linux_pkg  npm            req/opt
+  ensure_dep git      "git"            git             git        -              req
+  ensure_dep curl     "curl"           curl            curl       -              req
+  ensure_dep wget     "wget"           wget            wget       -              req
+  ensure_dep jq       "jq"             jq              jq         -              req
+  ensure_dep node     "node/npm/npx"   node            nodejs     -              req
+  ensure_command npm "Install Node.js (brew install node | apt-get install npm)" "npm"
+  ensure_command npx "Install Node.js (brew install node | apt-get install npm)" "npx"
+  ensure_dep python3  "python3"        python          python3    -              req
+  ensure_uv
+  ensure_astgrep
+  ensure_dep rg       "ripgrep"        ripgrep         ripgrep    -              req
+  ensure_dep codex    "Codex CLI"      -               -          @openai/codex@latest req
+
+  # Opcionais: úteis, mas o framework roda sem eles. Marcá-los como obrigatórios
+  # fazia toda instalação Linux terminar em "N dependency check(s) failed" —
+  # rtk e gcloud-cli não têm caminho de instalação fora do Homebrew.
+  ensure_dep gh       "GitHub CLI"     gh              gh         -              opt
+  ensure_dep bun      "bun"            oven-sh/bun/bun -          bun            opt
+  ensure_dep rtk      "rtk"            rtk             -          -              opt
+  if [ "$PKG_MGR" = "brew" ]; then
+    ensure_brew_cask gcloud gcloud-cli "Google Cloud CLI"
+  else
+    warn "Google Cloud CLI not installed (optional). See https://cloud.google.com/sdk/docs/install"
+  fi
+
+  if dep_present rtk; then
+    setup_rtk
+  else
+    warn "rtk unavailable — skipping RTK hook setup (Claude/Codex work without it)."
+  fi
 
   if [ "$failures" -gt 0 ]; then
     warn "$failures dependency check(s) failed."
@@ -917,14 +1044,20 @@ setup_search_tools() {
 
   log "Setting up search tools (ast-grep)..."
 
-  # Install ast-grep if missing
-  if command -v sg &> /dev/null; then
-    ok "ast-grep already installed ($(sg --version))"
+  # Install ast-grep if missing. Não confiar em `command -v sg`: em Linux o
+  # `sg` do shadow (set group) ocupa o mesmo nome e daria falso positivo.
+  if command -v ast-grep &> /dev/null; then
+    ok "ast-grep already installed ($(ast-grep --version 2>/dev/null | head -1))"
+  elif command -v sg &> /dev/null && sg --version 2>&1 | grep -qi ast-grep; then
+    ok "ast-grep already installed ($(sg --version 2>/dev/null | head -1))"
   elif command -v brew &> /dev/null; then
     log "Installing ast-grep via Homebrew..."
     brew install ast-grep 2>/dev/null && ok "ast-grep installed" || warn "Failed to install ast-grep — install manually: brew install ast-grep"
+  elif command -v npm &> /dev/null; then
+    log "Installing ast-grep via npm..."
+    npm install -g @ast-grep/cli >/dev/null 2>&1 && ok "ast-grep installed" || warn "Failed to install ast-grep — install manually: npm install -g @ast-grep/cli"
   else
-    warn "ast-grep not found and brew unavailable. Install manually: brew install ast-grep"
+    warn "ast-grep not found. Install manually: npm install -g @ast-grep/cli  (macOS: brew install ast-grep)"
   fi
 
   # Add ast-grep MCP server to settings.json
