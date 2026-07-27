@@ -79,9 +79,15 @@ echo "host: $(hostname)  ·  usuário: $(whoami)"
 
 # ── Preflight ───────────────────────────────────────────────────────────────
 log "Preflight"
-if [ "$(id -u)" -ne 0 ] && [ "$DRY_RUN" != true ]; then
-  echo "❌ Rode como root ou com sudo (runner + systemd exigem privilégio)." >&2
-  exit 1
+# Só o runner exige root (systemd + usuário dedicado). Vault e Uptime Kuma
+# rodam no espaço do usuário. Abortar tudo por falta de privilégio deixaria
+# duas etapas perfeitamente viáveis sem rodar.
+IS_ROOT=false
+[ "$(id -u)" -eq 0 ] && IS_ROOT=true
+if [ "$IS_ROOT" = true ]; then
+  ok "privilégio de root disponível"
+else
+  warn "sem root — etapa de runner será pulada; vault e uptime kuma seguem normalmente"
 fi
 for dep in git curl tar; do
   if command -v "$dep" >/dev/null 2>&1; then
@@ -93,7 +99,13 @@ for dep in git curl tar; do
 done
 
 # ── 1. Runner de CI ─────────────────────────────────────────────────────────
-if [ "${#REPOS[@]}" -eq 0 ]; then
+if [ "$IS_ROOT" != true ] && [ "$DRY_RUN" != true ]; then
+  warn "Runner exige root (cria usuário dedicado e serviço systemd) — pulado."
+  for repo in "${REPOS[@]:-}"; do
+    [ -n "$repo" ] && PENDING+=("Como root, registrar o runner: bash $SCRIPT_DIR/runner-setup.sh --repo $repo")
+  done
+  [ "${#REPOS[@]}" -eq 0 ] && PENDING+=("Como root: bash $SCRIPT_DIR/runner-setup.sh --repo owner/name")
+elif [ "${#REPOS[@]}" -eq 0 ]; then
   warn "Nenhum --repo informado — etapa de runner pulada."
   PENDING+=("Registrar runner: bash $SCRIPT_DIR/runner-setup.sh --repo owner/name")
 elif ! command -v gh >/dev/null 2>&1 || ! gh api user >/dev/null 2>&1; then
@@ -135,7 +147,10 @@ else
   step vault "Vault oficial na VPS" \
     bash "$SCRIPT_DIR/vault-remote-setup.sh" --server
 fi
-PENDING+=("No MAC: bash .agents/vps/vault-remote-setup.sh --client ssh://$(hostname -f 2>/dev/null || hostname)/srv/canuto/vault.git")
+# O hub muda de lugar conforme haja root ou não (ver vault-remote-setup.sh) —
+# a pendência precisa apontar para o caminho que realmente foi criado.
+if [ "$IS_ROOT" = true ]; then HUB_PATH="/srv/canuto/vault.git"; else HUB_PATH="$HOME/canuto/vault.git"; fi
+PENDING+=("No MAC: bash .agents/vps/vault-remote-setup.sh --client ssh://$(whoami)@$(hostname -f 2>/dev/null || hostname)$HUB_PATH")
 
 # ── 3. Uptime Kuma ──────────────────────────────────────────────────────────
 if skip_step kuma; then

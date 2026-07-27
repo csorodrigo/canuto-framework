@@ -29,7 +29,15 @@ set -euo pipefail
 
 MODE=""
 CLIENT_URL=""
-HUB="/srv/canuto/vault.git"
+# Hub em /srv só quando há privilégio para criá-lo. Numa VPS onde o usuário de
+# trabalho não está no sudoers (caso comum: conta criada por painel, acesso por
+# chave), insistir em /srv tornaria o passo impossível sem ganho nenhum — o hub
+# é um bare repo, funciona igual sob $HOME.
+if [ "$(id -u)" -eq 0 ]; then
+  HUB="/srv/canuto/vault.git"
+else
+  HUB="$HOME/canuto/vault.git"
+fi
 VAULT="${CANUTO_VAULT_DIR:-$HOME/.canuto/vault}"
 INTERVAL=10
 MERGE_UNRELATED=false
@@ -121,7 +129,14 @@ server)
   fi
 
   # ── Autosync ──────────────────────────────────────────────────────────────
-  SYNC_SCRIPT="/usr/local/bin/canuto-vault-autosync"
+  # /usr/local/bin exige root; sem ele, ~/.local/bin serve igual (o cron usa o
+  # caminho absoluto, então não depende do PATH).
+  if [ "$(id -u)" -eq 0 ]; then
+    SYNC_SCRIPT="/usr/local/bin/canuto-vault-autosync"
+  else
+    mkdir -p "$HOME/.local/bin"
+    SYNC_SCRIPT="$HOME/.local/bin/canuto-vault-autosync"
+  fi
   cat > "$SYNC_SCRIPT" <<AUTOSYNC
 #!/usr/bin/env bash
 # canuto-vault-autosync — commit+push periódico do vault oficial (gerado por
@@ -160,7 +175,7 @@ AUTOSYNC
   ok "VPS pronta. O vault oficial é $VAULT."
   echo ""
   echo "No Mac, rode:"
-  echo "    bash .agents/vps/vault-remote-setup.sh --client ssh://\$USER@$HOSTNAME_FQDN$HUB"
+  echo "    bash .agents/vps/vault-remote-setup.sh --client ssh://$(whoami)@$HOSTNAME_FQDN$HUB"
   echo ""
   echo "(ajuste usuário/host conforme o seu ~/.ssh/config — ex.: ssh://papiro$HUB)"
   ;;
