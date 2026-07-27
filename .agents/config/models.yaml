@@ -99,10 +99,13 @@ roles:
 # era no-op silencioso: o CLI registra o effort pedido sem validar contra o
 # modelo. luna suporta max (1102 turns reais medidos); sol também (27944).
 
-# O Codex CLI aceita `max`, mas o wrapper global não é versionado nem instalado
-# por este repo. Por isso nenhum role canônico usa `max`: consumidores com o
-# wrapper publicado anteriormente ainda validam apenas `high|xhigh`. Só elevar
-# para `max` depois que a compatibilidade do wrapper fizer parte do instalador.
+# Wrapper VERSIONADO desde 2026-07-27: template em .agents/tools/codex-delegate.sh,
+# instalado pelo install.sh em ~/.codex/bin/ SOMENTE quando ausente (nunca
+# sobrescreve o wrapper existente da máquina). O template aceita
+# low|medium|high|xhigh|max. ATENÇÃO: máquinas com wrapper antigo (pré-template)
+# podem validar apenas high|xhigh — antes de pinar `max` num role canônico,
+# confirme que o wrapper da máquina é o template (grep 'template versionado'
+# ~/.codex/bin/codex-delegate.sh) ou atualize-o manualmente.
 
 # ── Claude (tier-1: orquestração e decisão) ──────────────────────────────────
 # Use ALIAS, não versão fixa. `claude --model` aceita `fable`/`opus`/`sonnet`

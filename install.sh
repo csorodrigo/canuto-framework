@@ -615,6 +615,7 @@ FRAMEWORK_FILES=(
   # Heartbeat v1 (absorção edge-of-chaos, Fase 4 — ADR-0004)
   ".agents/tools/heartbeat-run.sh"
   ".agents/tools/instinct-aging.sh"
+  ".agents/tools/codex-delegate.sh"
   # Revisor cego com muro mecânico (ADR-0006)
   ".claude/agents/blind-reviewer.md"
   # Novos gates fail-closed (ADR-0002)
@@ -1612,6 +1613,18 @@ TOMLEOF
     fi
   done
   ok "Merged per-role profiles v2: ~/.codex/{coder,reviewer,architect,maestro,fast}.config.toml"
+
+  # ── Wrapper canônico de delegação: ~/.codex/bin/codex-delegate.sh ────────
+  # Template versionado em .agents/tools/codex-delegate.sh. Instala SOMENTE
+  # quando ausente — nunca sobrescreve o wrapper existente da máquina (que
+  # pode carregar ajustes locais). Sem isto, máquina nova ficava sem o
+  # caminho canônico de delegação que o models.yaml documenta.
+  if [ -f ".agents/tools/codex-delegate.sh" ] && [ ! -f "$HOME/.codex/bin/codex-delegate.sh" ]; then
+    mkdir -p "$HOME/.codex/bin"
+    cp ".agents/tools/codex-delegate.sh" "$HOME/.codex/bin/codex-delegate.sh"
+    chmod +x "$HOME/.codex/bin/codex-delegate.sh"
+    ok "Installed: ~/.codex/bin/codex-delegate.sh (wrapper canônico — template do framework)"
+  fi
 
   # ── Add project trust (Conductor-aware) ──────────────────────────────────
   local project_dir

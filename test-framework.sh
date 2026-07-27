@@ -717,6 +717,35 @@ if grep -q "Bloco ausente: NÃO criar" "$FRAMEWORK_DIR/install.sh"; then
 else
   fail "install.sh voltou a criar blocos [profiles.*] mortos"
 fi
+
+# 12h. Wrapper canônico de delegação: template versionado + install-if-missing
+DELEGATE="$AGENTS_DIR/tools/codex-delegate.sh"
+if [ -x "$DELEGATE" ] && grep -q "template versionado" "$DELEGATE" \
+  && grep -q 'codex-delegate.sh.*bin/codex-delegate.sh' "$FRAMEWORK_DIR/install.sh"; then
+  pass "codex-delegate.sh: template versionado + instalado quando ausente"
+else
+  fail "codex-delegate.sh sem template versionado ou sem wiring no install.sh"
+fi
+
+# 12i. O parser do wrapper casa TODOS os roles do models.yaml (regressão do
+# formato flow-style — a mesma que deixou 211 delegações no default errado)
+BROKEN_ROLES=()
+for r in coder reviewer architect maestro fast; do
+  grep -Eq "^[[:space:]]{2}${r}:[[:space:]]*\{" "$AGENTS_DIR/config/models.yaml" || BROKEN_ROLES+=("$r")
+done
+if [ ${#BROKEN_ROLES[@]} -eq 0 ]; then
+  pass "models.yaml flow-style parseável para os 5 roles"
+else
+  fail "models.yaml não parseável para: ${BROKEN_ROLES[*]} (block-style volta a ser decorativo)"
+fi
+
+# 12j. postdelegate-verify não dispara em bash -n/cp/chmod do arquivo do wrapper
+if grep -q '""|-\*)' "$AGENTS_DIR/hooks/postdelegate-verify.sh" 2>/dev/null \
+  || grep -q '"")\|-\*)' "$AGENTS_DIR/hooks/postdelegate-verify.sh" 2>/dev/null; then
+  pass "postdelegate-verify ignora toques no arquivo do wrapper (out-file vazio ou -*)"
+else
+  fail "postdelegate-verify sem guarda de falso positivo (bash -n vira 'delegação')"
+fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -28,6 +28,12 @@ if printf '%s' "$COMMAND" | grep -q 'codex-delegate\.sh'; then
   IS_DELEGATION=true
   # forma canônica: codex-delegate.sh <persona> <task-file> <out-file>
   OUT_FILE=$(printf '%s' "$COMMAND" | grep -o 'codex-delegate\.sh[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:];|&]\+' | awk '{print $4}' | head -1)
+  # Tocar no ARQUIVO do wrapper não é delegar: bash -n, shellcheck, cp, chmod,
+  # git add etc. produzem "out-file" começando com "-" ou nem casam a forma
+  # canônica (2026-07-27: falso positivo em `bash -n codex-delegate.sh`).
+  case "$OUT_FILE" in
+    ""|-*) IS_DELEGATION=false ;;
+  esac
 elif printf '%s' "$COMMAND" | grep -q 'codex[[:space:]]\+exec' && printf '%s' "$COMMAND" | grep -q -- '--output-last-message'; then
   IS_DELEGATION=true
   OUT_FILE=$(printf '%s' "$COMMAND" | sed -n 's/.*--output-last-message[= ]\([^[:space:];|&]*\).*/\1/p' | head -1)
