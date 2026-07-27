@@ -27,6 +27,27 @@ O `bootstrap.sh` roda as etapas abaixo na ordem certa, cada uma idempotente, e
 termina com a lista numerada do que ainda exige você. Confira no `--dry-run` e
 repita sem a flag para aplicar. Uma etapa que falha **não** aborta as outras.
 
+### Rodando de fora (do Mac, via ssh)
+
+Use `ssh -t` — o `-t` aloca o TTY para o `sudo` pedir a senha:
+
+```bash
+ssh -t papiro 'sudo bash ~/canuto-framework/.agents/vps/bootstrap.sh \
+    --repo csorodrigo/plomes-route-optimizer --dry-run'
+```
+
+> **Não habilite `NOPASSWD: ALL` para contornar o prompt de senha.** É uma
+> troca ruim: converte uma senha digitada uma vez numa escalada permanente para
+> root disponível a qualquer processo rodando como o seu usuário — postinstall
+> de npm, dependência comprometida, agente que escorregou. Esta é justamente a
+> máquina que hospeda produção e roda um runner de CI que **executa código dos
+> repositórios**. Se um dia precisar mesmo de automação sem senha, escope por
+> comando, nunca `ALL`:
+>
+> ```
+> rodrigo ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart actions.runner.*
+> ```
+
 Flags: `--repo` (repetível), `--skip runner,vault,kuma,signoz`, `--bind <ip>`,
 `--assume-private`, `--dry-run`.
 
