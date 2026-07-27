@@ -28,6 +28,16 @@ if printf '%s' "$COMMAND" | grep -q 'codex-delegate\.sh'; then
   IS_DELEGATION=true
   # forma canônica: codex-delegate.sh <persona> <task-file> <out-file>
   OUT_FILE=$(printf '%s' "$COMMAND" | grep -o 'codex-delegate\.sh[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:]]\+[[:space:]]\+[^[:space:];|&]\+' | awk '{print $4}' | head -1)
+  # Tocar no ARQUIVO do wrapper ou CITÁ-LO em prosa não é delegar: bash -n,
+  # cp, chmod, git commit -m "...codex-delegate.sh..." produzem "out-file"
+  # que é flag (-n), palavra solta (template) ou vazio. Delegação real tem
+  # out-file com cara de caminho (2026-07-27: 2 falsos positivos em sequência
+  # — syntax check e mensagem de commit).
+  case "$OUT_FILE" in
+    ""|-*) IS_DELEGATION=false ;;
+    */*|*.md|*.txt|*.json|*.log) : ;;
+    *) IS_DELEGATION=false ;;
+  esac
 elif printf '%s' "$COMMAND" | grep -q 'codex[[:space:]]\+exec' && printf '%s' "$COMMAND" | grep -q -- '--output-last-message'; then
   IS_DELEGATION=true
   OUT_FILE=$(printf '%s' "$COMMAND" | sed -n 's/.*--output-last-message[= ]\([^[:space:];|&]*\).*/\1/p' | head -1)

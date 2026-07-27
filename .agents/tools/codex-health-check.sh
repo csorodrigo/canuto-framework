@@ -397,6 +397,11 @@ if [ -f "$ROOT_DIR/.agents/tools/event-log.sh" ] \
 else
   warn "event-log.sh ausente ou sem caminho resolvível"
 fi
+if [ -x "$HOME/.codex/bin/codex-delegate.sh" ]; then
+  pass "wrapper de delegação presente: ~/.codex/bin/codex-delegate.sh"
+else
+  warn "wrapper de delegação ausente — rode install.sh --update (instala o template quando ausente)"
+fi
 
 VERDICT="HEALTHY"
 EXIT_CODE=0
