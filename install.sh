@@ -619,6 +619,7 @@ FRAMEWORK_FILES=(
   ".claude/agents/blind-reviewer.md"
   # Novos gates fail-closed (ADR-0002)
   ".agents/hooks/pre-pr-bash-gate.sh"
+  ".agents/hooks/git-pre-push-gate.sh"
   ".agents/hooks/postdelegate-verify.sh"
 )
 
@@ -872,6 +873,29 @@ setup_hooks() {
     cp ".agents/hooks/session-load.sh" "$HOME/.claude/hooks/session-load.sh"
     chmod +x "$HOME/.claude/hooks/session-load.sh"
     ok "Installed: $HOME/.claude/hooks/session-load.sh (utility — run manually with: bash ~/.claude/hooks/session-load.sh)"
+  fi
+
+  # Git pre-push gate — costura runtime-agnóstica (vale para Claude, Codex
+  # direto e push manual). Shim regenerável identificado pelo marker.
+  local git_hooks_path prepush
+  git_hooks_path="$(git rev-parse --git-path hooks 2>/dev/null || true)"
+  if [ -n "$git_hooks_path" ] && [ -f ".agents/hooks/git-pre-push-gate.sh" ]; then
+    case "$git_hooks_path" in /*) : ;; *) git_hooks_path="$(pwd)/$git_hooks_path" ;; esac
+    mkdir -p "$git_hooks_path"
+    prepush="$git_hooks_path/pre-push"
+    if [ -f "$prepush" ] && ! grep -q "canuto:git-pre-push-gate" "$prepush" 2>/dev/null; then
+      warn "pre-push existente (não-canuto) preservado em $prepush — encadeie: bash .agents/hooks/git-pre-push-gate.sh"
+    else
+      cat > "$prepush" <<'PREPUSH_SHIM'
+#!/usr/bin/env bash
+# canuto:git-pre-push-gate — shim gerado pelo install.sh (não editar).
+GATE="$(git rev-parse --show-toplevel)/.agents/hooks/git-pre-push-gate.sh"
+[ -f "$GATE" ] && exec bash "$GATE" "$@"
+exit 0
+PREPUSH_SHIM
+      chmod +x "$prepush"
+      ok "Installed: git pre-push gate → $prepush (runtime-agnóstico)"
+    fi
   fi
 }
 
@@ -1479,10 +1503,12 @@ TOMLEOF
         *) effort="high" ;;
       esac
       if ! grep -q "\[profiles\.$profile\]" "$config_toml" 2>/dev/null; then
-        # Profile missing — append canonical block
-        printf '\n[profiles.%s]\nmodel = "%s"\nmodel_reasoning_effort = "%s"\n' \
-          "$profile" "$CANONICAL_MODEL" "$effort" >> "$config_toml"
-        patched=true
+        # Bloco ausente: NÃO criar. [profiles.*] é config morta (codex-cli
+        # 0.135+ ignora) — só atualizamos blocos legados que JÁ existam, para
+        # não deixar valor defasado. Criar bloco morto em máquina limpa dava
+        # ilusão de controle (2026-07-27: instalação fresca ganhava 5 blocos
+        # que nada leem).
+        :
       else
         # Profile present — update model and reasoning_effort if drifted
         # Use awk to rewrite values within the [profiles.<name>] block only.

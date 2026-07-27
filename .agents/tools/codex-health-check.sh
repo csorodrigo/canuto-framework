@@ -369,6 +369,35 @@ if [ "$MODE" = "full" ]; then
   fi
 fi
 
+# ── Contrato Codex-side (runtime-agnóstico) ─────────────────────────────────
+# Paridade dos gates fora do Claude Code: pre-push do git + wrapper com eventos.
+_prepush_path="$(git -C "$PROJECT_ROOT" rev-parse --git-path hooks 2>/dev/null || true)"
+if [ -n "$_prepush_path" ]; then
+  case "$_prepush_path" in /*) : ;; *) _prepush_path="$PROJECT_ROOT/$_prepush_path" ;; esac
+  if [ -f "$_prepush_path/pre-push" ] && grep -q "canuto:git-pre-push-gate" "$_prepush_path/pre-push" 2>/dev/null; then
+    pass "git pre-push gate instalado (gate de PR vale para Codex e push manual)"
+  else
+    warn "git pre-push gate ausente — rode: bash .agents/hooks/install.sh"
+  fi
+fi
+if grep -q "SESSION_START" "$ROOT_DIR/.agents/tools/codex-maestro.sh" 2>/dev/null \
+  && grep -q "trap _canuto_codex_session_end EXIT" "$ROOT_DIR/.agents/tools/codex-maestro.sh" 2>/dev/null; then
+  pass "codex-maestro.sh registra eventos de sessão + gate de CLOSEOUT"
+else
+  warn "codex-maestro.sh sem eventos/CLOSEOUT — atualize o framework (install.sh --update)"
+fi
+if grep -q "Contrato de Eventos e Gates" "$PROJECT_ROOT/AGENTS.md" 2>/dev/null; then
+  pass "AGENTS.md carrega o contrato de eventos/gates para sessões Codex"
+else
+  warn "AGENTS.md sem a seção 'Contrato de Eventos e Gates' — rode install.sh --update"
+fi
+if [ -f "$ROOT_DIR/.agents/tools/event-log.sh" ] \
+  && bash "$ROOT_DIR/.agents/tools/event-log.sh" path >/dev/null 2>&1; then
+  pass "event-log.sh resolve caminho do log (fonte de verdade compartilhada)"
+else
+  warn "event-log.sh ausente ou sem caminho resolvível"
+fi
+
 VERDICT="HEALTHY"
 EXIT_CODE=0
 if [ "$FAIL" -gt 0 ]; then

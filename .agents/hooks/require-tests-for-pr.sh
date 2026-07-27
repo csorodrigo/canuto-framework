@@ -34,11 +34,15 @@ run_tests() {
   fi
 }
 
+# Quem chama declara a costura: mcp (default), gh-cli (pre-pr-bash-gate),
+# pre-push (git hook runtime-agnóstico).
+GATE_VIA="${CANUTO_GATE_VIA:-mcp}"
+
 if ! run_tests; then
-  canuto_event_append GATE actor=hook gate=pr-tests verdict=fail via=mcp || true
+  canuto_event_append GATE actor=hook gate=pr-tests verdict=fail via="$GATE_VIA" || true
   echo "Tests are failing. Fix all test failures before creating a PR." >&2
   exit 2
 fi
 
-canuto_event_append GATE actor=hook gate=pr-tests verdict=pass via=mcp || true
+canuto_event_append GATE actor=hook gate=pr-tests verdict=pass via="$GATE_VIA" || true
 exit 0

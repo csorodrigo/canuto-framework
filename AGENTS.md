@@ -71,18 +71,25 @@ Caminho canônico:
 
 ## Contrato de Eventos e Gates (sessões Codex diretas)
 
-Os hooks de gate (`pre-pr-bash-gate.sh`, `postdelegate-verify.sh`, cobrança de
-CLOSEOUT no Stop) são hooks do **Claude Code** — eles NÃO disparam em sessão
-Codex direta. Nessas sessões, o contrato vale por disciplina e você o cumpre
-manualmente com as mesmas ferramentas (são shell puro, runtime-agnóstico):
+Os hooks PreToolUse/Stop são do **Claude Code** e não disparam em sessão Codex
+direta — por isso o contrato foi movido para costuras que valem em QUALQUER
+runtime (validado end-to-end em 2026-07-27, 15/15 checks):
 
-- **Antes de criar QUALQUER PR**: `bash .agents/hooks/require-tests-for-pr.sh`
-  — se falhar, o PR não nasce. Sem exceção silenciosa; pressa consciente é
-  registrada: `bash .agents/tools/event-log.sh append GATE gate=pr verdict=skipped actor=codex`.
+**Mecânico (não depende de você):**
+- **git pre-push gate** (`.agents/hooks/git-pre-push-gate.sh`, instalado como
+  `.git/hooks/pre-push`): primeiro push de branch roda
+  `require-tests-for-pr.sh` — teste falhando bloqueia o push; push direto
+  para main é bloqueado. Escapes conscientes ficam no event log:
+  `CANUTO_SKIP_PR_GATE=1` (testes) e `CANUTO_ALLOW_MAIN_PUSH=1` (main).
+  Os escapes são independentes: liberar a main NÃO pula o gate de testes.
+- **codex-maestro.sh** registra SESSION_START/SESSION_END sozinho e, na
+  saída, cobra CLOSEOUT do dia (mesmo gate do session-save.sh do lado
+  Claude). Sempre entre por ele — nunca `codex` cru no projeto.
+
+**Disciplina (ainda é seu papel):**
 - **Ao encerrar a sessão**: rode o fluxo de session-end-learning e registre
   `bash .agents/tools/event-log.sh append CLOSEOUT actor=codex-maestro summary="<3-8 palavras>"`.
-  Dia trabalhado sem CLOSEOUT = learning loop morto — o gate do lado Claude
-  vai apontar a ausência.
+  O wrapper avisa na saída se o dia fechou sem CLOSEOUT.
 - **Eventos significativos** (delegação interna, gate, decisão): registre com
   `event-log.sh append` — o log é a fonte de verdade compartilhada entre os
   dois runtimes; notas são projeções.

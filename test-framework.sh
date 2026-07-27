@@ -659,6 +659,67 @@ fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════
+echo "── Test 12: Contrato Codex-side (runtime-agnóstico) ──"
+# Paridade dos gates fora do Claude Code: git pre-push + wrapper com eventos.
+# Validação funcional completa: scratchpad/validate-codex-side.sh (15 checks,
+# 2026-07-27). Aqui, o wiring que não pode regredir.
+
+# 12a. git-pre-push-gate existe, é executável e lê o protocolo do pre-push
+GATE_HOOK="$AGENTS_DIR/hooks/git-pre-push-gate.sh"
+if [ -x "$GATE_HOOK" ] && grep -q "remote_ref remote_sha" "$GATE_HOOK"; then
+  pass "git-pre-push-gate.sh presente, executável, lê protocolo do git"
+else
+  fail "git-pre-push-gate.sh ausente/não-executável/sem protocolo stdin"
+fi
+
+# 12b. Os dois instaladores geram o shim (marker canuto:git-pre-push-gate)
+if grep -q "canuto:git-pre-push-gate" "$FRAMEWORK_DIR/install.sh" \
+  && grep -q "canuto:git-pre-push-gate" "$AGENTS_DIR/hooks/install.sh"; then
+  pass "shim pre-push gerado por install.sh E hooks/install.sh"
+else
+  fail "instalação do shim pre-push ausente em um dos instaladores"
+fi
+
+# 12c. Escapes registrados e independentes (allow-main não pula gate de testes)
+if grep -q "CANUTO_ALLOW_MAIN_PUSH" "$GATE_HOOK" && grep -q "CANUTO_SKIP_PR_GATE" "$GATE_HOOK" \
+  && grep -q 'verdict=skipped' "$GATE_HOOK"; then
+  pass "escapes do pre-push existem e registram GATE skipped no event log"
+else
+  fail "escapes do pre-push sem registro no event log"
+fi
+
+# 12d. codex-maestro.sh: eventos mecânicos + gate de CLOSEOUT + sem exec
+CM="$AGENTS_DIR/tools/codex-maestro.sh"
+if grep -q "SESSION_START" "$CM" && grep -q "trap _canuto_codex_session_end EXIT" "$CM" \
+  && grep -q "CLOSEOUT" "$CM" && ! grep -q "^exec codex" "$CM"; then
+  pass "codex-maestro.sh registra SESSION_START/END e cobra CLOSEOUT via trap"
+else
+  fail "codex-maestro.sh sem eventos mecânicos/trap de CLOSEOUT"
+fi
+
+# 12e. require-tests-for-pr parametriza a costura (via=mcp|gh-cli|pre-push)
+if grep -q "CANUTO_GATE_VIA" "$AGENTS_DIR/hooks/require-tests-for-pr.sh"; then
+  pass "require-tests-for-pr.sh declara a costura via CANUTO_GATE_VIA"
+else
+  fail "require-tests-for-pr.sh sem CANUTO_GATE_VIA"
+fi
+
+# 12f. AGENTS.md carrega o contrato para sessões Codex
+if grep -q "Contrato de Eventos e Gates" "$FRAMEWORK_DIR/AGENTS.md"; then
+  pass "AGENTS.md tem a seção 'Contrato de Eventos e Gates'"
+else
+  fail "AGENTS.md sem a seção do contrato Codex-side"
+fi
+
+# 12g. install.sh não cria blocos [profiles.*] mortos em máquina limpa
+if grep -q "Bloco ausente: NÃO criar" "$FRAMEWORK_DIR/install.sh"; then
+  pass "install.sh não semeia [profiles.*] morto em config.toml limpo"
+else
+  fail "install.sh voltou a criar blocos [profiles.*] mortos"
+fi
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════
 # SUMMARY
 # ═══════════════════════════════════════════════════════════════════════════
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
