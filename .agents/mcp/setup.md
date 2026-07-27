@@ -96,6 +96,12 @@ You should get a JSON response with vault info.
 
 The framework ships with OpenTelemetry wiring so Claude Code 2.1.116 and Codex CLI 0.122 stream sessions to a **local SigNoz** instance on `http://localhost:8080`. No data leaves the machine.
 
+> **SigNoz na VPS**: desde 2026-07-27 dá para hospedar o SigNoz fora do Mac — o
+> dashboard fica de pé com o Mac desligado e o histórico sobrevive à máquina.
+> Use `.agents/vps/signoz-setup.sh` e troque o endpoint OTLP pelo IP privado
+> (Tailscale/WireGuard). O endpoint **nunca** deve ficar exposto no IP público:
+> ele carrega metadados das suas sessões.
+
 ### Stack
 
 ```
