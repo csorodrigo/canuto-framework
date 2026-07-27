@@ -53,6 +53,36 @@ for script in codex-common.sh codex-diff-context.sh; do
   fi
 done
 
+# ── Git pre-push gate (runtime-agnóstico: Claude, Codex ou humano) ─────────
+echo ""
+echo "🔒 Instalando git pre-push gate..."
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+GIT_HOOKS_PATH="$(git -C "$PROJECT_ROOT" rev-parse --git-path hooks 2>/dev/null || true)"
+if [ -n "$GIT_HOOKS_PATH" ]; then
+  case "$GIT_HOOKS_PATH" in
+    /*) : ;;
+    *) GIT_HOOKS_PATH="$PROJECT_ROOT/$GIT_HOOKS_PATH" ;;
+  esac
+  mkdir -p "$GIT_HOOKS_PATH"
+  PREPUSH="$GIT_HOOKS_PATH/pre-push"
+  if [ -f "$PREPUSH" ] && ! grep -q "canuto:git-pre-push-gate" "$PREPUSH" 2>/dev/null; then
+    echo "   ⚠️  pre-push existente (não-canuto) em $PREPUSH — preservado."
+    echo "      Encadeie manualmente: bash .agents/hooks/git-pre-push-gate.sh"
+  else
+    cat > "$PREPUSH" <<'PREPUSH_SHIM'
+#!/usr/bin/env bash
+# canuto:git-pre-push-gate — shim gerado por .agents/hooks/install.sh (não editar).
+GATE="$(git rev-parse --show-toplevel)/.agents/hooks/git-pre-push-gate.sh"
+[ -f "$GATE" ] && exec bash "$GATE" "$@"
+exit 0
+PREPUSH_SHIM
+    chmod +x "$PREPUSH"
+    echo "   ✅ git pre-push gate → $PREPUSH"
+  fi
+else
+  echo "   ⚠️  não é um repositório git — pre-push gate pulado."
+fi
+
 # ── MCP Servers ─────────────────────────────────────────────────────────────
 echo ""
 echo "🔌 Configurando MCP servers em settings.json..."

@@ -104,7 +104,7 @@ Detect broken or missing framework components before they silently degrade sessi
 
 ### Codex Integration (v2.0, 2026-04-29 — CLI-only)
 - [ ] `codex --version` returns OK.
-- [ ] `~/.codex/config.toml` has 5 profiles (coder, reviewer, architect, fast, maestro), all on canonical model.
+- [ ] `~/.codex/<role>.config.toml` existe para os 5 roles (coder, reviewer, architect, fast, maestro) — perfis v2, o caminho vivo do `--profile`. Blocos `[profiles.*]` em `config.toml` são config morta (codex-cli 0.135+ ignora): presença deles é WARNING de legado, nunca requisito.
 - [ ] `~/.claude/settings.json` does NOT have legacy `codex-coder` / `codex-reviewer` / `codex-maestro` MCP entries (re-run `bash install.sh --doctor` to clean).
 - [ ] `~/.claude/settings.json` has `codex-pretool-guard.sh` on `PreToolUse`.
 - [ ] `~/.claude/settings.json` has `screenshot-guard.sh` on `PreToolUse` with matcher `mcp__playwright__browser_take_screenshot|mcp__claude-in-chrome__computer`.
