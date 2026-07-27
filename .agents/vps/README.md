@@ -15,6 +15,21 @@ Duas pressões chegaram juntas em 2026-07:
    Mac. Isso muda uma premissa do framework: a sessão deixa de rodar sempre no
    Mac, então instalador, heartbeats e memória precisam funcionar em Linux.
 
+## Comando único
+
+```bash
+git clone https://github.com/csorodrigo/canuto-framework.git ~/canuto-framework
+sudo bash ~/canuto-framework/.agents/vps/bootstrap.sh \
+     --repo csorodrigo/plomes-route-optimizer --dry-run
+```
+
+O `bootstrap.sh` roda as etapas abaixo na ordem certa, cada uma idempotente, e
+termina com a lista numerada do que ainda exige você. Confira no `--dry-run` e
+repita sem a flag para aplicar. Uma etapa que falha **não** aborta as outras.
+
+Flags: `--repo` (repetível), `--skip runner,vault,kuma,signoz`, `--bind <ip>`,
+`--assume-private`, `--dry-run`.
+
 ## Ordem recomendada
 
 | # | Script | Ganho | Custo |

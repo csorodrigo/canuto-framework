@@ -91,6 +91,7 @@ Decisões completas (com alternativas rejeitadas e porquê): [`docs/adr/`](docs/
     weekly-maintenance.md — Task semanal: pending triage + instinct aging + digest.
     usage-audit.md        — Task mensal: auditoria de uso real do framework.
   vps/                  — Infra que roda NA VPS, não em projeto (fora de FRAMEWORK_FILES de propósito).
+    bootstrap.sh          — Ponto único: roda tudo na ordem e lista o que sobrou para você.
     runner-setup.sh       — GitHub Actions self-hosted runner via systemd (só repo privado).
     vault-remote-setup.sh — Vault oficial na VPS + Mac como espelho (nunca destrutivo).
     signoz-setup.sh       — SigNoz com bind privado e descoberta de serviços por release.
