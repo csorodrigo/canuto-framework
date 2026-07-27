@@ -22,7 +22,7 @@ Duas pressões chegaram juntas em 2026-07:
 | 1 | `runner-setup.sh` | CI volta a rodar, sem consumir cota | ~15 min |
 | 2 | `vault-remote-setup.sh` | Vault oficial na VPS, Mac vira espelho | ~10 min |
 | 3 | `uptime-kuma-setup.sh` | Alerta quando um app em produção cai | ~5 min |
-| 4 | `signoz-setup.sh` | Painel de custo/tokens/latência das sessões | ~20 min, pede ~4GB de RAM |
+| 4 | `signoz-setup.sh` | Preflight + auditoria de exposição do SigNoz | ~20 min, pede ~4GB de RAM |
 
 O SigNoz é o último de propósito: é o mais pesado e o único que pode não caber,
 dependendo do tamanho da VPS. O script avisa se a RAM for insuficiente.
@@ -88,17 +88,27 @@ uma home estática continua respondendo 200 com o backend morto.
 ## 4. SigNoz
 
 ```bash
-bash .agents/vps/signoz-setup.sh                    # só local
-bash .agents/vps/signoz-setup.sh --bind 100.x.y.z   # IP Tailscale
+bash .agents/vps/signoz-setup.sh --bind 100.x.y.z   # preflight + instruções
+bash .agents/vps/signoz-setup.sh --verify           # audita exposição das portas
 ```
 
-**Nunca exponha 4317/4318 no IP público.** O endpoint OTLP carrega metadados das
-suas sessões. O default do script é `127.0.0.1`; para receber telemetria do Mac,
-use Tailscale/WireGuard e passe o IP privado em `--bind`.
+**Este script não instala o SigNoz** — e isso é deliberado. Ao testá-lo contra o
+repositório real descobrimos que o projeto **descontinuou o `install.sh` e os
+manifests docker-compose de `deploy/`** em favor do Foundry (`foundryctl`). Uma
+automação por cima de um contrato que acabou de mudar viraria defasagem
+silenciosa; a instalação segue a [doc oficial](https://signoz.io/docs/install/docker/).
 
-Os nomes dos serviços mudam entre releases do SigNoz, então o script descobre o
-coletor com `docker compose config --services` em vez de chutar, e desfaz o
-override se o compose resultante não validar.
+O que o script faz é o que dá para garantir mecanicamente:
+
+- **preflight** — docker no ar, RAM (o ClickHouse morre por OOM abaixo de ~4GB), disco;
+- **guidance** — os trechos exatos de `~/.claude/settings.json` e `~/.codex/config.toml`;
+- **`--verify`** — roda `ss`/`netstat` e **falha com exit 1** se 4317/4318/8080
+  estiverem escutando em `0.0.0.0`.
+
+Essa última é a que mais importa: o endpoint OTLP carrega metadados das suas
+sessões e o default de quase todo compose é `0.0.0.0`. Numa VPS com IP público
+isso publica sua telemetria. Rode `--verify` depois de instalar e depois de cada
+upgrade.
 
 ## Rede privada (pré-requisito do SigNoz remoto)
 

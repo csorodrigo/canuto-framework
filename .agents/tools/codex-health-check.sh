@@ -97,6 +97,36 @@ check_required_command() {
   fi
 }
 
+check_optional_command() {
+  # Ferramenta útil mas não essencial: ausência vira aviso, não falha. Sem isto
+  # todo --doctor em Linux termina BROKEN por brew/rtk/gcloud, que não têm
+  # caminho de instalação fora do Homebrew — relatório que sempre acusa defeito
+  # é relatório que ninguém lê.
+  local command_name="$1"
+  local label="$2"
+  shift 2
+
+  if command -v "$command_name" >/dev/null 2>&1; then
+    local version=""
+    version=$(first_version_line "$command_name" "$@" || true)
+    pass "$label available: ${version:-$(command -v "$command_name")}"
+  else
+    warn "$label não instalado (opcional)"
+  fi
+}
+
+check_astgrep() {
+  # Em Linux `sg` é o set-group do shadow (/usr/bin/sg), homônimo do alias do
+  # ast-grep: `command -v sg` daria PASS apontando para a ferramenta errada.
+  if command -v ast-grep >/dev/null 2>&1; then
+    pass "ast-grep available: $(ast-grep --version 2>/dev/null | head -n 1)"
+  elif command -v sg >/dev/null 2>&1 && sg --version 2>&1 | grep -qi ast-grep; then
+    pass "ast-grep available: $(sg --version 2>/dev/null | head -n 1)"
+  else
+    fail "ast-grep missing: instale com npm install -g @ast-grep/cli (macOS: brew install ast-grep)"
+  fi
+}
+
 check_required_file() {
   local file_path="$1"
   local label="$2"
@@ -201,7 +231,6 @@ if [ "$MODE" = "full" ]; then
     echo "Dependency checks"
   fi
 
-  check_required_command brew "brew" --version
   check_required_command git "git" --version
   check_required_command curl "curl" --version
   check_required_command wget "wget" --version
@@ -213,13 +242,22 @@ if [ "$MODE" = "full" ]; then
   check_required_command uv "uv" --version
   check_required_command uvx "uvx" --version
   check_required_command codex "codex" --version
-  check_required_command sg "ast-grep" --version
+  check_astgrep
   check_required_command rg "ripgrep" --version
-  check_required_command bun "bun" --version
-  check_required_command rtk "rtk" --version
-  check_required_command gcloud "Google Cloud CLI" --version
-  check_required_command gh "GitHub CLI" --version
-  check_rtk_activation
+
+  # Opcionais: sem caminho de instalação fora do Homebrew (brew/rtk/gcloud) ou
+  # dispensáveis para o framework rodar (bun/gh). Ver ADR-0007.
+  check_optional_command brew "brew" --version
+  check_optional_command bun "bun" --version
+  check_optional_command rtk "rtk" --version
+  check_optional_command gcloud "Google Cloud CLI" --version
+  check_optional_command gh "GitHub CLI" --version
+
+  if command -v rtk >/dev/null 2>&1; then
+    check_rtk_activation
+  else
+    warn "rtk ausente — checagens de ativação do RTK puladas"
+  fi
 
   if [ "$JSON_OUTPUT" = false ]; then
     echo ""
@@ -233,10 +271,20 @@ if [ "$MODE" = "full" ]; then
   fi
 
   if [ -f "$CONFIG_TOML" ]; then
-    if grep -q '^model = "gpt-5.5"' "$CONFIG_TOML" 2>/dev/null; then
-      pass "codex default model configured: gpt-5.5"
+    # O modelo esperado vem de models.yaml, não de um literal aqui. Esta linha
+    # dizia `gpt-5.5` enquanto o real já era gpt-5.6 — exatamente a defasagem
+    # silenciosa que models.yaml existe para evitar (ver o cabeçalho dele).
+    expected_model=$(grep -E "^[[:space:]]{2}maestro:[[:space:]]*\{" \
+      "$PROJECT_DIR/.agents/config/models.yaml" 2>/dev/null \
+      | sed -nE "s/.*[{,][[:space:]]*model:[[:space:]]*([^,}[:space:]]+).*/\1/p" | head -1)
+    configured_model=$(grep -E '^model = ' "$CONFIG_TOML" 2>/dev/null | head -1 | sed -E 's/^model = "?([^"]*)"?.*/\1/')
+
+    if [ -z "$expected_model" ]; then
+      warn "não consegui ler o modelo esperado de .agents/config/models.yaml"
+    elif [ "$configured_model" = "$expected_model" ]; then
+      pass "codex default model configured: $configured_model"
     else
-      warn "codex default model is not gpt-5.5"
+      warn "codex default model é '${configured_model:-<ausente>}', models.yaml diz '$expected_model'"
     fi
     if [ -x "$HOME/.codex/bin/codex-delegate.sh" ]; then
       pass "codex delegate wrapper executable"
@@ -290,21 +338,26 @@ if [ "$MODE" = "full" ]; then
     pass "codex mcp list is available"
     _MCP_TMP=$(mktemp)
     trap 'rm -f "$ITEMS_FILE" "$_MCP_TMP"' EXIT
-    for server in obsidian-vault ast-grep playwright; do
+    # obsidian-vault é opcional por decisão documentada (auditoria 2026-06-10:
+    # 0 chamadas em 200 sessões — o caminho real é filesystem direto). Exigi-lo
+    # aqui contradizia o CLAUDE.md e fazia toda máquina sem Obsidian dar BROKEN.
+    for server in ast-grep playwright; do
       if codex mcp get "$server" --json >"$_MCP_TMP" 2>/dev/null; then
-        if [ "$server" = "obsidian-vault" ]; then
-          if jq -e '(.transport.env.OBSIDIAN_API_KEY // .env.OBSIDIAN_API_KEY) and (.transport.env.OBSIDIAN_BASE_URL // .env.OBSIDIAN_BASE_URL)' "$_MCP_TMP" >/dev/null 2>&1; then
-            pass "obsidian-vault has required env configuration"
-          else
-            fail "obsidian-vault missing env configuration"
-          fi
-        else
-          pass "codex native MCP present: $server"
-        fi
+        pass "codex native MCP present: $server"
       else
         fail "codex native MCP missing: $server"
       fi
     done
+
+    if codex mcp get obsidian-vault --json >"$_MCP_TMP" 2>/dev/null; then
+      if jq -e '(.transport.env.OBSIDIAN_API_KEY // .env.OBSIDIAN_API_KEY) and (.transport.env.OBSIDIAN_BASE_URL // .env.OBSIDIAN_BASE_URL)' "$_MCP_TMP" >/dev/null 2>&1; then
+        pass "obsidian-vault has required env configuration"
+      else
+        warn "obsidian-vault registrado sem env completo (OBSIDIAN_API_KEY/BASE_URL)"
+      fi
+    else
+      warn "obsidian-vault não registrado (opcional — filesystem é o caminho padrão)"
+    fi
   else
     fail "codex mcp list unavailable"
   fi
