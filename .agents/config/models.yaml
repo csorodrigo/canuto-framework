@@ -69,8 +69,8 @@ last-updated: 2026-07-26
 # Atenção ao acoplamento: subir effort aumenta duração. Se subir effort, suba
 # o timeout no mesmo commit ou a taxa de TIMEOUT volta.
 roles:
-  coder:     { model: gpt-5.6-sol,  effort: xhigh, timeout: 2700, sandbox: workspace-write }
-  reviewer:  { model: gpt-5.6-sol,  effort: xhigh, timeout: 1200, sandbox: read-only }
+  coder:     { model: gpt-5.6-luna, effort: max,   timeout: 2700, sandbox: workspace-write }
+  reviewer:  { model: gpt-5.6-sol,  effort: medium, timeout: 1200, sandbox: read-only }
   architect: { model: gpt-5.6-sol,  effort: xhigh, timeout: 2400, sandbox: workspace-write }
   maestro:   { model: gpt-5.6-sol,  effort: xhigh, timeout: 1800, sandbox: workspace-write }
   fast:      { model: gpt-5.6-luna, effort: low,   timeout: 900,  sandbox: workspace-write }
@@ -114,11 +114,20 @@ roles:
 # ambos defasados, enquanto a sessão já rodava Opus 5.
 # Alias resolve para o mais recente sozinho — inclusive modelos lançados depois
 # desta linha ser escrita.
+# Uma entrada por PERSONA — antes só existiam 4 papéis genéricos, e coder,
+# contextualizer e investigator não tinham modelo declarado em lugar nenhum:
+# quem rodasse essas personas caía no default da sessão sem que nada dissesse
+# qual deveria ser. O alias fica (é o que a CLI aceita) com o ID explícito ao
+# lado, para o arquivo não depender de tradução implícita quando a família
+# mudar de versão.
 claude:
-  maestro:   { model: fable, fallback: opus,        notes: "sessão interativa; fallback é manual — ver abaixo" }
-  architect: { model: fable, fallback: opus,        notes: "spawn headless (-p) — fallback automático funciona" }
-  reviewer:  { model: opus,  fallback: sonnet,      notes: "cross-model vs Codex; spawn headless" }
-  cheap:     { model: sonnet, fallback: haiku,      notes: "subagentes, varredura, trabalho mecânico" }
+  maestro:        { model: fable,  id: claude-fable-5,             fallback: opus,   notes: "sessão interativa; fallback é manual — ver abaixo" }
+  architect:      { model: fable,  id: claude-fable-5,             fallback: opus,   notes: "spawn headless (-p) — fallback automático funciona" }
+  coder:          { model: opus,   id: claude-opus-5,              fallback: sonnet, notes: "quando a implementação fica no Claude (XS/S, ou Codex vetado na linha de trabalho)" }
+  reviewer:       { model: opus,   id: claude-opus-5,              fallback: none,   notes: "cross-model vs Codex; SEM fallback — cair para sonnet em silêncio derrota o propósito do review cruzado" }
+  investigator:   { model: fable,  id: claude-fable-5,             fallback: opus,   notes: "causa raiz é o caso de ambiguidade máxima; vale o topo" }
+  contextualizer: { model: sonnet, id: claude-sonnet-5,            fallback: haiku,  notes: "varredura ampla de repositório — volume, não profundidade" }
+  cheap:          { model: sonnet, id: claude-sonnet-5,            fallback: haiku,  notes: "subagentes, varredura, trabalho mecânico" }
 
 # `--fallback-model` é nativo do claude CLI: "Enable automatic fallback to
 # specified model(s) when the default model is overloaded or not available.

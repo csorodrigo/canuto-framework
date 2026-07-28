@@ -57,6 +57,27 @@ run_tests() {
 # pre-push (git hook runtime-agnóstico).
 GATE_VIA="${CANUTO_GATE_VIA:-mcp}"
 
+# Opt-in de gates POR PROJETO, versionado no repo. Um `export` no shell some ao
+# trocar de terminal e não vale para o Codex nem para um push manual — o mesmo
+# problema que o pre-push runtime-agnóstico veio resolver (ADR-0002).
+# Variável de ambiente já definida tem precedência: dá para desligar pontualmente
+# sem editar o arquivo.
+GATES_ENV="$PROJECT_DIR/.agents/config/gates.env"
+if [ -f "$GATES_ENV" ]; then
+  while IFS='=' read -r key value; do
+    case "$key" in
+      ''|'#'*) continue ;;
+      CANUTO_*) : ;;
+      *) continue ;;
+    esac
+    value="${value%%#*}"; value="$(printf '%s' "$value" | tr -d '[:space:]')"
+    [ -n "$value" ] || continue
+    if [ -z "$(eval "printf '%s' \"\${$key:-}\"")" ]; then
+      export "$key=$value"
+    fi
+  done < "$GATES_ENV"
+fi
+
 # CANUTO_REQUIRE_PREPUSH=1 — fecha o `git push --no-verify`.
 # O pre-push é hook do git, e `--no-verify` o pula sem deixar rastro: em
 # lucrando-ai#2369 o push saiu com --no-verify num repo onde "o pre-push é o
