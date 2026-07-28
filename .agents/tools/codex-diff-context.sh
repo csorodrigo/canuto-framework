@@ -7,10 +7,22 @@ MODE="staged"
 BASE_REF=""
 OUTPUT_FILE=""
 DIFF_TARGET="index"
-DIFF_CONTEXT_LINES="${CODEX_DIFF_CONTEXT_LINES:-10}"
-MAX_PATCH_BYTES="${CODEX_DIFF_MAX_BYTES:-28000}"
-MAX_PATCH_LINES="${CODEX_DIFF_MAX_LINES:-480}"
-MAX_PATCH_FILES="${CODEX_DIFF_MAX_FILES:-8}"
+# Orçamento de contexto do review. Os valores antigos (10 linhas de contexto,
+# 480 linhas, 8 arquivos, 28KB) foram calibrados para um budget muito menor e,
+# na prática, faziam o gate se contornar exatamente nos commits maiores: em
+# papiro#341 um único arquivo dava 920 linhas contra o teto de 480 e o commit
+# saiu com CANUTO_ALLOW_COMMIT=1; em lucrando-ai#2369 um arquivo novo de 900
+# linhas bloqueou o review antes dele começar. Dois projetos independentes, o
+# mesmo teto. Contexto de 3 linhas é o default do git e corta ~40% do volume
+# sem perder o que importa para revisar um hunk.
+DIFF_CONTEXT_LINES="${CODEX_DIFF_CONTEXT_LINES:-3}"
+MAX_PATCH_BYTES="${CODEX_DIFF_MAX_BYTES:-90000}"
+MAX_PATCH_LINES="${CODEX_DIFF_MAX_LINES:-1500}"
+MAX_PATCH_FILES="${CODEX_DIFF_MAX_FILES:-20}"
+# Teto POR ARQUIVO: sem ele, o primeiro arquivo gigante consome o orçamento
+# inteiro e todos os seguintes desaparecem do diff — o revisor aprova sem nunca
+# ter visto os outros. Com ele, o arquivo grande é cortado e os demais entram.
+MAX_LINES_PER_FILE="${CODEX_DIFF_MAX_LINES_PER_FILE:-400}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -149,22 +161,42 @@ trim_patch_excerpt() {
   local line_count=0
   local byte_count=0
   local file_count=0
+  local file_lines=0
+  local file_skipping=false
+  local file_skipped=0
 
   : > "$output_file"
   printf '%s\n' "false" > "$flag_file"
 
   while IFS= read -r line || [ -n "$line" ]; do
     if [[ "$line" == diff\ --git* ]]; then
+      # Fecha a contabilidade do arquivo anterior antes de abrir o próximo.
+      if [ "$file_skipping" = true ] && [ "$file_skipped" -gt 0 ]; then
+        printf '%s\n' "... [+${file_skipped} linhas deste arquivo omitidas — teto por arquivo: ${MAX_LINES_PER_FILE}]" >> "$output_file"
+        line_count=$((line_count + 1))
+      fi
       if [ "$file_count" -ge "$MAX_PATCH_FILES" ]; then
         printf '%s\n' "true" > "$flag_file"
         break
       fi
       file_count=$((file_count + 1))
+      file_lines=0
+      file_skipping=false
+      file_skipped=0
     fi
 
     if [ "$line_count" -ge "$MAX_PATCH_LINES" ]; then
       printf '%s\n' "true" > "$flag_file"
       break
+    fi
+
+    # Arquivo estourou o próprio teto: pula o resto DELE e segue para o próximo,
+    # em vez de encerrar o diff inteiro.
+    if [ "$file_lines" -ge "$MAX_LINES_PER_FILE" ]; then
+      file_skipping=true
+      file_skipped=$((file_skipped + 1))
+      printf '%s\n' "true" > "$flag_file"
+      continue
     fi
 
     next_bytes=$((byte_count + ${#line} + 1))
@@ -175,8 +207,13 @@ trim_patch_excerpt() {
 
     printf '%s\n' "$line" >> "$output_file"
     line_count=$((line_count + 1))
+    file_lines=$((file_lines + 1))
     byte_count=$next_bytes
   done
+
+  if [ "$file_skipping" = true ] && [ "$file_skipped" -gt 0 ]; then
+    printf '%s\n' "... [+${file_skipped} linhas deste arquivo omitidas — teto por arquivo: ${MAX_LINES_PER_FILE}]" >> "$output_file"
+  fi
 }
 
 TYPE_PATTERN=$(extract_identifiers '\b[A-Z][A-Za-z0-9_]*\b' | join_pattern)
