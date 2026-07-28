@@ -57,6 +57,42 @@ run_tests() {
 # pre-push (git hook runtime-agnóstico).
 GATE_VIA="${CANUTO_GATE_VIA:-mcp}"
 
+# CANUTO_REQUIRE_PREPUSH=1 — fecha o `git push --no-verify`.
+# O pre-push é hook do git, e `--no-verify` o pula sem deixar rastro: em
+# lucrando-ai#2369 o push saiu com --no-verify num repo onde "o pre-push é o
+# único CI". Aqui exigimos prova POSITIVA de que o commit que está indo para o
+# PR cruzou o gate: um evento GATE com o sha do HEAD. Sem evento, sem PR.
+require_prepush_evidence() {
+  [ "${CANUTO_REQUIRE_PREPUSH:-0}" = "1" ] || return 0
+  [ "$GATE_VIA" = "pre-push" ] && return 0   # é o próprio pre-push rodando agora
+
+  local head_sha log_path
+  head_sha=$(git -C "$PROJECT_DIR" rev-parse HEAD 2>/dev/null || echo "")
+  [ -n "$head_sha" ] || return 0
+
+  if ! command -v canuto_event_log_path >/dev/null 2>&1; then
+    echo "[require-tests-for-pr] CANUTO_REQUIRE_PREPUSH=1 mas o event log não está disponível — não dá para provar o pre-push." >&2
+    return 1
+  fi
+  log_path=$(canuto_event_log_path "$PROJECT_DIR" 2>/dev/null || echo "")
+  if [ -z "$log_path" ] || [ ! -f "$log_path" ]; then
+    echo "[require-tests-for-pr] CANUTO_REQUIRE_PREPUSH=1 mas não há event log em $PROJECT_DIR — nenhum push registrado." >&2
+    return 1
+  fi
+
+  if grep -q "\"sha\":\"$head_sha\"" "$log_path" 2>/dev/null; then
+    return 0
+  fi
+
+  echo "" >&2
+  echo "✋ CANUTO_REQUIRE_PREPUSH=1 — nenhum evento de pre-push para o HEAD ($head_sha)." >&2
+  echo "   O commit que vai para o PR não tem prova de ter cruzado o gate." >&2
+  echo "   Causa comum: \`git push --no-verify\`, que pula o hook sem deixar rastro." >&2
+  echo "   Corrija com um push normal (sem --no-verify), ou declare o escape:" >&2
+  echo "       CANUTO_SKIP_PR_GATE=1 git push ...   (fica registrado no event log)" >&2
+  return 1
+}
+
 if ! run_tests; then
   canuto_event_append GATE actor=hook gate=pr-tests verdict=fail via="$GATE_VIA" || true
   echo "Tests are failing. Fix all test failures before creating a PR." >&2
@@ -66,6 +102,11 @@ fi
 if ! run_typecheck; then
   canuto_event_append GATE actor=hook gate=pr-typecheck verdict=fail via="$GATE_VIA" || true
   echo "Typecheck is failing. Suíte verde não prova compilação — corrija os erros de tipo antes de abrir o PR." >&2
+  exit 2
+fi
+
+if ! require_prepush_evidence; then
+  canuto_event_append GATE actor=hook gate=pr-prepush verdict=fail via="$GATE_VIA" || true
   exit 2
 fi
 
