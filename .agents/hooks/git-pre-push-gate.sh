@@ -82,7 +82,17 @@ if [ "$new_branch" = "1" ]; then
       exit 1
     fi
     canuto_event_append GATE actor=git-hook gate=pr-tests verdict=pass via=pre-push sha="$pushed_sha" || true
+    prepush_recorded=1
   fi
+fi
+
+# Todo push observado deixa registro, mesmo quando nenhum gate se aplicou.
+# A prova que CANUTO_REQUIRE_PREPUSH exige é "este commit passou pelo hook",
+# não "os testes rodaram": o gate de testes só dispara no primeiro push do
+# branch, então sem isto qualquer push subsequente ficaria sem evidência e o
+# require-prepush recusaria PRs legítimos — falha fechada pelo motivo errado.
+if [ "${prepush_recorded:-0}" != "1" ] && [ -n "$pushed_sha" ]; then
+  canuto_event_append GATE actor=git-hook gate=pre-push verdict=observed via=pre-push sha="$pushed_sha" || true
 fi
 
 exit 0

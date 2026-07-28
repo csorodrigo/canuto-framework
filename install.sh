@@ -3509,6 +3509,27 @@ if [ "$MODE" = "update" ]; then
     echo ""
     log "Staging updated files..."
     git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" "CODEX.md" 2>/dev/null || true
+
+    # Estado de runtime NUNCA entra no commit do consumidor. `git add .agents/`
+    # varre o diretório inteiro e arrastava junto o event log da máquina — que
+    # carrega o slug de QUEM gerou o evento. Foi assim que um evento com
+    # "project":"canuto-framework-v1" foi parar dentro de um repo de produto:
+    # vazamento de identidade exatamente do tipo que o ADR-0003 veta.
+    for runtime_path in \
+      "$AGENTS_DIR/vault/events" \
+      "$AGENTS_DIR/tmp" \
+      "$AGENTS_DIR/.cache" \
+      "$AGENTS_DIR/memory"; do
+      git reset -q -- "$runtime_path" 2>/dev/null || true
+    done
+
+    # E ignora daqui para frente, para não reaparecer no próximo `git add -A`
+    # que alguém rodar à mão.
+    if [ -f ".gitignore" ] && ! grep -q "^\.agents/vault/events/" .gitignore 2>/dev/null; then
+      printf '\n# Canuto — estado de runtime por máquina (nunca versionar)\n.agents/vault/events/\n.agents/tmp/\n.agents/.cache/\n' >> .gitignore
+      git add .gitignore 2>/dev/null || true
+      ok "Runtime do Canuto adicionado ao .gitignore"
+    fi
     echo ""
     if confirm_yes "Commit now? [Y/n] " "Y"; then
       git commit -m "chore: update Canuto Framework to v1.6"
