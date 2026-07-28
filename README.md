@@ -87,6 +87,9 @@ Decisões completas (com alternativas rejeitadas e porquê): [`docs/adr/`](docs/
     canuto-memory.sh    — Resolução canônica de slug e paths do vault.
     codex-maestro.sh    — Launch direct Codex runtime with the `maestro` profile.
     vault-sync.sh       — Flush pending sync notes into the active vault backend.
+  config/
+    models.yaml           — Fonte ÚNICA e executável de modelo/effort por role (Codex e Claude).
+    gates.env             — Opt-in de gates por projeto, versionado (vale p/ Claude, Codex e push manual).
   heartbeats/
     weekly-maintenance.md — Task semanal: pending triage + instinct aging + digest.
     usage-audit.md        — Task mensal: auditoria de uso real do framework.

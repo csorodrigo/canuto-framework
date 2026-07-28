@@ -663,6 +663,7 @@ FRAMEWORK_FILES=(
   ".agents/hooks/worktree-collision-check.sh"
   ".agents/hooks/pre-claim-grep.sh"
   ".agents/config/models.yaml"
+  ".agents/config/gates.env"
   ".agents/skills/continuous-learning/SKILL.md"
   ".agents/skills/continuous-learning/references/instinct-promotion.md"
   ".agents/skills/continuous-learning/references/examples.md"
