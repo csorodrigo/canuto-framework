@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # worktree-collision-check.sh
 #
-# What: warns if multiple Claude Code processes are likely operating on the
-#       same git worktree (Conductor pattern shares .git across worktrees).
+# What: warns if multiple agent processes (Claude Code OR Codex) are likely
+#       operating on the same git worktree (Conductor shares .git across them).
 # Why:  Sessão 2026-04-18 perdeu ~20 Edits silenciosamente porque outra sessão
 #       Claude (PID 4fa79590) commitou + branch-switched no mesmo worktree.
 #       I-023 capturou o pattern. Este hook detecta e avisa antes de começar.
 # When: SessionStart hook (matcher empty).
 #
 # Detection logic:
-#   1. Count `claude` processes via ps
+#   1. Count `claude` and `codex` processes via pgrep
 #   2. Read this session's PID (env CLAUDE_SESSION_ID se disponível)
 #   3. If >1 process → check if any are in the same git worktree path
 #   4. If colision → emit warning to stderr with PIDs to investigate
@@ -28,12 +28,16 @@ git_common=$(git -C "$project_dir" rev-parse --git-common-dir 2>/dev/null || ech
 # Resolve git common dir to absolute path
 git_common_abs=$(cd "$(dirname "$git_common")" 2>/dev/null && pwd)/$(basename "$git_common")
 
-# Count claude processes
-claude_pids=$(pgrep -f 'claude(\b|$)' 2>/dev/null | sort -u || true)
-claude_count=$(echo "$claude_pids" | grep -c . || true)
+# Conta processos de agente — Claude E Codex.
+# Contar só `claude` era um ponto cego real: em mecesa#90 o worktree estava
+# contestado por uma "delegação Codex ativa em modo workspace-write" com WIP de
+# outro agente em 8 arquivos, e o PR teve de ser remontado do zero. Este hook
+# rodou e não viu nada, porque o processo colidindo era `codex`, não `claude`.
+agent_pids=$( { pgrep -f 'claude(\b|$)' 2>/dev/null; pgrep -f 'codex(\b|$)' 2>/dev/null; } | sort -u || true)
+agent_count=$(echo "$agent_pids" | grep -c . || true)
 
 # If only one or zero, no collision possible
-if [ "$claude_count" -le 1 ]; then
+if [ "$agent_count" -le 1 ]; then
   exit 0
 fi
 
@@ -41,7 +45,7 @@ fi
 my_pid="${CLAUDE_PID:-$$}"
 collisions=()
 
-for pid in $claude_pids; do
+for pid in $agent_pids; do
   [ "$pid" = "$my_pid" ] && continue
   # Get cwd of process (macOS: lsof, Linux: /proc/PID/cwd)
   cwd=""
@@ -68,9 +72,9 @@ fi
 
 # Warn (non-blocking)
 cat >&2 <<EOF
-[worktree-collision-check] WARNING — another Claude session is operating on the same git repo.
+[worktree-collision-check] WARNING — outro agente (Claude ou Codex) está operando no mesmo git repo.
 
-Detected $((${#collisions[@]})) other Claude process(es) sharing this .git:
+Detected $((${#collisions[@]})) other agent process(es) — Claude ou Codex — sharing this .git:
 EOF
 
 for entry in "${collisions[@]}"; do
