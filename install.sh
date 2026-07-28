@@ -627,6 +627,7 @@ FRAMEWORK_FILES=(
   ".agents/personas/coder.md"
   ".agents/personas/reviewer.md"
   ".agents/personas/contextualizer.md"
+  ".agents/personas/investigator.md"
   ".agents/skills/context-maintenance/SKILL.md"
   ".agents/skills/context-maintenance/references/evaluate-repo-pipeline.md"
   ".agents/skills/context-maintenance/references/examples.md"
@@ -650,8 +651,7 @@ FRAMEWORK_FILES=(
   ".agents/hooks/require-tests-for-pr.sh"
   ".agents/hooks/screenshot-guard.sh"
   ".agents/hooks/session-save.sh"
-  ".agents/hooks/session-load.sh"
-  ".agents/hooks/pre-compact-save.sh"
+    ".agents/hooks/pre-compact-save.sh"
   ".agents/hooks/session-start.sh"
   ".agents/hooks/validation-mark.sh"
   ".agents/hooks/validation-clear.sh"
@@ -996,12 +996,6 @@ setup_hooks() {
   install_hook ".agents/hooks/worktree-collision-check.sh" "SessionStart" 3
   install_hook ".agents/hooks/pre-commit-branch-check.sh"  "PreToolUse"   3  "Bash"
   install_hook ".agents/hooks/pre-claim-grep.sh"           "PreToolUse"   3  "Write"
-  # session-load.sh is a utility script, not a hook — it's called manually or via CLAUDE.md
-  if [ -f ".agents/hooks/session-load.sh" ]; then
-    cp ".agents/hooks/session-load.sh" "$HOME/.claude/hooks/session-load.sh"
-    chmod +x "$HOME/.claude/hooks/session-load.sh"
-    ok "Installed: $HOME/.claude/hooks/session-load.sh (utility — run manually with: bash ~/.claude/hooks/session-load.sh)"
-  fi
 
   # Git pre-push gate — costura runtime-agnóstica (vale para Claude, Codex
   # direto e push manual). Shim regenerável identificado pelo marker.

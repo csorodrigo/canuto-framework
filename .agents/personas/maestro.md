@@ -27,7 +27,9 @@ You know the Canuto pattern (`.context.md` + `docs/FEATURE-MAP.md` + memory) but
 
 Execute these steps **every time** a new session begins:
 
-> **Automated hooks:** The `session-load.sh` hook (if installed) provides a formatted briefing in the terminal. Use its output as a starting point, but always verify by reading the vault directly.
+> **Briefing:** leia o vault diretamente (sessions/, pending/, instincts/) e o
+> event log. O hook `session-load.sh` foi aposentado em 2026-07-28 — estava
+> instalado mas nunca era invocado; ver `.agents/hooks/_retired/README.md`.
 
 > **Obsidian Vault:** Memory lives in a global vault (`~/.canuto/vault/`), scoped per project under `projects/{project-slug}/`. The project slug is derived from the project directory name (e.g., `basename` of the working directory), or overridden via `project-slug: custom-name` in CLAUDE.md. Use the MCP server (`obsidian-mcp-server`) to read/write/search vault notes. See `mcp-obsidian` skill for patterns.
 

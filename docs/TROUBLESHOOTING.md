@@ -39,7 +39,6 @@ Guia de solução de problemas comuns.
 |----------|-------|---------|
 | Dois projetos com mesmo slug | `basename` do diretório é igual (ex: dois `app/`) | Adicione `project-slug: nome-unico` no CLAUDE.md de cada projeto |
 | Vault mistura dados de projetos | Slug conflitante | Use override de slug (veja acima) |
-| `session-load.sh` carrega projeto errado | Diretório de trabalho não é o root do projeto | Defina `CLAUDE_PROJECT_DIR` ou rode do root |
 
 ### Configurar slug personalizado
 
@@ -57,7 +56,6 @@ O Maestro e os hooks respeitam esse override em vez de usar `basename`.
 | Problema | Causa | Solução |
 |----------|-------|---------|
 | Hooks não rodam | Hooks não instalados em `~/.claude/hooks/` | Rode `bash install.sh --update` para reinstalar |
-| "session-load.sh: command not found" | Path errado na config de hooks | Verifique `~/.claude/settings.json` — o path deve apontar para `.agents/hooks/session-load.sh` |
 | Hook roda mas não mostra output | Output está sendo capturado/suprimido | Verifique se o hook usa `echo` (stdout) e não `>&2` (stderr) |
 
 ## Problemas com Bases (Obsidian)
@@ -95,5 +93,4 @@ ls ~/.canuto/vault/projects/
 ls -la ~/.claude/hooks/
 
 # Testar syntax dos hooks
-bash -n .agents/hooks/session-load.sh && echo "OK"
 ```

@@ -5,3 +5,11 @@
 - `cleanup-tmp.sh`, `validate-config.sh` (2026-07-26): zero referências em
   settings-snippet.json, hooks/install.sh, FRAMEWORK_FILES, CI e demais
   arquivos — nunca tiveram caminho de disparo.
+
+- `session-load.sh` (2026-07-28): instalado, validado pelo health-check e citado
+  em três documentos — mas **registrado em evento nenhum e chamado por ninguém**.
+  Só a metade que grava (`session-save.sh`, no `Stop`) funcionava; a que carrega
+  nunca rodou. Ficou seis meses assim sem ninguém sentir falta: o briefing de
+  sessão do CLAUDE.md já faz a mesma função de forma seletiva. Manter um hook
+  instalado e documentado que nunca executa é pior que qualquer decisão — parece
+  uma rede de segurança que não existe.

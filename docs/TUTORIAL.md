@@ -96,7 +96,6 @@ Depois de instalar e abrir o projeto no Claude/Codex com o framework carregado, 
 | Chamar slash commands | `/office-hours`, `/qa`, `/review` |
 | Chamar uma skill especifica | `"use a skill health-check"`, `"use a skill research"` |
 | Instalar skills opcionais | `bash install.sh --skill adr --skill session-goals` |
-| Recarregar contexto manualmente | `bash ~/.claude/hooks/session-load.sh` |
 
 ## Bootstrap de contexto e handoff persistido
 
@@ -136,7 +135,6 @@ bash .agents/tools/vault-sync.sh
 | `screenshot-guard.sh` | `PreToolUse: mcp__playwright__browser_take_screenshot\|mcp__claude-in-chrome__computer` | Limita screenshots inline em base64; prefira `filename` ou snapshot textual |
 | `session-save.sh` | `Stop` | Salva snapshot de sessao |
 | `pre-compact-save.sh` | `Notification` | Salva contexto antes da compactacao |
-| `session-load.sh` | manual | Recarrega contexto da sessao quando voce chamar explicitamente |
 
 ## 1. Iniciando uma Sessao
 

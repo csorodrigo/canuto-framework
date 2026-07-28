@@ -75,6 +75,20 @@ case "$EFFORT" in
   *) echo "effort inválido: $EFFORT (low|medium|high|xhigh|max)" >&2; exit 65 ;;
 esac
 
+# Event log do PROJETO — o delegate-metrics.jsonl mora em $HOME e é por máquina,
+# então divergência entre models.yaml e execução real só aparecia em arqueologia
+# de PR (papiro#339 registrou "effort medium" com o yaml pedindo xhigh). Gravar
+# modelo/effort no evento DELEGATION torna isso um `jq` no log do projeto.
+if [ -f "$(dirname "${BASH_SOURCE[0]}")/event-log.sh" ]; then
+  # shellcheck source=event-log.sh
+  . "$(dirname "${BASH_SOURCE[0]}")/event-log.sh"
+elif [ -f "$PROJECT_DIR/.agents/tools/event-log.sh" ]; then
+  # shellcheck source=/dev/null
+  . "$PROJECT_DIR/.agents/tools/event-log.sh"
+else
+  canuto_event_append() { return 0; }
+fi
+
 METRICS="$HOME/.codex/delegate-metrics.jsonl"
 mkdir -p "$HOME/.codex" "$(dirname "$OUT")" 2>/dev/null || true
 EXEC_LOG="$OUT.exec.log"
@@ -94,6 +108,12 @@ emit_metric() {
     printf '{"ts":"%s","role":"%s","model":"%s","effort":"%s","sandbox":"%s","timeout":%s,"rc":%s,"result":"%s","bytes":%s,"duration":%s,"reason":"%s"}\n' \
       "$ts" "$ROLE" "$MODEL" "$EFFORT" "$SANDBOX" "$TIMEOUT_S" "$1" "$2" "$3" "$4" "$5" >> "$METRICS" 2>/dev/null || true
   fi
+
+  # Mesma informação no event log do projeto: é lá que a auditoria olha, e o
+  # que importa é a CONFIGURAÇÃO REALMENTE USADA, não a declarada no yaml.
+  canuto_event_append DELEGATION actor=codex-delegate role="$ROLE" \
+    model="$MODEL" effort="$EFFORT" sandbox="$SANDBOX" \
+    verdict="$2" rc="$1" duration="$4" out="$OUT" || true
 }
 
 # ── Pré-flight de auth (falha rápida em vez de queimar o timeout) ────────────

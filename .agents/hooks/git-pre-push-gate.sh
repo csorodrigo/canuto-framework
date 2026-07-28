@@ -36,6 +36,8 @@ ZERO="0000000000000000000000000000000000000000"
 new_branch=0
 main_push=0
 
+pushed_sha=""
+
 while read -r _local_ref local_sha remote_ref remote_sha; do
   [ -z "${remote_ref:-}" ] && continue
   # Deleção de branch remoto (local_sha zerado) nunca é gated.
@@ -44,14 +46,20 @@ while read -r _local_ref local_sha remote_ref remote_sha; do
     refs/heads/main|refs/heads/master) main_push=1 ;;
   esac
   [ "$remote_sha" = "$ZERO" ] && new_branch=1
+  pushed_sha="$local_sha"
 done
+
+# O sha entra no evento para que o gate de PR possa exigir prova de que ESTE
+# commit passou pelo pre-push (CANUTO_REQUIRE_PREPUSH=1). Sem o sha, um evento
+# GATE antigo de qualquer push serviria de álibi para um `--no-verify` novo.
+export CANUTO_EVENT_SHA="$pushed_sha"
 
 if [ "$main_push" = "1" ]; then
   if [ "${CANUTO_ALLOW_MAIN_PUSH:-0}" = "1" ]; then
-    canuto_event_append GATE actor=git-hook gate=main-push verdict=skipped via=pre-push || true
+    canuto_event_append GATE actor=git-hook gate=main-push verdict=skipped via=pre-push sha="$pushed_sha" || true
     echo "[canuto pre-push] push para main LIBERADO por CANUTO_ALLOW_MAIN_PUSH=1 (registrado no event log)." >&2
   else
-    canuto_event_append GATE actor=git-hook gate=main-push verdict=blocked via=pre-push || true
+    canuto_event_append GATE actor=git-hook gate=main-push verdict=blocked via=pre-push sha="$pushed_sha" || true
     echo "" >&2
     echo "✋ [canuto pre-push] Push direto para main bloqueado — regra da casa: feature branch + PR." >&2
     echo "   Urgência consciente: CANUTO_ALLOW_MAIN_PUSH=1 git push ... (fica registrado no event log)" >&2
@@ -61,7 +69,7 @@ fi
 
 if [ "$new_branch" = "1" ]; then
   if [ "${CANUTO_SKIP_PR_GATE:-0}" = "1" ]; then
-    canuto_event_append GATE actor=git-hook gate=pr-tests verdict=skipped via=pre-push || true
+    canuto_event_append GATE actor=git-hook gate=pr-tests verdict=skipped via=pre-push sha="$pushed_sha" || true
     echo "[canuto pre-push] gate de testes PULADO por CANUTO_SKIP_PR_GATE=1 (registrado no event log)." >&2
     exit 0
   fi
@@ -70,8 +78,10 @@ if [ "$new_branch" = "1" ]; then
     if ! CANUTO_GATE_VIA=pre-push bash "$HOOKS_DIR/require-tests-for-pr.sh"; then
       echo "✋ [canuto pre-push] Testes falhando — push bloqueado." >&2
       echo "   Escape consciente: CANUTO_SKIP_PR_GATE=1 git push ... (fica registrado no event log)" >&2
+      canuto_event_append GATE actor=git-hook gate=pr-tests verdict=fail via=pre-push sha="$pushed_sha" || true
       exit 1
     fi
+    canuto_event_append GATE actor=git-hook gate=pr-tests verdict=pass via=pre-push sha="$pushed_sha" || true
   fi
 fi
 

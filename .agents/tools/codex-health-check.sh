@@ -317,7 +317,7 @@ if [ "$MODE" = "full" ]; then
     fail "cannot inspect ~/.claude/settings.json"
   fi
 
-  for hook_file in codex-pretool-guard.sh screenshot-guard.sh session-save.sh session-load.sh pre-compact-save.sh; do
+  for hook_file in codex-pretool-guard.sh screenshot-guard.sh session-save.sh pre-compact-save.sh; do
     if [ -x "$HOME/.claude/hooks/$hook_file" ]; then
       pass "installed hook executable: $hook_file"
     else

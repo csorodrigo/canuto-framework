@@ -33,6 +33,7 @@ Decisões completas (com alternativas rejeitadas e porquê): [`docs/adr/`](docs/
     coder.md            — Implementer. Writes code + tests following the Architect's plan.
     reviewer.md         — Quality gate. Reviews code + generates PR descriptions.
     contextualizer.md   — Knowledge engine. Scans code and maintains context files.
+    investigator.md     — Causa raiz antes do fix. Fase read-only obrigatória; entrega diagnóstico, não correção.
     _archive/           — tester.md e debugger.md (aposentados 2026-06-11: /test e /fix cobrem os fluxos).
   skills/
     context-maintenance/
@@ -73,7 +74,6 @@ Decisões completas (com alternativas rejeitadas e porquê): [`docs/adr/`](docs/
     setup.md            — Setup guide for Obsidian + MCP integration.
   hooks/
     session-save.sh          — Auto-backup vault on Stop + gate de CLOSEOUT (avisa se o dia fechou sem evento).
-    session-load.sh          — Load session context on start.
     pre-compact-save.sh      — Save context before token compaction.
     pre-pr-bash-gate.sh      — PreToolUse: intercepta `gh pr create` e roda os testes antes (fail-closed).
     postdelegate-verify.sh   — PostToolUse: verifica artefato de toda delegação Codex (existe/não-vazio/recente).

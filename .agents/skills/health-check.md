@@ -99,7 +99,6 @@ Detect broken or missing framework components before they silently degrade sessi
 - [ ] `~/.claude/hooks/codex-pretool-guard.sh` exists and is executable.
 - [ ] `~/.claude/hooks/screenshot-guard.sh` exists and is executable.
 - [ ] `~/.claude/hooks/session-save.sh` exists and is executable.
-- [ ] `~/.claude/hooks/session-load.sh` exists and is executable.
 - [ ] `~/.claude/hooks/pre-compact-save.sh` exists and is executable.
 
 ### Codex Integration (v2.0, 2026-04-29 — CLI-only)

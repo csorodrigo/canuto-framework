@@ -10,7 +10,7 @@ Use this when the framework reports offline writes or when hooks tell you there 
 ## When to Use
 
 - `.agents/.cache/pending-sync/` contains `.md` files
-- `session-save.sh` or `session-load.sh` tells you to run `/vault-sync`
+- `session-save.sh` tells you to run `/vault-sync`
 - Obsidian crashed, MCP was unavailable, or the session completed in legacy-memory compatibility mode
 
 ## Command
