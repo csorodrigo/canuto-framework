@@ -112,6 +112,21 @@ require_prepush_evidence() {
   head_sha=$(git -C "$PROJECT_DIR" rev-parse HEAD 2>/dev/null || echo "")
   [ -n "$head_sha" ] || return 0
 
+  # Nada local a provar: se o HEAD já é ancestral do branch padrão remoto, ele
+  # já está publicado — tipicamente um merge commit criado no GitHub, que nunca
+  # passou por um pre-push local e nunca vai passar. Exigir prova aqui bloquearia
+  # todo PR aberto logo após um `git pull`. A proteção existe para trabalho local
+  # não publicado, que é onde o `--no-verify` faz estrago.
+  local default_ref
+  for default_ref in origin/HEAD origin/main origin/master; do
+    if git -C "$PROJECT_DIR" rev-parse --verify --quiet "$default_ref" >/dev/null 2>&1; then
+      if git -C "$PROJECT_DIR" merge-base --is-ancestor "$head_sha" "$default_ref" 2>/dev/null; then
+        return 0
+      fi
+      break
+    fi
+  done
+
   if ! command -v canuto_event_log_path >/dev/null 2>&1; then
     echo "[require-tests-for-pr] CANUTO_REQUIRE_PREPUSH=1 mas o event log não está disponível — não dá para provar o pre-push." >&2
     return 1
