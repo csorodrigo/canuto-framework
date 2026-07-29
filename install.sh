@@ -694,6 +694,7 @@ FRAMEWORK_FILES=(
   ".agents/mcp/codex-collab.md"
   ".agents/tools/vault-bridge.sh"
   ".agents/tools/canuto-memory.sh"
+  ".agents/tools/canuto-mcp.sh"
   ".agents/tools/codex-common.sh"
   ".agents/tools/codex-diff-context.sh"
   ".agents/tools/codex-context-package.sh"
