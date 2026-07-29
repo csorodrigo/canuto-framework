@@ -23,7 +23,10 @@ emit_hook_otel() {
   } || true
 }
 
-INPUT=$(cat)
+# Sem payload num TTY: `cat` sem stdin fechado bloqueia para sempre e o
+# runtime que espera o hook congela junto (regra de TTY/pipe do CLAUDE.md).
+INPUT=""
+[ -t 0 ] || INPUT=$(cat)
 stop_active=$(echo "$INPUT" | jq -r '.stop_hook_active // false' 2>/dev/null); [ "$stop_active" = "true" ] && { emit_hook_otel "success"; exit 0; }
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"

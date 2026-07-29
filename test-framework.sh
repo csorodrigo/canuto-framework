@@ -778,6 +778,96 @@ fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════
+echo "── Test 13: Hooks não bloqueiam em stdin de TTY ──"
+# CLAUDE.md manda testar todo script com TTY e com stdin piped, mas nada
+# verificava isso mecanicamente. O custo do esquecimento é caro e mudo: um hook
+# que lê stdin sem guarda fica preso PARA SEMPRE quando stdin é um terminal, e o
+# runtime que espera o hook trava junto — sem log, sem erro, com cara de
+# deadlock. Foi o que segurava a abertura do Codex CLI.
+#
+# A checagem é ESTÁTICA de propósito. A versão que executava cada hook num pty
+# real achou o bug, mas se auto-envenena: require-tests-for-pr.sh roda
+# test-framework.sh, que rodaria o probe, que rodaria o gate de novo — recursão
+# infinita. O probe dinâmico vive separado em .agents/tests/tty-block-probe.sh.
+if command -v python3 >/dev/null 2>&1; then
+  TTY_UNGUARDED=$(python3 - "$AGENTS_DIR/hooks" <<'PYEOF'
+import os, re, sys, glob
+
+# Construções que consomem stdin quando nenhuma origem é dada:
+#   $(cat) / $(cat 2>/dev/null)  — sem nome de arquivo
+#   =$(jq ...)                   — jq sem operando de arquivo também lê stdin
+#   while [IFS=] read ... done   — SÓ quando o `done` não traz redirecionamento
+CAT_RX = re.compile(r'\$\(\s*cat\s*(?:2>[^\s)]+\s*)*(?:\|\|[^)]*)?\)')
+JQ_RX  = re.compile(r'=\$\(\s*jq\b(?![^)]*\$[A-Za-z_])[^)]*\)')
+WHILE_RX = re.compile(r'^\s*while\b.*\bread\b')
+OPEN_RX  = re.compile(r'(^|\s|;)do\s*$')
+DONE_RX  = re.compile(r'^\s*done\b')
+
+def unredirected_while(lines):
+    """Laço while-read cujo `done` não é alimentado por `< arquivo` ou `< <(...)`."""
+    for i, line in enumerate(lines):
+        if not WHILE_RX.search(line):
+            continue
+        depth = 0
+        for j in range(i, len(lines)):
+            if OPEN_RX.search(lines[j]):
+                depth += 1
+            if DONE_RX.search(lines[j]):
+                depth -= 1
+                if depth <= 0:
+                    if "<" not in lines[j]:
+                        return True
+                    break
+    return False
+
+bad = []
+for hook in sorted(glob.glob(os.path.join(sys.argv[1], "*.sh"))):
+    name = os.path.basename(hook)
+    if name == "install.sh":
+        continue  # instalador, não hook de runtime
+    text = open(hook, encoding="utf-8", errors="replace").read()
+    if "-t 0" in text:
+        continue
+    if CAT_RX.search(text) or JQ_RX.search(text) or unredirected_while(text.splitlines()):
+        bad.append(name)
+print(" ".join(bad))
+PYEOF
+  )
+  if [ -z "$TTY_UNGUARDED" ]; then
+    pass "todo hook que lê stdin tem guarda de TTY"
+  else
+    fail "hooks leem stdin sem guarda '-t 0' (travam em TTY): $TTY_UNGUARDED"
+  fi
+else
+  warn "python3 ausente — checagem de guarda de TTY pulada"
+fi
+
+# 13b. Timeout precisa existir de fato onde um filho pode travar.
+# macOS não traz GNU `timeout`; sem o ramo gtimeout o limite vira decorativo.
+for TIMEOUT_USER in "$AGENTS_DIR/tools/codex-common.sh" "$AGENTS_DIR/tools/heartbeat-run.sh"; do
+  if [ -f "$TIMEOUT_USER" ]; then
+    if grep -q "gtimeout" "$TIMEOUT_USER"; then
+      pass "$(basename "$TIMEOUT_USER"): tem fallback gtimeout (macOS)"
+    else
+      fail "$(basename "$TIMEOUT_USER"): usa timeout sem fallback gtimeout — vira no-op no macOS"
+    fi
+  fi
+done
+
+# 13c. O health check do session-start precisa MATAR o filho no estouro.
+# A versão antiga usava `alarm` do perl e só saía do pai: o filho seguia vivo e
+# o close do pipe esperava por ele — 4s prometidos, 30s medidos.
+SS_HOOK="$AGENTS_DIR/hooks/session-start.sh"
+if [ -f "$SS_HOOK" ]; then
+  if grep -q 'kill("KILL", -\$pid)' "$SS_HOOK" || ! grep -q 'alarm' "$SS_HOOK"; then
+    pass "session-start.sh: timeout do health check mata o filho"
+  else
+    fail "session-start.sh: alarm sem kill — timeout decorativo, não limita nada"
+  fi
+fi
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════
 # SUMMARY
 # ═══════════════════════════════════════════════════════════════════════════
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

@@ -14,7 +14,10 @@
 
 set -uo pipefail
 
-INPUT=$(cat 2>/dev/null || true)
+# Sem payload num TTY: `cat` sem stdin fechado bloqueia para sempre e o
+# runtime que espera o hook congela junto (regra de TTY/pipe do CLAUDE.md).
+INPUT=""
+[ -t 0 ] || INPUT=$(cat 2>/dev/null || true)
 
 command -v jq >/dev/null 2>&1 || exit 0
 

@@ -14,7 +14,10 @@
 set -euo pipefail
 
 # ── Read notification from stdin ────────────────────────────────────────────
-NOTIFICATION=$(cat 2>/dev/null || echo "")
+# Sem payload num TTY: `cat` sem stdin fechado bloqueia para sempre e o
+# runtime que espera o hook congela junto (regra de TTY/pipe do CLAUDE.md).
+NOTIFICATION=""
+[ -t 0 ] || NOTIFICATION=$(cat 2>/dev/null || echo "")
 
 # Only act on compaction-related notifications
 if ! echo "$NOTIFICATION" | grep -Eqi "compact|context.*window|truncat" 2>/dev/null; then

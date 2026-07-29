@@ -27,7 +27,10 @@ else
   canuto_event_append() { return 0; }
 fi
 
-INPUT=$(cat 2>/dev/null || true)
+# Sem payload num TTY: `cat` sem stdin fechado bloqueia para sempre e o
+# runtime que espera o hook congela junto (regra de TTY/pipe do CLAUDE.md).
+INPUT=""
+[ -t 0 ] || INPUT=$(cat 2>/dev/null || true)
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 PROJECT_DIR="$(cd "$PROJECT_DIR" 2>/dev/null && pwd -P || pwd)"
 AUDIT_DIR="$PROJECT_DIR/.agents/vault/audit"

@@ -240,10 +240,33 @@ else
     codex mcp remove claude-architect >/dev/null 2>&1 || true
     codex mcp remove claude-reviewer  >/dev/null 2>&1 || true
   elif [ ! -x "$SCRIPTS_DIR/claude-architect.sh" ] || [ ! -x "$SCRIPTS_DIR/claude-reviewer.sh" ]; then
-    echo "   ⚠️  wrappers ausentes em $SCRIPTS_DIR — registro no Codex pulado."
+    # Registro apontando para wrapper que não existe é PIOR que não registrar:
+    # o Codex tenta subir o servidor a cada abertura, falha com "No such file or
+    # directory (os error 2)" e ainda paga a espera do startup. Sem wrapper,
+    # tira o registro.
+    echo "   ⚠️  wrappers ausentes em $SCRIPTS_DIR — removendo registro para não falhar no startup do Codex."
+    codex mcp remove claude-architect >/dev/null 2>&1 || true
+    codex mcp remove claude-reviewer  >/dev/null 2>&1 || true
   else
     _codex_mcp_refresh claude-architect -- "$SCRIPTS_DIR/claude-architect.sh"
     _codex_mcp_refresh claude-reviewer  -- "$SCRIPTS_DIR/claude-reviewer.sh"
+
+    # Verificação: reler o que ficou gravado e conferir que o comando existe em
+    # disco. `codex mcp add` retorna 0 sem validar o caminho, então "adicionou"
+    # não é o mesmo que "vai subir" — a única prova é ler de volta.
+    for _srv in claude-architect claude-reviewer; do
+      _cmd=$(codex mcp get "$_srv" --json 2>/dev/null | jq -r '.command // empty' 2>/dev/null || true)
+      if [ -z "$_cmd" ]; then
+        echo "   ⚠️  $_srv: registro não pôde ser lido de volta (codex mcp get)"
+      elif [ ! -x "$_cmd" ]; then
+        echo "   ❌ $_srv aponta para '$_cmd', que não existe/não é executável —"
+        echo "      é exatamente isso que vira 'MCP startup failed: No such file or directory'."
+        codex mcp remove "$_srv" >/dev/null 2>&1 || true
+        echo "      registro removido para o Codex parar de tentar no startup."
+      else
+        echo "   ✅ $_srv → $_cmd (verificado em disco)"
+      fi
+    done
   fi
 
   echo "   ℹ️  Verifique com: codex mcp list"

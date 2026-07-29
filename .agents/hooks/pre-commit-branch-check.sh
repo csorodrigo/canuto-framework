@@ -36,7 +36,10 @@ if [ "${CANUTO_SKIP_BRANCH_CHECK:-0}" = "1" ]; then
 fi
 
 # Read tool input from stdin (Claude Code hook contract)
-input=$(cat)
+# Sem payload num TTY: `cat` sem stdin fechado bloqueia para sempre e o
+# runtime que espera o hook congela junto (regra de TTY/pipe do CLAUDE.md).
+input=""
+[ -t 0 ] || input=$(cat)
 command=$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null) || command=""
 [ -n "$command" ] || exit 0
 

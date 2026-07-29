@@ -92,17 +92,32 @@ run_task() {
     echo "═══ heartbeat $task @ $(date -u +%Y-%m-%dT%H:%M:%SZ) ═══"
   } >> "$run_log"
 
+  # `timeout` é GNU e NÃO existe no macOS de fábrica: com coreutils do brew ele
+  # chega como `gtimeout`, sem coreutils não chega. Chamar direto fazia todo
+  # heartbeat morrer com rc=127 ("command not found") em Mac — falha silenciosa
+  # que se parece com "o heartbeat rodou e não achou nada".
+  local -a limit=()
+  if command -v timeout >/dev/null 2>&1; then
+    limit=(timeout "$timeout_s")
+  elif command -v gtimeout >/dev/null 2>&1; then
+    limit=(gtimeout "$timeout_s")
+  else
+    echo "[heartbeat] sem timeout/gtimeout — rodando sem limite de tempo" >> "$run_log"
+  fi
+
   # Single-shot, foreground, sem retry (lei do turno headless: nada em background)
   case "$cli" in
     codex)
       local out_file="$LOG_DIR/heartbeat-$task-last.md"
-      ( cd "$PROJECT_DIR" && timeout "$timeout_s" codex exec --color never \
+      # ${a[@]+"${a[@]}"}: no bash 3.2 do macOS, "${a[@]}" com array VAZIO e
+      # `set -u` aborta com "unbound variable". O idioma vale nas duas versões.
+      ( cd "$PROJECT_DIR" && ${limit[@]+"${limit[@]}"} codex exec --color never \
           --skip-git-repo-check --output-last-message "$out_file" \
           "$prompt" < /dev/null ) >> "$run_log" 2>&1
       rc=$?
       ;;
     claude|*)
-      ( cd "$PROJECT_DIR" && printf '%s' "$prompt" | timeout "$timeout_s" \
+      ( cd "$PROJECT_DIR" && printf '%s' "$prompt" | ${limit[@]+"${limit[@]}"} \
           claude -p --permission-mode "$perm" ) >> "$run_log" 2>&1
       rc=$?
       ;;

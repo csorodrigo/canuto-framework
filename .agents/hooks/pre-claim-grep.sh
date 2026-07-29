@@ -25,7 +25,10 @@ if [ "${CANUTO_SKIP_CLAIM_CHECK:-0}" = "1" ]; then
   exit 0
 fi
 
-INPUT=$(cat)
+# Sem payload num TTY: `cat` sem stdin fechado bloqueia para sempre e o
+# runtime que espera o hook congela junto (regra de TTY/pipe do CLAUDE.md).
+INPUT=""
+[ -t 0 ] || INPUT=$(cat)
 
 tool_name=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null) || tool_name=""
 file_path=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null) || file_path=""
