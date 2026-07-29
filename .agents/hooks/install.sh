@@ -268,3 +268,80 @@ if [ -f "$CODEX_HOOKS_JSON" ]; then
     echo "   ✅ ~/.codex/hooks.json: timeout de SessionEnd normalizado para ≤3s"
   fi
 fi
+
+# ── stop-hook-git-check.sh: ignora commits já publicados ────────────────────
+# Arquivo do harness (Claude Code remoto), não do framework — por isso é
+# REPARADO no lugar, nunca substituído: assim continua recebendo as atualizações
+# do harness e só a linha com o defeito muda.
+#
+# O defeito: o hook usa origin/<branch> como referência. Quando esse ref está
+# defasado — branch mergeada e a local resetada para main, ou clone --depth 1,
+# em que origin/<branch> não acompanha — o range "$upstream..HEAD" passa a
+# conter o MERGE COMMIT que o próprio GitHub criou. Ele tem committer
+# noreply@github.com e nunca poderá ser assinado por nós, então o hook manda
+# fazer `--amend --reset-author` num commit já publicado, o que reescreveria
+# história e faria a branch divergir do main.
+STOP_HOOK="$HOME/.claude/stop-hook-git-check.sh"
+if [ -f "$STOP_HOOK" ]; then
+  if grep -q "exclude_published" "$STOP_HOOK" 2>/dev/null; then
+    :  # já reparado
+  elif ! grep -q 'upstream\.\.HEAD' "$STOP_HOOK" 2>/dev/null; then
+    :  # versão do harness que não conhecemos — não mexer
+  elif ! command -v python3 >/dev/null 2>&1; then
+    echo "   ⚠️  ~/.claude/stop-hook-git-check.sh tem o bug de commit publicado, mas python3 não está disponível para reparar."
+  else
+    cp "$STOP_HOOK" "$STOP_HOOK.bak.$(date +%s)"
+    if python3 - "$STOP_HOOK" <<'PATCH_STOP_HOOK'
+import re, sys
+path = sys.argv[1]
+src = open(path).read()
+
+block = '''
+  # Commits já publicados no branch padrão remoto não são trabalho local: quando
+  # o ref remoto do branch está defasado (branch mergeada e a local resetada para
+  # main, ou clone --depth 1 cujo origin/<branch> não acompanha), o range
+  # "$upstream..HEAD" passa a incluir o MERGE COMMIT que o próprio GitHub criou.
+  # Ele tem committer noreply@github.com e nunca poderá ser assinado por nós —
+  # seguir a instrução de --amend --reset-author reescreveria história publicada.
+  # (reparo do Canuto Framework — ver .agents/hooks/install.sh)
+  published_ref=""
+  for candidate in origin/HEAD origin/main origin/master; do
+    if git rev-parse --verify --quiet "$candidate" >/dev/null 2>&1; then
+      published_ref="$candidate"
+      break
+    fi
+  done
+  exclude_published=()
+  if [[ -n "$published_ref" ]]; then
+    exclude_published=(--not "$published_ref")
+  fi
+'''
+
+# Insere o bloco logo após a resolução do upstream.
+anchor = re.search(r'^\s*upstream="origin/HEAD"\n\s*fi\n', src, re.M)
+if not anchor:
+    sys.exit(1)
+src = src[:anchor.end()] + block + src[anchor.end():]
+
+# Aplica a exclusão nas duas checagens que usam o range.
+before = src
+src = src.replace('"$upstream..HEAD" 2>/dev/null', '"$upstream..HEAD" "${exclude_published[@]}" 2>/dev/null')
+src = src.replace('"$upstream..HEAD" --count 2>/dev/null', '"$upstream..HEAD" "${exclude_published[@]}" --count 2>/dev/null')
+if src == before:
+    sys.exit(1)
+
+open(path, 'w').write(src)
+PATCH_STOP_HOOK
+    then
+      if bash -n "$STOP_HOOK" 2>/dev/null; then
+        echo "   ✅ ~/.claude/stop-hook-git-check.sh: commits já publicados deixam de ser sinalizados"
+      else
+        cp "$(ls -t "$STOP_HOOK".bak.* | head -1)" "$STOP_HOOK"
+        echo "   ⚠️  reparo do stop-hook gerou script inválido — revertido, nada foi alterado."
+      fi
+    else
+      cp "$(ls -t "$STOP_HOOK".bak.* | head -1)" "$STOP_HOOK"
+      echo "   ⚠️  stop-hook-git-check.sh em formato inesperado — reparo pulado (backup restaurado)."
+    fi
+  fi
+fi
