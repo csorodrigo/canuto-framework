@@ -251,13 +251,38 @@ else
     _codex_mcp_refresh claude-architect -- "$SCRIPTS_DIR/claude-architect.sh"
     _codex_mcp_refresh claude-reviewer  -- "$SCRIPTS_DIR/claude-reviewer.sh"
 
-    # Verificação: reler o que ficou gravado e conferir que o comando existe em
-    # disco. `codex mcp add` retorna 0 sem validar o caminho, então "adicionou"
-    # não é o mesmo que "vai subir" — a única prova é ler de volta.
+    # Verificação: reler o registro e conferir que o comando existe em disco.
+    # `codex mcp add` retorna 0 sem validar o caminho, então "adicionou" não é
+    # o mesmo que "vai subir".
+    #
+    # A leitura de volta é BEST-EFFORT, e isso é deliberado. O formato de saída
+    # do `codex mcp get` varia entre versões do codex-cli — assumir `--json` com
+    # `.command` no topo produziu "registro não pôde ser lido de volta" logo
+    # depois de um "Added global MCP server" bem-sucedido: alarme falso que
+    # parecia defeito e não era. Aqui tentamos algumas formas e, se nenhuma
+    # servir, dizemos que não deu para verificar em vez de acusar erro.
+    #
+    # O risco coberto pela leitura já está coberto antes: só chegamos aqui com
+    # o wrapper confirmado executável, e registramos com exatamente esse caminho.
+    _mcp_registered_cmd() {
+      local srv="$1" out=""
+      out=$(codex mcp get "$srv" --json 2>/dev/null | jq -r '
+        [.. | objects | .command? // empty] | map(select(type=="string")) | first // empty
+      ' 2>/dev/null) || true
+      [ -n "$out" ] && { printf '%s' "$out"; return 0; }
+      out=$(codex mcp list --json 2>/dev/null | jq -r --arg s "$srv" '
+        [.. | objects | select((.name? // empty) == $s) | .command? // empty] | first // empty
+      ' 2>/dev/null) || true
+      [ -n "$out" ] && { printf '%s' "$out"; return 0; }
+      # Última tentativa: saída em texto, pescando um caminho plausível.
+      codex mcp get "$srv" 2>/dev/null | grep -oE '(/|~)[^[:space:]"]*claude-(architect|reviewer)\.sh' | head -1
+    }
+
     for _srv in claude-architect claude-reviewer; do
-      _cmd=$(codex mcp get "$_srv" --json 2>/dev/null | jq -r '.command // empty' 2>/dev/null || true)
+      _cmd=$(_mcp_registered_cmd "$_srv")
+      _cmd="${_cmd/#\~/$HOME}"
       if [ -z "$_cmd" ]; then
-        echo "   ⚠️  $_srv: registro não pôde ser lido de volta (codex mcp get)"
+        echo "   ℹ️  $_srv registrado (esta versão do codex não expõe o caminho para conferência)"
       elif [ ! -x "$_cmd" ]; then
         echo "   ❌ $_srv aponta para '$_cmd', que não existe/não é executável —"
         echo "      é exatamente isso que vira 'MCP startup failed: No such file or directory'."
