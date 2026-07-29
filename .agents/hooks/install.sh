@@ -31,11 +31,55 @@ mkdir -p "$HOOKS_DIR"
 # plan-review.sh retired 2026-06-11 (0 firings in the 200-session audit) — see _retired/.
 for hook in codex-pretool-guard.sh session-save.sh pre-compact-save.sh protect-files.sh require-tests-for-pr.sh log-commands.sh session-start.sh validation-mark.sh validation-clear.sh retry-detect.sh fingerprint-gate.sh pre-finalize.sh posttooluse-universal.sh pre-commit-branch-check.sh worktree-collision-check.sh pre-claim-grep.sh screenshot-guard.sh pre-pr-bash-gate.sh postdelegate-verify.sh; do
   if [ -f "$SCRIPT_DIR/$hook" ]; then
+    # Guarda a versão anterior antes de sobrescrever: se a nova cópia não
+    # parsear, dá para voltar.
+    prev=""
+    if [ -f "$HOOKS_DIR/$hook" ]; then
+      prev="$HOOKS_DIR/$hook.prev.$$"
+      cp "$HOOKS_DIR/$hook" "$prev" 2>/dev/null || prev=""
+    fi
+
     cp "$SCRIPT_DIR/$hook" "$HOOKS_DIR/$hook"
     chmod +x "$HOOKS_DIR/$hook"
-    echo "   ✅ $hook"
+
+    # Verifica o DESTINO. Hook que não parseia dispara erro a cada invocação —
+    # e posttooluse-universal.sh tem matcher ".*", ou seja, todo comando da
+    # sessão. Visto em campo com o arquivo do repo íntegro: a cópia chegou
+    # corrompida. A causa exata não importa aqui; o que importa é não deixar
+    # em pé.
+    if bash -n "$HOOKS_DIR/$hook" 2>/dev/null; then
+      echo "   ✅ $hook"
+      rm -f "$prev" 2>/dev/null || true
+    else
+      echo "   ❌ $hook: a cópia instalada não parseia (bash -n falhou)"
+      bash -n "$HOOKS_DIR/$hook" 2>&1 | head -3 | sed 's/^/         /'
+      if [ -n "$prev" ] && bash -n "$prev" 2>/dev/null; then
+        mv "$prev" "$HOOKS_DIR/$hook"; chmod +x "$HOOKS_DIR/$hook"
+        echo "      versão anterior íntegra restaurada"
+      else
+        rm -f "$HOOKS_DIR/$hook"
+        echo "      removido — melhor sem hook que com hook quebrado em todo comando"
+      fi
+      rm -f "$prev" 2>/dev/null || true
+    fi
   fi
 done
+
+# Rede de segurança: hooks instalados em rodadas ANTERIORES podem ter corrompido
+# depois. Varre tudo que está em ~/.claude/hooks/, não só o que acabou de ser
+# copiado — foi exatamente assim que o posttooluse-universal.sh quebrado passou
+# despercebido, disparando em toda a sessão sem ninguém reinstalar.
+BROKEN_HOOKS=""
+for installed in "$HOOKS_DIR"/*.sh; do
+  [ -f "$installed" ] || continue
+  bash -n "$installed" 2>/dev/null || BROKEN_HOOKS="$BROKEN_HOOKS $(basename "$installed")"
+done
+if [ -n "$BROKEN_HOOKS" ]; then
+  echo ""
+  echo "   ⚠️  hooks já instalados que NÃO parseiam:$BROKEN_HOOKS"
+  echo "      Cada um deles falha a cada invocação. Se vieram do framework, o"
+  echo "      passo acima já os substituiu; se persistirem, são locais."
+fi
 
 echo ""
 echo "🧠 Instalando libs compartilhadas do Codex em ~/.claude/scripts/..."
