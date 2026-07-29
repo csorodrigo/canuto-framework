@@ -37,6 +37,18 @@ run_typecheck() {
   return 0
 }
 
+# Runner ausente ≠ teste falhando. Num clone fresco sem `npm install`, o script
+# de teste morre com "vitest: not found" (rc 127) e o gate bloqueava o push com
+# a mensagem "Tests are failing" — falso positivo que trava trabalho legítimo e,
+# pior, ensina a usar o escape por reflexo. Só a ausência da FERRAMENTA é
+# tolerada; teste que roda e falha continua bloqueando.
+runner_missing() {
+  local rc="$1" output="$2"
+  [ "$rc" -eq 127 ] && return 0
+  printf '%s' "$output" | grep -qiE '(command )?not found|No such file or directory|Missing script' && return 0
+  return 1
+}
+
 run_tests() {
   if [[ -f "$PROJECT_DIR/test-framework.sh" ]]; then
     bash "$PROJECT_DIR/test-framework.sh" 2>&1 | tail -20
@@ -114,16 +126,33 @@ require_prepush_evidence() {
   return 1
 }
 
-if ! run_tests; then
-  canuto_event_append GATE actor=hook gate=pr-tests verdict=fail via="$GATE_VIA" || true
-  echo "Tests are failing. Fix all test failures before creating a PR." >&2
-  exit 2
+TEST_RC=0
+TEST_OUTPUT=$(run_tests 2>&1) || TEST_RC=$?
+printf '%s\n' "$TEST_OUTPUT" >&2
+if [ "$TEST_RC" -ne 0 ]; then
+  if runner_missing "$TEST_RC" "$TEST_OUTPUT"; then
+    canuto_event_append GATE actor=hook gate=pr-tests verdict=unavailable via="$GATE_VIA" reason=runner-missing || true
+    echo "[require-tests-for-pr] runner de teste indisponível (dependências não instaladas?) — gate não pôde rodar." >&2
+    echo "   Isto NÃO é aprovação: rode 'npm install' e valide antes de confiar no PR." >&2
+  else
+    canuto_event_append GATE actor=hook gate=pr-tests verdict=fail via="$GATE_VIA" || true
+    echo "Tests are failing. Fix all test failures before creating a PR." >&2
+    exit 2
+  fi
 fi
 
-if ! run_typecheck; then
-  canuto_event_append GATE actor=hook gate=pr-typecheck verdict=fail via="$GATE_VIA" || true
-  echo "Typecheck is failing. Suíte verde não prova compilação — corrija os erros de tipo antes de abrir o PR." >&2
-  exit 2
+TC_RC=0
+TC_OUTPUT=$(run_typecheck 2>&1) || TC_RC=$?
+printf '%s\n' "$TC_OUTPUT" >&2
+if [ "$TC_RC" -ne 0 ]; then
+  if runner_missing "$TC_RC" "$TC_OUTPUT"; then
+    canuto_event_append GATE actor=hook gate=pr-typecheck verdict=unavailable via="$GATE_VIA" reason=runner-missing || true
+    echo "[require-tests-for-pr] typecheck indisponível (dependências não instaladas?) — gate não pôde rodar." >&2
+  else
+    canuto_event_append GATE actor=hook gate=pr-typecheck verdict=fail via="$GATE_VIA" || true
+    echo "Typecheck is failing. Suíte verde não prova compilação — corrija os erros de tipo antes de abrir o PR." >&2
+    exit 2
+  fi
 fi
 
 if ! require_prepush_evidence; then
