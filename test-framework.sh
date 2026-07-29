@@ -953,6 +953,30 @@ PYEOF
   else
     fail "wrapper roda 'uvx --from <pacote> python' — herda o calendário de releases de terceiro:$BORROWED"
   fi
+
+  # 14c. O venv é otimização; não pode ser ponto único de falha.
+  # Os wrappers preferem o python do venv fixo porque ele tira ~1,1s de `uv` do
+  # arranque de cada servidor (medido num MacBook Air). Mas venv some: disco
+  # cheio, `rm -rf` distraído, upgrade de Python que invalida o venv. Sem a
+  # linha de reserva, qualquer um desses derruba a back-delegation inteira em
+  # vez de só deixá-la lenta — trocar disponibilidade por 1,1s é péssimo negócio.
+  # Comentário não é reserva. Estes wrappers EXPLICAM a reserva em prosa, então
+  # grep no arquivo inteiro passa mesmo com a linha executável removida — foi o
+  # que aconteceu na primeira versão desta checagem. Só linha de código conta.
+  NO_FALLBACK=""
+  for W in "$AGENTS_DIR/tools/claude-architect.sh" "$AGENTS_DIR/tools/claude-reviewer.sh"; do
+    [ -f "$W" ] || continue
+    W_CODE=$(grep -vE '^[[:space:]]*#' "$W" || true)
+    if printf '%s' "$W_CODE" | grep -q "mcp-venv" \
+       && ! printf '%s' "$W_CODE" | grep -qE 'uv[[:space:]]+run[[:space:]]+--script'; then
+      NO_FALLBACK="$NO_FALLBACK $(basename "$W")"
+    fi
+  done
+  if [ -z "$NO_FALLBACK" ]; then
+    pass "wrappers MCP degradam para 'uv run --script' se o venv sumir"
+  else
+    fail "wrapper depende só do venv, sem reserva — venv quebrado mata a back-delegation:$NO_FALLBACK"
+  fi
 fi
 echo ""
 

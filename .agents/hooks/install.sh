@@ -309,30 +309,127 @@ else
     #
     # `--help` exercita o import (topo do módulo roda antes do argparse) e sai
     # 0 sem subir servidor nem falar stdio. Import quebrado ⇒ rc≠0, aqui e agora.
-    _mcp_smoke() {
-      local script="$SCRIPTS_DIR/claude-agent-mcp.py" limit=""
+
+    MCP_SCRIPT="$SCRIPTS_DIR/claude-agent-mcp.py"
+    MCP_VENV="$SCRIPTS_DIR/.mcp-venv"
+    MCP_VENV_PY="$MCP_VENV/bin/python"
+    MCP_SPEC_MARK="$MCP_VENV/.canuto-spec"
+
+    _mcp_limit() {
       # ADR-0008: nada no caminho de instalação espera para sempre.
-      if   command -v timeout  >/dev/null 2>&1; then limit="timeout"
-      elif command -v gtimeout >/dev/null 2>&1; then limit="gtimeout"
-      fi
-      if [ -n "$limit" ]; then
-        "$limit" 120 uv run --script "$script" --help >/dev/null 2>&1
-      else
-        uv run --script "$script" --help >/dev/null 2>&1
+      if   command -v timeout  >/dev/null 2>&1; then printf 'timeout'
+      elif command -v gtimeout >/dev/null 2>&1; then printf 'gtimeout'
       fi
     }
 
-    echo "   ⏳ verificando se o servidor MCP sobe (resolve deps e testa o import)..."
-    if _mcp_smoke; then
-      echo "   ✅ claude-agent-mcp importa e roda — ambiente em cache"
-      _codex_mcp_refresh claude-architect -- "$SCRIPTS_DIR/claude-architect.sh"
-      _codex_mcp_refresh claude-reviewer  -- "$SCRIPTS_DIR/claude-reviewer.sh"
+    _mcp_run() {
+      local limit; limit=$(_mcp_limit)
+      if [ -n "$limit" ]; then "$limit" 180 "$@" >/dev/null 2>&1
+      else "$@" >/dev/null 2>&1; fi
+    }
+
+    # As deps vêm do cabeçalho PEP 723 do próprio script — fonte única. Duplicar
+    # a lista aqui é como o defeito de 2026-07-29 nasce de novo: dois lugares
+    # dizendo qual `mcp` usar, e um deles envelhecendo em silêncio.
+    _mcp_declared_spec() {
+      command -v python3 >/dev/null 2>&1 || return 1
+      python3 - "$MCP_SCRIPT" <<'PYEOF' 2>/dev/null
+import re, sys
+text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+m = re.search(r"^# /// script\s*$(.*?)^# ///\s*$", text, re.M | re.S)
+if not m:
+    raise SystemExit(1)
+body = "\n".join(l.lstrip("#").strip() for l in m.group(1).splitlines())
+at = re.search(r"dependencies\s*=\s*\[", body, re.S)
+if not at:
+    raise SystemExit(1)
+i, depth, quote = at.end(), 1, None
+while i < len(body) and depth:
+    c = body[i]
+    if quote:
+        if c == quote: quote = None
+    elif c in "\"'": quote = c
+    elif c == "[": depth += 1
+    elif c == "]": depth -= 1
+    i += 1
+if depth:
+    raise SystemExit(1)
+specs = re.findall(r"[\"']([^\"']+)[\"']", body[at.end():i - 1])
+if not specs:
+    raise SystemExit(1)
+print("\n".join(specs))
+PYEOF
+    }
+
+    # Venv fixo: tira a camada do `uv` do arranque do Codex. Medido num MacBook
+    # Air: `uv run --script` gasta ~1,1s SÓ no uv, antes de o Python começar —
+    # vezes dois servidores, em toda sessão. O que sobra (~2,6s do `import mcp`,
+    # que arrasta o pydantic) é preço da biblioteca e não muda de caminho.
+    #
+    # O venv é recriado quando a spec declarada muda. Sem essa comparação, um
+    # venv velho seguiria servindo a versão errada do `mcp` para sempre — que é
+    # exatamente a classe de defeito que o teto de versão fechou.
+    MCP_SPEC=$(_mcp_declared_spec || true)
+    if [ -z "$MCP_SPEC" ]; then
+      echo "   ℹ️  não consegui ler as deps do cabeçalho PEP 723 — pulando o venv (wrappers usam 'uv run --script', ~1,1s a mais por servidor)"
+    else
+      MCP_SPEC_NOW=$(printf '%s' "$MCP_SPEC" | tr '\n' ' ')
+      MCP_SPEC_OLD=$(cat "$MCP_SPEC_MARK" 2>/dev/null || true)
+      if [ ! -x "$MCP_VENV_PY" ] || [ "$MCP_SPEC_NOW" != "$MCP_SPEC_OLD" ]; then
+        echo "   ⏳ montando venv do MCP (arranque do Codex ~1,1s mais rápido por servidor)..."
+        rm -rf "$MCP_VENV"
+        # shellcheck disable=SC2086
+        if _mcp_run uv venv "$MCP_VENV" \
+           && _mcp_run uv pip install --python "$MCP_VENV_PY" $MCP_SPEC_NOW; then
+          printf '%s' "$MCP_SPEC_NOW" > "$MCP_SPEC_MARK"
+          echo "   ✅ venv pronto ($MCP_SPEC_NOW)"
+        else
+          echo "   ⚠️  venv falhou — wrappers caem no 'uv run --script' (mais lento, mas funciona)"
+          rm -rf "$MCP_VENV"
+        fi
+      else
+        echo "   ✅ venv do MCP já em dia ($MCP_SPEC_NOW)"
+      fi
+    fi
+
+    # Smoke test no MESMO caminho que o wrapper vai usar. Testar o `uv run` e
+    # rodar pelo venv seria provar uma coisa e usar outra.
+    if [ -x "$MCP_VENV_PY" ]; then
+      MCP_SMOKE_CMD=("$MCP_VENV_PY" "$MCP_SCRIPT" --help)
+      MCP_SMOKE_HINT="$MCP_VENV_PY $MCP_SCRIPT --help"
+    else
+      MCP_SMOKE_CMD=(uv run --script "$MCP_SCRIPT" --help)
+      MCP_SMOKE_HINT="uv run --script $MCP_SCRIPT --help"
+    fi
+
+    echo "   ⏳ verificando se o servidor MCP sobe (testa o import no caminho real)..."
+    if _mcp_run "${MCP_SMOKE_CMD[@]}"; then
+      echo "   ✅ claude-agent-mcp importa e roda"
+      # Estado declarado pelo usuário manda. Desligado de propósito via
+      # canuto-mcp.sh, não volta sozinho aqui — instalador que desfaz escolha
+      # do usuário é instalador que ninguém roda de novo.
+      MCP_STATE=on
+      if [ -f "$SCRIPTS_DIR/.mcp-enabled" ]; then
+        case "$(tr -d '[:space:]' < "$SCRIPTS_DIR/.mcp-enabled" 2>/dev/null)" in
+          off) MCP_STATE=off ;;
+        esac
+      fi
+      if [ "$MCP_STATE" = "off" ]; then
+        echo "   🔌 back-delegation desligada por você (.mcp-enabled=off) — não vou registrar."
+        echo "      Religue com: bash .agents/tools/canuto-mcp.sh on"
+        codex mcp remove claude-architect >/dev/null 2>&1 || true
+        codex mcp remove claude-reviewer  >/dev/null 2>&1 || true
+        CLAUDE_MCP_SKIPPED=1
+      else
+        _codex_mcp_refresh claude-architect -- "$SCRIPTS_DIR/claude-architect.sh"
+        _codex_mcp_refresh claude-reviewer  -- "$SCRIPTS_DIR/claude-reviewer.sh"
+      fi
     else
       # Registrar um servidor que não sobe é o pior dos mundos: o Codex tenta em
       # TODA abertura, falha, e ainda paga a espera. Melhor não registrar e
       # dizer por quê.
       echo "   ❌ claude-agent-mcp NÃO sobe — não vou registrar (registro que falha custa startup em toda sessão)."
-      echo "      Diagnóstico: uv run --script $SCRIPTS_DIR/claude-agent-mcp.py --help"
+      echo "      Diagnóstico: $MCP_SMOKE_HINT"
       echo "      Se for rede/PyPI fora, re-rode este script quando voltar."
       codex mcp remove claude-architect >/dev/null 2>&1 || true
       codex mcp remove claude-reviewer  >/dev/null 2>&1 || true
