@@ -950,8 +950,38 @@ setup_hooks() {
       return
     fi
 
+    # Verificar o DESTINO, não a origem. Um hook que não parseia dispara erro a
+    # cada invocação — e o posttooluse-universal tem matcher ".*", ou seja, todo
+    # comando da sessão. Visto em campo: "syntax error near unexpected token '('"
+    # repetido a sessão inteira, com o arquivo do repo íntegro. A cópia chegou
+    # corrompida na máquina; a causa exata não importa aqui, o que importa é o
+    # instalador não deixar isso em pé.
+    local prev_backup=""
+    if [ -f "$dst" ]; then
+      prev_backup="$dst.prev.$$"
+      cp "$dst" "$prev_backup" 2>/dev/null || prev_backup=""
+    fi
+
     cp "$src" "$dst"
     chmod +x "$dst"
+
+    if ! bash -n "$dst" 2>/dev/null; then
+      warn "$filename: a cópia em $dst NÃO parseia (bash -n falhou)."
+      bash -n "$dst" 2>&1 | head -3 | sed 's/^/      /'
+      if [ -n "$prev_backup" ] && bash -n "$prev_backup" 2>/dev/null; then
+        mv "$prev_backup" "$dst"; chmod +x "$dst"
+        warn "   versão anterior (íntegra) restaurada — re-rode o instalador."
+      else
+        # Sem versão boa para voltar: melhor hook ausente que hook que falha em
+        # todo comando. O registro no settings.json fica, e a próxima execução
+        # do instalador reinstala.
+        rm -f "$dst"
+        warn "   arquivo removido — melhor sem hook que com hook quebrado."
+      fi
+      rm -f "$prev_backup" 2>/dev/null || true
+      return
+    fi
+    rm -f "$prev_backup" 2>/dev/null || true
     ok "Installed: $dst"
 
     if grep -q "$filename" "$settings" 2>/dev/null; then
