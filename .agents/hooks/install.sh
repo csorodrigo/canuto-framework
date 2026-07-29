@@ -290,6 +290,78 @@ if [ -f "$CODEX_HOOKS_JSON" ]; then
     echo "$NORMALIZED" > "$CODEX_HOOKS_JSON"
     echo "   ✅ ~/.codex/hooks.json: timeout de SessionEnd normalizado para ≤3s"
   fi
+
+  # ── SessionStart do Codex: exige JSON na saída ────────────────────────────
+  # "SessionStart hook (failed) — hook returned invalid session start JSON
+  # output" acontece quando um hook do CLAUDE CODE é ligado no SessionStart do
+  # Codex. Os contratos são diferentes: o Claude aceita texto humano no stdout,
+  # o Codex exige JSON. O hook roda, imprime as linhas de briefing, e o Codex
+  # recusa — a cada abertura, pagando o tempo de execução para jogar fora.
+  #
+  # A checagem é empírica, não por nome de arquivo: roda o comando com payload
+  # vazio e vê se o stdout parseia. Assim vale para qualquer hook ligado ali,
+  # inclusive os que o usuário escreveu.
+  _codex_sessionstart_cmds() {
+    jq -r '
+      [ (.SessionStart? // empty), (.hooks?.SessionStart? // empty) ]
+      | flatten | .[]? | (.hooks? // [.]) | flatten | .[]?
+      | (.command? // empty)
+      | if type == "array" then join(" ") else tostring end
+    ' "$CODEX_HOOKS_JSON" 2>/dev/null | sed '/^$/d'
+  }
+
+  # Com limite de tempo: este teste EXECUTA hook de terceiro. Um hook que trava
+  # travaria o instalador junto — seria reintroduzir aqui a mesma classe de bug
+  # que o ADR-0008 acabou de fechar. Sem timeout disponível, não testa: dar um
+  # veredito sem poder limitar a execução é pior que não dar veredito.
+  _emits_json() {
+    local out limit=""
+    if command -v timeout >/dev/null 2>&1; then limit="timeout 10"
+    elif command -v gtimeout >/dev/null 2>&1; then limit="gtimeout 10"
+    else return 0; fi   # sem limite seguro → trata como OK, não mexe
+    out=$(printf '{}' | $limit bash -c "$1" 2>/dev/null) || true
+    [ -n "$out" ] || return 1
+    printf '%s' "$out" | jq -e type >/dev/null 2>&1
+  }
+
+  SS_BROKEN=""
+  while IFS= read -r _ss_cmd; do
+    [ -n "$_ss_cmd" ] || continue
+    if ! _emits_json "$_ss_cmd"; then
+      SS_BROKEN="$SS_BROKEN$_ss_cmd"$'\n'
+    fi
+  done <<< "$(_codex_sessionstart_cmds)"
+
+  if [ -n "$SS_BROKEN" ]; then
+    echo "   ⚠️  ~/.codex/hooks.json tem hook(s) de SessionStart que não emitem JSON:"
+    printf '%s' "$SS_BROKEN" | sed 's/^/        /'
+    echo "      É a causa de 'hook returned invalid session start JSON output'."
+    # Desligar é estritamente melhor que deixar quebrado: o Codex descarta a
+    # saída de qualquer jeito, então o hook só custa tempo de startup e um erro
+    # por sessão. Backup antes; reversível.
+    PRUNED=$(jq --arg broken "$SS_BROKEN" '
+      # `// ""` e não `// empty`: em objeto SEM .command, `empty` produz stream
+      # vazio, `select` sobre stream vazio não emite nada e o elemento é
+      # descartado. Numa hooks.json aninhada ({hooks:[{hooks:[...]}]}) isso
+      # apagava o GRUPO inteiro em vez do comando quebrado — testado.
+      def cmd_of: (.command? // "") | if type == "array" then join(" ") else tostring end;
+      def is_broken: (cmd_of) as $c
+        | ($c | length > 0) and (($broken | split("\n")) | index($c) != null);
+      def prune: walk(
+        if type == "array" then map(select((type != "object") or (is_broken | not)))
+        else . end);
+      if .SessionStart? then .SessionStart |= prune else . end
+      | if ((.hooks? // {}) | has("SessionStart")) then .hooks.SessionStart |= prune else . end
+    ' "$CODEX_HOOKS_JSON" 2>/dev/null || true)
+    if [ -n "$PRUNED" ] && ! cmp -s <(echo "$PRUNED") "$CODEX_HOOKS_JSON"; then
+      cp "$CODEX_HOOKS_JSON" "$CODEX_HOOKS_JSON.bak.$(date +%s)"
+      echo "$PRUNED" > "$CODEX_HOOKS_JSON"
+      echo "      ✅ entrada(s) removida(s) do SessionStart (backup em ~/.codex/hooks.json.bak.*)"
+      echo "      O briefing de sessão continua valendo no Claude Code, que aceita texto."
+    else
+      echo "      ⚠️  não consegui remover automaticamente — edite ~/.codex/hooks.json à mão."
+    fi
+  fi
 fi
 
 # ── stop-hook-git-check.sh: ignora commits já publicados ────────────────────
