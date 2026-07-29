@@ -46,6 +46,15 @@ runner_missing() {
   local rc="$1" output="$2"
   [ "$rc" -eq 127 ] && return 0
   printf '%s' "$output" | grep -qiE '(command )?not found|No such file or directory|Missing script' && return 0
+
+  # Dependências nunca instaladas: o tsc RODA e cospe TS2307/TS2591 para cada
+  # import — indistinguível de erro de tipo real se olharmos só a mensagem.
+  # A checagem confiável é estrutural: package.json existe e node_modules não.
+  # (Visto no rollout: lcd---lucrando-com-delivery, clone fresco, 20 "erros"
+  # que eram todos "Cannot find module".)
+  if [ -f "$PROJECT_DIR/package.json" ] && [ ! -d "$PROJECT_DIR/node_modules" ]; then
+    return 0
+  fi
   return 1
 }
 
