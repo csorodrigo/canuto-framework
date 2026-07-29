@@ -29,7 +29,10 @@ emit_hook_otel() {
 # jq ausente: nunca quebrar a sessão por causa do guard.
 command -v jq >/dev/null 2>&1 || exit 0
 
-INPUT=$(cat)
+# Sem payload num TTY: `cat` sem stdin fechado bloqueia para sempre e o
+# runtime que espera o hook congela junto (regra de TTY/pipe do CLAUDE.md).
+INPUT=""
+[ -t 0 ] || INPUT=$(cat)
 
 tool_name=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null) || tool_name=""
 [ -z "$tool_name" ] && exit 0

@@ -5,7 +5,12 @@
 
 set -euo pipefail
 
-file=$(jq -r '.tool_input.file_path // .tool_input.path // ""' 2>/dev/null) || file=""
+# `jq` sem arquivo lê stdin: num TTY trava para sempre. Este hook roda em toda
+# Edit/Write — sem a guarda, um stdin de terminal congela o runtime.
+file=""
+if [ ! -t 0 ]; then
+  file=$(jq -r '.tool_input.file_path // .tool_input.path // ""' 2>/dev/null) || file=""
+fi
 
 [[ -z "$file" ]] && exit 0
 

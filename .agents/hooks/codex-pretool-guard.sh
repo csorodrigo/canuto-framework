@@ -2,7 +2,10 @@
 
 set -euo pipefail
 
-HOOK_INPUT=$(cat 2>/dev/null || echo "")
+# Sem payload num TTY: `cat` sem stdin fechado bloqueia para sempre e o
+# runtime que espera o hook congela junto (regra de TTY/pipe do CLAUDE.md).
+HOOK_INPUT=""
+[ -t 0 ] || HOOK_INPUT=$(cat 2>/dev/null || echo "")
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 ROOT_DIR="$(cd "$PROJECT_DIR" && git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
@@ -271,9 +274,22 @@ EOF
 
   local review_ok=false
   if [ "$review_tier" = "fast" ]; then
-    # Fast review: use gpt-5.5 with low reasoning instead of reviewer profile
+    # Tier fast: perfil `fast` com reasoning baixo (o modelo sai de models.yaml
+    # via perfil — não citar versão aqui, vira defasagem silenciosa).
+    #
+    # O timeout NÃO é opcional. Este hook roda SÍNCRONO dentro do Codex: o
+    # processo pai fica parado até o hook retornar, e aqui o hook sobe um SEGUNDO
+    # `codex exec` completo (config, auth, startup de MCP). Sem limite, qualquer
+    # travada do filho — MCP que não sobe, uvx buscando pacote na rede, auth
+    # expirada esperando input — congela a UI inteira sem log e sem saída. Foi
+    # exatamente esse o sintoma relatado ("codex todo travado, parece deadlock").
+    # O caminho `full` já era limitado por codex_run_with_timeout desde sempre;
+    # só o tier fast — o que deveria ser o mais barato — ficou sem rédea.
+    # Limite menor que o do full de propósito: um review "rápido" que passa de
+    # ~45s já falhou no que prometia; melhor degradar para advisory que travar.
+    local fast_timeout="${CODEX_FAST_REVIEW_TIMEOUT:-45}"
     local fast_cmd=(codex exec -C "$ROOT_DIR" -s read-only --skip-git-repo-check --ephemeral --profile fast -c 'model_reasoning_effort="low"' --output-schema "$schema_file" -o "$output_file" -)
-    if "${fast_cmd[@]}" < "$prompt_file" >/dev/null 2>&1; then
+    if codex_run_with_timeout "$fast_timeout" "${fast_cmd[@]}" < "$prompt_file" >/dev/null 2>&1; then
       review_ok=true
       printf '%s\n' "profile:fast" > "$used_file"
     fi

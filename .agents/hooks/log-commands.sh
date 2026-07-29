@@ -5,7 +5,13 @@
 
 set -euo pipefail
 
-cmd=$(jq -r '.tool_input.command // ""' 2>/dev/null) || cmd=""
+# `jq` sem arquivo lê stdin: num TTY ele espera para sempre, e este hook roda
+# em TODO comando Bash — o runtime inteiro congela junto. Mesma classe do
+# `INPUT=$(cat)` sem guarda, só que disfarçada de leitura de JSON.
+cmd=""
+if [ ! -t 0 ]; then
+  cmd=$(jq -r '.tool_input.command // ""' 2>/dev/null) || cmd=""
+fi
 
 [[ -z "$cmd" ]] && exit 0
 

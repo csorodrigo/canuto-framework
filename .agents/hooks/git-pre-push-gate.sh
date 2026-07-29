@@ -38,7 +38,10 @@ main_push=0
 
 pushed_sha=""
 
-while read -r _local_ref local_sha remote_ref remote_sha; do
+# O git sempre entrega o protocolo por pipe; num TTY (rodado à mão, ou runtime
+# que não redireciona) este `read` ficaria esperando input para sempre e
+# seguraria o push. Sem stdin, não há ref a avaliar — segue sem gate.
+while [ ! -t 0 ] && read -r _local_ref local_sha remote_ref remote_sha; do
   [ -z "${remote_ref:-}" ] && continue
   # Deleção de branch remoto (local_sha zerado) nunca é gated.
   [ "$local_sha" = "$ZERO" ] && continue

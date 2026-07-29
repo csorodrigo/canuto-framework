@@ -138,6 +138,14 @@ codex_run_with_timeout() {
     return $?
   fi
 
+  # macOS não traz GNU timeout; com coreutils do brew ele chega como `gtimeout`.
+  # Sem este ramo, todo Mac sem coreutils caía no fallback python3 — que funciona,
+  # mas é um processo a mais por chamada num caminho já síncrono e sensível.
+  if command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "$timeout_seconds" "$@"
+    return $?
+  fi
+
   python3 -c '
 import subprocess
 import sys
