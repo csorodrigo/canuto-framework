@@ -36,6 +36,9 @@ build/
 .agents/vault/audit/retry-counter.json
 .agents/vault/audit/validation-pending.json
 .agents/vault/audit/*-SESSION_START.md
+# Log de parse do posttooluse-universal: diagnóstico local, por máquina e por
+# dia. Aparecia como untracked em toda sessão e não tem por que versionar.
+.agents/vault/audit/*-otel-emit.log
 
 # OTLP fallback (runtime metrics state)
 .agents/vault/metrics/canuto-otlp.jsonl

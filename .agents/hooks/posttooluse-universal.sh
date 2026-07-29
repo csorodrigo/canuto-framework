@@ -48,6 +48,14 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
+# Ausência de payload ≠ payload corrompido. Sem stdin (TTY, invocação manual)
+# não há o que parsear e não há defeito a relatar — sai quieto. Registrar isso
+# como "invalid JSON" enchia a trilha de auditoria de alarme falso e escondia a
+# ocorrência real, que é payload malformado vindo do runtime.
+if [ -z "$INPUT" ]; then
+  exit 0
+fi
+
 if ! printf '%s' "$INPUT" | jq -e type >/dev/null 2>&1; then
   log_parse_error "invalid PostToolUse JSON payload"
   exit 0
