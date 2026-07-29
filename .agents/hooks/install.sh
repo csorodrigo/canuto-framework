@@ -276,10 +276,11 @@ else
 
   # Claude MCPs (subscription-based, no API key required) — back-delegation
   # Codex→Claude, registrados SÓ aqui (nunca no settings.json do Claude).
-  # Os wrappers executam via `uvx` (codex-as-mcp): sem uvx, o servidor morre
+  # Os wrappers executam via `uv run --script`: sem uv, o servidor morre
   # no startup com "No such file or directory" — pré-flight obrigatório.
-  if ! command -v uvx &> /dev/null; then
-    echo "   ⚠️  uvx não encontrado — removendo/pulando claude-architect e claude-reviewer."
+  CLAUDE_MCP_SKIPPED=0
+  if ! command -v uv &> /dev/null; then
+    echo "   ⚠️  uv não encontrado — removendo/pulando claude-architect e claude-reviewer."
     echo "      Instale com: brew install uv   (depois re-rode este script)"
     codex mcp remove claude-architect >/dev/null 2>&1 || true
     codex mcp remove claude-reviewer  >/dev/null 2>&1 || true
@@ -292,26 +293,53 @@ else
     codex mcp remove claude-architect >/dev/null 2>&1 || true
     codex mcp remove claude-reviewer  >/dev/null 2>&1 || true
   else
-    # Aquece o cache do uv ANTES de registrar. Os wrappers rodam
-    # `uvx --from codex-as-mcp` (sem `@latest`, de propósito — ver o comentário
-    # neles). Sem `@latest` o uv usa o cache, mas na PRIMEIRA vez ainda precisa
-    # baixar; e essa primeira vez cairia no startup do Codex, com 30s de teto
-    # por servidor. Pagar aqui, uma vez, é melhor que pagar lá, em duas sessões.
+    # Smoke test ANTES de registrar — e ele vale por dois.
     #
-    # Não é fatal: se falhar (sem rede, PyPI fora), o registro segue e o wrapper
-    # baixa sob demanda — só volta a arriscar o timeout na primeira abertura.
-    if command -v uv >/dev/null 2>&1; then
-      echo "   ⏳ aquecendo cache do codex-as-mcp (evita timeout de 30s no startup do Codex)..."
-      if uv tool install --quiet codex-as-mcp >/dev/null 2>&1 \
-         || uvx --from codex-as-mcp python -c "pass" >/dev/null 2>&1; then
-        echo "   ✅ codex-as-mcp em cache"
-      else
-        echo "   ⚠️  não consegui baixar codex-as-mcp agora — a primeira sessão Codex vai pagar o download"
+    # (1) Aquece o cache do uv. `uv run --script` resolve o ambiente a partir do
+    #     cabeçalho PEP 723 e cacheia por spec; a PRIMEIRA vez baixa, e essa
+    #     primeira vez cairia no startup do Codex, com teto de 30s por servidor.
+    #
+    # (2) Prova que o servidor SOBE. Isto é o que faltava: até 2026-07-29 o
+    #     instalador conferia que o wrapper existia e era executável, e parava
+    #     aí. "Wrapper existe" não é "servidor sobe" — do mesmo jeito que
+    #     "codex mcp add retornou 0" não é "registro aponta para algo real".
+    #     O `mcp` 2.0.0 removeu `mcp.server.fastmcp`, o import quebrou, e o
+    #     defeito só apareceu como "connection closed: initialize response" na
+    #     abertura do Codex, sem nada no instalador acusando.
+    #
+    # `--help` exercita o import (topo do módulo roda antes do argparse) e sai
+    # 0 sem subir servidor nem falar stdio. Import quebrado ⇒ rc≠0, aqui e agora.
+    _mcp_smoke() {
+      local script="$SCRIPTS_DIR/claude-agent-mcp.py" limit=""
+      # ADR-0008: nada no caminho de instalação espera para sempre.
+      if   command -v timeout  >/dev/null 2>&1; then limit="timeout"
+      elif command -v gtimeout >/dev/null 2>&1; then limit="gtimeout"
       fi
+      if [ -n "$limit" ]; then
+        "$limit" 120 uv run --script "$script" --help >/dev/null 2>&1
+      else
+        uv run --script "$script" --help >/dev/null 2>&1
+      fi
+    }
+
+    echo "   ⏳ verificando se o servidor MCP sobe (resolve deps e testa o import)..."
+    if _mcp_smoke; then
+      echo "   ✅ claude-agent-mcp importa e roda — ambiente em cache"
+      _codex_mcp_refresh claude-architect -- "$SCRIPTS_DIR/claude-architect.sh"
+      _codex_mcp_refresh claude-reviewer  -- "$SCRIPTS_DIR/claude-reviewer.sh"
+    else
+      # Registrar um servidor que não sobe é o pior dos mundos: o Codex tenta em
+      # TODA abertura, falha, e ainda paga a espera. Melhor não registrar e
+      # dizer por quê.
+      echo "   ❌ claude-agent-mcp NÃO sobe — não vou registrar (registro que falha custa startup em toda sessão)."
+      echo "      Diagnóstico: uv run --script $SCRIPTS_DIR/claude-agent-mcp.py --help"
+      echo "      Se for rede/PyPI fora, re-rode este script quando voltar."
+      codex mcp remove claude-architect >/dev/null 2>&1 || true
+      codex mcp remove claude-reviewer  >/dev/null 2>&1 || true
+      CLAUDE_MCP_SKIPPED=1
     fi
 
-    _codex_mcp_refresh claude-architect -- "$SCRIPTS_DIR/claude-architect.sh"
-    _codex_mcp_refresh claude-reviewer  -- "$SCRIPTS_DIR/claude-reviewer.sh"
+    if [ "$CLAUDE_MCP_SKIPPED" != "1" ]; then
 
     # Verificação: reler o registro e conferir que o comando existe em disco.
     # `codex mcp add` retorna 0 sem validar o caminho, então "adicionou" não é
@@ -354,6 +382,7 @@ else
         echo "   ✅ $_srv → $_cmd (verificado em disco)"
       fi
     done
+    fi
   fi
 
   echo "   ℹ️  Verifique com: codex mcp list"

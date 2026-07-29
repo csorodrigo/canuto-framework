@@ -868,6 +868,95 @@ fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════
+echo "── Test 14: Servidor MCP declara a própria dependência, com teto ──"
+# Em 2026-07-29 os dois MCPs de back-delegation pararam de subir. Ninguém tinha
+# tocado neles. O launcher era `uvx --from codex-as-mcp python claude-agent-mcp.py`
+# — usávamos o virtualenv de um pacote de terceiro só para ter o `mcp` no path,
+# sem consumir uma linha do código dele. O pedido do codex-as-mcp é
+# `mcp[cli]>=1.12.4`, SEM TETO. O `mcp` 2.0.0 saiu, o resolvedor pegou, e o
+# 2.0.0 removeu `mcp.server.fastmcp`. Import morria, processo saía com rc=1
+# antes do `initialize`, e o Codex dizia "connection closed: initialize
+# response" — mensagem que não aponta para lugar nenhum.
+#
+# Duas regras, verificadas estaticamente (sem rede):
+MCP_PY="$AGENTS_DIR/tools/claude-agent-mcp.py"
+if [ ! -f "$MCP_PY" ]; then
+  warn "claude-agent-mcp.py ausente — checagem de dependência pulada"
+elif ! command -v python3 >/dev/null 2>&1; then
+  warn "python3 ausente — checagem de dependência do MCP pulada"
+else
+  # 14a. A dependência é declarada no próprio script e tem limite superior.
+  DEP_VERDICT=$(python3 - "$MCP_PY" <<'PYEOF'
+import re, sys
+
+text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+m = re.search(r"^# /// script\s*$(.*?)^# ///\s*$", text, re.M | re.S)
+if not m:
+    print("SEM_HEADER")
+    raise SystemExit
+
+body = "\n".join(l.lstrip("#").strip() for l in m.group(1).splitlines())
+open_at = re.search(r"dependencies\s*=\s*\[", body, re.S)
+if not open_at:
+    print("SEM_DEPS")
+    raise SystemExit
+
+# Varredura ciente de aspas para achar o `]` que fecha. Regex não-guloso não
+# serve: `"mcp[cli]>=1.12.4,<2"` tem um `]` DENTRO da string e o match parava
+# ali, devolvendo `"mcp[cli` — sem aspa de fechamento, zero specs, e o teste
+# acusava "dependência ausente" num arquivo que a declara certinho.
+i, depth, quote = open_at.end(), 1, None
+while i < len(body) and depth:
+    c = body[i]
+    if quote:
+        if c == quote:
+            quote = None
+    elif c in "\"'":
+        quote = c
+    elif c == "[":
+        depth += 1
+    elif c == "]":
+        depth -= 1
+    i += 1
+if depth:
+    print("DEPS_ABERTO")
+    raise SystemExit
+
+specs = re.findall(r"[\"']([^\"']+)[\"']", body[open_at.end():i - 1])
+mcp_spec = next((s for s in specs if re.match(r"^mcp\b", s)), None)
+if not mcp_spec:
+    print("SEM_MCP")
+elif not re.search(r"[<!]|==", mcp_spec):
+    # >= sozinho é o defeito: deixa o próximo major entrar sozinho.
+    print("SEM_TETO:" + mcp_spec)
+else:
+    print("OK:" + mcp_spec)
+PYEOF
+  )
+  case "$DEP_VERDICT" in
+    OK:*)        pass "claude-agent-mcp.py declara mcp com teto (${DEP_VERDICT#OK:})" ;;
+    SEM_TETO:*)  fail "claude-agent-mcp.py pede '${DEP_VERDICT#SEM_TETO:}' sem teto — o próximo major entra sozinho e quebra o import" ;;
+    SEM_HEADER)  fail "claude-agent-mcp.py sem cabeçalho PEP 723 — a dependência não está declarada em lugar nenhum" ;;
+    *)           fail "claude-agent-mcp.py: não achei a dependência 'mcp' declarada ($DEP_VERDICT)" ;;
+  esac
+
+  # 14b. Nenhum wrapper pode emprestar o virtualenv de um pacote de terceiro.
+  BORROWED=""
+  for W in "$AGENTS_DIR/tools/claude-architect.sh" "$AGENTS_DIR/tools/claude-reviewer.sh"; do
+    [ -f "$W" ] || continue
+    if grep -qE 'uvx[[:space:]].*--from[[:space:]]+[^[:space:]]+[[:space:]]+python' "$W"; then
+      BORROWED="$BORROWED $(basename "$W")"
+    fi
+  done
+  if [ -z "$BORROWED" ]; then
+    pass "wrappers MCP não dependem do virtualenv de terceiros"
+  else
+    fail "wrapper roda 'uvx --from <pacote> python' — herda o calendário de releases de terceiro:$BORROWED"
+  fi
+fi
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════
 # SUMMARY
 # ═══════════════════════════════════════════════════════════════════════════
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
