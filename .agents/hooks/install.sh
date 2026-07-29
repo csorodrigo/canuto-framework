@@ -248,6 +248,24 @@ else
     codex mcp remove claude-architect >/dev/null 2>&1 || true
     codex mcp remove claude-reviewer  >/dev/null 2>&1 || true
   else
+    # Aquece o cache do uv ANTES de registrar. Os wrappers rodam
+    # `uvx --from codex-as-mcp` (sem `@latest`, de propósito — ver o comentário
+    # neles). Sem `@latest` o uv usa o cache, mas na PRIMEIRA vez ainda precisa
+    # baixar; e essa primeira vez cairia no startup do Codex, com 30s de teto
+    # por servidor. Pagar aqui, uma vez, é melhor que pagar lá, em duas sessões.
+    #
+    # Não é fatal: se falhar (sem rede, PyPI fora), o registro segue e o wrapper
+    # baixa sob demanda — só volta a arriscar o timeout na primeira abertura.
+    if command -v uv >/dev/null 2>&1; then
+      echo "   ⏳ aquecendo cache do codex-as-mcp (evita timeout de 30s no startup do Codex)..."
+      if uv tool install --quiet codex-as-mcp >/dev/null 2>&1 \
+         || uvx --from codex-as-mcp python -c "pass" >/dev/null 2>&1; then
+        echo "   ✅ codex-as-mcp em cache"
+      else
+        echo "   ⚠️  não consegui baixar codex-as-mcp agora — a primeira sessão Codex vai pagar o download"
+      fi
+    fi
+
     _codex_mcp_refresh claude-architect -- "$SCRIPTS_DIR/claude-architect.sh"
     _codex_mcp_refresh claude-reviewer  -- "$SCRIPTS_DIR/claude-reviewer.sh"
 
@@ -388,6 +406,44 @@ if [ -f "$CODEX_HOOKS_JSON" ]; then
     fi
   fi
 fi
+
+# ── Instruções globais: referências ao MCP Codex aposentado ─────────────────
+# Os MCPs codex-coder/codex-reviewer/codex-maestro foram aposentados em
+# 2026-04-29 — a delegação virou CLI. Instrução que ainda os cite faz o modelo
+# tentar um servidor que não existe e ANUNCIAR fallback em toda sessão:
+#
+#   CODER FALLBACK: Codex direct (reason: codex-coder unavailable)
+#
+# O fallback é PARA o caminho correto. É ruído puro, e some quando a instrução
+# para de tratar o MCP como primário. Os repositórios já foram corrigidos; o que
+# sobra são os arquivos globais da máquina, que não estão em repo nenhum.
+for GLOBAL_DOC in "$HOME/.claude/CLAUDE.md" "$HOME/.codex/AGENTS.md"; do
+  [ -f "$GLOBAL_DOC" ] || continue
+  grep -q 'mcp__codex-\(coder\|reviewer\|maestro\)' "$GLOBAL_DOC" 2>/dev/null || continue
+
+  echo ""
+  echo "🧹 $GLOBAL_DOC ainda cita o MCP Codex aposentado:"
+  grep -n 'mcp__codex-\(coder\|reviewer\|maestro\)' "$GLOBAL_DOC" | head -5 | sed 's/^/      /'
+
+  cp "$GLOBAL_DOC" "$GLOBAL_DOC.bak.$(date +%s)"
+  # Substituição mínima: troca só o token do MCP pela invocação equivalente do
+  # wrapper. Não reescreve a prosa em volta — o texto é do usuário, não meu.
+  sed -i.tmp \
+    -e 's|`mcp__codex-coder__spawn_agent`|`~/.codex/bin/codex-delegate.sh coder <task> <out>`|g' \
+    -e 's|`mcp__codex-reviewer__spawn_agent`|`~/.codex/bin/codex-delegate.sh reviewer <task> <out>`|g' \
+    -e 's|`mcp__codex-maestro__spawn_agent`|`~/.codex/bin/codex-delegate.sh maestro <task> <out>`|g' \
+    -e 's|mcp__codex-coder__spawn_agent|~/.codex/bin/codex-delegate.sh coder|g' \
+    -e 's|mcp__codex-reviewer__spawn_agent|~/.codex/bin/codex-delegate.sh reviewer|g' \
+    -e 's|mcp__codex-maestro__spawn_agent|~/.codex/bin/codex-delegate.sh maestro|g' \
+    "$GLOBAL_DOC" && rm -f "$GLOBAL_DOC.tmp"
+
+  if grep -q 'mcp__codex-\(coder\|reviewer\|maestro\)' "$GLOBAL_DOC" 2>/dev/null; then
+    echo "   ⚠️  sobraram referências em outra forma — revise à mão:"
+    grep -n 'mcp__codex-' "$GLOBAL_DOC" | head -3 | sed 's/^/      /'
+  else
+    echo "   ✅ referências trocadas pelo wrapper CLI (backup em $(basename "$GLOBAL_DOC").bak.*)"
+  fi
+done
 
 # ── stop-hook-git-check.sh: ignora commits já publicados ────────────────────
 # Arquivo do harness (Claude Code remoto), não do framework — por isso é
