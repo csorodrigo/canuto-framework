@@ -1,5 +1,32 @@
 #!/usr/bin/env python3
-"""Claude MCP bridge with explicit role routing."""
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["mcp[cli]>=1.12.4,<2"]
+# ///
+"""Claude MCP bridge with explicit role routing.
+
+O cabecalho PEP 723 acima nao e enfeite: e a correcao de um apagao real.
+
+Ate 2026-07-29 este script era lancado por `uvx --from codex-as-mcp python
+claude-agent-mcp.py`. Nao usavamos UMA linha de codigo do codex-as-mcp — ele
+servia so de doador de dependencia, porque tinha `mcp` no virtualenv dele. O
+pedido dele e `mcp[cli]>=1.12.4`, sem teto. Quando o `mcp` 2.0.0 saiu, o
+resolvedor pegou o 2.0.0, e o 2.0.0 REMOVEU `mcp.server.fastmcp` (a API virou
+`MCPServer` em `mcp.server.mcpserver`). O import da linha de baixo passou a
+morrer com ModuleNotFoundError, o processo saia com rc=1 antes de responder o
+`initialize`, e o Codex reportava:
+
+    MCP client for `claude-architect` failed to start: handshaking with MCP
+    server failed: connection closed: initialize response
+
+Ninguem mexeu neste arquivo. Quebrou porque um pacote de terceiro que a gente
+nao usa subiu de major. Emprestar o virtualenv dos outros e emprestar o
+calendario de releases deles junto.
+
+Agora o script declara o que precisa, com teto, e roda por `uv run --script`.
+O `<2` e proposital: a porta para a API 2.x e trabalho de verdade (decoradores
+de tool e Context mudaram) e nao se faz porta de API para apagar incendio.
+"""
 
 from __future__ import annotations
 

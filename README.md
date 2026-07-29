@@ -392,7 +392,7 @@ You are my coding orchestrator for this repository.
 | obsidian-mcp-server | `npx obsidian-mcp-server` | opcional (Claude e Codex) | Leitura/escrita do vault via Obsidian Local REST API — filesystem direto e o caminho real |
 | ast-grep | `npx -y @ast-grep/mcp` | Claude + Codex | Analise AST do codebase |
 | playwright | `npx -y @anthropic-ai/mcp-server-playwright` | Codex | Automacao de browser para agentes Codex |
-| claude-architect / claude-reviewer | `~/.claude/scripts/claude-*.sh` (via `uvx` codex-as-mcp) | **so Codex** | Back-delegation Codex→Claude — nunca registrados no settings.json do Claude (numa sessao Claude seriam servidores mortos) |
+| claude-architect / claude-reviewer | `~/.claude/scripts/claude-*.sh` (via `uv run --script`) | **so Codex** | Back-delegation Codex→Claude — nunca registrados no settings.json do Claude (numa sessao Claude seriam servidores mortos) |
 
 Configurados automaticamente por `install.sh` + `.agents/hooks/install.sh`. Removidos em 2026-07-27: `openbrand` e `context-hub` (unicos consumidores eram skills em `_archive/`; re-adicione com `claude mcp add` se voltar a usar).
 
