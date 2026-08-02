@@ -2102,6 +2102,9 @@ merge_agents_md() {
 - Read .agents/tmp/context-package.md if it exists (pre-loaded context from Architect)
 
 ## Coding Rules
+- Prefer the simplest implementation that fully meets the current requirement. No speculative abstraction, configuration, or indirection.
+- Grow in layers: smallest version that works end to end first, each new capability on top of something that already works. Never leave the tree broken mid-refactor.
+- Do not assume a library lacks a capability without checking its docs and types.
 - Follow existing patterns in nearby files — match style, naming, structure
 - Do NOT add new dependencies without explicit instruction in the prompt
 - Include basic happy-path tests for new functions
@@ -2215,6 +2218,27 @@ VAULTPATCH
 - Modelo e effort vêm de `.agents/config/models.yaml`, não desta doc. Não pinar
   versão aqui — foi assim que a tabela anterior ficou 2 releases atrás do real.
 RUNTIMEPATCH
+      patched=true
+    fi
+    if ! grep -q "Grow in layers" "$agents_md" 2>/dev/null; then
+      if grep -q "^## Coding Rules" "$agents_md" 2>/dev/null; then
+        # Section exists — insert the three engineering rules at the top of it
+        awk '/^## Coding Rules/{
+          print
+          print "- Prefer the simplest implementation that fully meets the current requirement. No speculative abstraction, configuration, or indirection."
+          print "- Grow in layers: smallest version that works end to end first, each new capability on top of something that already works. Never leave the tree broken mid-refactor."
+          print "- Do not assume a library lacks a capability without checking its docs and types."
+          next
+        }1' "$agents_md" > "${agents_md}.tmp" && mv "${agents_md}.tmp" "$agents_md"
+      else
+        cat >> "$agents_md" << 'RULESPATCH'
+
+## Coding Rules
+- Prefer the simplest implementation that fully meets the current requirement. No speculative abstraction, configuration, or indirection.
+- Grow in layers: smallest version that works end to end first, each new capability on top of something that already works. Never leave the tree broken mid-refactor.
+- Do not assume a library lacks a capability without checking its docs and types.
+RULESPATCH
+      fi
       patched=true
     fi
     if $patched; then

@@ -7,6 +7,9 @@
 - Read .agents/tmp/context-package.md if it exists (pre-loaded context from Architect)
 
 ## Coding Rules
+- Prefer the simplest implementation that fully meets the current requirement. No speculative abstraction, configuration, or indirection.
+- Grow in layers: smallest version that works end to end first, each new capability on top of something that already works. Never leave the tree broken mid-refactor.
+- Do not assume a library lacks a capability without checking its docs and types.
 - Follow existing patterns in nearby files — match style, naming, structure
 - Do NOT add new dependencies without explicit instruction in the prompt
 - Include basic happy-path tests for new functions
