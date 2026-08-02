@@ -2132,23 +2132,23 @@ bash .agents/tools/vault-bridge.sh search <query>
 ## Codex Profiles
 
 **Modelo e effort NÃO são declarados aqui.** A fonte única é
-\`.agents/config/models.yaml\` — é o arquivo que o wrapper realmente lê.
+`.agents/config/models.yaml` — é o arquivo que o wrapper realmente lê.
 Duplicar a versão numa tabela de doc é como a defasagem começa.
 
 | Role | Use For |
 |------|---------|
-| \`coder\` | Geração de código, refactor, edits multi-arquivo |
-| \`reviewer\` | Review de código e plano (roda read-only) |
-| \`architect\` | Arquitetura, decomposição complexa |
-| \`maestro\` | Orquestração em runtime Codex direto |
-| \`fast\` | Edits rápidos, formatação, docs (tier mais barato) |
+| `coder` | Geração de código, refactor, edits multi-arquivo |
+| `reviewer` | Review de código e plano (roda read-only) |
+| `architect` | Arquitetura, decomposição complexa |
+| `maestro` | Orquestração em runtime Codex direto |
+| `fast` | Edits rápidos, formatação, docs (tier mais barato) |
 
-- Caminho canônico de delegação: \`~/.codex/bin/codex-delegate.sh <role> <task> <out>\`.
-- \`--profile\` não é lido pelo wrapper. Vale para \`codex exec\` cru e para o app
-  Desktop, via \`~/.codex/<role>.config.toml\` (perfis v2) — **não** pelos blocos
-  \`[profiles.*]\` de \`config.toml\`, que o codex-cli 0.135+ ignora.
-- Nunca use \`-q\` (removido no codex-cli 0.135).
-- Sessões Claude mantêm Claude como Maestro (alias \`fable\`, fallback \`opus\`).
+- Caminho canônico de delegação: `~/.codex/bin/codex-delegate.sh <role> <task> <out>`.
+- `--profile` não é lido pelo wrapper. Vale para `codex exec` cru e para o app
+  Desktop, via `~/.codex/<role>.config.toml` (perfis v2) — **não** pelos blocos
+  `[profiles.*]` de `config.toml`, que o codex-cli 0.135+ ignora.
+- Nunca use `-q` (removido no codex-cli 0.135).
+- Sessões Claude mantêm Claude como Maestro (alias `fable`, fallback `opus`).
 
 ## Anti-Patterns
 - Do NOT create README.md, documentation files, or CHANGELOG entries
