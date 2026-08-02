@@ -140,10 +140,13 @@ canuto_alias_lookup() {
 
 # Flavor do stat detectado UMA vez no source (BSD -f no macOS, GNU -c no
 # Linux) para o hot path não pagar tentativa-e-erro a cada chamada.
-if stat -f %m / >/dev/null 2>&1; then
-  _CANUTO_STAT_BSD=1
-else
+# Sonda por -c (GNU): o BSD rejeita -c de verdade, mas o GNU ACEITA -f
+# (filesystem status, imprime mount point) — sondar por -f classificava
+# Linux como BSD e todo mtime virava lixo (CI 2026-08-02).
+if stat -c %Y / >/dev/null 2>&1; then
   _CANUTO_STAT_BSD=0
+else
+  _CANUTO_STAT_BSD=1
 fi
 
 canuto__mtime() {

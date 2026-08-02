@@ -326,7 +326,10 @@ _a5_note_is_fresh() {
   if [ -n "$today" ]; then
     case "$base" in "$today"*) return 0 ;; esac
   fi
-  mtime=$(stat -f %m "$note" 2>/dev/null || stat -c %Y "$note" 2>/dev/null || echo "")
+  # GNU primeiro: no Linux `stat -f %m` NÃO falha — imprime o mount point
+  # (CI 2026-08-02: toda nota virava "stale" e os 19 testes A5 quebravam).
+  # No macOS `stat -c` falha de verdade e o fallback BSD assume.
+  mtime=$(stat -c %Y "$note" 2>/dev/null || stat -f %m "$note" 2>/dev/null || echo "")
   now=$(date +%s 2>/dev/null || echo "")
   case "$mtime$now" in ''|*[!0-9]*) return 1 ;; esac
   [ $((now - mtime)) -lt 43200 ]
