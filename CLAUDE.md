@@ -60,7 +60,7 @@ only after ~50 calls/session, which is rare). See `.agents/skills/cost-routing.m
 - For authenticated web scraping (dashboards, CRMs behind login), see the Chrome DevTools MCP section in `browser-qa` skill.
 
 ## On Session Start
-1. Query vault via MCP: latest session note, pending tasks, high-confidence instincts
+1. O briefing (last session, pending, instincts) chega automaticamente via hook SessionStart (additionalContext do vault global); para aprofundar: `rtk node ~/.canuto/bin/canuto-brain.mjs brief <cwd>`. MCP obsidian é opcional/morto — nunca dependa dele
 2. Check for stale contexts (git diff)
 3. Run canuto-project-doctor if setup, memory, or context looks suspicious
 4. Present the session briefing, including recent rework or learning signals when present

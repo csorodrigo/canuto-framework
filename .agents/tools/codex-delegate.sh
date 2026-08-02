@@ -19,10 +19,14 @@
 #
 # Garantias sobre a forma crua (`codex exec` direto):
 #   - passa `-s` explícito (a forma crua herda danger-full-access + never)
-#   - timeout com resgate de parcial (<out>.partial.md)
+#   - timeout com resgate de parcial (<out>.partial.md + cópia persistente em
+#     ~/.codex/delegate-partials/<ts>-<role>.partial.md — /tmp evapora)
 #   - checagem de 0-byte (result=EMPTY_OUTPUT — rc mente, ver models.yaml)
 #   - pré-flight de auth
-#   - métricas em ~/.codex/delegate-metrics.jsonl
+#   - allowlist de role (role inválido → métrica reason:"invalid_role", exit 64
+#     — `--help` como role NÃO vira chamada real com MODEL_UNAVAILABLE falso)
+#   - métricas em ~/.codex/delegate-metrics.jsonl (override de teste:
+#     CANUTO_METRICS_FILE)
 #   - NUNCA usa -q (removido no codex-cli 0.135) nem --profile (morto no wrapper)
 
 set -uo pipefail
@@ -30,8 +34,40 @@ set -uo pipefail
 usage() { echo "uso: codex-delegate.sh <role> <task-file> <out-file>" >&2; exit 64; }
 
 ROLE="${1:-}"; TASK="${2:-}"; OUT="${3:-}"
-[ -n "$ROLE" ] && [ -n "$TASK" ] && [ -n "$OUT" ] || usage
-case "$ROLE" in coder|reviewer|architect|maestro|fast) : ;; *) echo "role inválido: $ROLE" >&2; usage ;; esac
+
+# Métricas: CANUTO_METRICS_FILE permite redirecionar em teste (validar
+# invalid_role e afins sem sujar o arquivo real da máquina).
+METRICS="${CANUTO_METRICS_FILE:-$HOME/.codex/delegate-metrics.jsonl}"
+
+# cwd estável em TODA métrica (review 2026-08-02): o delegation-ledger filtra
+# por projeto via este campo — métrica sem cwd é tratada como fora do projeto
+# e a falha some do fold. Toplevel do git quando houver; senão $PWD cru.
+WRAPPER_CWD="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+
+# Role validado ANTES de exigir task/out: `--help` (ou typo) passado como role
+# virava chamada real no wrapper legado e poluía a telemetria com
+# MODEL_UNAVAILABLE falso (auditoria 2026-08-01). Role inválido registra
+# métrica própria (result:"INVALID_ROLE", reason:"invalid_role") e sai com
+# erro de uso — nunca chega ao codex.
+[ -n "$ROLE" ] || usage
+case "$ROLE" in
+  coder|reviewer|architect|maestro|fast) : ;;
+  *)
+    mkdir -p "$(dirname "$METRICS")" 2>/dev/null || true
+    _ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    if command -v jq >/dev/null 2>&1; then
+      jq -cn --arg ts "$_ts" --arg role "$ROLE" --arg task "$TASK" --arg out "$OUT" --arg cwd "$WRAPPER_CWD" \
+        '{ts:$ts,role:$role,rc:64,result:"INVALID_ROLE",bytes:0,duration:0,
+          reason:"invalid_role",task:$task,out:$out,cwd:$cwd}' >> "$METRICS" 2>/dev/null || true
+    else
+      printf '{"ts":"%s","role":"%s","rc":64,"result":"INVALID_ROLE","bytes":0,"duration":0,"reason":"invalid_role","cwd":"%s"}\n' \
+        "$_ts" "$ROLE" "$WRAPPER_CWD" >> "$METRICS" 2>/dev/null || true
+    fi
+    echo "[codex-delegate] role inválido: '$ROLE' — válidos: coder|architect|reviewer|fast|maestro" >&2
+    usage
+    ;;
+esac
+[ -n "$TASK" ] && [ -n "$OUT" ] || usage
 [ -f "$TASK" ] || { echo "task-file não existe: $TASK" >&2; exit 66; }
 command -v codex >/dev/null 2>&1 || { echo "codex CLI não encontrado" >&2; exit 69; }
 
@@ -89,9 +125,12 @@ else
   canuto_event_append() { return 0; }
 fi
 
-METRICS="$HOME/.codex/delegate-metrics.jsonl"
-mkdir -p "$HOME/.codex" "$(dirname "$OUT")" 2>/dev/null || true
+mkdir -p "$(dirname "$METRICS")" "$HOME/.codex" "$(dirname "$OUT")" 2>/dev/null || true
 EXEC_LOG="$OUT.exec.log"
+
+# Path da cópia persistente do parcial resgatado (setado no bloco de TIMEOUT;
+# vazio nos demais caminhos — emit_metric só inclui o campo quando não-vazio).
+PARTIAL_SAVED=""
 
 emit_metric() {
   # $1=rc $2=result $3=bytes $4=duration $5=reason
@@ -100,13 +139,15 @@ emit_metric() {
     jq -cn --arg ts "$ts" --arg role "$ROLE" --arg model "$MODEL" --arg effort "$EFFORT" \
       --arg sandbox "$SANDBOX" --argjson timeout "$TIMEOUT_S" --argjson rc "$1" \
       --arg result "$2" --argjson bytes "$3" --argjson duration "$4" \
-      --arg reason "$5" --arg task "$TASK" --arg out "$OUT" \
+      --arg reason "$5" --arg task "$TASK" --arg out "$OUT" --arg partial "$PARTIAL_SAVED" \
+      --arg cwd "$WRAPPER_CWD" \
       '{ts:$ts,role:$role,model:$model,effort:$effort,sandbox:$sandbox,timeout:$timeout,
-        rc:$rc,result:$result,bytes:$bytes,duration:$duration,task:$task,out:$out}
-       + (if $reason != "" then {reason:$reason} else {} end)' >> "$METRICS" 2>/dev/null || true
+        rc:$rc,result:$result,bytes:$bytes,duration:$duration,task:$task,out:$out,cwd:$cwd}
+       + (if $reason != "" then {reason:$reason} else {} end)
+       + (if $partial != "" then {partial:$partial} else {} end)' >> "$METRICS" 2>/dev/null || true
   else
-    printf '{"ts":"%s","role":"%s","model":"%s","effort":"%s","sandbox":"%s","timeout":%s,"rc":%s,"result":"%s","bytes":%s,"duration":%s,"reason":"%s"}\n' \
-      "$ts" "$ROLE" "$MODEL" "$EFFORT" "$SANDBOX" "$TIMEOUT_S" "$1" "$2" "$3" "$4" "$5" >> "$METRICS" 2>/dev/null || true
+    printf '{"ts":"%s","role":"%s","model":"%s","effort":"%s","sandbox":"%s","timeout":%s,"rc":%s,"result":"%s","bytes":%s,"duration":%s,"reason":"%s","partial":"%s","cwd":"%s"}\n' \
+      "$ts" "$ROLE" "$MODEL" "$EFFORT" "$SANDBOX" "$TIMEOUT_S" "$1" "$2" "$3" "$4" "$5" "$PARTIAL_SAVED" "$WRAPPER_CWD" >> "$METRICS" 2>/dev/null || true
   fi
 
   # Mesma informação no event log do projeto: é lá que a auditoria olha, e o
@@ -146,6 +187,17 @@ if [ "$rc" -eq 124 ]; then
   result="TIMEOUT"
   if [ "$bytes" -eq 0 ] && [ -s "$EXEC_LOG" ]; then
     tail -c 20000 "$EXEC_LOG" > "$OUT.partial.md" 2>/dev/null || true
+    # Cópia persistente do resgate: <out>.partial.md costuma morar em /tmp e
+    # evapora na limpeza periódica — o parcial sumia antes de alguém olhar
+    # (auditoria 2026-08-01). Melhor esforço: falha de mkdir/cp não muda o
+    # fluxo; o path persistido entra na métrica (campo "partial").
+    PARTIAL_KEEP="$HOME/.codex/delegate-partials/$(date -u +%Y%m%dT%H%M%SZ)-$ROLE.partial.md"
+    if mkdir -p "$HOME/.codex/delegate-partials" 2>/dev/null \
+       && cp "$OUT.partial.md" "$PARTIAL_KEEP" 2>/dev/null; then
+      PARTIAL_SAVED="$PARTIAL_KEEP"
+    else
+      PARTIAL_SAVED="$OUT.partial.md"
+    fi
     reason="deadline_exceeded_partial_rescued"
   else
     reason="deadline_exceeded"
@@ -168,5 +220,5 @@ if [ "$result" = "OK" ]; then
 fi
 echo "[codex-delegate] $ROLE → $result (rc=$rc, ${bytes}B, ${duration}s) — log: $EXEC_LOG" >&2
 [ "$result" = "TIMEOUT" ] && [ -f "$OUT.partial.md" ] \
-  && echo "[codex-delegate] parcial resgatado: $OUT.partial.md — cheque git status antes de re-delegar" >&2
+  && echo "[codex-delegate] parcial resgatado: ${PARTIAL_SAVED:-$OUT.partial.md} (cópia volátil: $OUT.partial.md) — cheque git status antes de re-delegar" >&2
 exit 1

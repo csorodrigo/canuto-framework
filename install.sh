@@ -646,6 +646,7 @@ FRAMEWORK_FILES=(
   ".agents/skills/obsidian-writeback-queue.md"
   ".agents/hooks/codex-pretool-guard.sh"
   ".agents/hooks/install.sh"
+  ".agents/hooks/settings-snippet.json"
   ".agents/hooks/log-commands.sh"
   ".agents/hooks/protect-files.sh"
   ".agents/hooks/require-tests-for-pr.sh"
@@ -751,6 +752,11 @@ FRAMEWORK_FILES=(
   ".agents/hooks/pre-pr-bash-gate.sh"
   ".agents/hooks/git-pre-push-gate.sh"
   ".agents/hooks/postdelegate-verify.sh"
+  # Absorção edge-of-chaos, Fase 2 (auditoria 2026-08-01): briefing garantido,
+  # medição de uso da memória e fold de delegações pendentes
+  ".agents/tools/brief-compose.sh"
+  ".agents/tools/memory-usage.sh"
+  ".agents/tools/delegation-ledger.sh"
 )
 
 INSTALL_ONLY_FILES=(
@@ -912,6 +918,143 @@ SECTION
   fi
 }
 
+# ── install_global_fallback_libs ────────────────────────────────────────────
+# ~/.canuto/lib: cópia global de event-log.sh e canuto-memory.sh (contrato
+# Tracks A/D, auditoria 2026-08-01). O event log morreu em ~90% dos projetos
+# porque repos com install desatualizado não têm .agents/tools/event-log.sh.
+# Consumidores (hooks) usam a cascata: lib do repo → ~/.canuto/lib/<arquivo> →
+# stub que LOGA a ausência em ~/.canuto/vault/_health/missing-lib.jsonl.
+install_global_fallback_libs() {
+  local libdir="$HOME/.canuto/lib" lib src prev okd=""
+  mkdir -p "$libdir"
+  for lib in event-log.sh canuto-memory.sh brief-compose.sh memory-usage.sh delegation-ledger.sh; do
+    src=".agents/tools/$lib"
+    if [ ! -f "$src" ]; then
+      warn "$lib não está em .agents/tools — lib global pulada."
+      continue
+    fi
+    if ! bash -n "$src" 2>/dev/null; then
+      warn "$lib do repo não parseia (bash -n) — NÃO copiado para ~/.canuto/lib."
+      continue
+    fi
+    # Nunca deixar cópia quebrada em pé: uma lib global corrompida quebraria
+    # hooks de TODOS os projetos de uma vez (mesmo padrão do install de hooks).
+    prev=""
+    if [ -f "$libdir/$lib" ]; then
+      prev="$libdir/$lib.prev.$$"
+      cp "$libdir/$lib" "$prev" 2>/dev/null || prev=""
+    fi
+    cp "$src" "$libdir/$lib"
+    if bash -n "$libdir/$lib" 2>/dev/null; then
+      ok "Lib global: $libdir/$lib"
+      okd="$okd $lib"
+      rm -f "$prev" 2>/dev/null || true
+    else
+      warn "$lib: cópia em $libdir não parseia — revertendo."
+      if [ -n "$prev" ] && bash -n "$prev" 2>/dev/null; then
+        mv "$prev" "$libdir/$lib"
+      else
+        rm -f "$libdir/$lib"
+      fi
+      rm -f "$prev" 2>/dev/null || true
+    fi
+  done
+  if [ -n "$okd" ]; then
+    {
+      echo "canuto-lib"
+      echo "installed-at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      echo "source: $(pwd) ($(git rev-parse --short HEAD 2>/dev/null || echo unknown))"
+      echo "files:$okd"
+    } > "$libdir/VERSION" 2>/dev/null || true
+  fi
+}
+
+# ── dedup_canuto_hook_dupes ─────────────────────────────────────────────────
+# Self-heal (auditoria 2026-08-01): o merge antigo do settings.json agrupava
+# por (matcher + conjunto de comandos do grupo); bastava o grupo local ter um
+# hook a mais para a chave não bater e o grupo do snippet ser appendado inteiro
+# de novo — 12 hooks chegaram a rodar 2x por evento. Remove duplicatas exatas
+# (evento+matcher+command) de hooks CANUTO, preservando a 1ª ocorrência, e o
+# caso nominal cross-matcher do codex-pretool-guard (matcher "" duplica "Bash"
+# porque matcher vazio casa todo tool). Hooks não-canuto nunca são tocados.
+dedup_canuto_hook_dupes() {
+  local settings="$HOME/.claude/settings.json"
+  [ -f "$settings" ] || return 0
+  command -v python3 >/dev/null 2>&1 || return 0
+  local canuto_list="" f
+  for f in .agents/hooks/*.sh; do
+    [ -f "$f" ] || continue
+    canuto_list="$canuto_list$(basename "$f"),"
+  done
+  # Fallback (instalação remota antes do download dos hooks): lista distribuída.
+  if [ -z "$canuto_list" ]; then
+    canuto_list="codex-pretool-guard.sh,log-commands.sh,protect-files.sh,require-tests-for-pr.sh,screenshot-guard.sh,session-save.sh,pre-compact-save.sh,session-start.sh,validation-mark.sh,validation-clear.sh,retry-detect.sh,fingerprint-gate.sh,posttooluse-universal.sh,pre-finalize.sh,pre-commit-branch-check.sh,worktree-collision-check.sh,pre-claim-grep.sh,pre-pr-bash-gate.sh,postdelegate-verify.sh,"
+  fi
+  python3 - "$settings" "$canuto_list" <<'PYDEDUP' || warn "self-heal de hooks duplicados falhou — settings.json intacto."
+import json, os, sys
+path, canuto_csv = sys.argv[1], sys.argv[2]
+canuto = set(n for n in canuto_csv.split(",") if n)
+HOME = os.path.expanduser("~")
+def norm(c): return HOME + c[1:] if isinstance(c, str) and c.startswith("~") else c
+def name(c):
+    if not isinstance(c, str) or not c.strip(): return ""
+    return c.split()[0].rsplit("/", 1)[-1]
+data = json.load(open(path))
+hooks = data.get("hooks")
+if not isinstance(hooks, dict):
+    raise SystemExit(0)
+removed = []
+for event, groups in list(hooks.items()):
+    if not isinstance(groups, list):
+        continue
+    # R8: pré-scan — comandos do codex-pretool-guard que TÊM ocorrência com
+    # matcher "Bash" neste evento. No cross-matcher, a "Bash" vence SEMPRE,
+    # independente da ordem no arquivo: consolidar no matcher "" (por vir
+    # primeiro) forkaria o guard em TODO tool, não só em Bash.
+    guard_bash = set()
+    for g in groups:
+        if not isinstance(g, dict):
+            continue
+        if g.get("matcher", "") != "Bash":
+            continue
+        for h in g.get("hooks", []):
+            if isinstance(h, dict):
+                c = norm(h.get("command", ""))
+                if name(c) == "codex-pretool-guard.sh":
+                    guard_bash.add(c)
+    seen, first_matcher, out = set(), {}, []
+    for g in groups:
+        if not isinstance(g, dict):
+            out.append(g); continue
+        m = g.get("matcher", "")
+        kept = []
+        for h in g.get("hooks", []):
+            if not isinstance(h, dict):
+                kept.append(h); continue
+            c = norm(h.get("command", ""))
+            n = name(c)
+            if (m, c) in seen and n in canuto:
+                removed.append((event, m, h.get("command", ""))); continue
+            if n == "codex-pretool-guard.sh":
+                if c in guard_bash and m != "Bash":
+                    removed.append((event, m, h.get("command", ""))); continue
+                if c not in guard_bash and c in first_matcher and first_matcher[c] != m:
+                    removed.append((event, m, h.get("command", ""))); continue
+            seen.add((m, c)); first_matcher.setdefault(c, m); kept.append(h)
+        if kept:
+            g2 = dict(g); g2["hooks"] = kept; out.append(g2)
+    hooks[event] = out
+if removed:
+    tmp = path + ".canuto-dedup.tmp"
+    with open(tmp, "w") as fh:
+        json.dump(data, fh, indent=2, ensure_ascii=False)
+        fh.write("\n")
+    os.replace(tmp, path)
+    for e, m, c in removed:
+        print("   self-heal: removida duplicata [%s] matcher=%r %s" % (e, m, c))
+PYDEDUP
+}
+
 # ── setup_hooks ─────────────────────────────────────────────────────────────
 # Installs all hooks to ~/.claude/hooks/ and registers them in settings.json
 setup_hooks() {
@@ -922,6 +1065,11 @@ setup_hooks() {
     warn "jq not found — skipping hook setup. Install with: brew install jq"
     return
   fi
+
+  # Self-heal + lib global rodam SEMPRE — mesmo quando o repo trouxer um
+  # .agents/hooks/install.sh antigo (sem essas proteções), a máquina sai curada.
+  dedup_canuto_hook_dupes
+  install_global_fallback_libs
 
   if [ -x ".agents/hooks/install.sh" ]; then
     bash ".agents/hooks/install.sh"
@@ -985,8 +1133,19 @@ setup_hooks() {
     rm -f "$prev_backup" 2>/dev/null || true
     ok "Installed: $dst"
 
-    if grep -q "$filename" "$settings" 2>/dev/null; then
-      ok "Hook $event ($filename) already in settings.json — skipping."
+    # Presença por (evento + command), em qualquer grupo/matcher do evento —
+    # cobre (evento+matcher+command) e nunca re-registra hook já consolidado
+    # pelo usuário sob outro matcher. O grep-substring antigo checava o
+    # arquivo inteiro: nunca duplicava, mas também não sabia EM QUAL evento o
+    # hook estava.
+    local already
+    already=$(jq -r --arg event "$event" --arg name "/$filename" '
+      [ .hooks[$event]? // [] | .[] | .hooks? // [] | .[]
+        | .command? // "" | select(type == "string")
+        | select((split(" ")[0]) | endswith($name)) ] | length
+    ' "$settings" 2>/dev/null || echo 0)
+    if [ "${already:-0}" -gt 0 ] 2>/dev/null; then
+      ok "Hook $event ($filename) already registered in this event — skipping."
     else
       local new_hook
       new_hook=$(jq -n \

@@ -35,13 +35,9 @@ Execute these steps **every time** a new session begins:
 
 1. **Determine project slug**: Check CLAUDE.md for `project-slug:` override. If not found, use `basename` of project root directory (e.g., `my-app`). This is important for monorepos where multiple packages share the same directory name.
 
-2. **Load memory from vault** (if it exists):
-   - `obsidian_list_notes(path="projects/{project-slug}/sessions/")` → find latest session note.
-   - `obsidian_read_note(path="projects/{project-slug}/sessions/<latest>.md")` → prepare a short briefing.
-   - `obsidian_list_notes(path="projects/{project-slug}/pending/")` → check for unfinished tasks.
-   - `obsidian_global_search(query="confidence: high", contextLength=100)` → find high-confidence instincts (filter results to current project's path).
-   - `obsidian_global_search(query="confidence: medium", contextLength=100)` → find medium-confidence instincts.
-   - `obsidian_list_notes(path="global-instincts/")` → load **global instincts** (cross-project patterns). These are high-confidence instincts promoted from any project. Present them alongside project instincts in the briefing, tagged as `[GLOBAL]`.
+2. **Load memory from vault**: o briefing chega **AUTOMATICAMENTE** via hook SessionStart (`session-start.sh` injeta `additionalContext` com last session, pending e instincts do vault global `~/.canuto/vault/projects/{project-slug}/`) — não repita essas leituras à mão.
+   - Para aprofundar além do brief: `rtk node ~/.canuto/bin/canuto-brain.mjs brief <cwd>` (decisões, handoffs, pending/rework, instincts), ou leia o vault direto no filesystem.
+   - MCP obsidian é **opcional e normalmente morto** (0 chamadas em 200 sessões — auditoria 2026-06-10; só conecta com o app Obsidian aberto): nunca dependa dele nem espere por ele.
 
 3. **Check for stale contexts**:
    - Run `git diff --name-only` comparing file modification dates against `.context.md` timestamps.
