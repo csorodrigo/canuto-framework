@@ -73,9 +73,15 @@ def norm(cmd):
 
 def script_name(cmd):
     # basename do executável, ignorando argumentos ("api-reference-guard.sh stop")
+    # e pulando interpretador ("bash ~/.claude/hooks/x.sh" -> "x.sh" — sem isso,
+    # toda regra por nome falhava em silêncio na forma bash-prefixada).
     if not isinstance(cmd, str) or not cmd.strip():
         return ""
-    return cmd.split()[0].rsplit("/", 1)[-1]
+    toks = cmd.split()
+    tok = toks[0]
+    if tok.rsplit("/", 1)[-1] in ("bash", "sh", "zsh") and len(toks) > 1:
+        tok = toks[1]
+    return tok.rsplit("/", 1)[-1]
 
 with open(settings_path) as fh:
     data = json.load(fh)
@@ -84,6 +90,44 @@ with open(snippet_path) as fh:
 
 changes = []
 hooks = data.setdefault("hooks", {})
+
+# ── Migração matcher ""->"Bash" do codex-pretool-guard ──────────────────────
+# Ressalva do review cego 2026-08-01: "preservar a 1ª ocorrência" deixava o
+# guard sob matcher "" vencer quando esse grupo vinha primeiro — e matcher
+# vazio dispara o guard para TODO tool. Migra PRESERVANDO metadata do usuário
+# (cwd/timeout/env — garantia testada no test-framework): grupo "" só com o
+# guard tem o matcher convertido em-lugar; grupo misto tem só o hook-objeto do
+# guard movido para o grupo "Bash". Roda ANTES do self-heal: duplicatas que a
+# migração criar (guard já existente sob "Bash") caem na dedup logo abaixo.
+for event, groups in list(hooks.items()):
+    if not isinstance(groups, list):
+        continue
+    for group in groups:
+        if not isinstance(group, dict) or group.get("matcher", "") != "":
+            continue
+        ghooks = group.get("hooks", [])
+        guard_hooks = [h for h in ghooks if isinstance(h, dict)
+                       and script_name(h.get("command", "")) == "codex-pretool-guard.sh"]
+        if not guard_hooks:
+            continue
+        others = [h for h in ghooks if h not in guard_hooks]
+        if not others:
+            group["matcher"] = "Bash"
+            changes.append('migração: grupo do codex-pretool-guard convertido de '
+                           'matcher "" para "Bash" (metadata preservada) [%s]' % event)
+        else:
+            target = None
+            for g in groups:
+                if isinstance(g, dict) and g.get("matcher", "") == "Bash":
+                    target = g
+                    break
+            if target is None:
+                target = {"matcher": "Bash", "hooks": []}
+                groups.append(target)
+            target.setdefault("hooks", []).extend(guard_hooks)
+            group["hooks"] = others
+            changes.append('migração: codex-pretool-guard movido do matcher "" '
+                           'para "Bash" (hook-metadata preservada) [%s]' % event)
 
 # ── Self-heal: remove duplicatas pré-existentes de hooks canuto ─────────────
 for event, groups in list(hooks.items()):
