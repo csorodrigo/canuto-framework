@@ -11,6 +11,16 @@
 #   - Nunca quebra o chamador: toda falha degrada em silêncio (exit 0).
 #   - Fallback: sem vault resolvível, escreve em .agents/.cache/events/log.jsonl
 #     (mesma filosofia do pending-sync; /vault-sync pode migrar depois).
+#   - Concorrência SAME-HOST (multi-worktree): o append é protegido por lock de
+#     diretório via mkdir — atômico em POSIX; flock NÃO existe no macOS, então
+#     o branch antigo com flock era no-op exatamente onde o problema acontece.
+#     Retry curto (~5×0.05s) e fail-open: se o lock não vier, o append acontece
+#     mesmo assim — perder evento é pior que um interleaving raro. Lock órfão
+#     (processo morto entre mkdir e rmdir, idade >10s) é quebrado.
+#   - Conflitos ENTRE MÁQUINAS (Syncthing e afins) NÃO são resolvidos por lock
+#     local: são conflitos de sync de arquivo, invisíveis a este processo.
+#     Como o log é JSONL append-only, resolver um sync-conflict = concatenar as
+#     duas versões e ordenar por ts (nenhuma linha é editada, só anexada).
 #
 # Uso como biblioteca (hooks):
 #   source .agents/tools/event-log.sh
@@ -93,13 +103,17 @@ canuto_event_append() {
   session="${CLAUDE_SESSION_ID:-}"
 
   if command -v jq >/dev/null 2>&1; then
+    # UMA invocação de jq para o evento inteiro. A versão anterior pagava um
+    # spawn de jq POR par key=value (5-7 forks por evento): num host de 16GB em
+    # swap-thrash o fork custa dezenas de ms, e este append roda em TODO tool
+    # call. Os kvs entram como args posicionais; o split no primeiro "=" e o
+    # descarte de pares sem "=" ou com key vazia reproduzem o comportamento do
+    # loop antigo (último kv duplicado vence via add).
     line=$(jq -cn --arg ts "$ts" --arg event "$event" --arg project "$slug" --arg session "$session" \
-      '{ts:$ts,event:$event,project:$project,session:$session}' 2>/dev/null) || line=""
-    for kv in "$@"; do
-      key="${kv%%=*}"; value="${kv#*=}"
-      [ -n "$key" ] && [ "$key" != "$kv" ] || continue
-      line=$(printf '%s' "$line" | jq -c --arg k "$key" --arg v "$value" '. + {($k): $v}' 2>/dev/null) || break
-    done
+      '{ts:$ts,event:$event,project:$project,session:$session}
+       + ([$ARGS.positional[] | index("=") as $i | select($i != null and $i > 0)
+          | {(.[0:$i]): .[$i+1:]}] | add // {})' \
+      --args "$@" 2>/dev/null) || line=""
   fi
 
   if [ -z "${line:-}" ]; then
@@ -114,11 +128,35 @@ canuto_event_append() {
     line="$line}"
   fi
 
-  if command -v flock >/dev/null 2>&1; then
-    { flock -w 2 9 2>/dev/null || true; printf '%s\n' "$line" >&9; } 9>>"$log_path" 2>/dev/null || true
-  else
-    printf '%s\n' "$line" >> "$log_path" 2>/dev/null || true
+  # Lock same-host por diretório (mkdir é atômico; flock não existe no macOS).
+  # Ver invariante de concorrência no header: retry curto, fail-open, e locks
+  # entre máquinas (Syncthing) estão fora do alcance deste mecanismo.
+  local lock_dir have_lock attempt lock_mtime now_epoch
+  lock_dir="${log_path}.lock"
+  have_lock=0
+  for attempt in 1 2 3 4 5; do
+    if mkdir "$lock_dir" 2>/dev/null; then have_lock=1; break; fi
+    sleep 0.05 2>/dev/null || true
+  done
+  if [ "$have_lock" != "1" ]; then
+    # Lock órfão (dono morreu entre mkdir e rmdir): quebra se idade >10s.
+    lock_mtime=$(stat -f %m "$lock_dir" 2>/dev/null || stat -c %Y "$lock_dir" 2>/dev/null || echo "")
+    now_epoch=$(date +%s 2>/dev/null || echo "")
+    case "$lock_mtime$now_epoch" in *[!0-9]*|"") : ;; *)
+      if [ $((now_epoch - lock_mtime)) -gt 10 ]; then
+        rmdir "$lock_dir" 2>/dev/null || true
+        # R6: quebrar o lock órfão NÃO dá posse — só o mkdir atômico dá.
+        # Volta ao loop de aquisição: outro processo pode vencer a corrida
+        # pós-rmdir; quem perder segue fail-open (append sem lock), como antes.
+        for attempt in 1 2 3; do
+          if mkdir "$lock_dir" 2>/dev/null; then have_lock=1; break; fi
+          sleep 0.05 2>/dev/null || true
+        done
+      fi
+    ;; esac
   fi
+  printf '%s\n' "$line" >> "$log_path" 2>/dev/null || true
+  if [ "$have_lock" = "1" ]; then rmdir "$lock_dir" 2>/dev/null || true; fi
   return 0
 }
 

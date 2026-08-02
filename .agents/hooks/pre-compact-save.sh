@@ -38,12 +38,33 @@ else
   canuto_resolve_memory_backend() { printf 'none\t'; }
 fi
 
+# ── Event log: cascata repo → lib global → stub fail-loud ───────────────────
+# O antigo stub `return 0` deixava o event log morto EM SILÊNCIO em ~90% dos
+# repos consumidores (auditoria 2026-08-01). Sem lib no repo nem em
+# ~/.canuto/lib, o stub registra a ausência UMA vez por sessão (marker em
+# /tmp) em ~/.canuto/vault/_health/missing-lib.jsonl. Best-effort: nunca falha.
+_canuto_missing_lib_note() {
+  local marker cwd_s
+  marker="${TMPDIR:-/tmp}/canuto-missing-eventlib-${CLAUDE_SESSION_ID:-$PPID}-$1"
+  [ -e "$marker" ] && return 0
+  : >"$marker" 2>/dev/null || true
+  mkdir -p "$HOME/.canuto/vault/_health" 2>/dev/null || return 0
+  cwd_s=$(pwd 2>/dev/null || echo unknown)
+  cwd_s=$(printf '%s' "$cwd_s" | tr -d '"\\' 2>/dev/null || echo unknown)
+  printf '{"ts":"%s","hook":"%s","cwd":"%s","reason":"event-log-lib-missing"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo unknown)" "$1" "$cwd_s" \
+    >>"$HOME/.canuto/vault/_health/missing-lib.jsonl" 2>/dev/null || true
+  return 0
+}
 EVENT_LIB="$ROOT_DIR/.agents/tools/event-log.sh"
 if [ -f "$EVENT_LIB" ]; then
   # shellcheck source=/dev/null
   source "$EVENT_LIB"
+elif [ -f "$HOME/.canuto/lib/event-log.sh" ]; then
+  # shellcheck source=/dev/null
+  source "$HOME/.canuto/lib/event-log.sh"
 else
-  canuto_event_append() { return 0; }
+  canuto_event_append() { _canuto_missing_lib_note "pre-compact-save"; return 0; }
 fi
 
 PROJECT_DIR=$(canuto_project_dir "$PROJECT_DIR")

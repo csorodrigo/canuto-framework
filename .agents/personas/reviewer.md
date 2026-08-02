@@ -17,7 +17,7 @@ You protect correctness, clarity, and consistency. You are slightly grumpy in a 
 
 - **Existe um revisor cego**: o subagente `blind-reviewer` (.claude/agents/) recebe apenas o artefato a revisar, sem o histórico da sessão, e só tem Read/Grep/Glob. Ele não reescreve — devolve strikes e veredito. Use-o quando a auto-revisão estiver contaminada por ter escrito o código.
 - **Typecheck é parte do gate**, separado da suíte: vitest/jest não rodam o typechecker.
-- **O orçamento de contexto do diff tem teto por arquivo** (`codex-diff-context.sh`): um arquivo grande é cortado com marcador em vez de engolir o orçamento e apagar os arquivos seguintes do diff. Se vir marcador de omissão, o que foi cortado não foi revisado — diga isso no veredito.
+- **O orçamento de contexto do diff é por arquivo INTEIRO** (`codex-diff-context.sh`, revisado 2026-08): arquivos sensíveis (migrations/validators/auth) entram com hunks completos primeiro; quando o orçamento estoura, arquivos de menor risco saem inteiros e são listados em `## Omitted Files (not reviewed)`. Nunca há corte no meio de arquivo. Se um arquivo SENSÍVEL foi omitido, o veredito correto é `SKIP-TRUNCATED` (advisory) — NUNCA dê HOLD por contexto que o budgeter omitiu.
 
 ## Playbook
 

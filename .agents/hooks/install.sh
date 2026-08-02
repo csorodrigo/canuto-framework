@@ -15,6 +15,197 @@ HOOKS_DIR="$HOME/.claude/hooks"
 SETTINGS_FILE="$HOME/.claude/settings.json"
 SCRIPTS_DIR="$HOME/.claude/scripts"
 
+# ── Merge idempotente + self-heal do settings.json (auditoria 2026-08-01) ────
+# CAUSA-RAIZ da duplicação de hooks corrigida aqui: o merge jq antigo
+# identificava grupos por (matcher + conjunto ordenado dos comandos do grupo).
+# Bastava o grupo local ter UM hook a mais (git-truth, ccgram,
+# session-budget-warn...) para a chave nunca bater — e o grupo do snippet era
+# appendado INTEIRO de novo a cada install. A dedup por hook só rodava DENTRO
+# de um grupo casado, nunca entre grupos do mesmo evento: 12 hooks chegaram a
+# rodar 2x por evento na máquina de referência.
+#
+# Regras novas:
+#   1. Presença por (evento + command): se o comando já está registrado no
+#      evento — em QUALQUER grupo/matcher — skip. Cobre (evento+matcher+
+#      command) e também respeita consolidação manual do usuário (ex.:
+#      codex-pretool-guard movido do matcher "" para "Bash").
+#   2. Self-heal: duplicatas exatas (evento+matcher+command) PRÉ-EXISTENTES de
+#      hooks canuto são removidas (1ª ocorrência preservada), incluindo o caso
+#      nominal cross-matcher do codex-pretool-guard ("" duplica "Bash" porque
+#      matcher vazio casa todo tool). Hooks não-canuto nunca são tocados.
+#   3. Só reescreve o arquivo quando houve mudança real (escrita atômica).
+canuto_settings_merge() {
+  local settings="$1" snippet="$2"
+  if [ ! -f "$snippet" ]; then
+    echo "   ⚠️  snippet não encontrado: $snippet — merge de hooks pulado."
+    return 0
+  fi
+  if [ ! -f "$settings" ]; then
+    mkdir -p "$(dirname "$settings")"
+    cp "$snippet" "$settings"
+    echo "   ✅ settings.json criado com hooks e MCP servers"
+    return 0
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "   ⚠️  python3 indisponível — merge de hooks pulado (settings.json intacto; instale python3 e re-rode)."
+    return 0
+  fi
+
+  # Hooks canuto = exatamente os .sh que este diretório distribui.
+  local canuto_list="" f
+  for f in "$SCRIPT_DIR"/*.sh; do
+    [ -f "$f" ] || continue
+    canuto_list="$canuto_list$(basename "$f"),"
+  done
+
+  if python3 - "$settings" "$snippet" "$canuto_list" <<'PYMERGE'
+import json, os, sys
+
+settings_path, snippet_path = sys.argv[1], sys.argv[2]
+canuto_names = set(n for n in sys.argv[3].split(",") if n)
+HOME = os.path.expanduser("~")
+
+def norm(cmd):
+    # "~/.claude/hooks/x.sh" e "/Users/me/.claude/hooks/x.sh" são o mesmo hook.
+    if isinstance(cmd, str) and cmd.startswith("~"):
+        return HOME + cmd[1:]
+    return cmd
+
+def script_name(cmd):
+    # basename do executável, ignorando argumentos ("api-reference-guard.sh stop")
+    if not isinstance(cmd, str) or not cmd.strip():
+        return ""
+    return cmd.split()[0].rsplit("/", 1)[-1]
+
+with open(settings_path) as fh:
+    data = json.load(fh)
+with open(snippet_path) as fh:
+    snip = json.load(fh)
+
+changes = []
+hooks = data.setdefault("hooks", {})
+
+# ── Self-heal: remove duplicatas pré-existentes de hooks canuto ─────────────
+for event, groups in list(hooks.items()):
+    if not isinstance(groups, list):
+        continue
+    seen_exact = set()   # (matcher, command normalizado)
+    seen_cmd = {}        # command normalizado -> primeiro matcher
+    new_groups = []
+    for group in groups:
+        if not isinstance(group, dict):
+            new_groups.append(group)
+            continue
+        matcher = group.get("matcher", "")
+        kept = []
+        for h in group.get("hooks", []):
+            if not isinstance(h, dict):
+                kept.append(h)
+                continue
+            cmd = norm(h.get("command", ""))
+            name = script_name(cmd)
+            key = (matcher, cmd)
+            if key in seen_exact and name in canuto_names:
+                changes.append("self-heal: duplicata exata removida [%s] matcher=%r %s"
+                               % (event, matcher, h.get("command", "")))
+                continue
+            if (name == "codex-pretool-guard.sh" and cmd in seen_cmd
+                    and seen_cmd[cmd] != matcher):
+                changes.append("self-heal: duplicata cross-matcher removida [%s] matcher=%r %s"
+                               % (event, matcher, h.get("command", "")))
+                continue
+            seen_exact.add(key)
+            seen_cmd.setdefault(cmd, matcher)
+            kept.append(h)
+        if kept:
+            g2 = dict(group)
+            g2["hooks"] = kept
+            new_groups.append(g2)
+        else:
+            changes.append("self-heal: grupo vazio removido [%s] matcher=%r"
+                           % (event, group.get("matcher", "")))
+    hooks[event] = new_groups
+
+# ── Merge: registra hooks do snippet ausentes (presença por evento+command) ─
+for event, sgroups in (snip.get("hooks") or {}).items():
+    if not isinstance(sgroups, list):
+        continue
+    groups = hooks.setdefault(event, [])
+    present = set()
+    for g in groups:
+        if isinstance(g, dict):
+            for h in g.get("hooks", []):
+                if isinstance(h, dict):
+                    present.add(norm(h.get("command", "")))
+    for sgroup in sgroups:
+        if not isinstance(sgroup, dict):
+            continue
+        matcher = sgroup.get("matcher", "")
+        for h in sgroup.get("hooks", []):
+            if not isinstance(h, dict):
+                continue
+            cmd = norm(h.get("command", ""))
+            if not cmd or cmd in present:
+                continue
+            target = None
+            for g in groups:
+                if isinstance(g, dict) and g.get("matcher", "") == matcher:
+                    target = g
+                    break
+            if target is None:
+                target = {"matcher": matcher, "hooks": []}
+                groups.append(target)
+            target.setdefault("hooks", []).append(h)
+            present.add(cmd)
+            changes.append("registrado [%s] matcher=%r %s"
+                           % (event, matcher, h.get("command", "")))
+
+# ── mcpServers: deep-merge (preserva chaves extras locais, ex. env custom) ──
+def deep_merge(base, over):
+    out = dict(base)
+    for k, v in over.items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+snip_mcp = snip.get("mcpServers") or {}
+if snip_mcp:
+    current = data.get("mcpServers") or {}
+    merged = deep_merge(current, snip_mcp)
+    if merged != current:
+        changes.append("mcpServers atualizados a partir do snippet")
+        data["mcpServers"] = merged
+
+if changes:
+    tmp = settings_path + ".canuto-merge.tmp"
+    with open(tmp, "w") as fh:
+        json.dump(data, fh, indent=2, ensure_ascii=False)
+        fh.write("\n")
+    os.replace(tmp, settings_path)
+    for c in changes:
+        print("   • " + c)
+    print("   ✅ settings.json: %d mudança(s) aplicada(s)" % len(changes))
+else:
+    print("   ✅ settings.json já em dia (0 mudanças)")
+PYMERGE
+  then
+    :
+  else
+    echo "   ⚠️  merge de settings falhou — settings.json NÃO foi modificado."
+  fi
+}
+
+# Modo restrito (usado pelos testes e pelo track de validação): roda SÓ o
+# merge/self-heal do settings, sem copiar hooks nem tocar em mais nada.
+#   bash .agents/hooks/install.sh --merge-settings-only <settings.json> [snippet.json]
+if [ "${1:-}" = "--merge-settings-only" ]; then
+  [ -n "${2:-}" ] || { echo "uso: install.sh --merge-settings-only <settings.json> [snippet.json]" >&2; exit 64; }
+  canuto_settings_merge "$2" "${3:-$SCRIPT_DIR/settings-snippet.json}"
+  exit $?
+fi
+
 echo "🔍 Verificando pré-requisitos..."
 
 if ! command -v jq &> /dev/null; then
@@ -127,67 +318,70 @@ else
   echo "   ⚠️  não é um repositório git — pre-push gate pulado."
 fi
 
-# ── MCP Servers ─────────────────────────────────────────────────────────────
+# ── Lib global de fallback (~/.canuto/lib) — contrato Tracks A/D 2026-08-01 ──
+# O event log morreu em ~90% dos projetos: repos com install desatualizado não
+# têm .agents/tools/event-log.sh e os hooks caíam num stub silencioso. A cópia
+# global dá aos consumidores uma cascata determinística:
+#   lib do repo → ~/.canuto/lib/<arquivo> → stub que LOGA a ausência em
+#   ~/.canuto/vault/_health/missing-lib.jsonl (fail-loud, nunca fail-silent).
 echo ""
-echo "🔌 Configurando MCP servers em settings.json..."
+echo "📚 Instalando libs globais de fallback em ~/.canuto/lib/..."
+CANUTO_LIB_DIR="$HOME/.canuto/lib"
+mkdir -p "$CANUTO_LIB_DIR"
+CANUTO_LIB_OK=""
+for lib in event-log.sh canuto-memory.sh brief-compose.sh memory-usage.sh delegation-ledger.sh; do
+  if [ ! -f "$TOOLS_DIR/$lib" ]; then
+    echo "   ⚠️  $lib ausente em $TOOLS_DIR — pulado."
+    continue
+  fi
+  if ! bash -n "$TOOLS_DIR/$lib" 2>/dev/null; then
+    echo "   ❌ $lib do repo não parseia (bash -n) — NÃO copiado para a lib global."
+    continue
+  fi
+  # Mesmo padrão dos hooks: guarda a versão anterior e nunca deixa cópia
+  # quebrada em pé (uma lib global corrompida quebraria hooks de TODOS os
+  # projetos de uma vez).
+  prev=""
+  if [ -f "$CANUTO_LIB_DIR/$lib" ]; then
+    prev="$CANUTO_LIB_DIR/$lib.prev.$$"
+    cp "$CANUTO_LIB_DIR/$lib" "$prev" 2>/dev/null || prev=""
+  fi
+  cp "$TOOLS_DIR/$lib" "$CANUTO_LIB_DIR/$lib"
+  if bash -n "$CANUTO_LIB_DIR/$lib" 2>/dev/null; then
+    echo "   ✅ $lib"
+    CANUTO_LIB_OK="$CANUTO_LIB_OK $lib"
+    rm -f "$prev" 2>/dev/null || true
+  else
+    echo "   ❌ $lib: a cópia instalada não parseia"
+    if [ -n "$prev" ] && bash -n "$prev" 2>/dev/null; then
+      mv "$prev" "$CANUTO_LIB_DIR/$lib"
+      echo "      versão anterior íntegra restaurada"
+    else
+      rm -f "$CANUTO_LIB_DIR/$lib"
+      echo "      removida — consumidores caem no stub que loga em _health/missing-lib.jsonl"
+    fi
+    rm -f "$prev" 2>/dev/null || true
+  fi
+done
+if [ -n "$CANUTO_LIB_OK" ]; then
+  {
+    echo "canuto-lib"
+    echo "installed-at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "source: $PROJECT_ROOT ($(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown))"
+    echo "files:$CANUTO_LIB_OK"
+  } > "$CANUTO_LIB_DIR/VERSION" 2>/dev/null || true
+  echo "   ✅ VERSION marker atualizado"
+fi
+
+# ── MCP Servers + registro de hooks no settings.json ────────────────────────
+# O merge/self-heal mora em canuto_settings_merge() (topo deste arquivo) — o
+# merge jq antigo, que causava a duplicação de hooks, foi removido em
+# 2026-08-01 (ver comentário da função para a causa-raiz).
+echo ""
+echo "🔌 Configurando hooks e MCP servers em settings.json..."
 
 SNIPPET="$SCRIPT_DIR/settings-snippet.json"
-
-if [ -f "$SETTINGS_FILE" ] && [ -f "$SNIPPET" ]; then
-  MERGED=$(jq -s '
-    def hook_key:
-      (.type // "") + "|" + (.command // "");
-
-    def group_key:
-      (.matcher // "") + "|" + (((.hooks // []) | map(hook_key) | sort) | join(","));
-
-    def merge_hook_list(current; incoming):
-      reduce (incoming // [])[] as $hook (current // [];
-        if any(.[]; hook_key == ($hook | hook_key)) then
-          map(if hook_key == ($hook | hook_key) then $hook + . else . end)
-        else
-          . + [$hook]
-        end
-      );
-
-    def merge_hook_group(current; incoming):
-      (current + incoming)
-      | .matcher = (current.matcher // incoming.matcher // "")
-      | .hooks = merge_hook_list((current.hooks // []); (incoming.hooks // []));
-
-    def merge_event_groups(current; incoming):
-      reduce (incoming // [])[] as $group (current // [];
-        ($group | group_key) as $target
-        | (map(group_key) | index($target)) as $existing_index
-        | if $existing_index != null then
-            . as $current_groups
-            | .[$existing_index] = merge_hook_group($current_groups[$existing_index]; $group)
-        else
-          . + [$group]
-        end
-      );
-
-    def merge_hooks(current; incoming):
-      reduce (incoming | keys_unsorted[]) as $event (current;
-        .[$event] = merge_event_groups((.[ $event ] // []); (incoming[$event] // []))
-      );
-
-    .[0] as $base
-    | .[1] as $snippet
-    | $base
-    | .mcpServers = (($base.mcpServers // {}) * ($snippet.mcpServers // {}))
-    | .hooks = merge_hooks(($base.hooks // {}); ($snippet.hooks // {}))
-  ' \
-    "$SETTINGS_FILE" "$SNIPPET")
-  echo "$MERGED" > "$SETTINGS_FILE"
-  echo "   ✅ Hooks e MCP servers mesclados no settings.json existente"
-elif [ -f "$SNIPPET" ]; then
-  mkdir -p "$HOME/.claude"
-  cp "$SNIPPET" "$SETTINGS_FILE"
-  echo "   ✅ settings.json criado com hooks e MCP servers"
-else
-  echo "   ⚠️  settings-snippet.json não encontrado — pulando MCP setup."
-fi
+canuto_settings_merge "$SETTINGS_FILE" "$SNIPPET"
 
 # Cleanup: remove MCP entries que não pertencem ao settings.json do Claude.
 # - codex-* (retired 2026-04-29): Maestro invoca Codex via `codex exec` direto.

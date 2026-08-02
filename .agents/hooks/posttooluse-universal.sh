@@ -17,14 +17,35 @@ fi
 
 export CANUTO_OTEL_HOOK_SOURCE="posttooluse-universal"
 
+# ── Event log: cascata repo → lib global → stub fail-loud ───────────────────
+# O antigo stub `return 0` deixava o event log morto EM SILÊNCIO em ~90% dos
+# repos consumidores (auditoria 2026-08-01). Sem lib no repo nem em
+# ~/.canuto/lib, o stub registra a ausência UMA vez por sessão (marker em
+# /tmp) em ~/.canuto/vault/_health/missing-lib.jsonl. Best-effort: nunca falha.
+_canuto_missing_lib_note() {
+  local marker cwd_s
+  marker="${TMPDIR:-/tmp}/canuto-missing-eventlib-${CLAUDE_SESSION_ID:-$PPID}-$1"
+  [ -e "$marker" ] && return 0
+  : >"$marker" 2>/dev/null || true
+  mkdir -p "$HOME/.canuto/vault/_health" 2>/dev/null || return 0
+  cwd_s=$(pwd 2>/dev/null || echo unknown)
+  cwd_s=$(printf '%s' "$cwd_s" | tr -d '"\\' 2>/dev/null || echo unknown)
+  printf '{"ts":"%s","hook":"%s","cwd":"%s","reason":"event-log-lib-missing"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo unknown)" "$1" "$cwd_s" \
+    >>"$HOME/.canuto/vault/_health/missing-lib.jsonl" 2>/dev/null || true
+  return 0
+}
 if [ -f "$SCRIPT_DIR/../tools/event-log.sh" ]; then
   # shellcheck source=../tools/event-log.sh
   . "$SCRIPT_DIR/../tools/event-log.sh"
 elif [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -f "$CLAUDE_PROJECT_DIR/.agents/tools/event-log.sh" ]; then
   # shellcheck source=/dev/null
   . "$CLAUDE_PROJECT_DIR/.agents/tools/event-log.sh"
+elif [ -f "$HOME/.canuto/lib/event-log.sh" ]; then
+  # shellcheck source=/dev/null
+  . "$HOME/.canuto/lib/event-log.sh"
 else
-  canuto_event_append() { return 0; }
+  canuto_event_append() { _canuto_missing_lib_note "posttooluse-universal"; return 0; }
 fi
 
 # Sem payload num TTY: `cat` sem stdin fechado bloqueia para sempre e o
