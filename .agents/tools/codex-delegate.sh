@@ -146,8 +146,8 @@ emit_metric() {
        + (if $reason != "" then {reason:$reason} else {} end)
        + (if $partial != "" then {partial:$partial} else {} end)' >> "$METRICS" 2>/dev/null || true
   else
-    printf '{"ts":"%s","role":"%s","model":"%s","effort":"%s","sandbox":"%s","timeout":%s,"rc":%s,"result":"%s","bytes":%s,"duration":%s,"reason":"%s","partial":"%s","cwd":"%s"}\n' \
-      "$ts" "$ROLE" "$MODEL" "$EFFORT" "$SANDBOX" "$TIMEOUT_S" "$1" "$2" "$3" "$4" "$5" "$PARTIAL_SAVED" "$WRAPPER_CWD" >> "$METRICS" 2>/dev/null || true
+    printf '{"ts":"%s","role":"%s","model":"%s","effort":"%s","sandbox":"%s","timeout":%s,"rc":%s,"result":"%s","bytes":%s,"duration":%s,"reason":"%s","partial":"%s","out":"%s","cwd":"%s"}\n' \
+      "$ts" "$ROLE" "$MODEL" "$EFFORT" "$SANDBOX" "$TIMEOUT_S" "$1" "$2" "$3" "$4" "$5" "$PARTIAL_SAVED" "$OUT" "$WRAPPER_CWD" >> "$METRICS" 2>/dev/null || true
   fi
 
   # Mesma informação no event log do projeto: é lá que a auditoria olha, e o

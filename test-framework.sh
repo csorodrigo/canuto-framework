@@ -981,6 +981,1038 @@ fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════
+# TEST 15: Identidade em duas posturas (Fase 2 — A3)
+# ═══════════════════════════════════════════════════════════════════════════
+# canuto_project_slug DEGRADA (leitura sempre devolve algo) e
+# canuto_require_project_slug FALHA ALTO (escrita recusa slug que não
+# sobrevive a `git worktree add`). Sem estes testes o basename volta a ser
+# identidade de escrita — foi assim que o vault virou 184 ilhas.
+# Tudo em sandbox: HOME, CANUTO_VAULT_DIR e TMPDIR falsos; o vault real
+# (~/.canuto) nunca é lido nem escrito.
+echo "── Test 15: Identidade em duas posturas (A3) ──"
+
+f2_eq()    { if [ "$2" = "$3" ]; then pass "$1"; else fail "$1 — esperado [$2], obtido [$3]"; fi; }
+f2_has()   { case "$2" in *"$3"*) pass "$1" ;; *) fail "$1 — saída não contém [$3]" ;; esac; }
+f2_hasnt() { case "$2" in *"$3"*) fail "$1 — saída contém [$3] e não deveria" ;; *) pass "$1" ;; esac; }
+
+MEM_LIB="$AGENTS_DIR/tools/canuto-memory.sh"
+A3_SB="$(mktemp -d "${TMPDIR:-/tmp}/canuto-a3.XXXXXX")"
+A3_VAULT="$A3_SB/vault"
+A3_HOME="$A3_SB/home"
+A3_ERRF="$A3_SB/.stderr"
+# NB: nenhum diretório do sandbox pode se chamar workspaces/repos/projects/
+# worktrees fora dos casos que TESTAM colapso de container — o colapso é por
+# nome de segmento e contaminaria os demais casos.
+mkdir -p "$A3_VAULT/projects" "$A3_HOME" "$A3_SB/cases" "$A3_SB/tmp"
+
+A3_OUT=""; A3_ERR=""; A3_RC=0
+a3_call() {
+  # $1 = snippet bash · $2 = CLAUDE_PROJECT_DIR · $3 = CANUTO_SLUG_NO_CACHE (default 1)
+  # CLAUDE_PROJECT_DIR SEMPRE apontando para o sandbox: canuto_event_append o usa
+  # para resolver o destino do log; deixá-lo vazio escreveria no vault real.
+  local snippet="$1" projdir="${2:-$A3_SB/cases}" nocache="${3:-1}"
+  A3_RC=0
+  A3_OUT=$(
+    HOME="$A3_HOME" CANUTO_VAULT_DIR="$A3_VAULT" CANUTO_SLUG_NO_CACHE="$nocache" \
+    CLAUDE_PROJECT_DIR="$projdir" TMPDIR="$A3_SB/tmp" \
+    bash -c "cd '$A3_SB' || exit 9; . '$MEM_LIB'; set +e +u +o pipefail; $snippet" 2>"$A3_ERRF"
+  ) || A3_RC=$?
+  A3_ERR="$(cat "$A3_ERRF" 2>/dev/null || true)"
+}
+
+# ── A3-1: dir pelado (sem CLAUDE.md, sem git, fora de container) ────────────
+mkdir -p "$A3_SB/cases/pelado"
+a3_call "canuto_require_project_slug '$A3_SB/cases/pelado'" "$A3_SB/cases/pelado"
+if [ "$A3_RC" -eq 1 ] && [ -z "$A3_OUT" ]; then
+  pass "A3-1 require recusa dir sem identidade (exit 1, stdout vazio)"
+else
+  fail "A3-1 require deveria sair 1 com stdout vazio (rc=$A3_RC, out=[$A3_OUT])"
+fi
+f2_has "A3-1b require nomeia a ação no stderr" "$A3_ERR" "canuto-init"
+
+# ── A3-2: override project-slug no CLAUDE.md ────────────────────────────────
+mkdir -p "$A3_SB/cases/com-override"
+printf 'project-slug: meu-produto\n' > "$A3_SB/cases/com-override/CLAUDE.md"
+a3_call "canuto_require_project_slug '$A3_SB/cases/com-override'" "$A3_SB/cases/com-override"
+f2_eq "A3-2 require aceita override do CLAUDE.md" "meu-produto" "$A3_OUT"
+
+# ── A3-3: colapso de container (.../workspaces/<proj>/<wt>) ─────────────────
+mkdir -p "$A3_SB/cases/root/workspaces/produto-x/wt-feature"
+a3_call "canuto_require_project_slug '$A3_SB/cases/root/workspaces/produto-x/wt-feature'" \
+  "$A3_SB/cases/root/workspaces/produto-x/wt-feature"
+f2_eq "A3-3 require aceita colapso de container" "produto-x" "$A3_OUT"
+
+# ── A3-4: basename do remote origin ─────────────────────────────────────────
+mkdir -p "$A3_SB/cases/com-remote"
+( cd "$A3_SB/cases/com-remote" && git init -q . && \
+  git remote add origin 'git@github.com:acme/Produto_Y.git' ) >/dev/null 2>&1 || true
+a3_call "canuto_require_project_slug '$A3_SB/cases/com-remote'" "$A3_SB/cases/com-remote"
+f2_eq "A3-4 require aceita basename do remote origin" "produto-y" "$A3_OUT"
+
+# ── A3-5: as DUAS posturas no MESMO dir (git sem remote, fora de container) ──
+mkdir -p "$A3_SB/cases/repo-sem-remote"
+( cd "$A3_SB/cases/repo-sem-remote" && git init -q . ) >/dev/null 2>&1 || true
+a3_call "canuto_require_project_slug '$A3_SB/cases/repo-sem-remote'" "$A3_SB/cases/repo-sem-remote"
+A3_STRICT_RC="$A3_RC"
+a3_call "canuto_project_slug '$A3_SB/cases/repo-sem-remote'" "$A3_SB/cases/repo-sem-remote"
+if [ "$A3_STRICT_RC" -eq 1 ] && [ "$A3_OUT" = "repo-sem-remote" ]; then
+  pass "A3-5 escrita recusa o basename enquanto leitura o devolve (duas posturas)"
+else
+  fail "A3-5 duas posturas quebradas (require rc=$A3_STRICT_RC, slug=[$A3_OUT])"
+fi
+
+# ── A3-6: slug do template num repo que não é o framework ───────────────────
+mkdir -p "$A3_SB/cases/repo-alheio"
+printf 'project-slug: canuto-framework-v1\n' > "$A3_SB/cases/repo-alheio/CLAUDE.md"
+a3_call "canuto_require_project_slug '$A3_SB/cases/repo-alheio'" "$A3_SB/cases/repo-alheio"
+if [ "$A3_RC" -eq 1 ]; then
+  f2_has "A3-6 require recusa slug de template citando a guarda" "$A3_ERR" "anti-template"
+else
+  fail "A3-6 require aceitou slug de template em repo alheio (rc=$A3_RC, out=[$A3_OUT])"
+fi
+
+# ── Fixtures de vault para o classificador ──────────────────────────────────
+printf '{"velho": "canon", "velho2": "canon2", "velho3": "canon3"}\n' \
+  > "$A3_VAULT/.project-aliases.json"
+mkdir -p "$A3_VAULT/projects/populado/sessions"
+printf '# nota\n' > "$A3_VAULT/projects/populado/sessions/s1.md"
+mkdir -p "$A3_VAULT/projects/so-audit/audit" "$A3_VAULT/projects/so-audit/metrics"
+printf '# a\n' > "$A3_VAULT/projects/so-audit/audit/a.md"
+printf '# m\n' > "$A3_VAULT/projects/so-audit/metrics/m.md"
+mkdir -p "$A3_VAULT/projects/sozinho"
+mkdir -p "$A3_VAULT/projects/velho/sessions" "$A3_VAULT/projects/canon"
+printf '# nota antiga\n' > "$A3_VAULT/projects/velho/sessions/s1.md"
+mkdir -p "$A3_VAULT/projects/velho2/sessions" "$A3_VAULT/projects/canon2/sessions"
+printf '# a\n' > "$A3_VAULT/projects/velho2/sessions/s1.md"
+printf '# b\n' > "$A3_VAULT/projects/canon2/sessions/s1.md"
+mkdir -p "$A3_VAULT/projects/velho3" "$A3_VAULT/projects/canon3"
+mkdir -p "$A3_VAULT/projects/produto-x/sessions"
+printf '# nota do produto\n' > "$A3_VAULT/projects/produto-x/sessions/s1.md"
+
+# ── A3-7: POPULATED ─────────────────────────────────────────────────────────
+a3_call "canuto_classify_vault populado '$A3_SB/cases/pelado'" "$A3_SB/cases/pelado"
+if [ "$A3_OUT" = "POPULATED" ] && [ "$A3_RC" -eq 0 ]; then
+  pass "A3-7 classify POPULATED (exit 0)"
+else
+  fail "A3-7 classify deveria ser POPULATED/0 (out=[$A3_OUT] rc=$A3_RC)"
+fi
+
+# ── A3-8: audit/metrics são projeção mecânica, não conteúdo ─────────────────
+a3_call "canuto_classify_vault so-audit '$A3_SB/cases/pelado'" "$A3_SB/cases/pelado"
+f2_eq "A3-8 classify não conta audit/metrics como conteúdo" "FRESH" "$A3_OUT"
+
+# ── A3-9: FRESH honesto ─────────────────────────────────────────────────────
+a3_call "canuto_classify_vault sozinho '$A3_SB/cases/pelado'" "$A3_SB/cases/pelado"
+if [ "$A3_OUT" = "FRESH" ] && [ "$A3_RC" -eq 0 ]; then
+  pass "A3-9 classify FRESH sem irmão (exit 0)"
+else
+  fail "A3-9 classify deveria ser FRESH/0 (out=[$A3_OUT] rc=$A3_RC)"
+fi
+
+# ── A3-10: ORPHAN por alias REVERSO + evento VAULT_ORPHAN ───────────────────
+mkdir -p "$A3_SB/cases/orfao-repo"
+printf 'project-slug: canon\n' > "$A3_SB/cases/orfao-repo/CLAUDE.md"
+a3_call "canuto_classify_vault canon '$A3_SB/cases/orfao-repo'" "$A3_SB/cases/orfao-repo"
+if [ "$A3_OUT" = "ORPHAN" ] && [ "$A3_RC" -eq 1 ]; then
+  pass "A3-10 classify ORPHAN por alias reverso (exit 1)"
+else
+  fail "A3-10 classify deveria ser ORPHAN/1 (out=[$A3_OUT] rc=$A3_RC)"
+fi
+f2_has "A3-10b stderr nomeia o irmão" "$A3_ERR" "velho"
+A3_EVLOG="$A3_VAULT/projects/canon/events/log.jsonl"
+if [ -f "$A3_EVLOG" ]; then
+  A3_EVTXT="$(cat "$A3_EVLOG")"
+  f2_has "A3-10c evento VAULT_ORPHAN gravado" "$A3_EVTXT" '"event":"VAULT_ORPHAN"'
+  f2_has "A3-10d evento carrega o irmão" "$A3_EVTXT" 'velho'
+else
+  fail "A3-10c evento VAULT_ORPHAN não foi gravado em $A3_EVLOG"
+fi
+
+# ── A3-11: ORPHAN por colapso de container ──────────────────────────────────
+a3_call "canuto_classify_vault wt-feature '$A3_SB/cases/root/workspaces/produto-x/wt-feature'" \
+  "$A3_SB/cases/root/workspaces/produto-x/wt-feature"
+f2_eq "A3-11 classify ORPHAN por colapso de container" "ORPHAN" "$A3_OUT"
+
+# ── A3-12: irmão existe mas está vazio -> não inventar órfão ────────────────
+a3_call "canuto_classify_vault canon3 '$A3_SB/cases/pelado'" "$A3_SB/cases/pelado"
+f2_eq "A3-12 irmão vazio não vira ORPHAN" "FRESH" "$A3_OUT"
+
+# ── A3-13: POPULATED com irmão populado -> aviso, sem mudar o contrato ──────
+a3_call "canuto_classify_vault canon2 '$A3_SB/cases/pelado'" "$A3_SB/cases/pelado"
+if [ "$A3_OUT" = "POPULATED" ] && [ "$A3_RC" -eq 0 ]; then
+  f2_has "A3-13 fragmentação vira aviso em stderr (stdout/exit intactos)" "$A3_ERR" "fragmenta"
+else
+  fail "A3-13 contrato quebrado com irmão populado (out=[$A3_OUT] rc=$A3_RC)"
+fi
+
+# ── A3-14: fresh_clone_check nos 4 estados, sempre rc=0 ─────────────────────
+mkdir -p "$A3_SB/cases/clone-template"
+printf 'project-slug: canuto-framework-v1\n' > "$A3_SB/cases/clone-template/CLAUDE.md"
+a3_call "canuto_fresh_clone_check '$A3_SB/cases/clone-template' | head -1" "$A3_SB/cases/clone-template"
+if [ "$A3_RC" -eq 0 ]; then
+  f2_has "A3-14a fresh_clone_check TEMPLATE-CLONE (rc=0)" "$A3_OUT" "TEMPLATE-CLONE"
+else
+  fail "A3-14a fresh_clone_check deveria ser informativo (rc=$A3_RC)"
+fi
+
+mkdir -p "$A3_SB/cases/clone-novo/.agents"
+a3_call "canuto_fresh_clone_check '$A3_SB/cases/clone-novo' | head -1" "$A3_SB/cases/clone-novo"
+if [ "$A3_RC" -eq 0 ]; then
+  f2_has "A3-14b fresh_clone_check UNINITIALIZED (rc=0)" "$A3_OUT" "UNINITIALIZED"
+else
+  fail "A3-14b fresh_clone_check deveria ser informativo (rc=$A3_RC)"
+fi
+
+mkdir -p "$A3_SB/cases/nao-canuto"
+a3_call "canuto_fresh_clone_check '$A3_SB/cases/nao-canuto' | head -1" "$A3_SB/cases/nao-canuto"
+if [ "$A3_RC" -eq 0 ]; then
+  f2_has "A3-14c fresh_clone_check NOT-CANUTO (rc=0)" "$A3_OUT" "NOT-CANUTO"
+else
+  fail "A3-14c fresh_clone_check deveria ser informativo (rc=$A3_RC)"
+fi
+
+mkdir -p "$A3_SB/cases/install-vivo/.agents"
+printf 'project-slug: populado\n' > "$A3_SB/cases/install-vivo/CLAUDE.md"
+a3_call "canuto_fresh_clone_check '$A3_SB/cases/install-vivo' | head -1" "$A3_SB/cases/install-vivo"
+if [ "$A3_RC" -eq 0 ]; then
+  f2_has "A3-14d fresh_clone_check OK (rc=0)" "$A3_OUT" "OK:"
+else
+  fail "A3-14d fresh_clone_check deveria ser informativo (rc=$A3_RC)"
+fi
+
+# ── A3-15: CANUTO_SLUG_NO_CACHE=1 ignora cache E memo ───────────────────────
+mkdir -p "$A3_SB/cases/cache-test"
+printf 'project-slug: slug-a\n' > "$A3_SB/cases/cache-test/CLAUDE.md"
+a3_call "canuto_project_slug '$A3_SB/cases/cache-test'" "$A3_SB/cases/cache-test" 0
+printf 'project-slug: slug-b\n' > "$A3_SB/cases/cache-test/CLAUDE.md"
+a3_call "canuto_project_slug '$A3_SB/cases/cache-test'" "$A3_SB/cases/cache-test" 1
+f2_eq "A3-15 NO_CACHE=1 devolve o valor novo" "slug-b" "$A3_OUT"
+
+# ── A3-16: nenhuma função de identidade consome o stdin do hook ─────────────
+# Hooks recebem JSON por stdin: uma função que come stdin cega o hook inteiro.
+A3_STDIN_OUT=$(printf '{"hook_event_name":"SessionStart"}' | \
+  HOME="$A3_HOME" CANUTO_VAULT_DIR="$A3_VAULT" CANUTO_SLUG_NO_CACHE=1 \
+  CLAUDE_PROJECT_DIR="$A3_SB/cases/orfao-repo" TMPDIR="$A3_SB/tmp" \
+  bash -c ". '$MEM_LIB'; set +e +u +o pipefail
+    canuto_classify_vault canon '$A3_SB/cases/orfao-repo' >/dev/null 2>&1
+    canuto_require_project_slug '$A3_SB/cases/orfao-repo' >/dev/null 2>&1
+    canuto_fresh_clone_check '$A3_SB/cases/orfao-repo' >/dev/null 2>&1
+    cat" 2>/dev/null || true)
+f2_eq "A3-16 identidade não consome o stdin do caller" \
+  '{"hook_event_name":"SessionStart"}' "$A3_STDIN_OUT"
+
+# ── A3-17: sem event-log.sh, a degradação deixa rastro (nunca silenciosa) ───
+A3_ISO="$A3_SB/isolado"
+mkdir -p "$A3_ISO/lib" "$A3_ISO/home" "$A3_ISO/proj" "$A3_ISO/tmp" \
+         "$A3_ISO/vault/projects/velho/sessions" "$A3_ISO/vault/projects/canon"
+cp "$MEM_LIB" "$A3_ISO/lib/canuto-memory.sh"
+printf '# nota\n' > "$A3_ISO/vault/projects/velho/sessions/s1.md"
+printf '{"velho": "canon"}\n' > "$A3_ISO/vault/.project-aliases.json"
+A3_ISO_OUT=$(
+  HOME="$A3_ISO/home" CANUTO_VAULT_DIR="$A3_ISO/vault" CANUTO_SLUG_NO_CACHE=1 \
+  CLAUDE_PROJECT_DIR="$A3_ISO/proj" TMPDIR="$A3_ISO/tmp" \
+  bash -c "cd '$A3_ISO' || exit 9; . '$A3_ISO/lib/canuto-memory.sh'; set +e +u +o pipefail
+    canuto_classify_vault canon '$A3_ISO/proj'" 2>/dev/null || true)
+f2_eq "A3-17 classify segue funcionando sem event-log.sh" "ORPHAN" "$A3_ISO_OUT"
+if [ -f "$A3_ISO/vault/_health/missing-lib.jsonl" ] && \
+   grep -q 'event-log-lib-missing' "$A3_ISO/vault/_health/missing-lib.jsonl" 2>/dev/null; then
+  pass "A3-17b perda de telemetria vira nota em _health (degradação não-silenciosa)"
+else
+  fail "A3-17b lib de evento ausente não deixou nota em _health/missing-lib.jsonl"
+fi
+
+# ── A3-18: sintaxe nos dois shells ──────────────────────────────────────────
+if bash -n "$MEM_LIB" 2>/dev/null; then
+  pass "A3-18a canuto-memory.sh: bash -n"
+else
+  fail "A3-18a canuto-memory.sh: erro de sintaxe (bash -n)"
+fi
+if command -v zsh >/dev/null 2>&1; then
+  if zsh -n "$MEM_LIB" 2>/dev/null; then
+    pass "A3-18b canuto-memory.sh: zsh -n"
+  else
+    fail "A3-18b canuto-memory.sh: erro de sintaxe (zsh -n)"
+  fi
+else
+  warn "zsh ausente — checagem zsh -n pulada"
+fi
+
+rm -rf "$A3_SB"
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TEST 16: Briefing garantido + medição de uso (Fase 2 — A4)
+# ═══════════════════════════════════════════════════════════════════════════
+# O brief NUNCA pode sair vazio por quebra sem dizer que quebrou: vazio-honesto
+# e lobotomia silenciosa têm de ser distinguíveis (eoc briefing-lifecycle-audit).
+# O gate `check-identity` é o que prova isso — então ele próprio é testado
+# contra sabotagem, senão vira decoração.
+echo "── Test 16: Briefing garantido + uso (A4) ──"
+
+BRIEF_LIB="$AGENTS_DIR/tools/brief-compose.sh"
+USAGE_LIB="$AGENTS_DIR/tools/memory-usage.sh"
+A4_SB="$(mktemp -d "${TMPDIR:-/tmp}/canuto-a4.XXXXXX")"
+mkdir -p "$A4_SB/home" "$A4_SB/tmp"
+
+a4_brief() {
+  # $1 = root · $2 = vault · $3 = lib alternativa (sabotagem)
+  HOME="$A4_SB/home" CANUTO_VAULT_DIR="$2" CANUTO_SLUG_NO_CACHE=1 \
+  CLAUDE_PROJECT_DIR="$1" TMPDIR="$A4_SB/tmp" \
+    bash "${3:-$BRIEF_LIB}" brief "$1" 2>/dev/null || true
+}
+A4_CHECK_OUT=""; A4_CHECK_RC=0
+a4_check() {
+  A4_CHECK_RC=0
+  A4_CHECK_OUT=$(
+    HOME="$A4_SB/home" CANUTO_VAULT_DIR="$2" CANUTO_SLUG_NO_CACHE=1 \
+    CLAUDE_PROJECT_DIR="$1" TMPDIR="$A4_SB/tmp" \
+      bash "${3:-$BRIEF_LIB}" check-identity "$1" 2>&1
+  ) || A4_CHECK_RC=$?
+}
+
+# ── A4-1: sintaxe das duas libs novas nos dois shells ───────────────────────
+for A4_LIB in "$BRIEF_LIB" "$USAGE_LIB"; do
+  A4_LIB_NAME="$(basename "$A4_LIB")"
+  if [ ! -f "$A4_LIB" ]; then
+    fail "A4-1 lib ausente: $A4_LIB_NAME"
+    continue
+  fi
+  if bash -n "$A4_LIB" 2>/dev/null; then
+    pass "A4-1 $A4_LIB_NAME: bash -n"
+  else
+    fail "A4-1 $A4_LIB_NAME: erro de sintaxe (bash -n)"
+  fi
+  if command -v zsh >/dev/null 2>&1; then
+    if zsh -n "$A4_LIB" 2>/dev/null; then
+      pass "A4-1 $A4_LIB_NAME: zsh -n"
+    else
+      fail "A4-1 $A4_LIB_NAME: erro de sintaxe (zsh -n)"
+    fi
+  fi
+done
+
+# ── A4-2: o compositor não pode VOLTAR a morar dentro do hook ──────────────
+if grep -qE '^[[:space:]]*build_vault_brief[[:space:]]*\(\)' "$AGENTS_DIR/hooks/session-start.sh" 2>/dev/null; then
+  fail "A4-2 build_vault_brief() voltou a ser definido dentro de session-start.sh (não é provável fora do hook)"
+else
+  pass "A4-2 compositor segue extraído (nenhuma definição de build_vault_brief() no hook)"
+fi
+if grep -q 'brief-compose.sh' "$AGENTS_DIR/hooks/session-start.sh" 2>/dev/null; then
+  pass "A4-2b session-start.sh consome brief-compose.sh"
+else
+  fail "A4-2b session-start.sh não referencia brief-compose.sh"
+fi
+
+# ── Fixtures dos 4 estados de vault ─────────────────────────────────────────
+# (1) populado
+mkdir -p "$A4_SB/pop" "$A4_SB/vault-pop/projects/a4-brief-pop/sessions" \
+         "$A4_SB/vault-pop/projects/a4-brief-pop/pending" \
+         "$A4_SB/vault-pop/projects/a4-brief-pop/instincts"
+printf 'project-slug: a4-brief-pop\n' > "$A4_SB/pop/CLAUDE.md"
+printf '# Sessao A4 populada\n\nnext-entrypoint: retomar o gate de identidade\n' \
+  > "$A4_SB/vault-pop/projects/a4-brief-pop/sessions/2026-08-01-x.md"
+printf '# Pendencia numero um\n' > "$A4_SB/vault-pop/projects/a4-brief-pop/pending/p1.md"
+printf '# Instinto numero um\n' > "$A4_SB/vault-pop/projects/a4-brief-pop/instincts/i1.md"
+# (2) vault existe e está vazio
+mkdir -p "$A4_SB/vazio" "$A4_SB/vault-vazio/projects/a4-brief-vazio/sessions" \
+         "$A4_SB/vault-vazio/projects/a4-brief-vazio/pending" \
+         "$A4_SB/vault-vazio/projects/a4-brief-vazio/instincts"
+printf 'project-slug: a4-brief-vazio\n' > "$A4_SB/vazio/CLAUDE.md"
+# (3) declarado no CLAUDE.md e AUSENTE no disco
+mkdir -p "$A4_SB/decl"
+printf 'project-slug: a4-brief-decl\n' > "$A4_SB/decl/CLAUDE.md"
+# (4) nada declarado e sem vault -> fresco
+mkdir -p "$A4_SB/fresco"
+
+A4_OUT="$(a4_brief "$A4_SB/pop" "$A4_SB/vault-pop")"
+f2_has "A4-3 vault populado: título da última sessão no brief" "$A4_OUT" "Sessao A4 populada"
+f2_has "A4-3b vault populado: next-entrypoint destilado" "$A4_OUT" "retomar o gate de identidade"
+f2_has "A4-3c vault populado: seção Pending com contagem" "$A4_OUT" "Pending (1)"
+f2_has "A4-3d vault populado: seção Instincts com contagem" "$A4_OUT" "Instincts (1)"
+
+A4_OUT="$(a4_brief "$A4_SB/vazio" "$A4_SB/vault-vazio")"
+f2_has "A4-4a vault vazio: marcador de sessão" "$A4_OUT" "(nenhuma sessão registrada)"
+f2_has "A4-4b vault vazio: marcador de next-entrypoint" "$A4_OUT" "(nenhum next-entrypoint declarado)"
+f2_has "A4-4c vault vazio: marcador de pending" "$A4_OUT" "(nenhum pending registrado)"
+f2_has "A4-4d vault vazio: marcador de instinct" "$A4_OUT" "(nenhum instinct registrado)"
+
+A4_OUT="$(a4_brief "$A4_SB/decl" "$A4_SB/vault-decl-inexistente")"
+f2_has "A4-5 vault declarado-e-ausente: marcador QUEBRADO (memória desligada, não vazia)" \
+  "$A4_OUT" "vault declarado"
+f2_has "A4-5b declarado-e-ausente aponta a ação" "$A4_OUT" "canuto-project-doctor"
+
+A4_OUT="$(a4_brief "$A4_SB/fresco" "$A4_SB/vault-fresco-inexistente")"
+f2_has "A4-6 projeto fresco: marcador de 1ª sessão" "$A4_OUT" "1ª sessão"
+f2_hasnt "A4-6b projeto fresco não mente dizendo 'declarado'" "$A4_OUT" "vault declarado"
+
+# ── A4-7: o gate no repo real e num sandbox populado ────────────────────────
+# Este é o único caso que lê o vault REAL (só leitura — a perna 2 monta o
+# próprio mktemp). Num clone recém-baixado (CI) o vault sequer existe: aí o
+# gate reporta declarado-e-ausente, que é o veredito CERTO e não uma regressão.
+# Por isso a ausência de vault instalado vira WARN; a asserção dura é a
+# hermética logo abaixo (A4-7b), que não depende da máquina.
+A4_REAL_RC=0
+A4_REAL_OUT=$(bash "$BRIEF_LIB" check-identity "$FRAMEWORK_DIR" 2>&1) || A4_REAL_RC=$?
+if [ "$A4_REAL_RC" -eq 0 ]; then
+  pass "A4-7 check-identity OK no repo real"
+elif [ ! -d "${CANUTO_VAULT_DIR:-$HOME/.canuto/vault}/projects" ]; then
+  warn "A4-7 nenhum vault instalado nesta máquina — gate não exercitado no repo real"
+else
+  fail "A4-7 check-identity FALHOU no repo real: $A4_REAL_OUT"
+fi
+
+a4_check "$A4_SB/pop" "$A4_SB/vault-pop"
+if [ "$A4_CHECK_RC" -eq 0 ]; then
+  pass "A4-7b check-identity OK em sandbox populado (hermético)"
+else
+  fail "A4-7b check-identity falhou em sandbox populado: $A4_CHECK_OUT"
+fi
+
+# ── A4-8: o gate FALHA no feeder declarado-e-ausente ────────────────────────
+a4_check "$A4_SB/decl" "$A4_SB/vault-decl-inexistente"
+if [ "$A4_CHECK_RC" -ne 0 ]; then
+  f2_has "A4-8 gate falha no feeder declarado-e-ausente" "$A4_CHECK_OUT" "declarado-e-ausente"
+else
+  fail "A4-8 gate passou com vault declarado e ausente (memória desligada passaria por saudável)"
+fi
+
+# ── A4-9: SABOTAGEM — seção vazia renderizada SEM marcador (perna 2) ────────
+# É o teste que dá valor ao gate: sem ele, um compositor que devolvesse "" para
+# toda seção vazia passaria na perna 1 de qualquer projeto populado.
+mkdir -p "$A4_SB/sab2"
+cp "$AGENTS_DIR/tools/canuto-memory.sh" "$AGENTS_DIR/tools/memory-usage.sh" "$A4_SB/sab2/" 2>/dev/null || true
+sed 's/^Pending: \$CANUTO_BRIEF_MARK_NO_PENDING"$/Pending:"/' "$BRIEF_LIB" > "$A4_SB/sab2/brief-compose.sh"
+if cmp -s "$BRIEF_LIB" "$A4_SB/sab2/brief-compose.sh"; then
+  fail "A4-9 sabotagem da perna 2 não aplicou (o sed não casou — teste inválido, não código são)"
+else
+  a4_check "$A4_SB/pop" "$A4_SB/vault-pop" "$A4_SB/sab2/brief-compose.sh"
+  if [ "$A4_CHECK_RC" -ne 0 ]; then
+    f2_has "A4-9 perna 2 pega seção vazia sem marcador honesto" \
+      "$A4_CHECK_OUT" "marcador honesto de vazio"
+  else
+    fail "A4-9 gate passou com compositor sabotado (perna 2 é decorativa)"
+  fi
+fi
+
+# ── A4-10: SABOTAGEM — marcador VAZIO (perna 0) ────────────────────────────
+# Marcador vazio faz `case "$x" in *""*` casar com tudo: o gate passaria por
+# vacuidade justamente quando o compositor está mudo.
+mkdir -p "$A4_SB/sab0"
+cp "$AGENTS_DIR/tools/canuto-memory.sh" "$AGENTS_DIR/tools/memory-usage.sh" "$A4_SB/sab0/" 2>/dev/null || true
+sed 's/^CANUTO_BRIEF_MARK_NO_PENDING=.*/CANUTO_BRIEF_MARK_NO_PENDING=""/' "$BRIEF_LIB" \
+  > "$A4_SB/sab0/brief-compose.sh"
+if cmp -s "$BRIEF_LIB" "$A4_SB/sab0/brief-compose.sh"; then
+  fail "A4-10 sabotagem da perna 0 não aplicou (o sed não casou — teste inválido)"
+else
+  a4_check "$A4_SB/pop" "$A4_SB/vault-pop" "$A4_SB/sab0/brief-compose.sh"
+  if [ "$A4_CHECK_RC" -ne 0 ]; then
+    f2_has "A4-10 perna 0 pega marcador vazio antes das demais pernas" \
+      "$A4_CHECK_OUT" "marcador honesto vazio"
+  else
+    fail "A4-10 gate passou por vacuidade com marcador vazio"
+  fi
+fi
+
+# ── A4-11..16: memory-usage (record + rerank) ──────────────────────────────
+A4_USLUG="a4-usage-test"
+A4_UVAULT="$A4_SB/vault-usage"
+A4_USTORE="$A4_UVAULT/projects/$A4_USLUG/_usage/usage.jsonl"
+mkdir -p "$A4_UVAULT/projects/$A4_USLUG"
+
+a4_rerank() {
+  printf '%s\n' "$@" | HOME="$A4_SB/home" CANUTO_VAULT_DIR="$A4_UVAULT" TMPDIR="$A4_SB/tmp" \
+    bash "$USAGE_LIB" rerank "$A4_USLUG" 2>/dev/null || true
+}
+
+# A4-11: store frio == ordem de entrada (rerank é um `cat`)
+A4_OUT="$(a4_rerank ref-a ref-b ref-c)"
+f2_eq "A4-11 rerank com store frio devolve a ordem de entrada" \
+  "$(printf 'ref-a\nref-b\nref-c')" "$A4_OUT"
+
+# A4-12: sinal de uso levanta a ref usada, e a estabilidade preserva o resto
+HOME="$A4_SB/home" CANUTO_VAULT_DIR="$A4_UVAULT" bash "$USAGE_LIB" record "$A4_USLUG" ref-c >/dev/null 2>&1 || true
+HOME="$A4_SB/home" CANUTO_VAULT_DIR="$A4_UVAULT" bash "$USAGE_LIB" record "$A4_USLUG" ref-c >/dev/null 2>&1 || true
+A4_OUT="$(a4_rerank ref-a ref-b ref-c)"
+f2_eq "A4-12 ref usada sobe ao topo e as demais mantêm a ordem (sort estável)" \
+  "$(printf 'ref-c\nref-a\nref-b')" "$A4_OUT"
+
+# A4-13: ts no FUTURO é relógio torto, não sinal fresco
+A4_UVAULT2="$A4_SB/vault-usage2"
+A4_USTORE2="$A4_UVAULT2/projects/$A4_USLUG/_usage/usage.jsonl"
+mkdir -p "$(dirname "$A4_USTORE2")"
+printf '{"ts":%s,"refs":["ref-z"]}\n' "$(( $(date +%s) + 9999 ))" > "$A4_USTORE2"
+A4_OUT="$(printf 'ref-a\nref-z\n' | HOME="$A4_SB/home" CANUTO_VAULT_DIR="$A4_UVAULT2" \
+  TMPDIR="$A4_SB/tmp" bash "$USAGE_LIB" rerank "$A4_USLUG" 2>/dev/null || true)"
+f2_eq "A4-13 ts no futuro é ignorado (não sobe a ref)" "$(printf 'ref-a\nref-z')" "$A4_OUT"
+
+# A4-14: linha malformada não pode SUMIR com item do briefing
+A4_UVAULT3="$A4_SB/vault-usage3"
+A4_USTORE3="$A4_UVAULT3/projects/$A4_USLUG/_usage/usage.jsonl"
+mkdir -p "$(dirname "$A4_USTORE3")"
+{ printf 'lixo nao json\n'; printf '{"ts":%s,"refs":["ref-b"]}\n' "$(date +%s)"; } > "$A4_USTORE3"
+A4_OUT="$(printf 'ref-a\nref-b\nref-c\n' | HOME="$A4_SB/home" CANUTO_VAULT_DIR="$A4_UVAULT3" \
+  TMPDIR="$A4_SB/tmp" bash "$USAGE_LIB" rerank "$A4_USLUG" 2>/dev/null || true)"
+A4_NLINES="$(printf '%s\n' "$A4_OUT" | grep -c . || true)"
+f2_eq "A4-14 linha malformada no store não reduz o número de refs" "3" "$A4_NLINES"
+
+# A4-15/16: DECAY por recência — 30d decai abaixo do fresco, mas segue acima
+# de quem nunca foi usado (é o ponto do half-life: esquecer sem apagar).
+A4_UVAULT4="$A4_SB/vault-usage4"
+A4_USTORE4="$A4_UVAULT4/projects/$A4_USLUG/_usage/usage.jsonl"
+mkdir -p "$(dirname "$A4_USTORE4")"
+{
+  printf '{"ts":%s,"refs":["ref-velha"]}\n' "$(( $(date +%s) - 2592000 ))"
+  printf '{"ts":%s,"refs":["ref-nova"]}\n' "$(date +%s)"
+} > "$A4_USTORE4"
+A4_OUT="$(printf 'ref-nunca\nref-velha\nref-nova\n' | HOME="$A4_SB/home" \
+  CANUTO_VAULT_DIR="$A4_UVAULT4" TMPDIR="$A4_SB/tmp" \
+  bash "$USAGE_LIB" rerank "$A4_USLUG" 2>/dev/null || true)"
+f2_eq "A4-15 decay: fresca > velha(30d) > nunca-usada" \
+  "$(printf 'ref-nova\nref-velha\nref-nunca')" "$A4_OUT"
+
+# A4-16: o store de uso NUNCA mora no event log (invariante de governança N4)
+A4_OUT="$(HOME="$A4_SB/home" CANUTO_VAULT_DIR="$A4_UVAULT" bash "$USAGE_LIB" path "$A4_USLUG" 2>/dev/null || true)"
+f2_has "A4-16 store de uso vive em _usage/ (separado do event log)" "$A4_OUT" "/_usage/usage.jsonl"
+f2_hasnt "A4-16b store de uso não pode cair em events/" "$A4_OUT" "/events/"
+
+rm -rf "$A4_SB"
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TEST 17: Closeout atômico + pendings endereçáveis (Fase 2 — A5)
+# ═══════════════════════════════════════════════════════════════════════════
+# Nota sem intent kernel é memória write-only (eoc ADR-0009): prosa sem índice
+# de retrieval. E o Next-Entrypoint que não vira pending EVAPORA POR OMISSÃO
+# (ADR-0007). Ambos são gates mecânicos aqui — nenhum depende do agente lembrar.
+echo "── Test 17: Closeout atômico (A5) ──"
+
+A5_HOOK="$AGENTS_DIR/hooks/session-save.sh"
+A5_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/canuto-a5.XXXXXX")"
+A5_SLUG="a5-closeout-test"
+A5_CASE=""; A5_VAULT=""
+
+a5_setup() {
+  # Sandbox NOVO por caso: pending/rework acumulam, e cruzar casos esconderia
+  # exatamente o bug de idempotência que o caso 6 procura.
+  A5_CASE="$A5_ROOT/$1"
+  A5_VAULT="$A5_CASE/vault/projects/$A5_SLUG"
+  mkdir -p "$A5_CASE/proj/.agents/tools" "$A5_VAULT/sessions" \
+           "$A5_CASE/home" "$A5_CASE/tmp"
+  printf 'project-slug: %s\n' "$A5_SLUG" > "$A5_CASE/proj/CLAUDE.md"
+  cp "$AGENTS_DIR/tools/canuto-memory.sh" "$AGENTS_DIR/tools/event-log.sh" \
+     "$A5_CASE/proj/.agents/tools/" 2>/dev/null || true
+}
+a5_run() {
+  HOME="$A5_CASE/home" CANUTO_VAULT_DIR="$A5_CASE/vault" CANUTO_SLUG_NO_CACHE=1 \
+  CLAUDE_PROJECT_DIR="$A5_CASE/proj" TMPDIR="$A5_CASE/tmp" \
+    bash "$A5_HOOK" 2>&1 || true
+}
+a5_events() { cat "$A5_VAULT/events/log.jsonl" 2>/dev/null || true; }
+a5_count()  { ls "$A5_VAULT/$1" 2>/dev/null | grep -c '\.md$' || true; }
+
+# ── A5-1: sem nota canônica -> nada a publicar, nenhum evento ──────────────
+a5_setup sem-nota
+A5_OUT="$(a5_run)"
+f2_has "A5-1 sem nota canônica o hook diz o que falta" "$A5_OUT" "nenhuma nota canônica"
+f2_hasnt "A5-1b sem nota não emite CLOSEOUT_PUBLISHED" "$(a5_events)" "CLOSEOUT_PUBLISHED"
+
+# ── A5-2: kernel de 3 linhas -> CLOSEOUT_PUBLISHED ─────────────────────────
+a5_setup kernel-3-linhas
+cat > "$A5_VAULT/sessions/2026-08-01-sessao.md" <<'A5EOF'
+# Sessao com kernel
+
+intent: fechar a fase 2 do canuto
+porque: a memoria estava write-only
+proximo: rodar o gate de identidade no repo consumidor
+A5EOF
+A5_OUT="$(a5_run)"
+A5_EV="$(a5_events)"
+f2_has "A5-2 kernel presente -> CLOSEOUT PUBLICADO no output" "$A5_OUT" "CLOSEOUT PUBLICADO"
+f2_has "A5-2b evento CLOSEOUT_PUBLISHED emitido" "$A5_EV" '"event":"CLOSEOUT_PUBLISHED"'
+f2_has "A5-2c evento carrega status=published" "$A5_EV" '"status":"published"'
+f2_has "A5-2d evento carrega o kernel (intent)" "$A5_EV" 'fechar a fase 2 do canuto'
+
+# ── A5-5: Next Entrypoint acionável vira pending endereçável ───────────────
+if [ "$(a5_count pending)" = "1" ]; then
+  pass "A5-5 next-entrypoint virou pending auto-criado"
+  A5_PEND="$(cat "$A5_VAULT"/pending/*.md 2>/dev/null || true)"
+  f2_has "A5-5b pending nasce com status: proposed (ADR-0007)" "$A5_PEND" "status: proposed"
+  f2_has "A5-5c pending é endereçável (id: no frontmatter)" "$A5_PEND" "id: "
+else
+  fail "A5-5 next-entrypoint não virou pending (contagem=$(a5_count pending)) — evaporação por omissão"
+fi
+
+# ── A5-6: idempotência — rodar 2× não duplica ──────────────────────────────
+A5_OUT="$(a5_run)"
+if [ "$(a5_count pending)" = "1" ]; then
+  pass "A5-6 hook idempotente: 2 execuções -> 1 pending"
+else
+  fail "A5-6 hook duplicou pending na 2ª execução (contagem=$(a5_count pending))"
+fi
+
+# ── A5-3: contrato legado Summary/Proof/Next Entrypoint também publica ─────
+a5_setup kernel-legado
+cat > "$A5_VAULT/sessions/2026-08-01-legado.md" <<'A5EOF'
+---
+next-entrypoint: "consolidar os ADRs da fase 2"
+---
+
+# Sessao no formato canuto-brain
+
+## Summary
+Consolidei o ledger de delegacao.
+
+## Proof
+bash test-framework.sh
+
+## Next Entrypoint
+consolidar os ADRs da fase 2
+A5EOF
+A5_OUT="$(a5_run)"
+f2_has "A5-3 contrato legado (Summary/Proof/Next) não é penalizado" "$A5_OUT" "CLOSEOUT PUBLICADO"
+f2_has "A5-3b evento legado sai como published" "$(a5_events)" '"status":"published"'
+
+# ── A5-4: nota sem nenhum dos dois contratos -> write-only ─────────────────
+a5_setup sem-kernel
+printf '# Nota qualquer\n\nTrabalhei em varias coisas hoje.\n' \
+  > "$A5_VAULT/sessions/2026-08-01-solta.md"
+A5_OUT="$(a5_run)"
+f2_has "A5-4 nota sem kernel é nomeada como write-only" "$A5_OUT" "closeout sem intent kernel"
+A5_EV="$(a5_events)"
+f2_has "A5-4b evento sai como incomplete" "$A5_EV" '"status":"incomplete"'
+f2_has "A5-4c evento nomeia a razão" "$A5_EV" '"reason":"no_kernel"'
+
+# ── A5-7: admissão de retrabalho vira nota em rework/ ──────────────────────
+a5_setup rework
+cat > "$A5_VAULT/sessions/2026-08-01-rework.md" <<'A5EOF'
+# Sessao com retrabalho
+
+intent: corrigir o gate de identidade
+porque: o brief saia vazio sem dizer que quebrou
+proximo: portar os testes para test-framework.sh
+
+Hoje redescobri o mesmo bug de resolucao de slug do mes passado.
+A5EOF
+A5_OUT="$(a5_run)"
+if [ "$(a5_count rework)" = "1" ]; then
+  pass "A5-7 admissão de retrabalho virou nota em rework/"
+  A5_RW="$(cat "$A5_VAULT"/rework/*.md 2>/dev/null || true)"
+  f2_has "A5-7b rework nasce com status: proposed" "$A5_RW" "status: proposed"
+else
+  fail "A5-7 'redescobri' não gerou nota de rework (contagem=$(a5_count rework))"
+fi
+A5_OUT="$(a5_run)"
+if [ "$(a5_count rework)" = "1" ]; then
+  pass "A5-7c rework também é idempotente (2 execuções -> 1 nota)"
+else
+  fail "A5-7c rework duplicou na 2ª execução (contagem=$(a5_count rework))"
+fi
+
+# ── A5-8: menção a segredo alerta por CONTAGEM + LINHA, nunca por conteúdo ──
+# Reconciliado com a mitigação S4 (review cego 2026-08-02): a versão anterior
+# deste teste exigia o NOME da variável no alerta, mas o extrator de "nomes"
+# ([A-Z][A-Z0-9_]{2,}) capturava a própria CHAVE (ex.: AKIA…) e a colava no
+# transcript — o oposto do que o alerta promete. O contrato atual é mais
+# ESTRITO: o alerta existe, diz QUANTAS referências e EM QUE LINHAS da nota,
+# e não copia nada do conteúdo (nem nome, nem valor). Quem precisa do nome
+# abre a nota; o log fica limpo.
+a5_setup segredo
+cat > "$A5_VAULT/sessions/2026-08-01-segredo.md" <<'A5EOF'
+# Sessao com segredo
+
+intent: rotacionar credencial exposta
+porque: o valor vazou no transcript
+proximo: confirmar a rotacao no provedor
+
+Preciso rotacionar TOKEN=abc123 antes do proximo deploy.
+A5EOF
+A5_OUT="$(a5_run)"
+f2_has "A5-8 alerta de segredo aparece no output" "$A5_OUT" "ALERTA"
+f2_has "A5-8b alerta cita a CONTAGEM de referências (não o conteúdo)" \
+  "$A5_OUT" "referência(s) a segredo"
+f2_has "A5-8b2 alerta endereça a nota por linha (auditável sem copiar nada)" \
+  "$A5_OUT" "linha(s):"
+f2_hasnt "A5-8c alerta NUNCA imprime o valor do segredo" "$A5_OUT" "abc123"
+f2_hasnt "A5-8d alerta também não ecoa o NOME da variável (S4)" "$A5_OUT" "TOKEN"
+
+# ── A5-8e: segredo NO KERNEL não vaza para id/arquivo/evento/stdout ─────────
+# Gap do review cego 2026-08-02: `_a5_create_pending` embutia o texto CRU (e
+# derivava o id/nome de arquivo do slug dele), e os 3 campos do kernel iam
+# verbatim para o evento CLOSEOUT_PUBLISHED e para o stdout. Uma nota com
+# "proximo: rotacionar TOKEN=abc123" publicava o VALOR em três lugares.
+a5_setup segredo-no-kernel
+cat > "$A5_VAULT/sessions/2026-08-01-kernel-segredo.md" <<'A5EOF'
+# Sessao com segredo no kernel
+
+intent: fechar o gap de redacao do kernel
+porque: o valor ia verbatim para o evento e para o stdout
+proximo: rotacionar TOKEN=abc123 no provedor
+A5EOF
+A5_OUT="$(a5_run)"
+f2_hasnt "A5-8e valor do kernel não vaza no stdout do hook" "$A5_OUT" "abc123"
+f2_has "A5-8e2 kernel redigido preserva o NOME e mata o VALOR" "$A5_OUT" "TOKEN=<redigido>"
+A5_LEAK=""
+for A5_D in pending events; do
+  [ -d "$A5_VAULT/$A5_D" ] || continue
+  if grep -rq 'abc123' "$A5_VAULT/$A5_D" 2>/dev/null; then
+    A5_LEAK="$A5_LEAK $A5_D/"
+  fi
+done
+if [ -z "$A5_LEAK" ]; then
+  pass "A5-8f valor do kernel não vazou para pending/ nem events/"
+else
+  fail "A5-8f VALOR DE SEGREDO do kernel vazou para:$A5_LEAK"
+fi
+A5_PENDNAMES="$(ls "$A5_VAULT/pending" 2>/dev/null || true)"
+f2_hasnt "A5-8g nome do arquivo do pending não carrega o valor do segredo" \
+  "$A5_PENDNAMES" "abc123"
+f2_has "A5-8h pending foi criado mesmo assim (redação não engole a thread)" \
+  "$A5_PENDNAMES" "redigido"
+
+# ── A5-9: EXTRA — retrabalho e segredo na MESMA linha ──────────────────────
+# Gap declarado no recibo A5 (§2.5) e mitigado depois com redação `=<redigido>`
+# em _a5_create_rework. Sem este teste a mitigação some no próximo refactor:
+# a evidência de rework é copiada VERBATIM para a nota nova, então uma linha
+# "redescobri ... TOKEN=<valor>" levaria o segredo para um arquivo novo.
+a5_setup segredo-na-linha-do-rework
+cat > "$A5_VAULT/sessions/2026-08-01-misto.md" <<'A5EOF'
+# Sessao com segredo na linha do retrabalho
+
+intent: fechar o gap de redacao
+porque: evidencia de rework era copiada verbatim
+proximo: rodar o test-framework
+
+Hoje redescobri que precisava rotacionar TOKEN=abc123 de novo.
+A5EOF
+A5_OUT="$(a5_run)"
+if [ "$(a5_count rework)" = "1" ]; then
+  pass "A5-9 nota de rework criada mesmo com segredo na mesma linha"
+else
+  fail "A5-9 rework não foi criado (contagem=$(a5_count rework))"
+fi
+A5_LEAK=""
+for A5_D in rework pending events; do
+  [ -d "$A5_VAULT/$A5_D" ] || continue
+  if grep -rq 'abc123' "$A5_VAULT/$A5_D" 2>/dev/null; then
+    A5_LEAK="$A5_LEAK $A5_D/"
+  fi
+done
+if [ -z "$A5_LEAK" ]; then
+  pass "A5-9b valor do segredo não vazou para rework/, pending/ nem events/"
+else
+  fail "A5-9b VALOR DE SEGREDO vazou para:$A5_LEAK (redação de _a5_create_rework quebrou)"
+fi
+f2_hasnt "A5-9c valor do segredo não vaza no stdout do hook" "$A5_OUT" "abc123"
+A5_RW="$(cat "$A5_VAULT"/rework/*.md 2>/dev/null || true)"
+f2_has "A5-9d a evidência foi redigida (prova de que é mitigação, não acaso)" \
+  "$A5_RW" "=<redigido>"
+# Nota conhecida e aceita: <vault>/.snapshots/ guarda cópia byte-a-byte da nota
+# ORIGINAL (backup pré-existente ao A5), então o valor continua lá — por isso a
+# asserção acima é sobre os arquivos que ESTE mecanismo cria.
+
+# ── A5-10: regressão dos backends que não têm vault ────────────────────────
+# Backend offline não pode alcançar nenhum código novo (set -u veria $VAULT_DIR
+# não-vinculado se alcançasse).
+A5_OFF="$A5_ROOT/offline"
+mkdir -p "$A5_OFF/proj/.agents/tools" "$A5_OFF/home" "$A5_OFF/tmp"
+cp "$AGENTS_DIR/tools/canuto-memory.sh" "$AGENTS_DIR/tools/event-log.sh" \
+   "$A5_OFF/proj/.agents/tools/" 2>/dev/null || true
+A5_OFF_RC=0
+A5_OUT=$(HOME="$A5_OFF/home" CANUTO_VAULT_DIR="$A5_OFF/vault-inexistente" \
+  CANUTO_SLUG_NO_CACHE=1 CLAUDE_PROJECT_DIR="$A5_OFF/proj" TMPDIR="$A5_OFF/tmp" \
+  bash "$A5_HOOK" 2>&1) || A5_OFF_RC=$?
+if [ "$A5_OFF_RC" -eq 0 ]; then
+  f2_has "A5-10 backend offline segue no caminho antigo (OFFLINE Save)" "$A5_OUT" "OFFLINE Save"
+  f2_hasnt "A5-10b backend offline não menciona kernel" "$A5_OUT" "intent kernel"
+else
+  fail "A5-10 hook quebrou no backend offline (rc=$A5_OFF_RC)"
+fi
+
+# ── A5-11: sintaxe nos dois shells ─────────────────────────────────────────
+if bash -n "$A5_HOOK" 2>/dev/null; then
+  pass "A5-11a session-save.sh: bash -n"
+else
+  fail "A5-11a session-save.sh: erro de sintaxe (bash -n)"
+fi
+if command -v zsh >/dev/null 2>&1; then
+  if zsh -n "$A5_HOOK" 2>/dev/null; then
+    pass "A5-11b session-save.sh: zsh -n"
+  else
+    fail "A5-11b session-save.sh: erro de sintaxe (zsh -n)"
+  fi
+fi
+
+rm -rf "$A5_ROOT"
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TEST 18: Ledger de pendências de delegação (Fase 2 — A2b)
+# ═══════════════════════════════════════════════════════════════════════════
+# "Fallback nunca é silencioso" não se sustentava como prompt (42 falhas de
+# delegação -> 3 declarações). O ledger torna a pendência um FOLD mecânico:
+# só dead-letter COM RAZÃO ou fallback declarado fecham (eoc ADR-0017:
+# "an autonomous grill may only park, never fabricate acknowledged").
+echo "── Test 18: Ledger de delegação (A2b) ──"
+
+LEDGER="$AGENTS_DIR/tools/delegation-ledger.sh"
+A2_SB="$(mktemp -d "${TMPDIR:-/tmp}/canuto-a2b.XXXXXX")"
+A2_METRICS="$A2_SB/metrics.jsonl"
+A2_ID_ERR="2026-08-01T10:05:00Z"
+A2_ID_TMO="2026-08-01T10:10:00Z"
+A2_ID_OUTRO="2026-08-01T10:20:00Z"
+A2_ID_SEMCWD="2026-08-01T10:30:00Z"
+mkdir -p "$A2_SB/proj" "$A2_SB/home" "$A2_SB/tmp"
+# CANUTO_VAULT_DIR aponta para um vault inexistente de propósito: o backend cai
+# em `none` e o event log fica DENTRO do sandbox, nunca no vault real. E
+# CANUTO_METRICS_FILE substitui ~/.codex/delegate-metrics.jsonl.
+#
+# Heredoc NÃO-quotado (review cego 2026-08-02): as métricas são globais e os
+# fechamentos por projeto, então o fold passou a recortar por `cwd`. As
+# fixtures precisam de cwd REAL do sandbox para exercitar o recorte — e
+# incluem de propósito uma linha de OUTRO projeto e uma linha ANTIGA sem cwd.
+cat > "$A2_METRICS" <<A2EOF
+{"ts":"2026-08-01T10:00:00Z","role":"coder","result":"OK","reason":"","out":"/tmp/ok.md","cwd":"$A2_SB/proj"}
+{"ts":"2026-08-01T10:05:00Z","role":"coder","result":"ERROR","reason":"exit 4","out":"/tmp/a.md","cwd":"$A2_SB/proj"}
+{"ts":"2026-08-01T10:10:00Z","role":"reviewer","result":"TIMEOUT","reason":"600s","out":"/tmp/b.md","cwd":"$A2_SB/proj/pacote/x"}
+{"ts":"2026-08-01T10:20:00Z","role":"coder","result":"ERROR","reason":"falha do projeto B","out":"/tmp/z.md","cwd":"$A2_SB/outro-projeto"}
+{"ts":"2026-08-01T10:30:00Z","role":"coder","result":"ERROR","reason":"linha antiga sem cwd","out":"/tmp/y.md"}
+A2EOF
+
+A2_OUT=""; A2_ERR=""; A2_RC=0
+a2_run() {
+  A2_RC=0
+  A2_OUT=$(
+    HOME="$A2_SB/home" CANUTO_METRICS_FILE="$A2_METRICS" \
+    CANUTO_VAULT_DIR="$A2_SB/vault-inexistente" CANUTO_SLUG_NO_CACHE=1 \
+    CLAUDE_PROJECT_DIR="$A2_SB/proj" TMPDIR="$A2_SB/tmp" \
+    CANUTO_LEDGER_ALL="${A2_ALL:-0}" \
+      bash "$LEDGER" "$@" 2>"$A2_SB/.err"
+  ) || A2_RC=$?
+  A2_ERR="$(cat "$A2_SB/.err" 2>/dev/null || true)"
+}
+a2_pending_count() { printf '%s' "$A2_OUT" | grep -c . || true; }
+
+# ── A2b-1: fold — só as não-OK DESTE projeto (2 de 5 linhas) ───────────────
+a2_run pending
+f2_eq "A2b-1 fold lista só as não-OK deste projeto (5 linhas -> 2)" "2" "$(a2_pending_count)"
+f2_has "A2b-1b pendência nomeia o id do ERROR" "$A2_OUT" "$A2_ID_ERR"
+f2_has "A2b-1c pendência de SUBDIRETÓRIO do projeto conta como do projeto" "$A2_OUT" "$A2_ID_TMO"
+f2_hasnt "A2b-1d delegação OK não entra no fold" "$A2_OUT" "2026-08-01T10:00:00Z"
+
+# ── A2b-1e/f/g: escopo de projeto (métricas globais, fechamentos por projeto)
+# Sem o recorte, todo projeto listava o backlog global inteiro no primeiro Stop
+# e um dead-letter feito no projeto B nunca fechava a linha no projeto A.
+f2_hasnt "A2b-1e falha de OUTRO projeto não polui o Stop deste" "$A2_OUT" "$A2_ID_OUTRO"
+f2_hasnt "A2b-1f linha antiga sem cwd fica fora por default (limitação documentada)" \
+  "$A2_OUT" "$A2_ID_SEMCWD"
+f2_has "A2b-1g recorte não é silencioso: stderr conta as omitidas" "$A2_ERR" "CANUTO_LEDGER_ALL=1"
+A2_ALL=1
+a2_run pending
+f2_eq "A2b-1h CANUTO_LEDGER_ALL=1 desliga o filtro (backlog global = 4)" "4" "$(a2_pending_count)"
+f2_has "A2b-1i com ALL=1 a falha do outro projeto reaparece" "$A2_OUT" "$A2_ID_OUTRO"
+f2_has "A2b-1j com ALL=1 a linha sem cwd reaparece" "$A2_OUT" "$A2_ID_SEMCWD"
+A2_ALL=0
+a2_run pending
+
+# ── A2b-2/3: dead-letter SEM razão é recusado (não se fabrica fechamento) ──
+a2_run dead-letter "$A2_ID_ERR" ""
+if [ "$A2_RC" -eq 1 ]; then
+  f2_has "A2b-2 dead-letter sem razão sai 1 nomeando o id" "$A2_ERR" "$A2_ID_ERR"
+else
+  fail "A2b-2 dead-letter aceitou razão vazia (rc=$A2_RC) — park fabricado"
+fi
+a2_run dead-letter "$A2_ID_ERR" "   "
+if [ "$A2_RC" -eq 1 ]; then
+  pass "A2b-3 dead-letter com razão só-espaço também é recusado"
+else
+  fail "A2b-3 dead-letter aceitou razão em branco (rc=$A2_RC)"
+fi
+a2_run pending
+f2_eq "A2b-3b recusa não fecha nada: as 2 pendências continuam" "2" "$(a2_pending_count)"
+
+# ── A2b-4: dead-letter COM razão fecha o id ────────────────────────────────
+a2_run dead-letter "$A2_ID_ERR" "sandbox: resgatado manualmente"
+if [ "$A2_RC" -eq 0 ]; then
+  pass "A2b-4 dead-letter com razão é aceito"
+else
+  fail "A2b-4 dead-letter com razão falhou (rc=$A2_RC): $A2_ERR"
+fi
+a2_run pending
+f2_eq "A2b-4b id com dead-letter sai do fold (2 -> 1)" "1" "$(a2_pending_count)"
+f2_hasnt "A2b-4c o id fechado não reaparece" "$A2_OUT" "$A2_ID_ERR"
+
+# ── A2b-5: fallback declarado também fecha ─────────────────────────────────
+a2_run declare-fallback "$A2_ID_TMO" claude-direct
+if [ "$A2_RC" -eq 0 ]; then
+  pass "A2b-5 declare-fallback é aceito"
+else
+  fail "A2b-5 declare-fallback falhou (rc=$A2_RC): $A2_ERR"
+fi
+a2_run pending
+f2_eq "A2b-5b fallback declarado esvazia o fold (1 -> 0)" "0" "$(a2_pending_count)"
+
+# ── A2b-6: linha malformada no metrics não derruba o fold ──────────────────
+{
+  printf 'not-json-garbage\n'
+  printf '{"ts":truncated-broken-line\n'
+  printf '{"ts":"2026-08-01T11:00:00Z","role":"coder","result":"ERROR","reason":"x","out":"/tmp/c.md","cwd":"%s"}\n' "$A2_SB/proj"
+} >> "$A2_METRICS"
+a2_run pending
+f2_eq "A2b-6 linhas malformadas são puladas e a válida seguinte aparece" "1" "$(a2_pending_count)"
+f2_has "A2b-6b a pendência válida após o lixo é listada" "$A2_OUT" "2026-08-01T11:00:00Z"
+
+# ── A2b-7: uso incorreto é erro de uso, não fechamento silencioso ──────────
+a2_run dead-letter
+f2_eq "A2b-7 dead-letter sem argumentos sai 64 (erro de uso)" "64" "$A2_RC"
+a2_run declare-fallback "$A2_ID_TMO"
+f2_eq "A2b-7b declare-fallback sem executor sai 64" "64" "$A2_RC"
+
+# ── A2b-8: sintaxe nos dois shells ─────────────────────────────────────────
+if bash -n "$LEDGER" 2>/dev/null; then
+  pass "A2b-8a delegation-ledger.sh: bash -n"
+else
+  fail "A2b-8a delegation-ledger.sh: erro de sintaxe (bash -n)"
+fi
+if command -v zsh >/dev/null 2>&1; then
+  if zsh -n "$LEDGER" 2>/dev/null; then
+    pass "A2b-8b delegation-ledger.sh: zsh -n"
+  else
+    fail "A2b-8b delegation-ledger.sh: erro de sintaxe (zsh -n)"
+  fi
+fi
+
+rm -rf "$A2_SB"
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TEST 19: Cobertura dos ADR-0005 (aging) e ADR-0006 (revisor cego)
+# ═══════════════════════════════════════════════════════════════════════════
+# Gap conhecido: os dois ADRs tinham decisão escrita e ZERO teste. Um muro que
+# ninguém verifica é um muro que já caiu e ninguém viu.
+echo "── Test 19: ADR-0005 (aging) / ADR-0006 (revisor cego) ──"
+
+# ── 19a. instinct-aging: decay é por ESCASSEZ, não por tempo ───────────────
+# O tier curado (medium/high) é EXENTO por mais velho que esteja: idade sozinha
+# nunca arquiva. O gatilho é a escassez de confirmação (confidence: low).
+AGING="$AGENTS_DIR/tools/instinct-aging.sh"
+if [ ! -f "$AGING" ]; then
+  fail "19a instinct-aging.sh ausente (ADR-0005 sem implementação)"
+else
+  IA_SB="$(mktemp -d "${TMPDIR:-/tmp}/canuto-aging.XXXXXX")"
+  IA_SLUG="instinct-aging-test"
+  IA_INST="$IA_SB/vault/projects/$IA_SLUG/instincts"
+  mkdir -p "$IA_SB/proj" "$IA_INST" "$IA_SB/home" "$IA_SB/tmp"
+  printf 'project-slug: %s\n' "$IA_SLUG" > "$IA_SB/proj/CLAUDE.md"
+  cat > "$IA_INST/velho-low.md" <<'IAEOF'
+---
+id: velho-low
+confidence: low
+last-seen: 2020-01-01
+---
+# hipotese velha e nunca reconfirmada
+IAEOF
+  cat > "$IA_INST/velho-high.md" <<'IAEOF'
+---
+id: velho-high
+confidence: high
+last-seen: 2020-01-01
+---
+# curado, igualmente velho
+IAEOF
+  cat > "$IA_INST/novo-low.md" <<IAEOF
+---
+id: novo-low
+confidence: low
+last-seen: $(date +%Y-%m-%d)
+---
+# hipotese recente
+IAEOF
+  ia_run() {
+    HOME="$IA_SB/home" CANUTO_VAULT_DIR="$IA_SB/vault" CANUTO_SLUG_NO_CACHE=1 \
+    CLAUDE_PROJECT_DIR="$IA_SB/proj" TMPDIR="$IA_SB/tmp" \
+      bash "$AGING" "$1" 2>&1 || true
+  }
+  IA_OUT="$(ia_run --dry-run)"
+  f2_has "19a hipótese escassa e velha é candidata a arquivamento" "$IA_OUT" "velho-low"
+  f2_hasnt "19a2 DECAY É POR ESCASSEZ: instinct curado (high) igualmente velho é EXENTO" \
+    "$IA_OUT" "velho-high"
+  f2_hasnt "19a3 hipótese recente não é candidata" "$IA_OUT" "novo-low"
+
+  IA_OUT="$(ia_run --apply)"
+  if [ -f "$IA_INST/velho-low.md" ]; then
+    pass "19a4 aging NUNCA deleta: o arquivo continua no vault"
+  else
+    fail "19a4 aging DELETOU o instinct (ADR-0005 manda arquivar, nunca apagar)"
+  fi
+  if grep -q '^status: archived' "$IA_INST/velho-low.md" 2>/dev/null; then
+    pass "19a5 arquivamento é uma transição de status no frontmatter"
+  else
+    fail "19a5 --apply não marcou 'status: archived' em velho-low.md"
+  fi
+  if grep -q '^status: archived' "$IA_INST/velho-high.md" 2>/dev/null; then
+    fail "19a6 --apply arquivou um instinct CURADO (tier medium/high deve ser intocado)"
+  else
+    pass "19a6 --apply não tocou o tier curado"
+  fi
+  rm -rf "$IA_SB"
+fi
+
+# ── 19b. blind-reviewer: o muro é MECÂNICO, não uma promessa em prosa ──────
+# ADR-0006: a cegueira do revisor vale pelo que ele estruturalmente NÃO TEM.
+# Se `tools:` ganhar Bash/Edit/Write, o revisor passa a executar e consertar —
+# e o co-review vira o mesmo agente se auto-aprovando. O frontmatter É o muro.
+BR_FILE="$FRAMEWORK_DIR/.claude/agents/blind-reviewer.md"
+if [ ! -f "$BR_FILE" ]; then
+  fail "19b .claude/agents/blind-reviewer.md ausente (ADR-0006 sem agente)"
+else
+  BR_TOOLS=$(awk 'NR==1&&$0=="---"{i=1;next} i&&$0=="---"{exit} i&&/^tools:/{sub(/^tools:[[:space:]]*/,"");print;exit}' "$BR_FILE" 2>/dev/null || true)
+  if [ -z "$BR_TOOLS" ]; then
+    fail "19b blind-reviewer.md sem 'tools:' no frontmatter — sem allowlist, o agente herda TUDO"
+  else
+    pass "19b blind-reviewer.md declara allowlist de tools"
+    if printf '%s' "$BR_TOOLS" | grep -qE '(^|[,[:space:]])(Bash|Edit|Write|NotebookEdit|MultiEdit)([,[:space:]([]|$)'; then
+      fail "19b2 blind-reviewer ganhou ferramenta de execução/escrita ('$BR_TOOLS') — o muro do ADR-0006 caiu"
+    else
+      pass "19b2 blind-reviewer sem Bash/Edit/Write (muro do ADR-0006 de pé)"
+    fi
+    if printf '%s' "$BR_TOOLS" | grep -q 'Read'; then
+      pass "19b3 blind-reviewer mantém Read (consegue ler o artefato que julga)"
+    else
+      fail "19b3 blind-reviewer sem Read — não consegue nem ler o que revisa"
+    fi
+  fi
+  if grep -q 'blind-reviewer.md' "$FRAMEWORK_DIR/install.sh" 2>/dev/null; then
+    pass "19b4 blind-reviewer.md está na lista de distribuição do install.sh"
+  else
+    fail "19b4 blind-reviewer.md fora do install.sh — o muro não chega a repo consumidor"
+  fi
+fi
+
+# ── 19c. As libs da Fase 2 precisam CHEGAR ao repo consumidor ──────────────
+# Test 11c já cobre skills; ferramenta nova não era coberta por nada. Uma lib
+# que existe no repo mas não é distribuída é o buraco exato que deixou o event
+# log morto em ~90% dos projetos consumidores (auditoria 2026-08-01): a cascata
+# `~/.canuto/lib/<lib>.sh` dos hooks nunca resolve e a degradação é silenciosa.
+# Dois wirings, independentes: a lista de arquivos E o loop de libs globais.
+for F2_LIB in brief-compose.sh memory-usage.sh delegation-ledger.sh; do
+  if [ ! -f "$AGENTS_DIR/tools/$F2_LIB" ]; then
+    fail "19c lib da Fase 2 ausente do repo: .agents/tools/$F2_LIB"
+    continue
+  fi
+  if grep -qF "\".agents/tools/$F2_LIB\"" "$FRAMEWORK_DIR/install.sh" 2>/dev/null; then
+    pass "19c $F2_LIB está na lista de distribuição do install.sh"
+  else
+    fail "19c $F2_LIB fora de FRAMEWORK_FILES — não é copiada para o repo consumidor"
+  fi
+  if grep -qE "^[[:space:]]*for lib in .*\b${F2_LIB}( |;)" "$FRAMEWORK_DIR/install.sh" 2>/dev/null \
+     || grep -qE "^[[:space:]]*for lib in .*${F2_LIB}\b" "$FRAMEWORK_DIR/install.sh" 2>/dev/null; then
+    pass "19c2 $F2_LIB entra em ~/.canuto/lib (cascata de fallback dos hooks)"
+  else
+    fail "19c2 $F2_LIB fora de install_global_fallback_libs — hook em install antigo degrada calado"
+  fi
+done
+echo ""
+# ═══════════════════════════════════════════════════════════════════════════
 # SUMMARY
 # ═══════════════════════════════════════════════════════════════════════════
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

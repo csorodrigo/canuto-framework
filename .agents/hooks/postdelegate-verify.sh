@@ -97,7 +97,14 @@ if printf '%s' "$COMMAND" | grep -q 'codex-delegate\.sh'; then
   esac
 elif printf '%s' "$COMMAND" | grep -q 'codex[[:space:]]\+exec' && printf '%s' "$COMMAND" | grep -q -- '--output-last-message'; then
   IS_DELEGATION=true
-  OUT_FILE=$(printf '%s' "$COMMAND" | sed -n 's/.*--output-last-message[= ]\([^[:space:];|&]*\).*/\1/p' | head -1)
+  # Mesma classe do gap acima: `--output-last-message "/tmp/my out.md"` casava
+  # só até o espaço e produzia um caminho quebrado (`"/tmp/my`), virando um
+  # falso "missing" barulhento. As duas primeiras expressões pegam a forma
+  # entre aspas (s///p já reescreve o pattern space, então só uma imprime).
+  OUT_FILE=$(printf '%s' "$COMMAND" | sed -n \
+    -e 's/.*--output-last-message[= ]"\([^"]*\)".*/\1/p' \
+    -e "s/.*--output-last-message[= ]'\([^']*\)'.*/\1/p" \
+    -e 's/.*--output-last-message[= ]\([^[:space:];|&"'"'"']*\).*/\1/p' | head -1)
 fi
 
 [ "$IS_DELEGATION" = true ] || exit 0
