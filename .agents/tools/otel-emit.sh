@@ -28,7 +28,9 @@ otel_collector_reachable() {
   local now mtime age verdict
   now=$(date +%s 2>/dev/null || printf '0')
   if [ -f "$stamp" ]; then
-    mtime=$(stat -f %m "$stamp" 2>/dev/null || stat -c %Y "$stamp" 2>/dev/null || printf '0')
+    # GNU primeiro: `stat -f %m` no Linux imprime mount point sem falhar,
+    # e a aritmética de idade abaixo estouraria com valor não-numérico.
+    mtime=$(stat -c %Y "$stamp" 2>/dev/null || stat -f %m "$stamp" 2>/dev/null || printf '0')
     age=$((now - mtime))
     if [ "$age" -ge 0 ] && [ "$age" -lt 300 ]; then
       verdict=$(cat "$stamp" 2>/dev/null)

@@ -140,7 +140,9 @@ canuto_event_append() {
   done
   if [ "$have_lock" != "1" ]; then
     # Lock órfão (dono morreu entre mkdir e rmdir): quebra se idade >10s.
-    lock_mtime=$(stat -f %m "$lock_dir" 2>/dev/null || stat -c %Y "$lock_dir" 2>/dev/null || echo "")
+    # GNU primeiro: `stat -f %m` no Linux imprime mount point sem falhar —
+    # com a ordem antiga o lock órfão nunca era quebrado em Linux.
+    lock_mtime=$(stat -c %Y "$lock_dir" 2>/dev/null || stat -f %m "$lock_dir" 2>/dev/null || echo "")
     now_epoch=$(date +%s 2>/dev/null || echo "")
     case "$lock_mtime$now_epoch" in *[!0-9]*|"") : ;; *)
       if [ $((now_epoch - lock_mtime)) -gt 10 ]; then
