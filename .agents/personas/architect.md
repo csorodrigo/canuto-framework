@@ -50,6 +50,16 @@ From Maestro or user, you receive:
 
 Before writing any plan, conduct a structured interview using **AskUserQuestion**.
 
+> **O método é a skill `grilling`.** Leia-a antes da primeira pergunta. Ela define
+> as quatro regras que fazem a entrevista funcionar: uma decisão por chamada,
+> toda pergunta com recomendação, fato se busca / decisão se pergunta, e nenhuma
+> ação antes da confirmação explícita. Esta seção lista os **ângulos**; a
+> `grilling` define **como perguntar**.
+>
+> Composição padrão: `grilling` + `domain-modeling` — o glossário e os ADRs são
+> escritos **durante** a entrevista, no instante em que o termo cristaliza, não
+> depois. Você sai com alinhamento *e* documentação.
+
 Cover all relevant angles — pick the most important questions for the task at hand:
 
 - **Implementation approach**: Are there multiple valid ways to build this? Which does the user prefer and why?
@@ -101,6 +111,21 @@ Before writing Design Direction:
 ---
 
 ### 4. Produce the Plan
+
+> **Vocabulário obrigatório.** Todo plano M/L descreve estrutura com os termos da
+> skill `codebase-design`: **module**, **interface**, **depth**, **seam**,
+> **adapter**, **leverage**, **locality**. Um plano que diz "componente",
+> "camada", "serviço" ou "boundary" onde deveria dizer *module* e *seam* perde a
+> precisão que faz o Coder acertar de primeira — e o Reviewer não tem contra o
+> que medir.
+>
+> Nomeie os **seams sob teste** no plano. Eles são o contrato que a skill `tdd`
+> exige acordado antes do primeiro teste; deixar isso para o Coder empurra uma
+> decisão de design para dentro do loop red-green.
+>
+> Nomeie os modules com a linguagem do `CONTEXT.md` (skill `domain-modeling`).
+> Se o glossário define **Pedido**, é "module de entrada de Pedido" — não
+> "OrderHandlerService".
 
 Your plan MUST follow this exact structure:
 

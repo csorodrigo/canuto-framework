@@ -34,8 +34,17 @@ only after ~50 calls/session, which is rare). See `.agents/skills/cost-routing.m
 
 ## Project Rules
 - Before finalizing any plan, always interview the user in detail using AskUserQuestion about implementation choices, UI/UX decisions, trade-offs, and concerns. Never assume — always ask first.
+  **O método é a skill `grilling`** (`.agents/skills/grilling.md`): uma decisão por
+  chamada, toda pergunta com recomendação, fato se busca / decisão se pergunta,
+  nenhuma ação antes da confirmação. Composta com `domain-modeling`, ela escreve
+  `CONTEXT.md` e ADRs durante a entrevista. Obrigatória para S/M/L; XS é exceção.
 - Read any .context.md and docs/FEATURE-MAP.md files if they exist.
+- **`CONTEXT.md` (raiz, maiúsculo) é outra camada**: o glossário do domínio, mantido
+  pela skill `domain-modeling`. `.context.md` diz o que o código faz; `CONTEXT.md`
+  diz o que as palavras significam.
 - If they do not exist, have the Contextualizer create them (with approval).
+- Perdido sobre qual skill usar? `/ask-canuto` é o roteador — uma tabela de
+  situação → skill de entrada, em vez de varrer as ~55 skills.
 - Never run Git or shell commands without explicit confirmation.
 - When in doubt, ask questions instead of guessing.
 
