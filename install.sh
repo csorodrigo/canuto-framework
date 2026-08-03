@@ -2220,26 +2220,51 @@ VAULTPATCH
 RUNTIMEPATCH
       patched=true
     fi
-    if ! grep -q "Grow in layers" "$agents_md" 2>/dev/null; then
-      if grep -q "^## Coding Rules" "$agents_md" 2>/dev/null; then
-        # Section exists — insert the three engineering rules at the top of it
-        awk '/^## Coding Rules/{
-          print
-          print "- Prefer the simplest implementation that fully meets the current requirement. No speculative abstraction, configuration, or indirection."
-          print "- Grow in layers: smallest version that works end to end first, each new capability on top of something that already works. Never leave the tree broken mid-refactor."
-          print "- Do not assume a library lacks a capability without checking its docs and types."
-          next
-        }1' "$agents_md" > "${agents_md}.tmp" && mv "${agents_md}.tmp" "$agents_md"
-      else
-        cat >> "$agents_md" << 'RULESPATCH'
+    if ! grep -qE "^##+ Coding Rules" "$agents_md" 2>/dev/null; then
+      # Section absent — append it whole. Must mirror the generation heredoc
+      # above; a partial section would leave the project permanently without
+      # the dependency and test rules, and no later run would repair it.
+      cat >> "$agents_md" << 'RULESPATCH'
 
 ## Coding Rules
 - Prefer the simplest implementation that fully meets the current requirement. No speculative abstraction, configuration, or indirection.
 - Grow in layers: smallest version that works end to end first, each new capability on top of something that already works. Never leave the tree broken mid-refactor.
 - Do not assume a library lacks a capability without checking its docs and types.
+- Follow existing patterns in nearby files — match style, naming, structure
+- Do NOT add new dependencies without explicit instruction in the prompt
+- Include basic happy-path tests for new functions
+- Use TypeScript strict mode if tsconfig.json has strict: true
+- Prefer editing existing files over creating new ones
+- Do NOT add comments, docstrings, or type annotations to code you didn't change
 RULESPATCH
-      fi
       patched=true
+    else
+      # Section exists — one sentinel PER rule, so deleting or translating a
+      # single bullet never re-inserts the others as duplicates. Collect the
+      # missing ones first, then insert once, to keep canonical order.
+      : > "${agents_md}.rules.tmp"
+      while IFS= read -r rule; do
+        [ -n "$rule" ] || continue
+        # `--` obrigatório: a regra começa com "- " e o grep a leria como opção
+        grep -qF -- "$rule" "$agents_md" 2>/dev/null || printf '%s\n' "$rule" >> "${agents_md}.rules.tmp"
+      done << 'RULESLIST'
+- Prefer the simplest implementation that fully meets the current requirement. No speculative abstraction, configuration, or indirection.
+- Grow in layers: smallest version that works end to end first, each new capability on top of something that already works. Never leave the tree broken mid-refactor.
+- Do not assume a library lacks a capability without checking its docs and types.
+RULESLIST
+      if [ -s "${agents_md}.rules.tmp" ]; then
+        if awk 'NR==FNR{ins[++n]=$0; next}
+                /^##+ Coding Rules/ && !done{print; for(i=1;i<=n;i++) print ins[i]; done=1; next}
+                1' "${agents_md}.rules.tmp" "$agents_md" > "${agents_md}.tmp"; then
+          # cat-over, not mv: preserves symlink target, mode, and inode
+          cat "${agents_md}.tmp" > "$agents_md"
+          patched=true
+        else
+          warn "AGENTS.md: falha ao inserir regras em ## Coding Rules — arquivo intacto"
+        fi
+        rm -f "${agents_md}.tmp"
+      fi
+      rm -f "${agents_md}.rules.tmp"
     fi
     if $patched; then
       ok "AGENTS.md patched with missing sections"

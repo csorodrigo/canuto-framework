@@ -740,6 +740,36 @@ else
   fail "AGENTS.md sem a seção do contrato Codex-side"
 fi
 
+# 12f2. Regras de engenharia do AGENTS.md: presentes e sem divergência entre as
+# cópias de merge_agents_md (heredoc de geração, RULESPATCH, RULESLIST).
+rules_ok=1
+rules_why=""
+while IFS= read -r r; do
+  [ -n "$r" ] || continue
+  # `--` obrigatório: a regra começa com "- " e o grep a leria como opção
+  if ! grep -qF -- "$r" "$FRAMEWORK_DIR/AGENTS.md"; then
+    rules_ok=0; rules_why="ausente no AGENTS.md"; break
+  fi
+  n=$(grep -cF -- "$r" "$FRAMEWORK_DIR/install.sh" || true)
+  if [ "$n" -ne 3 ]; then
+    rules_ok=0; rules_why="install.sh tem $n cópias (esperado 3) de: ${r:0:40}..."; break
+  fi
+done <<'RULES'
+- Prefer the simplest implementation that fully meets the current requirement. No speculative abstraction, configuration, or indirection.
+- Grow in layers: smallest version that works end to end first, each new capability on top of something that already works. Never leave the tree broken mid-refactor.
+- Do not assume a library lacks a capability without checking its docs and types.
+RULES
+# RULESPATCH deve reproduzir a seção INTEIRA (9 bullets), não só as 3 novas —
+# seção parcial deixa o projeto sem as regras de dependência e de teste.
+patch_bullets=$(awk '/^## Coding Rules$/{f++; next} f==2 && /^RULESPATCH$/{exit} f==2 && /^- /{c++} END{print c+0}' "$FRAMEWORK_DIR/install.sh" || true)
+if [ "$rules_ok" -eq 1 ] && [ "$patch_bullets" -eq 9 ]; then
+  pass "AGENTS.md Coding Rules: 3 regras presentes, cópias em sincronia, RULESPATCH completo"
+elif [ "$rules_ok" -eq 0 ]; then
+  fail "AGENTS.md Coding Rules divergiu — $rules_why"
+else
+  fail "RULESPATCH tem $patch_bullets bullets (esperado 9) — seção parcial no patch"
+fi
+
 # 12g. install.sh não cria blocos [profiles.*] mortos em máquina limpa
 if grep -q "Bloco ausente: NÃO criar" "$FRAMEWORK_DIR/install.sh"; then
   pass "install.sh não semeia [profiles.*] morto em config.toml limpo"
