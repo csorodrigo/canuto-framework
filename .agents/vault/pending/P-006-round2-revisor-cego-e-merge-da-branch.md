@@ -25,11 +25,23 @@ sem PR aberto:
 
 ## Ações
 
-- [ ] Incorporar o resultado do round 2 do revisor cego (rodou no fecho da
-      sessão de 2026-08-03; o veredito não foi lido antes do encerramento).
-- [ ] Decidir: abrir PR ou mergear direto. O round 1 fechou em REQUEST CHANGES
-      e o round 2 é o que dá o APPROVE — não mergear sem ele.
-- [ ] Se o round 2 trouxer strikes novos, corrigir antes do merge.
+- [x] Round 2 do revisor cego incorporado — veredito REQUEST CHANGES,
+      1 BLOCKER + 3 MAJOR + 2 MINOR, **todos os 6 endereçados** em `5f1a62f`.
+      O BLOCKER era regressão da correção do round 1 (ver `instincts/I-030`).
+- [ ] Rodar round 3 do revisor cego. Os dois rounds anteriores acharam defeito
+      real, e o round 2 achou um introduzido pelo round 1 — não assumir
+      convergência sem uma passada limpa.
+- [ ] Decidir: abrir PR ou mergear direto. Não mergear sem um APPROVE.
+
+## Estado do review
+
+| Round | Veredito | Strikes | Disposição |
+|-------|----------|---------|------------|
+| 1 | REQUEST CHANGES | 3 MAJOR + 4 MINOR | 5 corrigidos, 1 rejeitado, 1 corrigido de outro jeito |
+| 2 | REQUEST CHANGES | 1 BLOCKER + 3 MAJOR + 2 MINOR | 6/6 corrigidos |
+| 3 | — | — | não rodado |
+
+Commits: `8ea8b02`, `ccaf5fb`, `50cad9c`, `b3f5c1c`, `5f1a62f`.
 
 ## Contexto para não reabrir a discussão
 

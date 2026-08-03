@@ -52,3 +52,19 @@ apontou no bloco novo — corrigir os dois deixa o arquivo consistente.
 
 - [ ] Adicionar `*.tmp` ao `.gitignore` da raiz.
 - [ ] Varrer o `install.sh` por outros `cmd > tmp && mv tmp dst` com `ok` incondicional.
+
+## Achado incidental (2026-08-03) — geração não é ponto fixo
+
+Observado ao montar as fixtures de `12f3`: `merge_agents_md` gerando do zero
+produz um `AGENTS.md` que o **próprio patcher** ainda modifica na run seguinte.
+O heredoc de geração não contém a string `codex-maestro.sh`, que é justamente o
+sentinel do bloco `RUNTIMEPATCH` — então toda instalação nova ganha a seção
+`## Codex Runtime` por append na segunda execução.
+
+Não é loop: a partir da terceira run vira no-op. Mas significa que
+"gerar" e "gerar + patchar" produzem arquivos diferentes, o que torna qualquer
+teste de geração sensível a quantas vezes a função rodou.
+
+- [ ] Decidir: incluir `codex-maestro.sh` no heredoc de geração (fecha o ponto
+      fixo), ou documentar que geração exige 2 passes.
+
