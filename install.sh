@@ -2223,10 +2223,27 @@ RUNTIMEPATCH
     # Um `## Coding Rules` dentro de bloco cercado é exemplo, não seção. Este
     # repo GERA AGENTS.md, então documentar a seção num bloco de código é
     # plausível — tratá-la como real faria o patch cair dentro da cerca.
-    agents_has_section=$(awk '
-      /^```/{fence=!fence; next}
+    # Rastreio de cerca CommonMark: abre com 3+ de ` ou ~, fecha só com o MESMO
+    # char e comprimento >= o de abertura. Contar toda linha de crase como
+    # alternância deixava a paridade presa em arquivo com cerca não fechada.
+    agents_fence_awk='
+      function fence_line(l,   ch, n) {
+        if (l !~ /^(```+|~~~+)/) return 0
+        ch = substr(l, 1, 1); n = match(l, /[^`~]|$/) - 1
+        if (!fence) { fence = 1; fchar = ch; flen = n }
+        else if (ch == fchar && n >= flen) { fence = 0 }
+        return 1
+      }'
+    agents_has_section=$(awk "$agents_fence_awk"'
+      { if (fence_line($0)) next }
       !fence && /^##+ Coding Rules[[:space:]]*$/{print "yes"; exit}' "$agents_md" 2>/dev/null || true)
-    if [ "$agents_has_section" != "yes" ]; then
+    # Guarda de convergência, independente do rastreio de cerca: se existe
+    # QUALQUER linha de heading Coding Rules, nunca anexar outra seção. Sem
+    # isso, um falso negativo na deteção anexa uma seção nova a cada run.
+    agents_any_section=$(grep -cE '^##+ Coding Rules[[:space:]]*$' "$agents_md" 2>/dev/null || true)
+    if [ "$agents_has_section" != "yes" ] && [ "${agents_any_section:-0}" -gt 0 ]; then
+      warn "AGENTS.md: '## Coding Rules' só aparece dentro de bloco de código — nada aplicado (edite a seção real e rode de novo)"
+    elif [ "$agents_has_section" != "yes" ]; then
       # Section absent — append it whole. Must mirror the generation heredoc
       # above; a partial section would leave the project permanently without
       # the dependency and test rules, and no later run would repair it.
@@ -2252,11 +2269,15 @@ RULESPATCH
       # A presença é checada DENTRO da seção, não no arquivo inteiro: uma regra
       # citada em bloco de código ou em prosa não pode contar como aplicada,
       # senão a seção real nunca a recebe e o instalador diz "up to date".
-      agents_section=$(awk '
-        /^```/{fence=!fence; next}
-        !fence && /^##+ Coding Rules[[:space:]]*$/{f=1; next}
-        f && !fence && /^##+ /{exit}
-        f' "$agents_md" 2>/dev/null || true)
+      # Encerra no próximo heading de nível IGUAL OU MAIOR — um `### Gerais`
+      # dentro da seção não a termina, senão a extração sai vazia e as regras
+      # já presentes são reinseridas como duplicata. Conteúdo dentro de cerca
+      # não conta como presença: exemplo citado não é regra aplicada.
+      agents_section=$(awk "$agents_fence_awk"'
+        { if (fence_line($0)) next }
+        !fence && /^##+ Coding Rules[[:space:]]*$/{ match($0,/^#+/); lvl=RLENGTH; f=1; next }
+        f && !fence && /^#+ /{ match($0,/^#+/); if (RLENGTH<=lvl) exit }
+        f && !fence' "$agents_md" 2>/dev/null || true)
       agents_missing=""
       while IFS= read -r rule; do
         [ -n "$rule" ] || continue
@@ -2274,12 +2295,25 @@ RULESLIST
         # meio deixaria um AGENTS.md parcial sem cópia de retorno.
         agents_dest="$agents_md"
         if [ -L "$agents_dest" ]; then
-          agents_dest=$(readlink -f "$agents_dest" 2>/dev/null || printf '%s' "$agents_md")
+          # `readlink -f` não existe no BSD antigo; resolve manualmente na falta
+          agents_dest=$(readlink -f "$agents_dest" 2>/dev/null || true)
+          if [ -z "$agents_dest" ]; then
+            agents_dest="$agents_md"; agents_hops=0
+            while [ -L "$agents_dest" ] && [ "$agents_hops" -lt 16 ]; do
+              agents_link=$(readlink "$agents_dest" 2>/dev/null || true)
+              [ -n "$agents_link" ] || break
+              case "$agents_link" in
+                /*) agents_dest="$agents_link" ;;
+                *)  agents_dest="$(dirname "$agents_dest")/$agents_link" ;;
+              esac
+              agents_hops=$((agents_hops + 1))
+            done
+          fi
         fi
         agents_tmp="${agents_dest}.canuto.$$"
-        if awk -v ins="$agents_missing" '
+        if awk -v ins="$agents_missing" "$agents_fence_awk"'
               BEGIN{n=split(ins, a, "\n")}
-              /^```/{fence=!fence; print; next}
+              { if (fence_line($0)) { print; next } }
               !fence && !seen && /^##+ Coding Rules[[:space:]]*$/{
                 print; for(i=1;i<=n;i++) if(a[i]!="") print a[i]; seen=1; next
               }

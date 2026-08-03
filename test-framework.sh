@@ -747,10 +747,17 @@ fi
 gen_block=$(awk '/^## Coding Rules$/{f++} f==1 && /^- /{print} f==1 && /^$/ && seen{exit} f==1 && /^- /{seen=1}' "$FRAMEWORK_DIR/install.sh" || true)
 patch_block=$(awk '/^## Coding Rules$/{f++} f==2 && /^RULESPATCH$/{exit} f==2 && /^- /{print}' "$FRAMEWORK_DIR/install.sh" || true)
 gen_n=$(printf '%s\n' "$gen_block" | grep -c '^- ' || true)
+# RULESLIST é a fonte EXECUTÁVEL: alimenta o sentinela de presença e o conteúdo
+# inserido. Se divergir das outras duas, o instalador procura e injeta o texto
+# velho em todo projeto existente — e comparar só gen vs patch não veria nada.
+list_block=$(awk '/<< .RULESLIST.$/{f=1; next} f && /^RULESLIST$/{exit} f && /^- /{print}' "$FRAMEWORK_DIR/install.sh" || true)
+gen_first3=$(printf '%s\n' "$gen_block" | head -3)
 if [ -z "$gen_block" ] || [ "$gen_n" -lt 9 ]; then
   fail "12f2: não consegui extrair a seção Coding Rules do heredoc de geração (achei $gen_n bullets)"
 elif [ "$gen_block" != "$patch_block" ]; then
   fail "12f2: heredoc de geração e RULESPATCH divergiram — projeto novo e projeto patchado receberiam regras diferentes"
+elif [ -z "$list_block" ] || [ "$list_block" != "$gen_first3" ]; then
+  fail "12f2: RULESLIST divergiu do texto emitido — o instalador procuraria/injetaria texto que não é o publicado"
 else
   # e o AGENTS.md deste repo tem de conter cada bullet emitido
   missing_in_repo=""
@@ -788,15 +795,41 @@ mam_run "$mam_tmp/b" && mam_run "$mam_tmp/b"
 [ "$(mam_count "$mam_tmp/b" "$R_GROW")" = "1" ] || mam_fail="${mam_fail:+$mam_fail; }duplicou em 2 runs"
 grep -q "preservar isto" "$mam_tmp/b/AGENTS.md" || mam_fail="${mam_fail:+$mam_fail; }perdeu seção custom"
 
-# c) regra citada dentro de bloco de código não pode contar como aplicada
+# c) regra citada dentro de bloco de código não conta como aplicada.
+# O fixture usa o texto INTEGRAL da regra: com o prefixo só, uma regressão para
+# escopo-de-arquivo passaria verde, porque o grep não acharia o texto de todo
+# jeito. Com o texto integral, escopo-de-arquivo acha → não insere → falha.
+R_FULL=$(awk '/<< .RULESLIST.$/{f=1; next} f && /^- Grow in layers:/{print; exit}' "$FRAMEWORK_DIR/install.sh")
 mkdir -p "$mam_tmp/c"
-{ printf '# X\n\n## Exemplo\n\n```markdown\n## Coding Rules\n%s ...\n```\n\n## Coding Rules\n- Follow existing patterns\n' "$R_GROW"; } > "$mam_tmp/c/AGENTS.md"
+{ printf '# X\n\n## Exemplo\n\n```markdown\n## Coding Rules\n%s\n```\n\n## Coding Rules\n- Follow existing patterns\n' "$R_FULL"; } > "$mam_tmp/c/AGENTS.md"
 mam_run "$mam_tmp/c"
 if [ "$(awk '/^## Coding Rules[[:space:]]*$/{f++} f==2 && /^- Grow in layers:/{c++} END{print c+0}' "$mam_tmp/c/AGENTS.md")" != "1" ]; then
   mam_fail="${mam_fail:+$mam_fail; }não inseriu na seção real (bloco de código contou como aplicada)"
 fi
 
-# d) nenhum temp órfão em nenhum dos casos
+# c2) subtítulo ### dentro da seção não pode truncar a extração e duplicar
+mkdir -p "$mam_tmp/c2"
+{ printf '# X\n\n## Coding Rules\n\n### Gerais\n'; printf '%s\n' "$gen_first3"; } > "$mam_tmp/c2/AGENTS.md"
+mam_run "$mam_tmp/c2"
+[ "$(mam_count "$mam_tmp/c2" "$R_GROW")" = "1" ] || mam_fail="${mam_fail:+$mam_fail; }duplicou por causa de subtítulo ###"
+
+# c3) cerca não fechada não pode fazer a seção sumir e anexar outra a cada run
+mkdir -p "$mam_tmp/c3"
+printf '# X\n\n```\ncerca aberta e nunca fechada\n\n## Coding Rules\n- Follow existing patterns\n' > "$mam_tmp/c3/AGENTS.md"
+mam_run "$mam_tmp/c3"; mam_run "$mam_tmp/c3"; mam_run "$mam_tmp/c3"
+[ "$(grep -cE '^##+ Coding Rules[[:space:]]*$' "$mam_tmp/c3/AGENTS.md")" = "1" ] || mam_fail="${mam_fail:+$mam_fail; }anexou seção duplicada (cerca não fechada, 3 runs)"
+
+# d) falha na publicação não pode danificar o arquivo do usuário
+mkdir -p "$mam_tmp/d"
+printf '# X\n\n## Coding Rules\n- Follow existing patterns\n\n## Custom\n- insubstituivel\n' > "$mam_tmp/d/AGENTS.md"
+mam_run "$mam_tmp/d"   # assenta as seções irmãs
+grep -v "Grow in layers" "$mam_tmp/d/AGENTS.md" > "$mam_tmp/d/x" && mv "$mam_tmp/d/x" "$mam_tmp/d/AGENTS.md"
+d_before=$(cksum < "$mam_tmp/d/AGENTS.md")
+( cd "$mam_tmp/d" && . "$mam_tmp/fn.sh" && mv(){ return 1; } && merge_agents_md ) >/dev/null 2>&1 || true
+[ "$d_before" = "$(cksum < "$mam_tmp/d/AGENTS.md")" ] || mam_fail="${mam_fail:+$mam_fail; }falha de mv danificou o arquivo"
+grep -q insubstituivel "$mam_tmp/d/AGENTS.md" || mam_fail="${mam_fail:+$mam_fail; }falha de mv perdeu conteúdo custom"
+
+# e) nenhum temp órfão em nenhum dos casos, inclusive no de falha
 [ "$(find "$mam_tmp" -name '*.tmp' -o -name '*.canuto.*' | wc -l)" -eq 0 ] || mam_fail="${mam_fail:+$mam_fail; }deixou temp órfão"
 
 if [ -z "$mam_fail" ]; then
