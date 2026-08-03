@@ -627,6 +627,11 @@ skill_remote_files() {
         ".agents/skills/tdd/SKILL.md" \
         ".agents/skills/tdd/tests.md"
       ;;
+    codebase-design)
+      printf '%s\n' \
+        ".agents/skills/codebase-design/SKILL.md" \
+        ".agents/skills/codebase-design/TESTABILIDADE.md"
+      ;;
     *)
       printf '%s\n' ".agents/skills/${skill_name}.md"
       ;;
@@ -749,7 +754,8 @@ FRAMEWORK_FILES=(
   ".agents/skills/stuck-detection.md"
   # Disciplinas de engenharia (ADR-0015 — adaptado de mattpocock/skills, MIT)
   ".agents/skills/grilling.md"
-  ".agents/skills/codebase-design.md"
+  ".agents/skills/codebase-design/SKILL.md"
+  ".agents/skills/codebase-design/TESTABILIDADE.md"
   ".agents/skills/domain-modeling/SKILL.md"
   ".agents/skills/domain-modeling/CONTEXT-FORMAT.md"
   ".agents/skills/tdd/SKILL.md"

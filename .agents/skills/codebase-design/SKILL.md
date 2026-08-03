@@ -99,33 +99,17 @@ callers. Conserta uma vez, consertado em todo lugar.
 
 ## Deep vs shallow
 
-**Deep** = interface pequena + muita implementação:
-
-```
-┌─────────────────────┐
-│  Interface pequena  │  ← poucos métodos, parâmetros simples
-├─────────────────────┤
-│                     │
-│  Implementação      │  ← lógica complexa escondida
-│  profunda           │
-└─────────────────────┘
-```
-
-**Shallow** = interface grande + pouca implementação (evitar):
-
-```
-┌─────────────────────────────────┐
-│      Interface grande           │  ← muitos métodos, params complexos
-├─────────────────────────────────┤
-│  Implementação fina             │  ← só repassa
-└─────────────────────────────────┘
-```
+**Deep** = interface pequena + muita implementação. **Shallow** = interface
+grande + pouca implementação, evitar.
 
 Ao desenhar uma interface, pergunte:
 
 - Dá para reduzir o número de métodos?
 - Dá para simplificar os parâmetros?
 - Dá para esconder mais complexidade dentro?
+
+Um módulo com dezenas de exports é interface grande por definição: cada caller
+precisa aprender todas antes de usar qualquer uma.
 
 ---
 
@@ -152,32 +136,13 @@ Ao desenhar uma interface, pergunte:
 
 ## Desenhando para testabilidade
 
+Três regras, com exemplos e o diagnóstico de módulo raso em
+[TESTABILIDADE.md](TESTABILIDADE.md):
+
 1. **Receba dependências, não as crie.**
-
-   ```typescript
-   // Testável
-   function processOrder(order, paymentGateway) {}
-
-   // Difícil de testar
-   function processOrder(order) {
-     const gateway = new StripeGateway();
-   }
-   ```
-
 2. **Devolva resultados, não produza efeitos colaterais.**
-
-   ```typescript
-   // Testável
-   function calculateDiscount(cart): Discount {}
-
-   // Difícil de testar
-   function applyDiscount(cart): void {
-     cart.total -= discount;
-   }
-   ```
-
-3. **Superfície pequena.** Menos métodos = menos testes necessários. Menos
-   parâmetros = setup de teste mais simples.
+3. **Superfície pequena** — menos métodos, menos testes; menos parâmetros, setup
+   mais simples.
 
 ---
 
