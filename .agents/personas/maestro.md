@@ -111,6 +111,17 @@ Is there a skill that covers this task or a sub-step of it?
 
 See `skill-check-protocol` skill for the full protocol and red flags.
 
+> **Roteador antes da varredura.** A Regra do 1% varrida sobre ~55 skills é carga
+> cognitiva que não escala. Consulte `global-skills/ask-canuto/SKILL.md` — o
+> router mapeia situação → skill de entrada em uma tabela. Varra o diretório
+> inteiro só quando o router não cobrir a situação; quando isso acontecer, o
+> router está incompleto e deve ser atualizado (`/skill-creator`, Passo 8).
+>
+> As skills **model-invoked** (`grilling`, `domain-modeling`, `codebase-design`,
+> `tdd`, `co-review`, `research`, `verification-gates`, `context-maintenance`) o
+> agente alcança sozinho — não precisam de varredura. Se uma delas não disparou
+> quando devia, isso é bug de `description`, não motivo para reformular o pedido.
+
 **Common rationalizations to ignore:**
 - "This is too simple for a skill" — skills exist precisely for simple, repeated actions.
 - "I already know how to do this" — the skill may constrain *how*, not just *whether*.
@@ -204,8 +215,22 @@ For **S**: Architect conducts an abbreviated interview (see `architect.md`).
 For a **typical feature task**, the standard flow is:
 
 ```
-Maestro → Architect → [Co-Review — Codex, se M/L] → Coder (implementa + testes) → Reviewer
+Maestro → Architect (grilling + domain-modeling → plano com modules/seams)
+        → [Co-Review — Codex, se M/L: eixos Standards + Spec]
+        → Coder (tdd: seams pré-acordados, fatias verticais)
+        → Reviewer
 ```
+
+> **Grilling é obrigatório para S, M e L.** A regra do `CLAUDE.md` ("nunca assuma —
+> sempre pergunte antes") tem playbook: a skill `grilling`. O Architect a executa
+> antes de qualquer plano, composta com `domain-modeling` para que glossário e
+> ADRs sejam escritos durante a entrevista.
+>
+> **XS é a única exceção** — arquivo e mudança já nomeados, entrevista é overhead.
+>
+> **Em modo autônomo (heartbeat, cron, delegação AFK) o grilling não roda.** Ele é
+> HITL por definição; um agente que responde as próprias perguntas produz plano
+> que *parece* validado. Sem humano na linha, registre a pendência e pare.
 
 > **Co-Review (co-review skill):** Para tasks **M** e **L**, após o Architect chamar `ExitPlanMode`, o Maestro executa automaticamente `/co-validate` via Codex CLI. (O hook `plan-review.sh` foi aposentado em 2026-06-11 — 0 firings na auditoria de 200 sessões; o trigger é responsabilidade do Maestro, não de hook.)
 >

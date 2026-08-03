@@ -20,10 +20,12 @@ These skills ship with every install and update automatically.
 | `auto-analysis` | Deep project scan + cross-project vault intelligence | analytics, onboarding |
 | `browser-qa` | Real-browser QA via gstack + authenticated data extraction via Chrome DevTools MCP | testing, quality, scraping |
 | `budget-controls` | Token/cost budgets per persona and session with advisory warnings | cost-management |
-| `co-review` | Cross-model plan review gate for M/L tasks | review, orchestration |
+| `co-review` | Cross-model plan review gate for M/L tasks — two blind axes: Standards and Spec | review, orchestration |
+| `codebase-design` | Vocabulário de módulos profundos — module, interface, depth, seam, adapter, leverage, locality + teste da deleção | design, architecture |
 | `colorize` | BM25 over curated palettes → WCAG-compliant semantic token sets | design, color |
 | `cost-routing` | Provider routing matrix: what runs on Claude inline vs Codex spawn | cost-management, orchestration |
 | `design-consultation` | Generate a full design system → `design-system/MASTER.md` | design |
+| `domain-modeling` | Linguagem ubíqua em `CONTEXT.md` + filtro de 3 condições para ADR | documentation, architecture |
 | `context-maintenance` | How to maintain `.context.md`, `FEATURE-MAP.md`, and Repo Index (evaluate-repo pipeline) | documentation, indexation |
 | `continuous-learning` | Extract, store, and evolve reusable patterns (instincts) from session experience | learning, memory |
 | `convergence-detection` | Detect when multiple personas independently reach the same conclusion | observability |
@@ -35,6 +37,7 @@ These skills ship with every install and update automatically.
 | `frontend-design` | Visual design consistency with tunable design knobs (variance, motion, density) | design, frontend |
 | `frontend-implementation` | How to implement frontend features | frontend |
 | `governance` | Approval gates for high-impact actions (deploy, migration, breaking changes) | governance |
+| `grilling` | Entrevista implacável, uma decisão por vez — playbook da regra "nunca assuma" do CLAUDE.md | planning, alignment |
 | `health-check` | Diagnose framework setup integrity | diagnostics |
 | `canuto-project-doctor` | Diagnose setup, memory coverage, stale context, and framework drift | diagnostics |
 | `canuto-session-end-learning` | Extract session learning, pending tasks, decisions, metrics, and candidate instincts | learning, memory |
@@ -55,8 +58,9 @@ These skills ship with every install and update automatically.
 | `security-practices` | Rules for secrets, env vars, and security hygiene | security |
 | `session-goals` | Track session goals explicitly with continuation modes | productivity |
 | `skill-check-protocol` | The 1% Rule + red-flag rationalizations for skill activation | meta, compliance |
-| `skill-creator` | 7-phase skill authoring workflow | meta, authoring |
+| `skill-creator` | Autoria **e poda** de skills com modelo de custo explícito (carga de contexto vs. cognitiva) + `GLOSSARY.md` | meta, authoring |
 | `stuck-detection` | Detect fix→implement→re-test loops without progress; escalate | quality, observability |
+| `tdd` | Loop red → green: seams pré-acordados, fatias verticais, e os 3 anti-padrões que matam suíte | testing, quality |
 | `trace-analysis` | Session-end trace analysis: playbook gaps, instinct candidates, routing misfires | learning, observability |
 | `typeset` | BM25 over font pairings → heading+body + Tailwind config | design, typography |
 | `vault-maintenance` | Periodic vault cleanup — archives old sessions, aggregates metrics/audits | maintenance, vault |
@@ -105,6 +109,7 @@ These skills are slash commands invokable directly in Claude Code. Installed aut
 
 | Command | Description | Tags |
 |---------|-------------|------|
+| `/ask-canuto` | **Roteador** — tabela situação → skill de entrada. Cura a carga cognitiva da Regra do 1% sobre ~55 skills. | meta, routing |
 | `/office-hours` | YC Office Hours — reframe product idea before coding. Asks forcing questions, generates 3 approaches, saves context for Architect. | product, planning |
 | `/investigate` | Forensic debugger — Iron Law: no fix without confirmed root cause. Read-only investigation phase first. | debugging |
 | `/document-release` | Post-ship documentation sweep — updates README, FEATURE-MAP.md, .context.md, CHANGELOG after a deploy. | documentation, workflow |

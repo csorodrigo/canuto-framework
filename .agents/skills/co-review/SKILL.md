@@ -4,12 +4,14 @@ description: Coordinate independent Claude and Codex planning or review passes, 
 skill: co-review
 trigger: "/co-brainstorm, /co-plan, /co-validate, or automatic for M/L plan review and pre-commit"
 persona: maestro
-version: 2.0.0
-lastUpdated: 2026-03-30
+version: 2.1.0
+lastUpdated: 2026-08-03
+invocacao: model
 shortDescription: >
   Bias-free parallel collaboration with Codex via MCP. Three modes: brainstorm (ideation),
   plan (parallel planning), validate (staff-engineer review). Eliminates anchoring bias by
-  completing your own work before seeing Codex's output.
+  completing your own work before seeing Codex's output. Reviews run on two blind axes —
+  Standards (does it follow the repo?) and Spec (is it what was asked?).
 usedBy: [maestro, architect]
 evals:
   - prompt: "let's brainstorm approaches for the auth system with codex"
@@ -143,6 +145,48 @@ For detailed prompts, output formats, and examples, read `references/modes.md`.
 4. After both complete → compare the independent review with the one-shot reviewer response
 5. Compare: convergent issues (fix these), unique issues from each (evaluate)
 6. Present verdict: `✓ LGTM` or `⚠️ Concerns (N issues)`
+
+---
+
+## Os dois eixos da revisão (Standards e Spec)
+
+Toda revisão de plano (Mode 3) e de diff (Mode 4) corre em **dois eixos
+independentes**. Rodá-los juntos deixa um contaminar o outro: um reviewer que
+acabou de aprovar a qualidade do código tende a assumir que ele faz a coisa
+certa.
+
+| Eixo | A pergunta | Fonte de verdade |
+|---|---|---|
+| **Standards** | Isto segue o padrão deste repo? Tem code smell? | `.context.md`, `stack.md`, `security-practices`, `codebase-design`, ADRs |
+| **Spec** | Isto é **o que foi pedido**? | a mensagem original do usuário, o plano aprovado, a issue/PRD de origem |
+
+**Regras:**
+
+- Os dois eixos rodam **em paralelo e cegos um ao outro** — mesma mecânica de
+  independência da §"Independence First". Na prática: o reviewer Codex leva um
+  eixo, o agente principal leva o outro, e a comparação vem depois.
+- O eixo **Spec** precisa da fonte original **verbatim**. Resumo do plano não
+  serve — é justamente a paráfrase que esconde o desvio.
+- **Se não existe fonte de spec, diga isso** em vez de inventar uma. "Eixo Spec:
+  não avaliado — nenhum plano aprovado ou issue de origem foi fornecido" é um
+  resultado válido; um Spec fabricado a partir do próprio diff sempre aprova.
+- Um achado do eixo Spec **nunca** é estilo. "Faltou tratar o caso X que o plano
+  pedia" é Spec; "esse nome podia ser melhor" é Standards.
+
+**Formato do veredito:**
+
+```
+[Co-Review — 2 eixos]
+  Standards: ✓ LGTM  |  ⚠️ N issues
+  Spec:      ✓ fiel   |  ⚠️ N desvios  |  ⊘ não avaliado (sem fonte)
+  Convergentes (alta confiança): ...
+  Exclusivas Codex / exclusivas Claude: ...
+```
+
+> **Por que isto foi adicionado.** O `co-review` já era cego entre *modelos* — o
+> que faltava era o eixo que pergunta se o resultado é o que o usuário pediu.
+> Desalinhamento é o modo de falha nº 1 em desenvolvimento assistido por agente,
+> e nenhuma quantidade de revisão de qualidade o pega.
 
 ---
 

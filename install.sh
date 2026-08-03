@@ -612,6 +612,26 @@ skill_remote_files() {
         ".agents/skills/frontend-design/references/design-patterns.md" \
         ".agents/skills/frontend-design/references/aesthetic-patterns.md"
       ;;
+    skill-creator)
+      printf '%s\n' \
+        ".agents/skills/skill-creator/SKILL.md" \
+        ".agents/skills/skill-creator/GLOSSARY.md"
+      ;;
+    domain-modeling)
+      printf '%s\n' \
+        ".agents/skills/domain-modeling/SKILL.md" \
+        ".agents/skills/domain-modeling/CONTEXT-FORMAT.md"
+      ;;
+    tdd)
+      printf '%s\n' \
+        ".agents/skills/tdd/SKILL.md" \
+        ".agents/skills/tdd/tests.md"
+      ;;
+    codebase-design)
+      printf '%s\n' \
+        ".agents/skills/codebase-design/SKILL.md" \
+        ".agents/skills/codebase-design/TESTABILIDADE.md"
+      ;;
     *)
       printf '%s\n' ".agents/skills/${skill_name}.md"
       ;;
@@ -729,8 +749,17 @@ FRAMEWORK_FILES=(
   ".agents/skills/research.md"
   ".agents/skills/review.md"
   ".agents/skills/skill-check-protocol.md"
-  ".agents/skills/skill-creator.md"
+  ".agents/skills/skill-creator/SKILL.md"
+  ".agents/skills/skill-creator/GLOSSARY.md"
   ".agents/skills/stuck-detection.md"
+  # Disciplinas de engenharia (ADR-0015 — adaptado de mattpocock/skills, MIT)
+  ".agents/skills/grilling.md"
+  ".agents/skills/codebase-design/SKILL.md"
+  ".agents/skills/codebase-design/TESTABILIDADE.md"
+  ".agents/skills/domain-modeling/SKILL.md"
+  ".agents/skills/domain-modeling/CONTEXT-FORMAT.md"
+  ".agents/skills/tdd/SKILL.md"
+  ".agents/skills/tdd/tests.md"
   ".agents/skills/trace-analysis/SKILL.md"
   ".agents/skills/trace-analysis/references/blind-spot-generator.md"
   ".agents/skills/trace-analysis/references/digest-schema.md"
@@ -2529,6 +2558,7 @@ setup_gstack() {
 setup_global_skills() {
   local -a global_skills=(
     # Canuto originals
+    "ask-canuto"
     "co-plan"
     "office-hours"
     "investigate"
