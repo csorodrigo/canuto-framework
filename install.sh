@@ -2220,7 +2220,13 @@ VAULTPATCH
 RUNTIMEPATCH
       patched=true
     fi
-    if ! grep -qE "^##+ Coding Rules" "$agents_md" 2>/dev/null; then
+    # Um `## Coding Rules` dentro de bloco cercado é exemplo, não seção. Este
+    # repo GERA AGENTS.md, então documentar a seção num bloco de código é
+    # plausível — tratá-la como real faria o patch cair dentro da cerca.
+    agents_has_section=$(awk '
+      /^```/{fence=!fence; next}
+      !fence && /^##+ Coding Rules[[:space:]]*$/{print "yes"; exit}' "$agents_md" 2>/dev/null || true)
+    if [ "$agents_has_section" != "yes" ]; then
       # Section absent — append it whole. Must mirror the generation heredoc
       # above; a partial section would leave the project permanently without
       # the dependency and test rules, and no later run would repair it.
@@ -2242,29 +2248,55 @@ RULESPATCH
       # Section exists — one sentinel PER rule, so deleting or translating a
       # single bullet never re-inserts the others as duplicates. Collect the
       # missing ones first, then insert once, to keep canonical order.
-      : > "${agents_md}.rules.tmp"
+      #
+      # A presença é checada DENTRO da seção, não no arquivo inteiro: uma regra
+      # citada em bloco de código ou em prosa não pode contar como aplicada,
+      # senão a seção real nunca a recebe e o instalador diz "up to date".
+      agents_section=$(awk '
+        /^```/{fence=!fence; next}
+        !fence && /^##+ Coding Rules[[:space:]]*$/{f=1; next}
+        f && !fence && /^##+ /{exit}
+        f' "$agents_md" 2>/dev/null || true)
+      agents_missing=""
       while IFS= read -r rule; do
         [ -n "$rule" ] || continue
         # `--` obrigatório: a regra começa com "- " e o grep a leria como opção
-        grep -qF -- "$rule" "$agents_md" 2>/dev/null || printf '%s\n' "$rule" >> "${agents_md}.rules.tmp"
+        printf '%s\n' "$agents_section" | grep -qF -- "$rule" || agents_missing="${agents_missing}${rule}"$'\n'
       done << 'RULESLIST'
 - Prefer the simplest implementation that fully meets the current requirement. No speculative abstraction, configuration, or indirection.
 - Grow in layers: smallest version that works end to end first, each new capability on top of something that already works. Never leave the tree broken mid-refactor.
 - Do not assume a library lacks a capability without checking its docs and types.
 RULESLIST
-      if [ -s "${agents_md}.rules.tmp" ]; then
-        if awk 'NR==FNR{ins[++n]=$0; next}
-                /^##+ Coding Rules/ && !done{print; for(i=1;i<=n;i++) print ins[i]; done=1; next}
-                1' "${agents_md}.rules.tmp" "$agents_md" > "${agents_md}.tmp"; then
-          # cat-over, not mv: preserves symlink target, mode, and inode
-          cat "${agents_md}.tmp" > "$agents_md"
-          patched=true
-        else
-          warn "AGENTS.md: falha ao inserir regras em ## Coding Rules — arquivo intacto"
+      if [ -n "$agents_missing" ]; then
+        # Escreve no ALVO resolvido, para não trocar um symlink por cópia local,
+        # e publica com `mv` (rename atômico). Nunca redirecionar por cima do
+        # arquivo do usuário: o `>` trunca antes de escrever, e uma falha no
+        # meio deixaria um AGENTS.md parcial sem cópia de retorno.
+        agents_dest="$agents_md"
+        if [ -L "$agents_dest" ]; then
+          agents_dest=$(readlink -f "$agents_dest" 2>/dev/null || printf '%s' "$agents_md")
         fi
-        rm -f "${agents_md}.tmp"
+        agents_tmp="${agents_dest}.canuto.$$"
+        if awk -v ins="$agents_missing" '
+              BEGIN{n=split(ins, a, "\n")}
+              /^```/{fence=!fence; print; next}
+              !fence && !seen && /^##+ Coding Rules[[:space:]]*$/{
+                print; for(i=1;i<=n;i++) if(a[i]!="") print a[i]; seen=1; next
+              }
+              1' "$agents_dest" > "$agents_tmp"; then
+          # herda o modo do original; sem isso o arquivo publicado nasce com o umask
+          chmod "$(stat -c '%a' "$agents_dest" 2>/dev/null || stat -f '%Lp' "$agents_dest" 2>/dev/null || echo 644)" "$agents_tmp" 2>/dev/null || true
+          if mv -f "$agents_tmp" "$agents_dest"; then
+            patched=true
+          else
+            rm -f "$agents_tmp"
+            warn "AGENTS.md: falha ao publicar ## Coding Rules — arquivo original intacto"
+          fi
+        else
+          rm -f "$agents_tmp"
+          warn "AGENTS.md: falha ao inserir regras em ## Coding Rules — arquivo original intacto"
+        fi
       fi
-      rm -f "${agents_md}.rules.tmp"
     fi
     if $patched; then
       ok "AGENTS.md patched with missing sections"

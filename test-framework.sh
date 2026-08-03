@@ -740,35 +740,71 @@ else
   fail "AGENTS.md sem a seção do contrato Codex-side"
 fi
 
-# 12f2. Regras de engenharia do AGENTS.md: presentes e sem divergência entre as
-# cópias de merge_agents_md (heredoc de geração, RULESPATCH, RULESLIST).
-rules_ok=1
-rules_why=""
-while IFS= read -r r; do
-  [ -n "$r" ] || continue
-  # `--` obrigatório: a regra começa com "- " e o grep a leria como opção
-  if ! grep -qF -- "$r" "$FRAMEWORK_DIR/AGENTS.md"; then
-    rules_ok=0; rules_why="ausente no AGENTS.md"; break
-  fi
-  n=$(grep -cF -- "$r" "$FRAMEWORK_DIR/install.sh" || true)
-  if [ "$n" -ne 3 ]; then
-    rules_ok=0; rules_why="install.sh tem $n cópias (esperado 3) de: ${r:0:40}..."; break
-  fi
-done <<'RULES'
-- Prefer the simplest implementation that fully meets the current requirement. No speculative abstraction, configuration, or indirection.
-- Grow in layers: smallest version that works end to end first, each new capability on top of something that already works. Never leave the tree broken mid-refactor.
-- Do not assume a library lacks a capability without checking its docs and types.
-RULES
-# RULESPATCH deve reproduzir a seção INTEIRA (9 bullets), não só as 3 novas —
-# seção parcial deixa o projeto sem as regras de dependência e de teste.
-patch_bullets=$(awk '/^## Coding Rules$/{f++; next} f==2 && /^RULESPATCH$/{exit} f==2 && /^- /{c++} END{print c+0}' "$FRAMEWORK_DIR/install.sh" || true)
-if [ "$rules_ok" -eq 1 ] && [ "$patch_bullets" -eq 9 ]; then
-  pass "AGENTS.md Coding Rules: 3 regras presentes, cópias em sincronia, RULESPATCH completo"
-elif [ "$rules_ok" -eq 0 ]; then
-  fail "AGENTS.md Coding Rules divergiu — $rules_why"
+# 12f2. Coding Rules: os dois caminhos de merge_agents_md têm de emitir a MESMA
+# seção. Comparação textual do bloco inteiro — checar só as 3 regras novas
+# deixaria passar edição em qualquer um dos outros 6 bullets, e deixaria passar
+# uma 4a regra adicionada só no heredoc de geração.
+gen_block=$(awk '/^## Coding Rules$/{f++} f==1 && /^- /{print} f==1 && /^$/ && seen{exit} f==1 && /^- /{seen=1}' "$FRAMEWORK_DIR/install.sh" || true)
+patch_block=$(awk '/^## Coding Rules$/{f++} f==2 && /^RULESPATCH$/{exit} f==2 && /^- /{print}' "$FRAMEWORK_DIR/install.sh" || true)
+gen_n=$(printf '%s\n' "$gen_block" | grep -c '^- ' || true)
+if [ -z "$gen_block" ] || [ "$gen_n" -lt 9 ]; then
+  fail "12f2: não consegui extrair a seção Coding Rules do heredoc de geração (achei $gen_n bullets)"
+elif [ "$gen_block" != "$patch_block" ]; then
+  fail "12f2: heredoc de geração e RULESPATCH divergiram — projeto novo e projeto patchado receberiam regras diferentes"
 else
-  fail "RULESPATCH tem $patch_bullets bullets (esperado 9) — seção parcial no patch"
+  # e o AGENTS.md deste repo tem de conter cada bullet emitido
+  missing_in_repo=""
+  while IFS= read -r r; do
+    [ -n "$r" ] || continue
+    grep -qF -- "$r" "$FRAMEWORK_DIR/AGENTS.md" || missing_in_repo="${r:0:44}"
+  done <<< "$gen_block"
+  if [ -n "$missing_in_repo" ]; then
+    fail "12f2: AGENTS.md do repo não tem a regra emitida pelo instalador: $missing_in_repo..."
+  else
+    pass "AGENTS.md Coding Rules: geração e patch idênticos ($gen_n bullets), AGENTS.md em dia"
+  fi
 fi
+
+# 12f3. merge_agents_md EXECUTADA — 12f2 é estático e não prova comportamento.
+# Cobre: geração, idempotência em 2 runs, inserção escopada à seção real
+# (regra citada em bloco de código não conta como aplicada), preservação de
+# conteúdo custom, e ausência de temp órfão.
+mam_tmp=$(mktemp -d)
+{ echo 'set -euo pipefail'; echo 'ok(){ :; }'; echo 'warn(){ :; }'
+  sed -n '/^merge_agents_md() {/,/^}/p' "$FRAMEWORK_DIR/install.sh"; } > "$mam_tmp/fn.sh"
+R_GROW="- Grow in layers:"
+mam_run(){ ( cd "$1" && . "$mam_tmp/fn.sh" && merge_agents_md ) >/dev/null 2>&1 || true; }
+mam_count(){ grep -cF -- "$2" "$1/AGENTS.md" 2>/dev/null || echo 0; }
+mam_fail=""
+
+# a) geração do zero + idempotência
+mkdir -p "$mam_tmp/a" && mam_run "$mam_tmp/a" && mam_run "$mam_tmp/a"
+[ "$(mam_count "$mam_tmp/a" "$R_GROW")" = "1" ] || mam_fail="geração/idempotência"
+
+# b) seção existente sem uma regra, 2 runs → exatamente 1 de cada
+mkdir -p "$mam_tmp/b"
+printf '# X\n\n## Coding Rules\n- Follow existing patterns\n\n## Custom\n- preservar isto\n' > "$mam_tmp/b/AGENTS.md"
+mam_run "$mam_tmp/b" && mam_run "$mam_tmp/b"
+[ "$(mam_count "$mam_tmp/b" "$R_GROW")" = "1" ] || mam_fail="${mam_fail:+$mam_fail; }duplicou em 2 runs"
+grep -q "preservar isto" "$mam_tmp/b/AGENTS.md" || mam_fail="${mam_fail:+$mam_fail; }perdeu seção custom"
+
+# c) regra citada dentro de bloco de código não pode contar como aplicada
+mkdir -p "$mam_tmp/c"
+{ printf '# X\n\n## Exemplo\n\n```markdown\n## Coding Rules\n%s ...\n```\n\n## Coding Rules\n- Follow existing patterns\n' "$R_GROW"; } > "$mam_tmp/c/AGENTS.md"
+mam_run "$mam_tmp/c"
+if [ "$(awk '/^## Coding Rules[[:space:]]*$/{f++} f==2 && /^- Grow in layers:/{c++} END{print c+0}' "$mam_tmp/c/AGENTS.md")" != "1" ]; then
+  mam_fail="${mam_fail:+$mam_fail; }não inseriu na seção real (bloco de código contou como aplicada)"
+fi
+
+# d) nenhum temp órfão em nenhum dos casos
+[ "$(find "$mam_tmp" -name '*.tmp' -o -name '*.canuto.*' | wc -l)" -eq 0 ] || mam_fail="${mam_fail:+$mam_fail; }deixou temp órfão"
+
+if [ -z "$mam_fail" ]; then
+  pass "merge_agents_md executada: gera, é idempotente em 2 runs, escopa à seção real, preserva custom"
+else
+  fail "merge_agents_md: $mam_fail"
+fi
+rm -rf "$mam_tmp"
 
 # 12g. install.sh não cria blocos [profiles.*] mortos em máquina limpa
 if grep -q "Bloco ausente: NÃO criar" "$FRAMEWORK_DIR/install.sh"; then
