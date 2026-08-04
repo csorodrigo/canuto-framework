@@ -2131,6 +2131,9 @@ merge_agents_md() {
 - Read .agents/tmp/context-package.md if it exists (pre-loaded context from Architect)
 
 ## Coding Rules
+- Prefer the simplest implementation that fully meets the current requirement. No speculative abstraction, configuration, or indirection.
+- Grow in layers: smallest version that works end to end first, each new capability on top of something that already works. Never leave the tree broken mid-refactor.
+- Do not assume a library lacks a capability without checking its docs and types.
 - Follow existing patterns in nearby files — match style, naming, structure
 - Do NOT add new dependencies without explicit instruction in the prompt
 - Include basic happy-path tests for new functions
@@ -2158,23 +2161,23 @@ bash .agents/tools/vault-bridge.sh search <query>
 ## Codex Profiles
 
 **Modelo e effort NÃO são declarados aqui.** A fonte única é
-\`.agents/config/models.yaml\` — é o arquivo que o wrapper realmente lê.
+`.agents/config/models.yaml` — é o arquivo que o wrapper realmente lê.
 Duplicar a versão numa tabela de doc é como a defasagem começa.
 
 | Role | Use For |
 |------|---------|
-| \`coder\` | Geração de código, refactor, edits multi-arquivo |
-| \`reviewer\` | Review de código e plano (roda read-only) |
-| \`architect\` | Arquitetura, decomposição complexa |
-| \`maestro\` | Orquestração em runtime Codex direto |
-| \`fast\` | Edits rápidos, formatação, docs (tier mais barato) |
+| `coder` | Geração de código, refactor, edits multi-arquivo |
+| `reviewer` | Review de código e plano (roda read-only) |
+| `architect` | Arquitetura, decomposição complexa |
+| `maestro` | Orquestração em runtime Codex direto |
+| `fast` | Edits rápidos, formatação, docs (tier mais barato) |
 
-- Caminho canônico de delegação: \`~/.codex/bin/codex-delegate.sh <role> <task> <out>\`.
-- \`--profile\` não é lido pelo wrapper. Vale para \`codex exec\` cru e para o app
-  Desktop, via \`~/.codex/<role>.config.toml\` (perfis v2) — **não** pelos blocos
-  \`[profiles.*]\` de \`config.toml\`, que o codex-cli 0.135+ ignora.
-- Nunca use \`-q\` (removido no codex-cli 0.135).
-- Sessões Claude mantêm Claude como Maestro (alias \`fable\`, fallback \`opus\`).
+- Caminho canônico de delegação: `~/.codex/bin/codex-delegate.sh <role> <task> <out>`.
+- `--profile` não é lido pelo wrapper. Vale para `codex exec` cru e para o app
+  Desktop, via `~/.codex/<role>.config.toml` (perfis v2) — **não** pelos blocos
+  `[profiles.*]` de `config.toml`, que o codex-cli 0.135+ ignora.
+- Nunca use `-q` (removido no codex-cli 0.135).
+- Sessões Claude mantêm Claude como Maestro (alias `fable`, fallback `opus`).
 
 ## Anti-Patterns
 - Do NOT create README.md, documentation files, or CHANGELOG entries
@@ -2245,6 +2248,118 @@ VAULTPATCH
   versão aqui — foi assim que a tabela anterior ficou 2 releases atrás do real.
 RUNTIMEPATCH
       patched=true
+    fi
+    # Um `## Coding Rules` dentro de bloco cercado é exemplo, não seção. Este
+    # repo GERA AGENTS.md, então documentar a seção num bloco de código é
+    # plausível — tratá-la como real faria o patch cair dentro da cerca.
+    # Rastreio de cerca CommonMark: abre com 3+ de ` ou ~, fecha só com o MESMO
+    # char e comprimento >= o de abertura. Contar toda linha de crase como
+    # alternância deixava a paridade presa em arquivo com cerca não fechada.
+    agents_fence_awk='
+      function fence_line(l,   ch, n) {
+        if (l !~ /^(```+|~~~+)/) return 0
+        ch = substr(l, 1, 1); n = match(l, /[^`~]|$/) - 1
+        if (!fence) { fence = 1; fchar = ch; flen = n }
+        else if (ch == fchar && n >= flen) { fence = 0 }
+        return 1
+      }'
+    agents_has_section=$(awk "$agents_fence_awk"'
+      { if (fence_line($0)) next }
+      !fence && /^##+ Coding Rules[[:space:]]*$/{print "yes"; exit}' "$agents_md" 2>/dev/null || true)
+    # Guarda de convergência, independente do rastreio de cerca: se existe
+    # QUALQUER linha de heading Coding Rules, nunca anexar outra seção. Sem
+    # isso, um falso negativo na deteção anexa uma seção nova a cada run.
+    agents_any_section=$(grep -cE '^##+ Coding Rules[[:space:]]*$' "$agents_md" 2>/dev/null || true)
+    if [ "$agents_has_section" != "yes" ] && [ "${agents_any_section:-0}" -gt 0 ]; then
+      warn "AGENTS.md: '## Coding Rules' só aparece dentro de bloco de código — nada aplicado (edite a seção real e rode de novo)"
+    elif [ "$agents_has_section" != "yes" ]; then
+      # Section absent — append it whole. Must mirror the generation heredoc
+      # above; a partial section would leave the project permanently without
+      # the dependency and test rules, and no later run would repair it.
+      cat >> "$agents_md" << 'RULESPATCH'
+
+## Coding Rules
+- Prefer the simplest implementation that fully meets the current requirement. No speculative abstraction, configuration, or indirection.
+- Grow in layers: smallest version that works end to end first, each new capability on top of something that already works. Never leave the tree broken mid-refactor.
+- Do not assume a library lacks a capability without checking its docs and types.
+- Follow existing patterns in nearby files — match style, naming, structure
+- Do NOT add new dependencies without explicit instruction in the prompt
+- Include basic happy-path tests for new functions
+- Use TypeScript strict mode if tsconfig.json has strict: true
+- Prefer editing existing files over creating new ones
+- Do NOT add comments, docstrings, or type annotations to code you didn't change
+RULESPATCH
+      patched=true
+    else
+      # Section exists — one sentinel PER rule, so deleting or translating a
+      # single bullet never re-inserts the others as duplicates. Collect the
+      # missing ones first, then insert once, to keep canonical order.
+      #
+      # A presença é checada DENTRO da seção, não no arquivo inteiro: uma regra
+      # citada em bloco de código ou em prosa não pode contar como aplicada,
+      # senão a seção real nunca a recebe e o instalador diz "up to date".
+      # Encerra no próximo heading de nível IGUAL OU MAIOR — um `### Gerais`
+      # dentro da seção não a termina, senão a extração sai vazia e as regras
+      # já presentes são reinseridas como duplicata. Conteúdo dentro de cerca
+      # não conta como presença: exemplo citado não é regra aplicada.
+      agents_section=$(awk "$agents_fence_awk"'
+        { if (fence_line($0)) next }
+        !fence && /^##+ Coding Rules[[:space:]]*$/{ match($0,/^#+/); lvl=RLENGTH; f=1; next }
+        f && !fence && /^#+ /{ match($0,/^#+/); if (RLENGTH<=lvl) exit }
+        f && !fence' "$agents_md" 2>/dev/null || true)
+      agents_missing=""
+      while IFS= read -r rule; do
+        [ -n "$rule" ] || continue
+        # `--` obrigatório: a regra começa com "- " e o grep a leria como opção
+        printf '%s\n' "$agents_section" | grep -qF -- "$rule" || agents_missing="${agents_missing}${rule}"$'\n'
+      done << 'RULESLIST'
+- Prefer the simplest implementation that fully meets the current requirement. No speculative abstraction, configuration, or indirection.
+- Grow in layers: smallest version that works end to end first, each new capability on top of something that already works. Never leave the tree broken mid-refactor.
+- Do not assume a library lacks a capability without checking its docs and types.
+RULESLIST
+      if [ -n "$agents_missing" ]; then
+        # Escreve no ALVO resolvido, para não trocar um symlink por cópia local,
+        # e publica com `mv` (rename atômico). Nunca redirecionar por cima do
+        # arquivo do usuário: o `>` trunca antes de escrever, e uma falha no
+        # meio deixaria um AGENTS.md parcial sem cópia de retorno.
+        agents_dest="$agents_md"
+        if [ -L "$agents_dest" ]; then
+          # `readlink -f` não existe no BSD antigo; resolve manualmente na falta
+          agents_dest=$(readlink -f "$agents_dest" 2>/dev/null || true)
+          if [ -z "$agents_dest" ]; then
+            agents_dest="$agents_md"; agents_hops=0
+            while [ -L "$agents_dest" ] && [ "$agents_hops" -lt 16 ]; do
+              agents_link=$(readlink "$agents_dest" 2>/dev/null || true)
+              [ -n "$agents_link" ] || break
+              case "$agents_link" in
+                /*) agents_dest="$agents_link" ;;
+                *)  agents_dest="$(dirname "$agents_dest")/$agents_link" ;;
+              esac
+              agents_hops=$((agents_hops + 1))
+            done
+          fi
+        fi
+        agents_tmp="${agents_dest}.canuto.$$"
+        if awk -v ins="$agents_missing" "$agents_fence_awk"'
+              BEGIN{n=split(ins, a, "\n")}
+              { if (fence_line($0)) { print; next } }
+              !fence && !seen && /^##+ Coding Rules[[:space:]]*$/{
+                print; for(i=1;i<=n;i++) if(a[i]!="") print a[i]; seen=1; next
+              }
+              1' "$agents_dest" > "$agents_tmp"; then
+          # herda o modo do original; sem isso o arquivo publicado nasce com o umask
+          chmod "$(stat -c '%a' "$agents_dest" 2>/dev/null || stat -f '%Lp' "$agents_dest" 2>/dev/null || echo 644)" "$agents_tmp" 2>/dev/null || true
+          if mv -f "$agents_tmp" "$agents_dest"; then
+            patched=true
+          else
+            rm -f "$agents_tmp"
+            warn "AGENTS.md: falha ao publicar ## Coding Rules — arquivo original intacto"
+          fi
+        else
+          rm -f "$agents_tmp"
+          warn "AGENTS.md: falha ao inserir regras em ## Coding Rules — arquivo original intacto"
+        fi
+      fi
     fi
     if $patched; then
       ok "AGENTS.md patched with missing sections"
