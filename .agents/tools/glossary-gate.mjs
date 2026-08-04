@@ -190,6 +190,14 @@ function loadIgnore() {
 // ── 4. só identificadores ───────────────────────────────────────────────────
 /** Remove string, template e comentário — o que sobra é código. */
 function stripLiterals(text) {
+  // Continuação de bloco de comentário. O gate lê o diff LINHA A LINHA, então
+  // ele nunca vê o `/*` de abertura de um JSDoc de várias linhas — sem esta
+  // regra, cada linha ` * texto` entra como código. Foi o que produziu o
+  // primeiro falso positivo real: "Parte da skill..." num cabeçalho JSDoc
+  // acusado como o termo de domínio `parte` (Party). JSDoc é onipresente, e
+  // falso positivo é o que ensina o time a passar --no-verify.
+  const t = text.trim();
+  if (t.startsWith("*") || t.startsWith("/*") || t.startsWith("//")) return " ";
   return text
     .replace(/\/\/.*$/g, " ")
     .replace(/\/\*[\s\S]*?\*\//g, " ")
