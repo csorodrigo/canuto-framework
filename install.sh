@@ -622,6 +622,7 @@ skill_remote_files() {
         ".agents/skills/domain-modeling/SKILL.md" \
         ".agents/skills/domain-modeling/CONTEXT-FORMAT.md"
   ".agents/tools/glossary-gate.mjs"
+  ".agents/tools/__tests__/glossary-gate.test.mjs"
       ;;
     tdd)
       printf '%s\n' \
