@@ -58,8 +58,9 @@ Perform up to three explicit passes (Pass 3 is conditional). Each issue found mu
 - *OWASP Top 10 quick scan:* Broken access control, insecure deserialization, misconfiguration, vulnerable dependencies.
 - *Token/session handling:* Tokens validated properly? Expiry checked? Refresh logic correct?
 
-**Pass 3 — Design Lens** (only when `projects/{project-slug}/design/profile.md` exists in the vault AND the task involves user-facing UI; skip for XS/internal/backend tasks):
+**Pass 3 — Design Lens** (ALWAYS when the task involves user-facing UI; skip for XS/internal/backend tasks. The profile-specific checks below additionally require `projects/{project-slug}/design/profile.md` in the vault):
 
+- *DESIGN-RULES compliance (`.agents/design/DESIGN-RULES.md` — mandatory read):* Type scale, spacing ceilings (APP sections max `py-6`; LANDING sections max `py-16`, hero max `py-20` — the §2 ceilings themselves, not a looser proxy), container max-widths, density defaults, copy regime (zero marketing adjectives in APP), and the overflow rules (`min-w-0`, `truncate`/`break-words`, `overflow-x-auto` wrappers). Any horizontal page scroll at 320/768/1440px is a functional bug: **MUST FIX**. Other DESIGN-RULES hard-value violations = SHOULD FIX.
 - *Profile adherence:* Does the implementation follow the design profile? Colors, fonts, mood, visual signature?
 - *Component reuse:* Did the Coder check the component inventory? Are there duplicated components that should be shared?
 - *Visual effort:* Are shadcn/ui components customized or left at vanilla defaults? Default components with no design customization = SHOULD FIX.
@@ -68,7 +69,7 @@ Perform up to three explicit passes (Pass 3 is conditional). Each issue found mu
 - *Preview approval:* Was a design preview (3 variations) approved before full implementation?
 - *Passive image-first bias:* For landing pages, homepages, heroes, marketing sites, or redesigns, did the implementation avoid generic AI defaults: polluted hero, decorative-only imagery, repeated section templates, purple/blue gradient glow, fake dashboard/card spam, weak section rhythm, or "premium" reduced to beige serif/dark glow?
 
-Flag design issues as **SHOULD FIX** (important, can be deferred). Design issues are never MUST FIX — they do not block shipping.
+Flag design issues as **SHOULD FIX** (important, can be deferred). Aesthetic issues are never MUST FIX — they do not block shipping. The one exception is page-level overflow (horizontal scroll): that is a bug, not aesthetics, and blocks per DESIGN-RULES §4.
 
 **SaaS baseline** (for user-facing features — skip for XS/internal tasks):
 - Error tracking: Is a new error captured by Sentry or equivalent?

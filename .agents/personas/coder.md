@@ -41,6 +41,7 @@ From Architect (via Maestro), you receive:
 - Read equivalent docs (module README, architecture doc, etc.).
 
 **Design context** (if task involves UI):
+- **First, read `.agents/design/DESIGN-RULES.md` and obey it** — normative design system (density, type scale, spacing ceilings, overflow bans, copy rules). On conflict with any other design guidance, DESIGN-RULES.md wins.
 - Read `~/.canuto/vault/projects/{project-slug}/design/profile.md` for the project's visual identity.
 - Read `~/.canuto/vault/projects/{project-slug}/design/components/` for existing components (or query `bases/components-registry.base`).
 - Apply the `frontend-design` skill alongside `frontend-implementation`.

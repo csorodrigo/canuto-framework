@@ -38,6 +38,11 @@ only after ~50 calls/session, which is rare). See `.agents/skills/cost-routing.m
   chamada, toda pergunta com recomendação, fato se busca / decisão se pergunta,
   nenhuma ação antes da confirmação. Composta com `domain-modeling`, ela escreve
   `CONTEXT.md` e ADRs durante a entrevista. Obrigatória para S/M/L; XS é exceção.
+- **Front (qualquer UI visível): leia e obedeça `.agents/design/DESIGN-RULES.md` antes.**
+  É o design system normativo de TODOS os projetos — densidade, escala tipográfica,
+  tetos de espaçamento, proibição de overflow, copy APP vs LANDING. Vale para os dois
+  runtimes (Claude e Codex; task-file de front pro codex-delegate DEVE referenciá-lo)
+  e vence qualquer outra orientação de design em conflito.
 - Read any .context.md and docs/FEATURE-MAP.md files if they exist.
 - **`CONTEXT.md` (raiz, maiúsculo) é outra camada**: o glossário do domínio, mantido
   pela skill `domain-modeling`. `.context.md` diz o que o código faz; `CONTEXT.md`

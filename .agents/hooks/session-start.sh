@@ -337,6 +337,80 @@ if [ -n "$BRIEF_VAULT_STATE" ] \
   ) || true
 fi
 
+# --- Registro do path do projeto (para canuto-update-all.sh) ---------------
+# O vault global conhece SLUGS, não paths — e o update-all precisa dos paths
+# para varrer os projetos. Cada sessão registra (last-write-wins) o toplevel em
+# <vault>/projects/<slug>/project-path. Postura de ESCRITA: só com
+# canuto_require_project_slug (identidade confiável); slug degradado criaria
+# ilha nova no vault — aí é melhor não registrar. Best-effort: nunca quebra a
+# abertura da sessão.
+# Worktree linkado não registra (git-dir != git-common-dir): last-write-wins
+# redirecionaria o update-all — e o commit dele — para o branch de feature.
+REG_GITDIR=$(git -C "$ROOT" rev-parse --git-dir 2>/dev/null) || REG_GITDIR=""
+REG_GITCOMMON=$(git -C "$ROOT" rev-parse --git-common-dir 2>/dev/null) || REG_GITCOMMON=""
+if [ -n "$ROOT" ] && [ "$REG_GITDIR" = "$REG_GITCOMMON" ] \
+   && command -v canuto_require_project_slug >/dev/null 2>&1; then
+  REG_SLUG=$(canuto_require_project_slug "$ROOT" 2>/dev/null) || REG_SLUG=""
+  if [ -n "$REG_SLUG" ]; then
+    REG_DIR="${CANUTO_VAULT_DIR:-$HOME/.canuto/vault}/projects/$REG_SLUG"
+    mkdir -p "$REG_DIR" 2>/dev/null \
+      && printf '%s\n' "$ROOT" > "$REG_DIR/project-path" 2>/dev/null || true
+  fi
+fi
+
+# --- Aviso de framework desatualizado ---------------------------------------
+# Compara .agents/VERSION local com o VERSION remoto do main. A busca remota
+# NUNCA roda no caminho crítico: o valor usado é o do cache
+# (~/.canuto/.cache/framework-remote-version) e o refresh dispara em
+# BACKGROUND quando o cache tem >6h — a primeira sessão não avisa, a próxima
+# sim. Offline: curl falha em silêncio, cache antigo continua valendo.
+# CANUTO_NO_VERSION_CHECK=1 desliga.
+# Só avisa quando o remoto é MAIS NOVO: `!=` cru transformava cache atrasado
+# (até 6h) ou fork à frente num "DESATUALIZADO" mandando refazer update já
+# feito. sort -t. -kN,Nn é portátil BSD/GNU; indefinido = sem aviso.
+_canuto_ver_gt() {
+  [ "$1" = "$2" ] && return 1
+  [ "$(printf '%s\n%s\n' "$1" "$2" | sort -t. -k1,1n -k2,2n -k3,3n 2>/dev/null | tail -1)" = "$1" ]
+}
+UPDATE_LINE=""
+if [ -n "$ROOT" ] && [ "${CANUTO_NO_VERSION_CHECK:-0}" != "1" ] \
+   && [ -d "$ROOT/.agents" ]; then
+  # `|| VAR=""` em TODA substituição com head/pipe: o source transitivo de
+  # canuto-memory.sh (via event-log.sh) traz `set -euo pipefail` para este
+  # shell — um head contra arquivo ausente sob pipefail mataria o hook
+  # inteiro e a sessão abriria sem briefing.
+  # VERSION ausente NÃO desliga o check: instalação pré-1.7 é exatamente a
+  # frota desatualizada que o aviso existe para alcançar.
+  LOCAL_FW_VER=$(head -1 "$ROOT/.agents/VERSION" 2>/dev/null | tr -d '[:space:]') || LOCAL_FW_VER=""
+  VER_CACHE_DIR="$HOME/.canuto/.cache"
+  VER_CACHE="$VER_CACHE_DIR/framework-remote-version"
+  CACHE_MTIME=$(stat -c %Y "$VER_CACHE" 2>/dev/null || stat -f %m "$VER_CACHE" 2>/dev/null || echo 0)
+  NOW_EPOCH=$(date +%s 2>/dev/null || echo 0)
+  if [ $((NOW_EPOCH - CACHE_MTIME)) -gt 21600 ] && command -v curl >/dev/null 2>&1; then
+    mkdir -p "$VER_CACHE_DIR" 2>/dev/null || true
+    # stdin/stdout/stderr TODOS re-plugados: descritor herdado do hook em
+    # processo backgrounded segura o pipe que o runtime espera fechar — a
+    # mesma classe do "timeout que não mata o filho" do health check.
+    (
+      RAW=$(curl -fsSL -m 5 "${CANUTO_REPO_URL:-https://raw.githubusercontent.com/csorodrigo/canuto-framework/main}/.agents/VERSION" 2>/dev/null | head -1 | tr -d '[:space:]') || RAW=""
+      # Só versão com cara de versão entra no cache — 404 HTML ou lixo de
+      # proxy viraria um "desatualizado" fantasma em toda sessão.
+      case "$RAW" in
+        [0-9]*.[0-9]*) printf '%s\n' "$RAW" > "$VER_CACHE.tmp" 2>/dev/null \
+          && mv "$VER_CACHE.tmp" "$VER_CACHE" 2>/dev/null ;;
+      esac
+    ) </dev/null >/dev/null 2>&1 &
+  fi
+  REMOTE_FW_VER=$(head -1 "$VER_CACHE" 2>/dev/null | tr -d '[:space:]') || REMOTE_FW_VER=""
+  if [ -n "$REMOTE_FW_VER" ]; then
+    if [ -z "$LOCAL_FW_VER" ]; then
+      UPDATE_LINE="Framework: DESATUALIZADO (local pré-1.7 sem carimbo, remoto v$REMOTE_FW_VER) — rode 'bash install.sh --update' neste projeto (o update também instala o canuto-update-all.sh, que atualiza todos os projetos de uma vez)"
+    elif _canuto_ver_gt "$REMOTE_FW_VER" "$LOCAL_FW_VER"; then
+      UPDATE_LINE="Framework: DESATUALIZADO (local v$LOCAL_FW_VER, remoto v$REMOTE_FW_VER) — rode 'bash install.sh --update' aqui, ou 'bash .agents/tools/canuto-update-all.sh' para atualizar todos os projetos"
+    fi
+  fi
+fi
+
 # --- Emit ------------------------------------------------------------------
 CONTEXT=""
 if [ -n "$HEALTH_LINE" ]; then
@@ -344,6 +418,10 @@ if [ -n "$HEALTH_LINE" ]; then
 "
 fi
 CONTEXT="${CONTEXT}${SESSION_LINE}"
+if [ -n "$UPDATE_LINE" ]; then
+  CONTEXT="$CONTEXT
+$UPDATE_LINE"
+fi
 if [ -n "$STALE_LINE" ]; then
   CONTEXT="$CONTEXT
 $STALE_LINE"

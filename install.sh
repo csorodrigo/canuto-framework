@@ -507,19 +507,31 @@ fi
 download() {
   local remote_path="$1"
   local local_path="$2"
-  local dir
+  local dir tmp rc
   dir=$(dirname "$local_path")
   mkdir -p "$dir"
 
+  # Temp + mv (rename), nunca escrita direta: cp/curl -o truncam o MESMO
+  # inode, e quando o alvo é o próprio install.sh em execução o bash continua
+  # lendo o inode truncado e morre com "unexpected EOF" ao fim do update —
+  # exit != 0 num update que na verdade deu certo (sandbox 2026-08-21).
+  # rename troca o inode: o processo em execução segue no antigo até o fim.
+  tmp="$local_path.canuto-dl.$$"
+  rc=0
   if [ -n "$SOURCE_DIR" ] && [ -f "$SOURCE_DIR/$remote_path" ]; then
-    cp "$SOURCE_DIR/$remote_path" "$local_path"
+    cp "$SOURCE_DIR/$remote_path" "$tmp" || rc=$?
   elif command -v curl > /dev/null 2>&1; then
-    curl -fsSL "$REPO_URL/$remote_path" -o "$local_path"
+    curl -fsSL "$REPO_URL/$remote_path" -o "$tmp" || rc=$?
   elif command -v wget > /dev/null 2>&1; then
-    wget -q "$REPO_URL/$remote_path" -O "$local_path"
+    wget -q "$REPO_URL/$remote_path" -O "$tmp" || rc=$?
   else
     error "Neither curl nor wget found. Install one and retry."
   fi
+  if [ "$rc" -ne 0 ]; then
+    rm -f "$tmp" 2>/dev/null || true
+    return "$rc"
+  fi
+  mv "$tmp" "$local_path" || { rm -f "$tmp" 2>/dev/null || true; return 1; }
 
   # Exec bit é parte da distribuição: curl/wget sempre gravam 644, e o chmod
   # do repair_runtime não roda quando setup_deps falha (fail-open silencioso
@@ -642,6 +654,14 @@ skill_remote_files() {
 
 FRAMEWORK_FILES=(
   "install.sh"
+  # Carimbo de versão do framework: fonte do `--check` agregado, do aviso de
+  # desatualização no SessionStart e do canuto-update-all.sh. Distribuído como
+  # arquivo normal para o caminho ser idêntico no repo e no consumidor.
+  ".agents/VERSION"
+  # Design system normativo (denso/compacto/sem overflow) — NÃO é skill:
+  # contrato neutro consultado por Claude E Codex antes de qualquer front.
+  ".agents/design/DESIGN-RULES.md"
+  ".agents/tools/canuto-update-all.sh"
   ".agents/personas/maestro.md"
   ".agents/personas/architect.md"
   ".agents/personas/coder.md"
@@ -905,6 +925,7 @@ SECTION
 
 ## Project Rules
 - Before finalizing any plan, always interview the user in detail using AskUserQuestion about implementation choices, UI/UX decisions, trade-offs, and concerns. Never assume — always ask first.
+- Before planning, implementing, or reviewing ANY user-facing UI, read `.agents/design/DESIGN-RULES.md` and obey it. It is the normative design system (density, spacing, overflow, copy) for every runtime — Claude and Codex alike.
 - Read any .context.md and docs/FEATURE-MAP.md files if they exist.
 - If they do not exist, have the Contextualizer create them (with approval).
 - Never run Git or shell commands without explicit confirmation.
@@ -922,6 +943,15 @@ SECTION
         next
       }1' "$CLAUDE_MD" > "${CLAUDE_MD}.tmp" && mv "${CLAUDE_MD}.tmp" "$CLAUDE_MD"
       ok "  patched: planning-interview rule added to ## Project Rules"
+      appended=1
+    fi
+    if ! grep -q "DESIGN-RULES" "$CLAUDE_MD" 2>/dev/null; then
+      awk '/^## Project Rules/{
+        print
+        print "- Before planning, implementing, or reviewing ANY user-facing UI, read `.agents/design/DESIGN-RULES.md` and obey it. It is the normative design system (density, spacing, overflow, copy) for every runtime \342\200\224 Claude and Codex alike."
+        next
+      }1' "$CLAUDE_MD" > "${CLAUDE_MD}.tmp" && mv "${CLAUDE_MD}.tmp" "$CLAUDE_MD"
+      ok "  patched: design-rules consultation rule added to ## Project Rules"
       appended=1
     fi
   fi
@@ -996,6 +1026,39 @@ install_global_fallback_libs() {
       echo "files:$okd"
     } > "$libdir/VERSION" 2>/dev/null || true
   fi
+}
+
+# ── register_project_path ───────────────────────────────────────────────────
+# Registro para o canuto-update-all.sh: <vault>/projects/<slug>/project-path.
+# Registrar AQUI (install/update) e não só no hook SessionStart do Claude é o
+# que cobre projetos usados apenas via runtime Codex — sessão Codex direta não
+# roda os hooks do Claude Code (ver codex-maestro.sh) e ficaria invisível para
+# o update-all. Postura de ESCRITA (canuto_require_project_slug): slug
+# degradado criaria ilha nova no vault — melhor não registrar. Best-effort:
+# roda em subshell (o set -euo pipefail do canuto-memory.sh não vaza) e nunca
+# falha o install.
+register_project_path() {
+  local memlib=".agents/tools/canuto-memory.sh" slug="" regdir=""
+  local gitdir="" gitcommon=""
+  [ -f "$memlib" ] || return 0
+  # Worktree linkado NÃO registra (git-dir != git-common-dir): o registro é
+  # last-write-wins e a última sessão num worktree redirecionaria o update-all
+  # — e o commit do update — para o branch de feature que estiver lá.
+  gitdir=$(git rev-parse --git-dir 2>/dev/null) || gitdir=""
+  gitcommon=$(git rev-parse --git-common-dir 2>/dev/null) || gitcommon=""
+  if [ -n "$gitdir" ] && [ -n "$gitcommon" ] && [ "$gitdir" != "$gitcommon" ]; then
+    return 0
+  fi
+  slug=$(CANUTO_TARGET_DIR="$(pwd)" bash -c '
+    . ".agents/tools/canuto-memory.sh" 2>/dev/null || exit 1
+    canuto_require_project_slug "$CANUTO_TARGET_DIR" 2>/dev/null
+  ' 2>/dev/null) || slug=""
+  [ -n "$slug" ] || return 0
+  regdir="${CANUTO_VAULT_DIR:-$HOME/.canuto/vault}/projects/$slug"
+  mkdir -p "$regdir" 2>/dev/null || return 0
+  printf '%s\n' "$(pwd)" > "$regdir/project-path" 2>/dev/null || true
+  ok "Projeto registrado para o update-all: $slug"
+  return 0
 }
 
 # ── dedup_canuto_hook_dupes ─────────────────────────────────────────────────
@@ -2141,6 +2204,12 @@ merge_agents_md() {
 - Prefer editing existing files over creating new ones
 - Do NOT add comments, docstrings, or type annotations to code you didn't change
 
+## Design Rules (mandatory for any UI work)
+- Before planning, implementing, or reviewing ANY user-facing UI, read
+  `.agents/design/DESIGN-RULES.md` and obey it. It is the normative design
+  system: density, type scale, spacing ceilings, overflow bans, copy rules.
+- On conflict with any other guidance, DESIGN-RULES.md wins.
+
 ## MCP Tools Available
 - **obsidian-vault**: Read/write vault notes at ~/.canuto/vault/ for project memory
 - **ast-grep**: Structural code search — use for finding patterns, symbols, callers
@@ -2223,6 +2292,17 @@ Duplicar a versão numa tabela de doc é como a defasagem começa.
 - Nunca use `-q` (removido no codex-cli 0.135).
 - Sessões Claude mantêm Claude como Maestro (alias `fable`, fallback `opus`).
 PROFILEPATCH
+      patched=true
+    fi
+    if ! grep -q "DESIGN-RULES" "$agents_md" 2>/dev/null; then
+      cat >> "$agents_md" << 'DESIGNPATCH'
+
+## Design Rules (mandatory for any UI work)
+- Before planning, implementing, or reviewing ANY user-facing UI, read
+  `.agents/design/DESIGN-RULES.md` and obey it. It is the normative design
+  system: density, type scale, spacing ceilings, overflow bans, copy rules.
+- On conflict with any other guidance, DESIGN-RULES.md wins.
+DESIGNPATCH
       patched=true
     fi
     if ! grep -q "## Vault Access" "$agents_md" 2>/dev/null; then
@@ -3492,6 +3572,22 @@ if [ "$MODE" = "check" ]; then
     if [ ! -f "$file" ]; then
       echo -e "  ${RED}\u2717 MISSING${RESET}    $file"
       MISSING=$((MISSING + 1))
+    elif [ "$file" = ".agents/VERSION" ]; then
+      # O carimbo \u00c9 a vers\u00e3o (conte\u00fado cru, sem frontmatter) \u2014 o grep
+      # "^version:" abaixo o rotularia UNKNOWN em todo --check.
+      LOCAL_VER=$(head -1 "$file" 2>/dev/null | tr -d '[:space:]' || true)
+      REMOTE_VER=$(fetch_content "$file" | head -1 | tr -d '[:space:]' || true)
+      if [ -z "$LOCAL_VER" ] || [ -z "$REMOTE_VER" ]; then
+        # Mesmo contrato do bra\u00e7o gen\u00e9rico: sem os DOIS lados (offline, 404),
+        # \u00e9 UNKNOWN \u2014 nunca um OUTDATED fantasma.
+        echo -e "  ${YELLOW}? UNKNOWN${RESET}    $file (version unavailable)"
+      elif [ "$LOCAL_VER" = "$REMOTE_VER" ]; then
+        echo -e "  ${GREEN}\u2713 OK${RESET}        $file (v$LOCAL_VER)"
+        UP_TO_DATE=$((UP_TO_DATE + 1))
+      else
+        echo -e "  ${YELLOW}\u26a0 OUTDATED${RESET}   $file (local: v$LOCAL_VER \u2192 remote: v$REMOTE_VER)"
+        OUTDATED=$((OUTDATED + 1))
+      fi
     else
       LOCAL_VER=$(grep "^version:" "$file" 2>/dev/null | head -1 | awk '{print $2}' || true)
       REMOTE_VER=$(fetch_content "$file" | grep "^version:" | head -1 | awk '{print $2}' || true)
@@ -3772,15 +3868,29 @@ if [ "$MODE" = "install" ]; then
   ok "Vault directories created"
 
   repair_runtime
+  register_project_path
 
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
     log "Staging files for git..."
-    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" "CODEX.md" 2>/dev/null || true
+    # Um path POR VEZ: `git add` com vários pathspecs é tudo-ou-nada — um
+    # único ausente (.context.md só existe com aprovação) fazia o comando
+    # inteiro falhar em silêncio e NADA era stageado; o commit em seguida
+    # falhava e o update saía não-zero com os arquivos na verdade aplicados.
+    # (install.sh e .claude/agents/ entram no add: estão em FRAMEWORK_FILES e
+    # ficavam untracked/modified para sempre no consumidor.)
+    for add_path in "$AGENTS_DIR" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs" "CODEX.md" "install.sh" ".claude/agents"; do
+      [ -e "$add_path" ] && git add "$add_path" 2>/dev/null || true
+    done
     echo ""
     if confirm_yes "Commit now? [Y/n] " "Y"; then
-      git commit -m "chore: add Canuto Framework v1.6"
-      ok "Committed!"
+      # Versão real do carimbo recém-baixado — "v1.6" hardcoded aqui nascia
+      # defasado no mesmo release que criou .agents/VERSION para evitar isso.
+      INSTALL_FW_VER=$(head -1 "$AGENTS_DIR/VERSION" 2>/dev/null | tr -d '[:space:]')
+      [ -n "$INSTALL_FW_VER" ] || INSTALL_FW_VER="?"
+      git commit -m "chore: add Canuto Framework v$INSTALL_FW_VER" \
+        && ok "Committed!" \
+        || warn "Nada para commitar."
     else
       warn "Files staged but not committed. Run 'git commit' when ready."
     fi
@@ -3798,7 +3908,7 @@ if [ "$MODE" = "install" ]; then
     warn "Post-install validation reported issues. Re-run: bash install.sh --doctor"
   fi
 
-  echo -e "${GREEN}  Done! v1.6 installed.${RESET}"
+  echo -e "${GREEN}  Done! v${INSTALL_FW_VER:-?} installed.${RESET}"
   echo -e "${GREEN}  Claude keeps Opus as Maestro by default.${RESET}"
   echo -e "${GREEN}  For direct Codex Maestro mode: bash .agents/tools/codex-maestro.sh${RESET}"
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
@@ -3839,11 +3949,26 @@ if [ "$MODE" = "update" ]; then
   if ! repair_runtime; then
     warn "Runtime repair incompleto (dependência ausente?). Arquivos já foram atualizados; rode 'bash install.sh --doctor' para completar o ambiente."
   fi
+  register_project_path
+
+  # Versão recém-baixada em .agents/VERSION — mensagens de commit e de saída
+  # deixam de carregar "v1.6" hardcoded (estava defasado desde que a lista
+  # passou de 1.6; versão escrita em string vira mentira no release seguinte).
+  FW_VER=$(head -1 "$AGENTS_DIR/VERSION" 2>/dev/null | tr -d '[:space:]')
+  [ -n "$FW_VER" ] || FW_VER="?"
 
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
     log "Staging updated files..."
-    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" "CODEX.md" 2>/dev/null || true
+    # Um path POR VEZ: `git add` com vários pathspecs é tudo-ou-nada — um
+    # único ausente (.context.md só existe com aprovação) fazia o comando
+    # inteiro falhar em silêncio e NADA era stageado; o commit em seguida
+    # falhava e o update saía não-zero com os arquivos na verdade aplicados.
+    # (install.sh e .claude/agents/ entram no add: estão em FRAMEWORK_FILES e
+    # ficavam untracked/modified para sempre no consumidor.)
+    for add_path in "$AGENTS_DIR" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs" "CODEX.md" "install.sh" ".claude/agents"; do
+      [ -e "$add_path" ] && git add "$add_path" 2>/dev/null || true
+    done
 
     # Estado de runtime NUNCA entra no commit do consumidor. `git add .agents/`
     # varre o diretório inteiro e arrastava junto o event log da máquina — que
@@ -3867,8 +3992,11 @@ if [ "$MODE" = "update" ]; then
     fi
     echo ""
     if confirm_yes "Commit now? [Y/n] " "Y"; then
-      git commit -m "chore: update Canuto Framework to v1.6"
-      ok "Committed!"
+      # Guardado: sem diff (re-run com --force, ou nada mudou) o commit sai
+      # não-zero e, sob set -e, derrubava um update que deu certo.
+      git commit -m "chore: update Canuto Framework to v$FW_VER" \
+        && ok "Committed!" \
+        || warn "Nada novo para commitar (arquivos já em dia)."
     else
       warn "Files staged but not committed. Run 'git commit' when ready."
     fi
@@ -3880,7 +4008,7 @@ if [ "$MODE" = "update" ]; then
 
   echo ""
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
-  echo -e "${GREEN}  Framework updated to v1.6 successfully.${RESET}"
+  echo -e "${GREEN}  Framework updated to v$FW_VER successfully.${RESET}"
   echo -e "${GREEN}  Claude remains the default Maestro runtime.${RESET}"
   echo -e "${GREEN}  Direct Codex Maestro launcher: bash .agents/tools/codex-maestro.sh${RESET}"
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"

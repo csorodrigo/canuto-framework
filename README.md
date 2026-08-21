@@ -189,7 +189,29 @@ bash install.sh --update
 
 `bash install.sh --update` is now the standard path. The installer refreshes itself from `main` before applying the update, so it still works even if the local `install.sh` is stale.
 
-`--update` never overwrites `vault/`, `plugins/`, or `CLAUDE.md`; it updates personas, skills, hooks, runtime helpers, and support docs.
+`--update` never overwrites `vault/` or `plugins/`; it updates personas, skills, hooks, runtime helpers, and support docs. `CLAUDE.md` and `AGENTS.md` are **merged section by section** (missing framework sections/rules are added; your custom content is never replaced).
+
+### Update ALL projects at once
+
+```bash
+# de qualquer projeto que tenha o framework (ou do repo do framework):
+bash .agents/tools/canuto-update-all.sh            # atualiza os desatualizados
+bash .agents/tools/canuto-update-all.sh --dry-run  # só relata
+bash .agents/tools/canuto-update-all.sh --force    # reaplica mesmo em dia
+bash .agents/tools/canuto-update-all.sh --scan ~/projetos  # 1ª rodada: acha
+                                                   # projetos com .agents/
+```
+
+Os projetos são descobertos por `~/.canuto/vault/projects/<slug>/project-path`.
+O registro é gravado pelo próprio `install.sh` (install e update — cobre
+projetos usados só via Codex), pelo hook SessionStart do Claude e pelo
+launcher `codex-maestro.sh`. Para a primeira rodada numa máquina onde nada se
+registrou ainda, use `--scan <dir>` (ou passe os paths como argumento). O
+orquestrador compara o `.agents/VERSION` de cada projeto com o `VERSION` do
+`main`, roda `install.sh --update --yes` nos desatualizados, pula projetos com
+working tree sujo e **nunca faz push**. O mesmo `VERSION` alimenta o aviso
+"Framework: DESATUALIZADO" que o SessionStart injeta no briefing (opt-out:
+`CANUTO_NO_VERSION_CHECK=1`).
 
 ### Validate install or update
 
