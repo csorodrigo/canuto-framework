@@ -29,19 +29,32 @@ fi
 # versão remota vem SÓ do cache (alimentado em background pelas sessões
 # Claude) — nunca rede no caminho de abertura. Tudo best-effort sob o
 # set -euo pipefail deste wrapper.
-_REG_SLUG=$(CANUTO_TARGET_DIR="$PROJECT_DIR" bash -c '
-  . "$0" 2>/dev/null || exit 1
-  canuto_require_project_slug "$CANUTO_TARGET_DIR" 2>/dev/null
-' "$SCRIPT_DIR/canuto-memory.sh" 2>/dev/null) || _REG_SLUG=""
+_REG_GITDIR=$(git -C "$PROJECT_DIR" rev-parse --git-dir 2>/dev/null) || _REG_GITDIR=""
+_REG_GITCOMMON=$(git -C "$PROJECT_DIR" rev-parse --git-common-dir 2>/dev/null) || _REG_GITCOMMON=""
+_REG_SLUG=""
+# Worktree linkado não registra (git-dir != git-common-dir): last-write-wins
+# redirecionaria o update-all para o branch de feature do worktree.
+if [ "$_REG_GITDIR" = "$_REG_GITCOMMON" ]; then
+  _REG_SLUG=$(CANUTO_TARGET_DIR="$PROJECT_DIR" bash -c '
+    . "$0" 2>/dev/null || exit 1
+    canuto_require_project_slug "$CANUTO_TARGET_DIR" 2>/dev/null
+  ' "$SCRIPT_DIR/canuto-memory.sh" 2>/dev/null) || _REG_SLUG=""
+fi
 if [ -n "$_REG_SLUG" ]; then
   _REG_DIR="${CANUTO_VAULT_DIR:-$HOME/.canuto/vault}/projects/$_REG_SLUG"
   { mkdir -p "$_REG_DIR" 2>/dev/null \
       && printf '%s\n' "$PROJECT_DIR" > "$_REG_DIR/project-path" 2>/dev/null; } || true
 fi
+# Só avisa quando o remoto é MAIS NOVO (cache atrasado ou fork à frente não
+# podem virar "DESATUALIZADO" mandando refazer update já feito).
+_canuto_ver_gt() {
+  [ "$1" = "$2" ] && return 1
+  [ "$(printf '%s\n%s\n' "$1" "$2" | sort -t. -k1,1n -k2,2n -k3,3n 2>/dev/null | tail -1)" = "$1" ]
+}
 _LOCAL_FW_VER=$(head -1 "$PROJECT_DIR/.agents/VERSION" 2>/dev/null | tr -d '[:space:]') || _LOCAL_FW_VER=""
 _REMOTE_FW_VER=$(head -1 "$HOME/.canuto/.cache/framework-remote-version" 2>/dev/null | tr -d '[:space:]') || _REMOTE_FW_VER=""
 if [ -n "$_LOCAL_FW_VER" ] && [ -n "$_REMOTE_FW_VER" ] \
-   && [ "$_LOCAL_FW_VER" != "$_REMOTE_FW_VER" ]; then
+   && _canuto_ver_gt "$_REMOTE_FW_VER" "$_LOCAL_FW_VER"; then
   echo "⚠ Canuto Framework DESATUALIZADO (local v$_LOCAL_FW_VER, remoto v$_REMOTE_FW_VER) — rode 'bash install.sh --update' aqui, ou 'bash .agents/tools/canuto-update-all.sh' para todos os projetos." >&2
 fi
 

@@ -131,8 +131,15 @@ for p in "${CANDIDATES[@]}"; do
   [ "$dup" = 0 ] && PROJECTS+=("$p")
 done
 
-LOG_DIR="${TMPDIR:-/tmp}/canuto-update-all-$$"
-mkdir -p "$LOG_DIR"
+# mktemp -d, NUNCA path previsível com mkdir -p: um diretório pré-criado por
+# outro usuário em /tmp (canuto-update-all-<pid> é adivinhável) seria dele —
+# e este script grava e EXECUTA um install.sh aqui dentro. mktemp cria com
+# modo 700 e falha se não conseguir; sem mktemp, aborta.
+LOG_DIR=$(mktemp -d "${TMPDIR:-/tmp}/canuto-update-all.XXXXXX" 2>/dev/null) || LOG_DIR=""
+if [ -z "$LOG_DIR" ]; then
+  err "mktemp indisponível ou falhou — sem diretório de trabalho seguro. Abortando."
+  exit 1
+fi
 
 # Instalador FRESCO, baixado UMA vez e usado em todos os projetos. Nunca o
 # install.sh de cada projeto: (a) o dele pode ser antigo, com FRAMEWORK_FILES
@@ -173,34 +180,38 @@ for proj in "${PROJECTS[@]}"; do
     continue
   fi
 
-  # A fonte nunca atualiza a si mesma por aqui.
-  remote_url="$(git -C "$proj" remote get-url origin 2>/dev/null || true)"
-  case "$(basename "${remote_url:-$proj}" .git)" in
-    *canuto-framework*)
-      add_report "SKIP" "$name" "-" "-" "é o repo do framework (fonte)"
-      continue
-      ;;
-  esac
+  # A fonte nunca atualiza a si mesma por aqui. MESMO critério do guard do
+  # install.sh (grep em QUALQUER remote, não só basename do origin): critérios
+  # diferentes deixavam um fork renomeado passar por aqui e abortar lá dentro
+  # — PARCIAL eterno com nota enganosa.
+  if git -C "$proj" remote -v 2>/dev/null | grep -q "canuto-framework"; then
+    add_report "SKIP" "$name" "-" "-" "repo do framework (fonte) — $proj"
+    continue
+  fi
 
   local_ver="$(head -1 "$proj/.agents/VERSION" 2>/dev/null | tr -d '[:space:]')"
   [ -n "$local_ver" ] || local_ver="?"
 
+  # Trabalho em curso = pular (nunca misturar update com mudança de produto) —
+  # checado ANTES do dry-run e do check de versão, para o dry-run prometer
+  # exatamente o que a rodada real faria. Só MODIFICAÇÕES RASTREADAS contam
+  # (-uno): o próprio install.sh deixa arquivos untracked para trás.
+  if [ -n "$(git -C "$proj" status --porcelain -uno 2>/dev/null)" ]; then
+    if [ "$local_ver" = "$REMOTE_VERSION" ] && [ "$FORCE" = 0 ]; then
+      add_report "OK" "$name" "$local_ver" "$local_ver" "já na versão remota (árvore suja) — $proj"
+    else
+      add_report "SKIP" "$name" "$local_ver" "-" "mudanças não commitadas — commit/stash antes — $proj"
+    fi
+    continue
+  fi
+
   if [ "$local_ver" = "$REMOTE_VERSION" ] && [ "$FORCE" = 0 ]; then
-    add_report "OK" "$name" "$local_ver" "$local_ver" "já na versão remota"
+    add_report "OK" "$name" "$local_ver" "$local_ver" "já na versão remota — $proj"
     continue
   fi
 
   if [ "$DRY_RUN" = 1 ]; then
-    add_report "PENDENTE" "$name" "$local_ver" "$REMOTE_VERSION" "dry-run: atualizaria"
-    continue
-  fi
-
-  # Trabalho em curso = pular (nunca misturar update com mudança de produto).
-  # Só MODIFICAÇÕES RASTREADAS contam (-uno): o próprio install.sh deixa
-  # arquivos untracked para trás (install.sh baixado, .claude/), e contá-los
-  # travaria toda rodada seguinte ao primeiro update.
-  if [ -n "$(git -C "$proj" status --porcelain -uno 2>/dev/null)" ]; then
-    add_report "SKIP" "$name" "$local_ver" "-" "mudanças não commitadas — commit/stash antes"
+    add_report "PENDENTE" "$name" "$local_ver" "$REMOTE_VERSION" "dry-run: atualizaria — $proj"
     continue
   fi
 
@@ -208,7 +219,11 @@ for proj in "${PROJECTS[@]}"; do
   # Índice no nome do log: dois projetos com o mesmo basename (ex.: web/ em
   # contêineres diferentes) não podem sobrescrever o log um do outro.
   plog="$LOG_DIR/$PROJ_IDX-$name.log"
-  if (cd "$proj" && bash "$FRESH_INSTALLER" --update --yes) >"$plog" 2>&1; then
+  # </dev/null é obrigatório: o repair_runtime do install.sh tem prompts crus
+  # guardados por [[ -t 0 ]] (API key do Obsidian, "install Codex?") que o
+  # --yes NÃO cobre — com o stdin do TTY herdado, o prompt iria para o log e
+  # a rodada congelaria em silêncio no primeiro projeto.
+  if (cd "$proj" && bash "$FRESH_INSTALLER" --update --yes </dev/null) >"$plog" 2>&1; then
     new_ver="$(head -1 "$proj/.agents/VERSION" 2>/dev/null | tr -d '[:space:]')"
     if [ "$new_ver" = "$REMOTE_VERSION" ]; then
       add_report "ATUALIZADO" "$name" "$local_ver" "$new_ver" "log: $plog"

@@ -1039,7 +1039,16 @@ install_global_fallback_libs() {
 # falha o install.
 register_project_path() {
   local memlib=".agents/tools/canuto-memory.sh" slug="" regdir=""
+  local gitdir="" gitcommon=""
   [ -f "$memlib" ] || return 0
+  # Worktree linkado NÃO registra (git-dir != git-common-dir): o registro é
+  # last-write-wins e a última sessão num worktree redirecionaria o update-all
+  # — e o commit do update — para o branch de feature que estiver lá.
+  gitdir=$(git rev-parse --git-dir 2>/dev/null) || gitdir=""
+  gitcommon=$(git rev-parse --git-common-dir 2>/dev/null) || gitcommon=""
+  if [ -n "$gitdir" ] && [ -n "$gitcommon" ] && [ "$gitdir" != "$gitcommon" ]; then
+    return 0
+  fi
   slug=$(CANUTO_TARGET_DIR="$(pwd)" bash -c '
     . ".agents/tools/canuto-memory.sh" 2>/dev/null || exit 1
     canuto_require_project_slug "$CANUTO_TARGET_DIR" 2>/dev/null
@@ -3864,13 +3873,24 @@ if [ "$MODE" = "install" ]; then
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
     log "Staging files for git..."
-    # install.sh e .claude/agents/ estão em FRAMEWORK_FILES mas ficavam fora
-    # do add: todo update deixava o consumidor com untracked/modified para sempre.
-    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" "CODEX.md" "install.sh" ".claude/agents/" 2>/dev/null || true
+    # Um path POR VEZ: `git add` com vários pathspecs é tudo-ou-nada — um
+    # único ausente (.context.md só existe com aprovação) fazia o comando
+    # inteiro falhar em silêncio e NADA era stageado; o commit em seguida
+    # falhava e o update saía não-zero com os arquivos na verdade aplicados.
+    # (install.sh e .claude/agents/ entram no add: estão em FRAMEWORK_FILES e
+    # ficavam untracked/modified para sempre no consumidor.)
+    for add_path in "$AGENTS_DIR" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs" "CODEX.md" "install.sh" ".claude/agents"; do
+      [ -e "$add_path" ] && git add "$add_path" 2>/dev/null || true
+    done
     echo ""
     if confirm_yes "Commit now? [Y/n] " "Y"; then
-      git commit -m "chore: add Canuto Framework v1.6"
-      ok "Committed!"
+      # Versão real do carimbo recém-baixado — "v1.6" hardcoded aqui nascia
+      # defasado no mesmo release que criou .agents/VERSION para evitar isso.
+      INSTALL_FW_VER=$(head -1 "$AGENTS_DIR/VERSION" 2>/dev/null | tr -d '[:space:]')
+      [ -n "$INSTALL_FW_VER" ] || INSTALL_FW_VER="?"
+      git commit -m "chore: add Canuto Framework v$INSTALL_FW_VER" \
+        && ok "Committed!" \
+        || warn "Nada para commitar."
     else
       warn "Files staged but not committed. Run 'git commit' when ready."
     fi
@@ -3888,7 +3908,7 @@ if [ "$MODE" = "install" ]; then
     warn "Post-install validation reported issues. Re-run: bash install.sh --doctor"
   fi
 
-  echo -e "${GREEN}  Done! v1.6 installed.${RESET}"
+  echo -e "${GREEN}  Done! v${INSTALL_FW_VER:-?} installed.${RESET}"
   echo -e "${GREEN}  Claude keeps Opus as Maestro by default.${RESET}"
   echo -e "${GREEN}  For direct Codex Maestro mode: bash .agents/tools/codex-maestro.sh${RESET}"
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
@@ -3940,9 +3960,15 @@ if [ "$MODE" = "update" ]; then
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
     log "Staging updated files..."
-    # install.sh e .claude/agents/ estão em FRAMEWORK_FILES mas ficavam fora
-    # do add: todo update deixava o consumidor com untracked/modified para sempre.
-    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" "CODEX.md" "install.sh" ".claude/agents/" 2>/dev/null || true
+    # Um path POR VEZ: `git add` com vários pathspecs é tudo-ou-nada — um
+    # único ausente (.context.md só existe com aprovação) fazia o comando
+    # inteiro falhar em silêncio e NADA era stageado; o commit em seguida
+    # falhava e o update saía não-zero com os arquivos na verdade aplicados.
+    # (install.sh e .claude/agents/ entram no add: estão em FRAMEWORK_FILES e
+    # ficavam untracked/modified para sempre no consumidor.)
+    for add_path in "$AGENTS_DIR" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs" "CODEX.md" "install.sh" ".claude/agents"; do
+      [ -e "$add_path" ] && git add "$add_path" 2>/dev/null || true
+    done
 
     # Estado de runtime NUNCA entra no commit do consumidor. `git add .agents/`
     # varre o diretório inteiro e arrastava junto o event log da máquina — que
@@ -3966,8 +3992,11 @@ if [ "$MODE" = "update" ]; then
     fi
     echo ""
     if confirm_yes "Commit now? [Y/n] " "Y"; then
-      git commit -m "chore: update Canuto Framework to v$FW_VER"
-      ok "Committed!"
+      # Guardado: sem diff (re-run com --force, ou nada mudou) o commit sai
+      # não-zero e, sob set -e, derrubava um update que deu certo.
+      git commit -m "chore: update Canuto Framework to v$FW_VER" \
+        && ok "Committed!" \
+        || warn "Nada novo para commitar (arquivos já em dia)."
     else
       warn "Files staged but not committed. Run 'git commit' when ready."
     fi

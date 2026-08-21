@@ -189,7 +189,7 @@ bash install.sh --update
 
 `bash install.sh --update` is now the standard path. The installer refreshes itself from `main` before applying the update, so it still works even if the local `install.sh` is stale.
 
-`--update` never overwrites `vault/`, `plugins/`, or `CLAUDE.md`; it updates personas, skills, hooks, runtime helpers, and support docs.
+`--update` never overwrites `vault/` or `plugins/`; it updates personas, skills, hooks, runtime helpers, and support docs. `CLAUDE.md` and `AGENTS.md` are **merged section by section** (missing framework sections/rules are added; your custom content is never replaced).
 
 ### Update ALL projects at once
 

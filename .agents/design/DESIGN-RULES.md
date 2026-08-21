@@ -1,6 +1,6 @@
 ---
 name: design-rules
-version: 1.0.0
+version: 1.0.1
 lastUpdated: 2026-08-21
 shortDescription: >
   Design system normativo do front — densidade, tipografia, espaçamento,
@@ -148,7 +148,7 @@ relatório vai para o vault do projeto (`audit/`); a correção é backlog
 priorizado pelo usuário, nunca correção automática em massa.
 
 - [ ] Nenhum scroll horizontal de página em 320/768/1440px
-- [ ] Nenhum `py-16+` em APP; nenhum `py-24+` em LANDING (hero: `py-20` máx)
+- [ ] Nenhuma seção de APP acima de `py-6`; nenhuma de LANDING acima de `py-16` (hero: `py-20` máx) — os MESMOS tetos da seção 2, não um limiar mais frouxo
 - [ ] Corpo de APP em 14px; nenhum texto fora da escala da seção 1
 - [ ] Tabelas/código/conteúdo largo em wrapper `overflow-x-auto`
 - [ ] `min-w-0` + `truncate`/`break-words` onde texto dinâmico encontra flex/grid
