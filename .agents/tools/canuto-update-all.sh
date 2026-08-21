@@ -13,6 +13,8 @@
 #   bash .agents/tools/canuto-update-all.sh --dry-run    # só relata, não toca
 #   bash .agents/tools/canuto-update-all.sh --force      # atualiza mesmo em dia
 #   bash .agents/tools/canuto-update-all.sh /path/a /path/b   # paths extras
+#   bash .agents/tools/canuto-update-all.sh --scan ~/projetos # bootstrap: acha
+#       projetos com .agents/ sob o diretório (1ª rodada, registro ainda vazio)
 #
 # Por projeto: compara .agents/VERSION local com o VERSION remoto do main e,
 # quando desatualizado (ou --force), roda `bash install.sh --update --yes`
@@ -42,12 +44,22 @@ err()  { echo -e "${RED}[update-all]${RESET} ✗ $1"; }
 DRY_RUN=0
 FORCE=0
 EXTRA_PATHS=()
+SCAN_DIRS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY_RUN=1 ;;
     --force)   FORCE=1 ;;
+    --scan)
+      # Bootstrap do registro: varre um diretório-contêiner atrás de projetos
+      # com .agents/. É o caminho para a PRIMEIRA rodada em máquinas cujos
+      # projetos ainda não se registraram (o registro passa a acontecer no
+      # install/update e nas sessões seguintes).
+      shift
+      [ -n "${1:-}" ] || { err "--scan exige um diretório"; exit 64; }
+      SCAN_DIRS+=("$1")
+      ;;
     --help|-h)
-      sed -n '3,25p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '3,30p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     -*)
@@ -92,10 +104,22 @@ fi
 if [ "${#EXTRA_PATHS[@]}" -gt 0 ]; then
   CANDIDATES+=("${EXTRA_PATHS[@]}")
 fi
+if [ "${#SCAN_DIRS[@]}" -gt 0 ]; then
+  for d in "${SCAN_DIRS[@]}"; do
+    [ -d "$d" ] || { warn "--scan: $d não existe — ignorado"; continue; }
+    # -maxdepth 4 cobre contêiner/projeto(/worktree); prune de node_modules e
+    # .git evita varrer o mundo. IFS por linha: path com espaço sobrevive.
+    while IFS= read -r agents_dir; do
+      [ -n "$agents_dir" ] && CANDIDATES+=("${agents_dir%/.agents}")
+    done < <(find "$d" -maxdepth 4 \( -name node_modules -o -name .git \) -prune \
+             -o -type d -name .agents -print 2>/dev/null)
+  done
+fi
 
 if [ "${#CANDIDATES[@]}" -eq 0 ]; then
   warn "nenhum projeto registrado em $VAULT_ROOT/projects/*/project-path e nenhum path passado."
-  warn "abra uma sessão em cada projeto (o hook SessionStart registra o path) ou passe os paths como argumento."
+  warn "bootstrap: rode com --scan <dir-dos-projetos>, ou passe os paths como argumento."
+  warn "(daqui em diante, install/update e sessões registram cada projeto sozinhos)"
   exit 0
 fi
 
@@ -135,7 +159,9 @@ export CANUTO_BOOTSTRAPPED=1
 REPORT=()   # linhas "status|projeto|antes|depois|nota"
 add_report() { REPORT+=("$1|$2|$3|$4|$5"); }
 
+PROJ_IDX=0
 for proj in "${PROJECTS[@]}"; do
+  PROJ_IDX=$((PROJ_IDX + 1))
   name="$(basename "$proj")"
 
   if [ ! -d "$proj" ]; then
@@ -179,7 +205,9 @@ for proj in "${PROJECTS[@]}"; do
   fi
 
   log "atualizando $name ($local_ver → $REMOTE_VERSION)…"
-  plog="$LOG_DIR/$name.log"
+  # Índice no nome do log: dois projetos com o mesmo basename (ex.: web/ em
+  # contêineres diferentes) não podem sobrescrever o log um do outro.
+  plog="$LOG_DIR/$PROJ_IDX-$name.log"
   if (cd "$proj" && bash "$FRESH_INSTALLER" --update --yes) >"$plog" 2>&1; then
     new_ver="$(head -1 "$proj/.agents/VERSION" 2>/dev/null | tr -d '[:space:]')"
     if [ "$new_ver" = "$REMOTE_VERSION" ]; then

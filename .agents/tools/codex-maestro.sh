@@ -22,6 +22,29 @@ if [ -f "$EVENT_LOG" ]; then
   bash "$EVENT_LOG" append SESSION_START actor=codex-maestro runtime=codex || true
 fi
 
+# ── Registro + aviso de versão (paridade com o hook SessionStart do Claude) ──
+# Sessão Codex direta não roda os hooks do Claude: sem isto, um projeto usado
+# só via Codex nunca entraria no registro do canuto-update-all.sh nem veria o
+# aviso de framework desatualizado. Postura de escrita no slug (require);
+# versão remota vem SÓ do cache (alimentado em background pelas sessões
+# Claude) — nunca rede no caminho de abertura. Tudo best-effort sob o
+# set -euo pipefail deste wrapper.
+_REG_SLUG=$(CANUTO_TARGET_DIR="$PROJECT_DIR" bash -c '
+  . "$0" 2>/dev/null || exit 1
+  canuto_require_project_slug "$CANUTO_TARGET_DIR" 2>/dev/null
+' "$SCRIPT_DIR/canuto-memory.sh" 2>/dev/null) || _REG_SLUG=""
+if [ -n "$_REG_SLUG" ]; then
+  _REG_DIR="${CANUTO_VAULT_DIR:-$HOME/.canuto/vault}/projects/$_REG_SLUG"
+  { mkdir -p "$_REG_DIR" 2>/dev/null \
+      && printf '%s\n' "$PROJECT_DIR" > "$_REG_DIR/project-path" 2>/dev/null; } || true
+fi
+_LOCAL_FW_VER=$(head -1 "$PROJECT_DIR/.agents/VERSION" 2>/dev/null | tr -d '[:space:]') || _LOCAL_FW_VER=""
+_REMOTE_FW_VER=$(head -1 "$HOME/.canuto/.cache/framework-remote-version" 2>/dev/null | tr -d '[:space:]') || _REMOTE_FW_VER=""
+if [ -n "$_LOCAL_FW_VER" ] && [ -n "$_REMOTE_FW_VER" ] \
+   && [ "$_LOCAL_FW_VER" != "$_REMOTE_FW_VER" ]; then
+  echo "⚠ Canuto Framework DESATUALIZADO (local v$_LOCAL_FW_VER, remoto v$_REMOTE_FW_VER) — rode 'bash install.sh --update' aqui, ou 'bash .agents/tools/canuto-update-all.sh' para todos os projetos." >&2
+fi
+
 _canuto_codex_session_end() {
   local rc=$?
   [ -f "$EVENT_LOG" ] || return 0

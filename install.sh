@@ -1028,6 +1028,30 @@ install_global_fallback_libs() {
   fi
 }
 
+# ── register_project_path ───────────────────────────────────────────────────
+# Registro para o canuto-update-all.sh: <vault>/projects/<slug>/project-path.
+# Registrar AQUI (install/update) e não só no hook SessionStart do Claude é o
+# que cobre projetos usados apenas via runtime Codex — sessão Codex direta não
+# roda os hooks do Claude Code (ver codex-maestro.sh) e ficaria invisível para
+# o update-all. Postura de ESCRITA (canuto_require_project_slug): slug
+# degradado criaria ilha nova no vault — melhor não registrar. Best-effort:
+# roda em subshell (o set -euo pipefail do canuto-memory.sh não vaza) e nunca
+# falha o install.
+register_project_path() {
+  local memlib=".agents/tools/canuto-memory.sh" slug="" regdir=""
+  [ -f "$memlib" ] || return 0
+  slug=$(CANUTO_TARGET_DIR="$(pwd)" bash -c '
+    . ".agents/tools/canuto-memory.sh" 2>/dev/null || exit 1
+    canuto_require_project_slug "$CANUTO_TARGET_DIR" 2>/dev/null
+  ' 2>/dev/null) || slug=""
+  [ -n "$slug" ] || return 0
+  regdir="${CANUTO_VAULT_DIR:-$HOME/.canuto/vault}/projects/$slug"
+  mkdir -p "$regdir" 2>/dev/null || return 0
+  printf '%s\n' "$(pwd)" > "$regdir/project-path" 2>/dev/null || true
+  ok "Projeto registrado para o update-all: $slug"
+  return 0
+}
+
 # ── dedup_canuto_hook_dupes ─────────────────────────────────────────────────
 # Self-heal (auditoria 2026-08-01): o merge antigo do settings.json agrupava
 # por (matcher + conjunto de comandos do grupo); bastava o grupo local ter um
@@ -3539,6 +3563,22 @@ if [ "$MODE" = "check" ]; then
     if [ ! -f "$file" ]; then
       echo -e "  ${RED}\u2717 MISSING${RESET}    $file"
       MISSING=$((MISSING + 1))
+    elif [ "$file" = ".agents/VERSION" ]; then
+      # O carimbo \u00c9 a vers\u00e3o (conte\u00fado cru, sem frontmatter) \u2014 o grep
+      # "^version:" abaixo o rotularia UNKNOWN em todo --check.
+      LOCAL_VER=$(head -1 "$file" 2>/dev/null | tr -d '[:space:]' || true)
+      REMOTE_VER=$(fetch_content "$file" | head -1 | tr -d '[:space:]' || true)
+      if [ -z "$LOCAL_VER" ] || [ -z "$REMOTE_VER" ]; then
+        # Mesmo contrato do bra\u00e7o gen\u00e9rico: sem os DOIS lados (offline, 404),
+        # \u00e9 UNKNOWN \u2014 nunca um OUTDATED fantasma.
+        echo -e "  ${YELLOW}? UNKNOWN${RESET}    $file (version unavailable)"
+      elif [ "$LOCAL_VER" = "$REMOTE_VER" ]; then
+        echo -e "  ${GREEN}\u2713 OK${RESET}        $file (v$LOCAL_VER)"
+        UP_TO_DATE=$((UP_TO_DATE + 1))
+      else
+        echo -e "  ${YELLOW}\u26a0 OUTDATED${RESET}   $file (local: v$LOCAL_VER \u2192 remote: v$REMOTE_VER)"
+        OUTDATED=$((OUTDATED + 1))
+      fi
     else
       LOCAL_VER=$(grep "^version:" "$file" 2>/dev/null | head -1 | awk '{print $2}' || true)
       REMOTE_VER=$(fetch_content "$file" | grep "^version:" | head -1 | awk '{print $2}' || true)
@@ -3819,6 +3859,7 @@ if [ "$MODE" = "install" ]; then
   ok "Vault directories created"
 
   repair_runtime
+  register_project_path
 
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
@@ -3888,6 +3929,7 @@ if [ "$MODE" = "update" ]; then
   if ! repair_runtime; then
     warn "Runtime repair incompleto (dependência ausente?). Arquivos já foram atualizados; rode 'bash install.sh --doctor' para completar o ambiente."
   fi
+  register_project_path
 
   # Versão recém-baixada em .agents/VERSION — mensagens de commit e de saída
   # deixam de carregar "v1.6" hardcoded (estava defasado desde que a lista

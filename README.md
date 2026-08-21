@@ -198,11 +198,15 @@ bash install.sh --update
 bash .agents/tools/canuto-update-all.sh            # atualiza os desatualizados
 bash .agents/tools/canuto-update-all.sh --dry-run  # só relata
 bash .agents/tools/canuto-update-all.sh --force    # reaplica mesmo em dia
+bash .agents/tools/canuto-update-all.sh --scan ~/projetos  # 1ª rodada: acha
+                                                   # projetos com .agents/
 ```
 
-Os projetos são descobertos por `~/.canuto/vault/projects/<slug>/project-path`,
-gravado pelo hook SessionStart — um projeto entra no registro na primeira
-sessão aberta depois deste release (ou passe o path como argumento). O
+Os projetos são descobertos por `~/.canuto/vault/projects/<slug>/project-path`.
+O registro é gravado pelo próprio `install.sh` (install e update — cobre
+projetos usados só via Codex), pelo hook SessionStart do Claude e pelo
+launcher `codex-maestro.sh`. Para a primeira rodada numa máquina onde nada se
+registrou ainda, use `--scan <dir>` (ou passe os paths como argumento). O
 orquestrador compara o `.agents/VERSION` de cada projeto com o `VERSION` do
 `main`, roda `install.sh --update --yes` nos desatualizados, pula projetos com
 working tree sujo e **nunca faz push**. O mesmo `VERSION` alimenta o aviso

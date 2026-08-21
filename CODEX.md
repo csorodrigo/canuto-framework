@@ -50,6 +50,7 @@ If no writable vault exists, queue sync payloads in `.agents/.cache/pending-sync
 ## Project Rules
 
 - Before finalizing any plan, always interview the user in detail using AskUserQuestion about implementation choices, UI/UX decisions, trade-offs, and concerns. Never assume — always ask first.
+- Before planning, implementing, or reviewing ANY user-facing UI, read `.agents/design/DESIGN-RULES.md` and obey it — normative design system (density, type scale, spacing ceilings, overflow bans, copy rules) for every runtime; on conflict it wins.
 - Read any .context.md and docs/FEATURE-MAP.md files if they exist.
 - If they do not exist, have the Contextualizer create them (with approval).
 - Never run Git or shell commands without explicit confirmation.

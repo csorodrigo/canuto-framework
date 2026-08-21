@@ -363,24 +363,31 @@ fi
 UPDATE_LINE=""
 if [ -n "$ROOT" ] && [ "${CANUTO_NO_VERSION_CHECK:-0}" != "1" ] \
    && [ -f "$ROOT/.agents/VERSION" ]; then
-  LOCAL_FW_VER=$(head -1 "$ROOT/.agents/VERSION" 2>/dev/null | tr -d '[:space:]')
+  # `|| VAR=""` em TODA substituição com head/pipe: o source transitivo de
+  # canuto-memory.sh (via event-log.sh) traz `set -euo pipefail` para este
+  # shell — um head contra arquivo ausente sob pipefail mataria o hook
+  # inteiro e a sessão abriria sem briefing.
+  LOCAL_FW_VER=$(head -1 "$ROOT/.agents/VERSION" 2>/dev/null | tr -d '[:space:]') || LOCAL_FW_VER=""
   VER_CACHE_DIR="$HOME/.canuto/.cache"
   VER_CACHE="$VER_CACHE_DIR/framework-remote-version"
   CACHE_MTIME=$(stat -c %Y "$VER_CACHE" 2>/dev/null || stat -f %m "$VER_CACHE" 2>/dev/null || echo 0)
   NOW_EPOCH=$(date +%s 2>/dev/null || echo 0)
   if [ $((NOW_EPOCH - CACHE_MTIME)) -gt 21600 ] && command -v curl >/dev/null 2>&1; then
     mkdir -p "$VER_CACHE_DIR" 2>/dev/null || true
+    # stdin/stdout/stderr TODOS re-plugados: descritor herdado do hook em
+    # processo backgrounded segura o pipe que o runtime espera fechar — a
+    # mesma classe do "timeout que não mata o filho" do health check.
     (
-      RAW=$(curl -fsSL -m 5 "${CANUTO_REPO_URL:-https://raw.githubusercontent.com/csorodrigo/canuto-framework/main}/.agents/VERSION" 2>/dev/null | head -1 | tr -d '[:space:]')
+      RAW=$(curl -fsSL -m 5 "${CANUTO_REPO_URL:-https://raw.githubusercontent.com/csorodrigo/canuto-framework/main}/.agents/VERSION" 2>/dev/null | head -1 | tr -d '[:space:]') || RAW=""
       # Só versão com cara de versão entra no cache — 404 HTML ou lixo de
       # proxy viraria um "desatualizado" fantasma em toda sessão.
       case "$RAW" in
         [0-9]*.[0-9]*) printf '%s\n' "$RAW" > "$VER_CACHE.tmp" 2>/dev/null \
           && mv "$VER_CACHE.tmp" "$VER_CACHE" 2>/dev/null ;;
       esac
-    ) >/dev/null 2>&1 &
+    ) </dev/null >/dev/null 2>&1 &
   fi
-  REMOTE_FW_VER=$(head -1 "$VER_CACHE" 2>/dev/null | tr -d '[:space:]')
+  REMOTE_FW_VER=$(head -1 "$VER_CACHE" 2>/dev/null | tr -d '[:space:]') || REMOTE_FW_VER=""
   if [ -n "$LOCAL_FW_VER" ] && [ -n "$REMOTE_FW_VER" ] \
      && [ "$LOCAL_FW_VER" != "$REMOTE_FW_VER" ]; then
     UPDATE_LINE="Framework: DESATUALIZADO (local v$LOCAL_FW_VER, remoto v$REMOTE_FW_VER) — rode 'bash install.sh --update' aqui, ou 'bash .agents/tools/canuto-update-all.sh' para atualizar todos os projetos"
