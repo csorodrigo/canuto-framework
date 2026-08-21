@@ -17,6 +17,12 @@
 - Prefer editing existing files over creating new ones
 - Do NOT add comments, docstrings, or type annotations to code you didn't change
 
+## Design Rules (mandatory for any UI work)
+- Before planning, implementing, or reviewing ANY user-facing UI, read
+  `.agents/design/DESIGN-RULES.md` and obey it. It is the normative design
+  system: density, type scale, spacing ceilings, overflow bans, copy rules.
+- On conflict with any other guidance, DESIGN-RULES.md wins.
+
 ## MCP Tools Available
 - **obsidian-vault**: Read/write vault notes at ~/.canuto/vault/ for project memory
 - **ast-grep**: Structural code search — use for finding patterns, symbols, callers

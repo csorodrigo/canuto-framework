@@ -3,8 +3,8 @@ name: frontend-design
 description: Apply opinionated visual direction and design guardrails so frontend work avoids generic default UI.
 shortDescription: How to make frontend features visually distinctive and design-coherent.
 usedBy: [coder, reviewer, architect]
-version: 4.1.0
-lastUpdated: 2026-04-22
+version: 4.2.0
+lastUpdated: 2026-08-21
 copyright: Rodrigo Canuto © 2026.
 evals:
   - prompt: "implementing the dashboard page now, what design patterns should i apply?"
@@ -41,6 +41,14 @@ Prevent generic-looking UI by encoding opinionated design principles within the 
 
 Works alongside `frontend-implementation` (which covers _where_ to put code). This skill covers _how it should look_.
 
+> **Contrato normativo: `.agents/design/DESIGN-RULES.md` vem PRIMEIRO.** Ele
+> fixa os valores duros — type scale, tetos de espaçamento, max-widths,
+> densidade, proibição de overflow e regime de copy (APP vs LANDING) — e vale
+> para qualquer runtime (Claude e Codex). Esta skill dá direção estética
+> DENTRO desses limites; em qualquer conflito, DESIGN-RULES.md vence. Em
+> particular: nada de composição "arejada" que ultrapasse os tetos da seção 2,
+> e nada de copy de marketing em telas de APP.
+
 For landing pages, homepages, heroes, public marketing sites, redesigns, and visually important first impressions, this skill also applies a passive **Image-First Art Direction Bias**. The user does not need to ask for it explicitly: the agent should quietly choose a stronger composition, section rhythm, typography stance, and image strategy before planning or implementing.
 
 > **References** (read on demand):
@@ -70,11 +78,15 @@ If `design-profile.md` already exists and answers these, skip directly to readin
 |------|---------|-------|-------------|
 | **DESIGN_VARIANCE** | 6 | 1–10 | 1 = symmetric. 10 = asymmetric, editorial. |
 | **MOTION_INTENSITY** | 5 | 1–10 | 1 = hover only. 10 = choreographed Framer Motion. |
-| **VISUAL_DENSITY** | 4 | 1–10 | 1 = airy editorial. 10 = cockpit-mode packed. |
+| **VISUAL_DENSITY** | 7 | 1–10 | 1 = airy editorial. 10 = cockpit-mode packed. |
 | **ART_DIRECTION** | 7 | 1–10 | 1 = safe commercial. 10 = bold concept. |
 | **IMAGE_USAGE_PRIORITY** | 7 | 1–10 | 1 = mostly typographic. 10 = image-led composition. |
 
-> Defaults (6, 5, 4) are more conservative than Taste Skill reference (8, 6, 4) for production SaaS. Adjust in `design-profile.md`.
+> Defaults (6, 5, 7): VISUAL_DENSITY subiu de 4 para 7 (2026-08-21) — o
+> default "standard app spacing" era exatamente o viés espaçoso que o
+> DESIGN-RULES.md existe para matar. Denso é o padrão; abaixo de 5 só em
+> LANDING, e mesmo aí dentro dos tetos do DESIGN-RULES §2. Adjust in
+> `design-profile.md`.
 
 **How knobs affect decisions (summary):**
 - DESIGN_VARIANCE 1–3: centered, symmetrical. 4–7: offset, left-aligned. 8–10: masonry, fractional CSS Grid.

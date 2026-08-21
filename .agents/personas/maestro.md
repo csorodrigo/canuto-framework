@@ -207,6 +207,14 @@ For **S**: Architect conducts an abbreviated interview (see `architect.md`).
 > Maestro nunca implementa código. Delegar ao executor via CLI é obrigatório para tasks M/L.
 > Se o wrapper retornar `CODEX_DELEGATE_FAILED`/`FALLBACK`, **declare o fallback explicitamente** e implemente com Claude.
 > Modelo canônico: gpt-5.5 (high). Override via `.agents/config/models.yaml`.
+>
+> **Task de front (qualquer UI visível ao usuário):** o task-file DEVE conter,
+> no topo, a instrução "Leia e obedeça `.agents/design/DESIGN-RULES.md` antes
+> de qualquer decisão de layout, espaçamento ou copy" — e citar as regras da
+> seção relevante (APP ou LANDING) que se aplicam à tela. O design system é
+> contrato para os DOIS runtimes: Codex delegado não lê CLAUDE.md, então a
+> referência precisa viajar dentro do task-file. Task de front sem essa
+> referência é task-file malformado.
 
 ---
 

@@ -507,19 +507,31 @@ fi
 download() {
   local remote_path="$1"
   local local_path="$2"
-  local dir
+  local dir tmp rc
   dir=$(dirname "$local_path")
   mkdir -p "$dir"
 
+  # Temp + mv (rename), nunca escrita direta: cp/curl -o truncam o MESMO
+  # inode, e quando o alvo é o próprio install.sh em execução o bash continua
+  # lendo o inode truncado e morre com "unexpected EOF" ao fim do update —
+  # exit != 0 num update que na verdade deu certo (sandbox 2026-08-21).
+  # rename troca o inode: o processo em execução segue no antigo até o fim.
+  tmp="$local_path.canuto-dl.$$"
+  rc=0
   if [ -n "$SOURCE_DIR" ] && [ -f "$SOURCE_DIR/$remote_path" ]; then
-    cp "$SOURCE_DIR/$remote_path" "$local_path"
+    cp "$SOURCE_DIR/$remote_path" "$tmp" || rc=$?
   elif command -v curl > /dev/null 2>&1; then
-    curl -fsSL "$REPO_URL/$remote_path" -o "$local_path"
+    curl -fsSL "$REPO_URL/$remote_path" -o "$tmp" || rc=$?
   elif command -v wget > /dev/null 2>&1; then
-    wget -q "$REPO_URL/$remote_path" -O "$local_path"
+    wget -q "$REPO_URL/$remote_path" -O "$tmp" || rc=$?
   else
     error "Neither curl nor wget found. Install one and retry."
   fi
+  if [ "$rc" -ne 0 ]; then
+    rm -f "$tmp" 2>/dev/null || true
+    return "$rc"
+  fi
+  mv "$tmp" "$local_path" || { rm -f "$tmp" 2>/dev/null || true; return 1; }
 
   # Exec bit é parte da distribuição: curl/wget sempre gravam 644, e o chmod
   # do repair_runtime não roda quando setup_deps falha (fail-open silencioso
@@ -642,6 +654,14 @@ skill_remote_files() {
 
 FRAMEWORK_FILES=(
   "install.sh"
+  # Carimbo de versão do framework: fonte do `--check` agregado, do aviso de
+  # desatualização no SessionStart e do canuto-update-all.sh. Distribuído como
+  # arquivo normal para o caminho ser idêntico no repo e no consumidor.
+  ".agents/VERSION"
+  # Design system normativo (denso/compacto/sem overflow) — NÃO é skill:
+  # contrato neutro consultado por Claude E Codex antes de qualquer front.
+  ".agents/design/DESIGN-RULES.md"
+  ".agents/tools/canuto-update-all.sh"
   ".agents/personas/maestro.md"
   ".agents/personas/architect.md"
   ".agents/personas/coder.md"
@@ -905,6 +925,7 @@ SECTION
 
 ## Project Rules
 - Before finalizing any plan, always interview the user in detail using AskUserQuestion about implementation choices, UI/UX decisions, trade-offs, and concerns. Never assume — always ask first.
+- Before planning, implementing, or reviewing ANY user-facing UI, read `.agents/design/DESIGN-RULES.md` and obey it. It is the normative design system (density, spacing, overflow, copy) for every runtime — Claude and Codex alike.
 - Read any .context.md and docs/FEATURE-MAP.md files if they exist.
 - If they do not exist, have the Contextualizer create them (with approval).
 - Never run Git or shell commands without explicit confirmation.
@@ -922,6 +943,15 @@ SECTION
         next
       }1' "$CLAUDE_MD" > "${CLAUDE_MD}.tmp" && mv "${CLAUDE_MD}.tmp" "$CLAUDE_MD"
       ok "  patched: planning-interview rule added to ## Project Rules"
+      appended=1
+    fi
+    if ! grep -q "DESIGN-RULES" "$CLAUDE_MD" 2>/dev/null; then
+      awk '/^## Project Rules/{
+        print
+        print "- Before planning, implementing, or reviewing ANY user-facing UI, read `.agents/design/DESIGN-RULES.md` and obey it. It is the normative design system (density, spacing, overflow, copy) for every runtime \342\200\224 Claude and Codex alike."
+        next
+      }1' "$CLAUDE_MD" > "${CLAUDE_MD}.tmp" && mv "${CLAUDE_MD}.tmp" "$CLAUDE_MD"
+      ok "  patched: design-rules consultation rule added to ## Project Rules"
       appended=1
     fi
   fi
@@ -2141,6 +2171,12 @@ merge_agents_md() {
 - Prefer editing existing files over creating new ones
 - Do NOT add comments, docstrings, or type annotations to code you didn't change
 
+## Design Rules (mandatory for any UI work)
+- Before planning, implementing, or reviewing ANY user-facing UI, read
+  `.agents/design/DESIGN-RULES.md` and obey it. It is the normative design
+  system: density, type scale, spacing ceilings, overflow bans, copy rules.
+- On conflict with any other guidance, DESIGN-RULES.md wins.
+
 ## MCP Tools Available
 - **obsidian-vault**: Read/write vault notes at ~/.canuto/vault/ for project memory
 - **ast-grep**: Structural code search — use for finding patterns, symbols, callers
@@ -2223,6 +2259,17 @@ Duplicar a versão numa tabela de doc é como a defasagem começa.
 - Nunca use `-q` (removido no codex-cli 0.135).
 - Sessões Claude mantêm Claude como Maestro (alias `fable`, fallback `opus`).
 PROFILEPATCH
+      patched=true
+    fi
+    if ! grep -q "DESIGN-RULES" "$agents_md" 2>/dev/null; then
+      cat >> "$agents_md" << 'DESIGNPATCH'
+
+## Design Rules (mandatory for any UI work)
+- Before planning, implementing, or reviewing ANY user-facing UI, read
+  `.agents/design/DESIGN-RULES.md` and obey it. It is the normative design
+  system: density, type scale, spacing ceilings, overflow bans, copy rules.
+- On conflict with any other guidance, DESIGN-RULES.md wins.
+DESIGNPATCH
       patched=true
     fi
     if ! grep -q "## Vault Access" "$agents_md" 2>/dev/null; then
@@ -3776,7 +3823,9 @@ if [ "$MODE" = "install" ]; then
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
     log "Staging files for git..."
-    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" "CODEX.md" 2>/dev/null || true
+    # install.sh e .claude/agents/ estão em FRAMEWORK_FILES mas ficavam fora
+    # do add: todo update deixava o consumidor com untracked/modified para sempre.
+    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" "CODEX.md" "install.sh" ".claude/agents/" 2>/dev/null || true
     echo ""
     if confirm_yes "Commit now? [Y/n] " "Y"; then
       git commit -m "chore: add Canuto Framework v1.6"
@@ -3840,10 +3889,18 @@ if [ "$MODE" = "update" ]; then
     warn "Runtime repair incompleto (dependência ausente?). Arquivos já foram atualizados; rode 'bash install.sh --doctor' para completar o ambiente."
   fi
 
+  # Versão recém-baixada em .agents/VERSION — mensagens de commit e de saída
+  # deixam de carregar "v1.6" hardcoded (estava defasado desde que a lista
+  # passou de 1.6; versão escrita em string vira mentira no release seguinte).
+  FW_VER=$(head -1 "$AGENTS_DIR/VERSION" 2>/dev/null | tr -d '[:space:]')
+  [ -n "$FW_VER" ] || FW_VER="?"
+
   if [ "$GIT_AVAILABLE" = true ]; then
     echo ""
     log "Staging updated files..."
-    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" "CODEX.md" 2>/dev/null || true
+    # install.sh e .claude/agents/ estão em FRAMEWORK_FILES mas ficavam fora
+    # do add: todo update deixava o consumidor com untracked/modified para sempre.
+    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs/" "CODEX.md" "install.sh" ".claude/agents/" 2>/dev/null || true
 
     # Estado de runtime NUNCA entra no commit do consumidor. `git add .agents/`
     # varre o diretório inteiro e arrastava junto o event log da máquina — que
@@ -3867,7 +3924,7 @@ if [ "$MODE" = "update" ]; then
     fi
     echo ""
     if confirm_yes "Commit now? [Y/n] " "Y"; then
-      git commit -m "chore: update Canuto Framework to v1.6"
+      git commit -m "chore: update Canuto Framework to v$FW_VER"
       ok "Committed!"
     else
       warn "Files staged but not committed. Run 'git commit' when ready."
@@ -3880,7 +3937,7 @@ if [ "$MODE" = "update" ]; then
 
   echo ""
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
-  echo -e "${GREEN}  Framework updated to v1.6 successfully.${RESET}"
+  echo -e "${GREEN}  Framework updated to v$FW_VER successfully.${RESET}"
   echo -e "${GREEN}  Claude remains the default Maestro runtime.${RESET}"
   echo -e "${GREEN}  Direct Codex Maestro launcher: bash .agents/tools/codex-maestro.sh${RESET}"
   echo -e "${GREEN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
