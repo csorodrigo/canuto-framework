@@ -1,0 +1,4 @@
+{"type":"session_meta","payload":{"id":"hermes-fixture-session","timestamp":"2026-08-03T03:00:00.000Z"}}
+{"type":"tool_use","name":"Read","id":"hermes-read-1","input":{"file_path":"~/.hermes/skills/audit/SKILL.md"},"timestamp":"2026-08-03T03:01:00.000Z"}
+{"type":"tool_result","tool_use_id":"hermes-read-1","content":"---\nname: audit\n---","is_error":false,"timestamp":"2026-08-03T03:01:01.000Z"}
+{"type":"tool_use","name":"Bash","id":"hermes-signal-1","input":{"command":"rg audit .agents/skills"},"timestamp":"2026-08-03T03:02:00.000Z"}

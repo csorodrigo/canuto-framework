@@ -79,6 +79,98 @@ if [ "$MODE" = "auto" ]; then
   fi
 fi
 
+emit_repair_warnings() {
+  local repair_rc="$1"
+  case "$repair_rc" in
+    10) warn "Runtime dependency repair failed; local repairs were continued." ;;
+    20) warn "Skill gardener repair failed; the remaining local repairs were continued." ;;
+    30)
+      warn "Runtime dependency repair failed; local repairs were continued."
+      warn "Skill gardener repair failed; the remaining local repairs were continued."
+      ;;
+  esac
+}
+
+handle_repair_outcome() {
+  local mode="$1"
+  local repair_rc="$2"
+  local validation_rc="${3:-0}"
+  case "$repair_rc" in
+    0|10|20|30) ;;
+    *) warn "Invalid repair outcome: $repair_rc"; return 30 ;;
+  esac
+  case "$mode" in
+    repair)
+      if [ "$repair_rc" -eq 0 ]; then
+        ok "Runtime repaired. Validate with: bash install.sh --test"
+      else
+        emit_repair_warnings "$repair_rc"
+      fi
+      return "$repair_rc"
+      ;;
+    doctor)
+      [ "$repair_rc" -eq 0 ] || emit_repair_warnings "$repair_rc"
+      if [ "$validation_rc" -eq 0 ]; then
+        [ "$repair_rc" -eq 0 ] && ok "Runtime repair and validation passed."
+      else
+        warn "Runtime validation reported issues."
+      fi
+      if [ "$repair_rc" -ne 0 ]; then return "$repair_rc"; fi
+      return "$validation_rc"
+      ;;
+    install)
+      if [ "$repair_rc" -eq 0 ]; then return 0; fi
+      emit_repair_warnings "$repair_rc"
+      rm -rf "$TMP_DIR"
+      return "$repair_rc"
+      ;;
+    update)
+      if [ "$repair_rc" -eq 0 ]; then return 0; fi
+      emit_repair_warnings "$repair_rc"
+      if [ "$repair_rc" -eq 10 ]; then
+        warn "Continuing update; dependency repair is incomplete."
+        return 0
+      fi
+      warn "Framework files may already be updated; stopping before further update actions."
+      rm -rf "$TMP_DIR"
+      return "$repair_rc"
+      ;;
+    migrate)
+      if [ "$repair_rc" -eq 0 ]; then return 0; fi
+      emit_repair_warnings "$repair_rc"
+      warn "Stopping migration before destructive cleanup and success reporting."
+      rm -rf "$TMP_DIR"
+      return "$repair_rc"
+      ;;
+    *)
+      warn "Unsupported repair outcome mode: $mode"
+      return 30
+      ;;
+  esac
+}
+
+if [ -n "${CANUTO_INSTALL_TEST_DISPATCH_REPAIR_RC:-}" ] && [ "${CANUTO_INSTALL_LIBRARY_ONLY:-0}" != "1" ]; then
+  TEST_REPAIR_RC="$CANUTO_INSTALL_TEST_DISPATCH_REPAIR_RC"
+  case "$TEST_REPAIR_RC" in
+    0|10|20|30) ;;
+    *) echo "Invalid CANUTO_INSTALL_TEST_DISPATCH_REPAIR_RC: $TEST_REPAIR_RC" >&2; rm -rf "$TMP_DIR"; exit 1 ;;
+  esac
+  TEST_ISOLATED_HOME="${CANUTO_INSTALL_TEST_ISOLATED_HOME:-}"
+  case "$TEST_ISOLATED_HOME" in
+    /*) ;;
+    *) echo "CANUTO_INSTALL_TEST_ISOLATED_HOME must be an absolute path" >&2; rm -rf "$TMP_DIR"; exit 1 ;;
+  esac
+  if [ "$TEST_ISOLATED_HOME" = "/" ] || [ "${HOME:-}" != "$TEST_ISOLATED_HOME" ] || [ ! -d "$TEST_ISOLATED_HOME" ]; then
+    echo "CANUTO_INSTALL_TEST_ISOLATED_HOME must equal a dedicated HOME directory" >&2
+    rm -rf "$TMP_DIR"
+    exit 1
+  fi
+  TEST_OUTCOME_RC=0
+  handle_repair_outcome "$MODE" "$TEST_REPAIR_RC" 0 || TEST_OUTCOME_RC=$?
+  rm -rf "$TMP_DIR"
+  exit "$TEST_OUTCOME_RC"
+fi
+
 is_interactive() {
   [[ -t 0 ]]
 }
@@ -99,7 +191,7 @@ confirm_yes() {
 }
 
 # ── Confirm not running install/update flows in the framework repo itself ───
-if git remote -v 2>/dev/null | grep -q "canuto-framework"; then
+if [ "${CANUTO_INSTALL_LIBRARY_ONLY:-0}" != "1" ] && git remote -v 2>/dev/null | grep -q "canuto-framework"; then
   case "$MODE" in
     install|update|migrate|skill)
       warn "This looks like the canuto-framework repo itself. Aborting."
@@ -601,7 +693,9 @@ refresh_from_remote_installer_if_needed() {
   warn "Failed to refresh installer from main. Continuing with local copy."
 }
 
-refresh_from_remote_installer_if_needed
+if [ "${CANUTO_INSTALL_LIBRARY_ONLY:-0}" != "1" ]; then
+  refresh_from_remote_installer_if_needed
+fi
 
 skill_remote_files() {
   local skill_name="$1"
@@ -2391,7 +2485,7 @@ RULESPATCH
       while IFS= read -r rule; do
         [ -n "$rule" ] || continue
         # `--` obrigatório: a regra começa com "- " e o grep a leria como opção
-        printf '%s\n' "$agents_section" | grep -qF -- "$rule" || agents_missing="${agents_missing}${rule}"$'\n'
+        printf '%s\n' "$agents_section" | grep -qF -- "$rule" || agents_missing="${agents_missing}${rule}"$'\034'
       done << 'RULESLIST'
 - Prefer the simplest implementation that fully meets the current requirement. No speculative abstraction, configuration, or indirection.
 - Grow in layers: smallest version that works end to end first, each new capability on top of something that already works. Never leave the tree broken mid-refactor.
@@ -2421,7 +2515,7 @@ RULESLIST
         fi
         agents_tmp="${agents_dest}.canuto.$$"
         if awk -v ins="$agents_missing" "$agents_fence_awk"'
-              BEGIN{n=split(ins, a, "\n")}
+              BEGIN{n=split(ins, a, "\034")}
               { if (fence_line($0)) { print; next } }
               !fence && !seen && /^##+ Coding Rules[[:space:]]*$/{
                 print; for(i=1;i<=n;i++) if(a[i]!="") print a[i]; seen=1; next
@@ -2690,7 +2784,8 @@ repair_runtime() {
   # CLAUDE.md, bootstrap de contexto, hooks): o rc de setup_deps é lembrado
   # e reportado no RETORNO, depois de reparar tudo que não depende dela.
   local deps_rc=0
-  setup_deps || deps_rc=1
+  local gardener_rc=0
+  setup_deps || deps_rc=10
   setup_local_script_permissions
   merge_claude_md
   merge_agents_md
@@ -2704,6 +2799,7 @@ repair_runtime() {
   setup_codex_mcps
   setup_gstack
   setup_global_skills
+  setup_skill_gardener || gardener_rc=20
 
   mkdir -p ".agents/tmp"
   if [ ! -f ".agents/tmp/.gitkeep" ]; then
@@ -2713,7 +2809,10 @@ repair_runtime() {
   if [ -f ".gitignore" ] && ! grep -q ".agents/tmp/" ".gitignore" 2>/dev/null; then
     echo ".agents/tmp/" >> ".gitignore"
   fi
-  return "$deps_rc"
+  if [ "$deps_rc" -ne 0 ] && [ "$gardener_rc" -ne 0 ]; then return 30; fi
+  if [ "$deps_rc" -ne 0 ]; then return 10; fi
+  if [ "$gardener_rc" -ne 0 ]; then return 20; fi
+  return 0
 }
 
 # ── setup_gstack ─────────────────────────────────────────────────────────────
@@ -2752,6 +2851,7 @@ setup_gstack() {
 # Uses the existing download() helper — no duplicate curl/wget logic.
 setup_global_skills() {
   local -a global_skills=(
+    "skill-gardener"
     # Canuto originals
     "ask-canuto"
     "co-plan"
@@ -2791,6 +2891,324 @@ setup_global_skills() {
         || warn "Could not download $remote"
     fi
   done
+}
+
+# ── setup_skill_gardener ────────────────────────────────────────────────────
+skill_gardener_sha256_file() {
+  node - "$1" <<'NODE'
+const crypto = require('node:crypto');
+const fs = require('node:fs');
+process.stdout.write(crypto.createHash('sha256').update(fs.readFileSync(process.argv[2])).digest('hex'));
+NODE
+}
+
+verify_skill_gardener_release() {
+  local release_dir="$1"
+  local expected_cli_hash="${2:-}"
+  local expected_lib_hash="${3:-}"
+  local cli_file="$release_dir/canuto-skill-gardener.js"
+  local lib_file="$release_dir/canuto-skill-gardener-lib.js"
+  [ -d "$release_dir" ] || return 1
+  [ ! -L "$release_dir" ] || return 1
+  [ -f "$cli_file" ] && [ -s "$cli_file" ] || return 1
+  [ -f "$lib_file" ] && [ -s "$lib_file" ] || return 1
+  if [ -n "$expected_cli_hash" ] && [ "$(skill_gardener_sha256_file "$cli_file")" != "$expected_cli_hash" ]; then return 1; fi
+  if [ -n "$expected_lib_hash" ] && [ "$(skill_gardener_sha256_file "$lib_file")" != "$expected_lib_hash" ]; then return 1; fi
+  if ! node --check "$cli_file" >/dev/null 2>&1; then return 1; fi
+  if ! node --check "$lib_file" >/dev/null 2>&1; then return 1; fi
+  if ! node - "$cli_file" "$lib_file" <<'NODE'
+const fs = require('node:fs');
+for (const [index, file] of process.argv.slice(2).entries()) {
+  const stat = fs.lstatSync(file);
+  if (!stat.isFile() || (index === 0 && (stat.mode & 0o111) === 0)) process.exit(1);
+}
+NODE
+  then return 1; fi
+  return 0
+}
+
+validate_skill_gardener_config() {
+  local library_file="$1"
+  local config_file="$2"
+  node - "$library_file" "$config_file" <<'NODE'
+const path = require('node:path');
+const library = require(path.resolve(process.argv[2]));
+library.loadConfig(path.resolve(process.argv[3]));
+NODE
+}
+
+acquire_skill_gardener_materialize_lock() {
+  local requested="$1"
+  local nonce="${2:-${SKILL_GARDENER_LOCK_NONCE:-}}"
+  local lock_path="$requested"
+  if [ "$(basename "$requested")" != ".materialize.lock" ]; then lock_path="$requested/.materialize.lock"; fi
+  [ -n "$nonce" ] || return 1
+  mkdir -p "$(dirname "$lock_path")"
+  if ! mkdir "$lock_path" 2>/dev/null; then return 1; fi
+  if ! printf '%s\n' "{\"nonce\":\"$nonce\",\"pid\":${BASHPID:-$$},\"command\":\"${BASH_SOURCE[1]:-$0}\",\"startedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$lock_path/owner.json"; then
+    rmdir "$lock_path" 2>/dev/null || true
+    return 1
+  fi
+  SKILL_GARDENER_LOCK_PATH="$lock_path"
+  SKILL_GARDENER_LOCK_NONCE="$nonce"
+  return 0
+}
+
+release_skill_gardener_materialize_lock() {
+  local requested="${1:-${SKILL_GARDENER_LOCK_PATH:-}}"
+  local nonce="${2:-${SKILL_GARDENER_LOCK_NONCE:-}}"
+  local lock_path="$requested"
+  if [ -n "$requested" ] && [ "$(basename "$requested")" != ".materialize.lock" ]; then lock_path="$requested/.materialize.lock"; fi
+  local owner="$lock_path/owner.json"
+  [ -n "$lock_path" ] && [ -n "$nonce" ] || return 1
+  local owner_nonce
+  if ! owner_nonce=$(node - "$owner" <<'NODE'
+const fs = require('node:fs');
+try {
+  const owner = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+  if (!owner || typeof owner.nonce !== 'string') process.exit(1);
+  process.stdout.write(owner.nonce);
+} catch {
+  process.exit(1);
+}
+NODE
+  ); then return 1; fi
+  [ "$owner_nonce" = "$nonce" ] || return 1
+  rm -f "$owner" || return 1
+  rmdir "$lock_path" || return 1
+  return 0
+}
+
+skill_gardener_install_config_if_absent() {
+  local candidate="$1"
+  local destination="$2"
+  local install_rc=0
+  node - "$candidate" "$destination" <<'NODE' || install_rc=$?
+const fs = require('node:fs');
+const source = process.argv[2];
+const destination = process.argv[3];
+try {
+  fs.linkSync(source, destination);
+  fs.unlinkSync(source);
+  process.exit(0);
+} catch (error) {
+  try { fs.unlinkSync(source); } catch {}
+  process.exit(error && error.code === 'EEXIST' ? 2 : 1);
+}
+NODE
+  return "$install_rc"
+}
+
+setup_skill_gardener() {
+  local source_dir="${CANUTO_SKILL_GARDENER_SOURCE_DIR:-skill-gardener}"
+  local cli_source="$source_dir/canuto-skill-gardener.js"
+  local lib_source="$source_dir/canuto-skill-gardener-lib.js"
+  local config_src="${CANUTO_SKILL_GARDENER_CONFIG_SOURCE:-config/skill-gardener.json}"
+  local staging_dir="$TMP_DIR/skill-gardener"
+  local bin_dir="$HOME/.canuto/bin"
+  local lib_dir="$HOME/.canuto/lib/skill-gardener"
+  local releases_dir="$lib_dir/releases"
+  local config_dir="$HOME/.canuto/config"
+  local cli_dst="$bin_dir/canuto-skill-gardener"
+  local config_dst="$config_dir/skill-gardener.json"
+  local nonce="skill-gardener-$(date +%s)-$$-${RANDOM}"
+  local staged_cli="$staging_dir/canuto-skill-gardener.js"
+  local staged_lib="$staging_dir/canuto-skill-gardener-lib.js"
+  local staged_config="$staging_dir/skill-gardener.json"
+  local release_tmp="$releases_dir/.tmp-$nonce"
+  local release_dir=""
+  local link_tmp="$bin_dir/.canuto-skill-gardener-$nonce"
+  local config_created=0
+  local config_created_hash=""
+  local lock_acquired=0
+  local config_present_initial=0
+  local cli_hash=""
+  local lib_hash=""
+  local digest=""
+  local config_validated_hash=""
+
+  mkdir -p "$staging_dir" "$bin_dir" "$releases_dir" "$config_dir" "$HOME/.canuto/logs" || { warn "Could not prepare Skill Gardener staging."; return 1; }
+  if [ -f "$cli_source" ]; then
+    cp "$cli_source" "$staged_cli" || { warn "Could not stage Skill Gardener CLI."; return 1; }
+  else
+    download "skill-gardener/canuto-skill-gardener.js" "$staged_cli" || { warn "Skill gardener CLI source unavailable."; return 1; }
+  fi
+  if [ -f "$lib_source" ]; then
+    cp "$lib_source" "$staged_lib" || { warn "Could not stage Skill Gardener library."; return 1; }
+  else
+    download "skill-gardener/canuto-skill-gardener-lib.js" "$staged_lib" || { warn "Skill gardener library source unavailable."; return 1; }
+  fi
+  if [ -f "$config_src" ]; then
+    cp "$config_src" "$staged_config" || { warn "Could not stage Skill Gardener config."; return 1; }
+  elif ! download "config/skill-gardener.json" "$staged_config"; then
+    rm -f "$staged_config" 2>/dev/null || true
+  fi
+
+  if [ ! -f "$staged_cli" ] || [ ! -s "$staged_cli" ] || [ ! -f "$staged_lib" ] || [ ! -s "$staged_lib" ]; then
+    warn "Skill Gardener release files are missing or empty."
+    return 1
+  fi
+  if ! node --check "$staged_cli" >/dev/null 2>&1 || ! node --check "$staged_lib" >/dev/null 2>&1; then
+    warn "Skill Gardener release contains invalid JavaScript."
+    return 1
+  fi
+  if [ -e "$config_dst" ]; then config_present_initial=1; fi
+  if [ "$config_present_initial" -eq 0 ] && [ -f "$staged_config" ] && ! validate_skill_gardener_config "$staged_lib" "$staged_config" >/dev/null 2>&1; then
+    warn "Skill Gardener config candidate is invalid."
+    return 1
+  fi
+  if ! node "$staged_cli" --help >/dev/null 2>&1; then
+    warn "Staged Skill Gardener CLI help failed."
+    return 1
+  fi
+
+  cli_hash=$(skill_gardener_sha256_file "$staged_cli") || { warn "Could not hash Skill Gardener CLI."; return 1; }
+  lib_hash=$(skill_gardener_sha256_file "$staged_lib") || { warn "Could not hash Skill Gardener library."; return 1; }
+  digest=$(node - "$cli_hash" "$lib_hash" <<'NODE'
+const crypto = require('node:crypto');
+const payload = `canuto-skill-gardener-release-v1\0${process.argv[2]}\0${process.argv[3]}`;
+process.stdout.write(crypto.createHash('sha256').update(payload).digest('hex'));
+NODE
+  ) || { warn "Could not derive Skill Gardener release digest."; return 1; }
+  release_dir="$releases_dir/$digest"
+  if ! mkdir "$release_tmp" 2>/dev/null; then warn "Could not create immutable Skill Gardener release staging."; return 1; fi
+  if ! cp "$staged_cli" "$release_tmp/canuto-skill-gardener.js" || ! cp "$staged_lib" "$release_tmp/canuto-skill-gardener-lib.js" || ! chmod 0755 "$release_tmp/canuto-skill-gardener.js"; then
+    rm -rf "$release_tmp"
+    warn "Could not materialize Skill Gardener release files."
+    return 1
+  fi
+  if ! verify_skill_gardener_release "$release_tmp" "$cli_hash" "$lib_hash"; then
+    rm -rf "$release_tmp"
+    warn "Staged Skill Gardener release failed verification."
+    return 1
+  fi
+
+  if ! acquire_skill_gardener_materialize_lock "$releases_dir" "$nonce"; then
+    rm -rf "$release_tmp"
+    warn "Skill Gardener materialization is already locked."
+    return 1
+  fi
+  lock_acquired=1
+
+  if [ -e "$config_dst" ]; then
+    if ! validate_skill_gardener_config "$staged_lib" "$config_dst" >/dev/null 2>&1; then
+      warn "Existing Skill Gardener config is invalid; preserving it and aborting activation."
+      rm -rf "$release_tmp"
+      release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
+      return 1
+    fi
+  else
+    if [ ! -f "$staged_config" ] || [ ! -s "$staged_config" ]; then
+      warn "Skill Gardener config is unavailable."
+      rm -rf "$release_tmp"
+      release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
+      return 1
+    fi
+    local config_tmp="$config_dst.tmp-$nonce"
+    if ! cp "$staged_config" "$config_tmp"; then
+      rm -f "$config_tmp" 2>/dev/null || true
+      rm -rf "$release_tmp"
+      release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
+      return 1
+    fi
+    local config_rc=0
+    skill_gardener_install_config_if_absent "$config_tmp" "$config_dst" || config_rc=$?
+    if [ "$config_rc" -eq 0 ]; then
+      config_created=1
+      config_created_hash=$(skill_gardener_sha256_file "$config_dst")
+    elif [ "$config_rc" -eq 2 ]; then
+      if ! validate_skill_gardener_config "$staged_lib" "$config_dst" >/dev/null 2>&1; then
+        warn "Concurrent Skill Gardener config winner is invalid; aborting activation."
+        rm -rf "$release_tmp"
+        release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
+        return 1
+      fi
+    else
+      warn "Could not install Skill Gardener config atomically."
+      rm -rf "$release_tmp"
+      release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
+      return 1
+    fi
+  fi
+  if ! validate_skill_gardener_config "$staged_lib" "$config_dst" >/dev/null 2>&1; then
+    warn "Skill Gardener config is invalid after materialization; preserving it and aborting activation."
+    if [ "$config_created" -eq 1 ] && [ "$(skill_gardener_sha256_file "$config_dst")" = "$config_created_hash" ]; then rm -f "$config_dst"; fi
+    rm -rf "$release_tmp"
+    release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
+    return 1
+  fi
+  config_validated_hash=$(skill_gardener_sha256_file "$config_dst") || {
+    warn "Could not hash the validated Skill Gardener config."
+    if [ "$config_created" -eq 1 ] && [ "$(skill_gardener_sha256_file "$config_dst")" = "$config_created_hash" ]; then rm -f "$config_dst"; fi
+    rm -rf "$release_tmp"
+    release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
+    return 1
+  }
+
+  if [ -e "$release_dir" ]; then
+    if ! verify_skill_gardener_release "$release_dir" "$cli_hash" "$lib_hash"; then
+      warn "Existing immutable Skill Gardener release failed verification."
+      if [ "$config_created" -eq 1 ] && [ "$(skill_gardener_sha256_file "$config_dst")" = "$config_created_hash" ]; then rm -f "$config_dst"; fi
+      rm -rf "$release_tmp"
+      release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
+      return 1
+    fi
+    rm -rf "$release_tmp"
+  else
+    if ! node - "$release_tmp" "$release_dir" <<'NODE'
+const fs = require('node:fs');
+fs.renameSync(process.argv[2], process.argv[3]);
+NODE
+    then
+      warn "Could not atomically materialize immutable Skill Gardener release."
+      if [ "$config_created" -eq 1 ] && [ "$(skill_gardener_sha256_file "$config_dst")" = "$config_created_hash" ]; then rm -f "$config_dst"; fi
+      rm -rf "$release_tmp"
+      release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
+      return 1
+    fi
+  fi
+  if ! verify_skill_gardener_release "$release_dir" "$cli_hash" "$lib_hash"; then
+    warn "Final Skill Gardener release failed verification."
+    if [ "$config_created" -eq 1 ] && [ "$(skill_gardener_sha256_file "$config_dst")" = "$config_created_hash" ]; then rm -f "$config_dst"; fi
+    release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
+    return 1
+  fi
+  rm -f "$link_tmp"
+  if ! ln -s "../lib/skill-gardener/releases/$digest/canuto-skill-gardener.js" "$link_tmp"; then
+    warn "Could not prepare Skill Gardener activation link."
+    if [ "$config_created" -eq 1 ] && [ "$(skill_gardener_sha256_file "$config_dst")" = "$config_created_hash" ]; then rm -f "$config_dst"; fi
+    release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
+    return 1
+  fi
+  if [ "${CANUTO_SKILL_GARDENER_TEST_SWAP_CONFIG_BEFORE_ACTIVATION:-0}" = "1" ]; then
+    printf '%s\n' '{"schemaVersion":2}' > "$config_dst"
+  fi
+  if [ ! -f "$config_dst" ] || ! validate_skill_gardener_config "$staged_lib" "$config_dst" >/dev/null 2>&1 || [ "$(skill_gardener_sha256_file "$config_dst")" != "$config_validated_hash" ]; then
+    warn "Skill Gardener config changed before activation; preserving the old runtime."
+    rm -f "$link_tmp"
+    if [ "$config_created" -eq 1 ] && [ "$(skill_gardener_sha256_file "$config_dst")" = "$config_created_hash" ]; then rm -f "$config_dst"; fi
+    rm -rf "$release_tmp"
+    release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
+    return 1
+  fi
+  if [ "${CANUTO_SKILL_GARDENER_TEST_FAIL_ACTIVATION:-0}" = "1" ] || ! node - "$link_tmp" "$cli_dst" <<'NODE'
+const fs = require('node:fs');
+fs.renameSync(process.argv[2], process.argv[3]);
+NODE
+  then
+    warn "Could not atomically activate Skill Gardener CLI."
+    rm -f "$link_tmp"
+    if [ "$config_created" -eq 1 ] && [ "$(skill_gardener_sha256_file "$config_dst")" = "$config_created_hash" ]; then rm -f "$config_dst"; fi
+    release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
+    return 1
+  fi
+  if ! release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1; then
+    warn "Skill Gardener materialization lock cleanup failed; release left inactive until reviewed."
+    return 1
+  fi
+  lock_acquired=0
+  ok "Installed immutable Skill Gardener release: $cli_dst"
+  return 0
 }
 
 # ── post_install_analysis ─────────────────────────────────────────────────────
@@ -3556,6 +3974,12 @@ print(f"\033[0;32m[canuto]\033[0m \u2713 onboarding-report.md ({len(matches)} pr
 PYEOF
 }
 
+# Test-only library seam: source installer helpers without entering an install
+# mode. It performs no setup and is used by framework smoke tests.
+if [ "${CANUTO_INSTALL_LIBRARY_ONLY:-0}" = "1" ]; then
+  return 0 2>/dev/null || exit 0
+fi
+
 # ── CHECK ───────────────────────────────────────────────────────────────────
 if [ "$MODE" = "check" ]; then
   echo ""
@@ -3687,27 +4111,25 @@ if [ "$MODE" = "repair" ]; then
   echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
   echo ""
 
-  repair_runtime
-
-  if [ "$JSON_OUTPUT" = false ]; then
-    echo ""
-    ok "Runtime repaired. Validate with: bash install.sh --test"
-    echo ""
-  fi
+  REPAIR_RC=0
+  repair_runtime || REPAIR_RC=$?
+  handle_repair_outcome repair "$REPAIR_RC" 0 || REPAIR_OUTCOME_RC=$?
+  REPAIR_OUTCOME_RC="${REPAIR_OUTCOME_RC:-0}"
 
   rm -rf "$TMP_DIR"
-  exit 0
+  exit "$REPAIR_OUTCOME_RC"
 fi
 
 # ── DOCTOR ──────────────────────────────────────────────────────────────────
 if [ "$MODE" = "doctor" ]; then
-  repair_runtime
-  if run_install_validation; then
-    rm -rf "$TMP_DIR"
-    exit 0
-  fi
+  REPAIR_RC=0
+  repair_runtime || REPAIR_RC=$?
+  VALIDATION_RC=0
+  run_install_validation || VALIDATION_RC=$?
+  DOCTOR_OUTCOME_RC=0
+  handle_repair_outcome doctor "$REPAIR_RC" "$VALIDATION_RC" || DOCTOR_OUTCOME_RC=$?
   rm -rf "$TMP_DIR"
-  exit 1
+  exit "$DOCTOR_OUTCOME_RC"
 fi
 
 # ── MIGRATE ─────────────────────────────────────────────────────────────────
@@ -3792,7 +4214,14 @@ if [ "$MODE" = "migrate" ]; then
   migrate_flat_file ".agents/memory/component-inventory.md" "$PROJECT_VAULT/design/components" "migrated-inventory.md"
 
   # ── Step 5: Setup deps, hooks, tools ─────────────────────────────────────
-  repair_runtime
+  MIGRATE_REPAIR_RC=0
+  repair_runtime || MIGRATE_REPAIR_RC=$?
+  MIGRATE_OUTCOME_RC=0
+  handle_repair_outcome migrate "$MIGRATE_REPAIR_RC" 0 || MIGRATE_OUTCOME_RC=$?
+  if [ "$MIGRATE_OUTCOME_RC" -ne 0 ]; then
+    rm -rf "$TMP_DIR"
+    exit "$MIGRATE_OUTCOME_RC"
+  fi
 
   # ── Step 6: Clean up old memory dir ──────────────────────────────────────
   if [ -d ".agents/memory" ] && [ "$MIGRATED" -gt 0 ]; then
@@ -3867,7 +4296,13 @@ if [ "$MODE" = "install" ]; then
   done
   ok "Vault directories created"
 
-  repair_runtime
+  INSTALL_REPAIR_RC=0
+  repair_runtime || INSTALL_REPAIR_RC=$?
+  INSTALL_OUTCOME_RC=0
+  handle_repair_outcome install "$INSTALL_REPAIR_RC" 0 || INSTALL_OUTCOME_RC=$?
+  if [ "$INSTALL_OUTCOME_RC" -ne 0 ]; then
+    exit "$INSTALL_OUTCOME_RC"
+  fi
   register_project_path
 
   if [ "$GIT_AVAILABLE" = true ]; then
@@ -3946,8 +4381,12 @@ if [ "$MODE" = "update" ]; then
   # (set -e + return 1 do setup_deps matava merge de CLAUDE.md, registro de
   # hooks e validação — atualização pela metade sem aviso). Falha dura de
   # ambiente continua sendo papel do --doctor.
-  if ! repair_runtime; then
-    warn "Runtime repair incompleto (dependência ausente?). Arquivos já foram atualizados; rode 'bash install.sh --doctor' para completar o ambiente."
+  UPDATE_REPAIR_RC=0
+  repair_runtime || UPDATE_REPAIR_RC=$?
+  UPDATE_OUTCOME_RC=0
+  handle_repair_outcome update "$UPDATE_REPAIR_RC" 0 || UPDATE_OUTCOME_RC=$?
+  if [ "$UPDATE_OUTCOME_RC" -ne 0 ]; then
+    exit "$UPDATE_OUTCOME_RC"
   fi
   register_project_path
 

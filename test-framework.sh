@@ -290,6 +290,147 @@ else
   fail "framework-session-audit CLI help failed"
 fi
 
+echo "── Test 3c: Federated Skill Gardener ──"
+
+SKILL_GARDENER_DIR="$FRAMEWORK_DIR/skill-gardener"
+for gardener_file in canuto-skill-gardener.js canuto-skill-gardener-lib.js canuto-skill-gardener.test.js; do
+  if [ ! -f "$SKILL_GARDENER_DIR/$gardener_file" ]; then
+    fail "Skill gardener file missing: $gardener_file"
+  elif node --check "$SKILL_GARDENER_DIR/$gardener_file" >/dev/null 2>&1; then
+    pass "skill gardener $gardener_file syntax valid"
+  else
+    fail "skill gardener $gardener_file has syntax errors"
+  fi
+done
+
+SG_TEST_HOME="$(mktemp -d)"
+SG_TEST_CRONTAB="$(mktemp)"
+if HOME="$SG_TEST_HOME" CANUTO_INSTALL_TEST_ISOLATED_HOME="$SG_TEST_HOME" \
+  CANUTO_SKILL_GARDENER_SOURCE_DIR="$SKILL_GARDENER_DIR" \
+  CANUTO_SKILL_GARDENER_CONFIG_SOURCE="$FRAMEWORK_DIR/config/skill-gardener.json" \
+  CANUTO_SKILL_GARDENER_CONFIG="$FRAMEWORK_DIR/config/skill-gardener.json" \
+  CANUTO_SKILL_GARDENER_CRONTAB_FILE="$SG_TEST_CRONTAB" \
+  node --test "$SKILL_GARDENER_DIR/canuto-skill-gardener.test.js" >/tmp/canuto-skill-gardener-test.$$ 2>&1; then
+  pass "canuto-skill-gardener focused tests"
+else
+  fail "canuto-skill-gardener focused tests failed"
+fi
+rm -f /tmp/canuto-skill-gardener-test.$$
+rm -rf "$SG_TEST_HOME"
+rm -f "$SG_TEST_CRONTAB"
+
+SG_HELP_HOME="$(mktemp -d)"
+SG_HELP_CRONTAB="$(mktemp)"
+if HOME="$SG_HELP_HOME" CANUTO_INSTALL_TEST_ISOLATED_HOME="$SG_HELP_HOME" \
+  CANUTO_SKILL_GARDENER_SOURCE_DIR="$SKILL_GARDENER_DIR" \
+  CANUTO_SKILL_GARDENER_CONFIG_SOURCE="$FRAMEWORK_DIR/config/skill-gardener.json" \
+  CANUTO_SKILL_GARDENER_CONFIG="$FRAMEWORK_DIR/config/skill-gardener.json" \
+  CANUTO_SKILL_GARDENER_CRONTAB_FILE="$SG_HELP_CRONTAB" \
+  node "$SKILL_GARDENER_DIR/canuto-skill-gardener.js" --help >/dev/null 2>&1; then
+  pass "canuto-skill-gardener CLI help"
+else
+  fail "canuto-skill-gardener CLI help failed"
+fi
+rm -rf "$SG_HELP_HOME"
+rm -f "$SG_HELP_CRONTAB"
+
+if grep -qF 'skill-gardener/canuto-skill-gardener.js' "$FRAMEWORK_DIR/install.sh" \
+  && grep -qF 'setup_skill_gardener' "$FRAMEWORK_DIR/install.sh"; then
+  pass "install.sh wires skill gardener CLI/library"
+else
+  fail "install.sh does not wire skill gardener CLI/library"
+fi
+
+SG_HOME="$(mktemp -d)"
+SG_STATUS_BEFORE="$(mktemp)"
+SG_STATUS_AFTER="$(mktemp)"
+SG_CRONTAB="$(mktemp)"
+SG_CONFIG_BEFORE="$(mktemp)"
+SG_SOURCE_DIR="$FRAMEWORK_DIR/skill-gardener"
+SG_CONFIG_SOURCE="$FRAMEWORK_DIR/config/skill-gardener.json"
+git -C "$FRAMEWORK_DIR" status --porcelain --untracked-files=all > "$SG_STATUS_BEFORE" 2>/dev/null || true
+if (
+  cd "$FRAMEWORK_DIR"
+  export HOME="$SG_HOME" CANUTO_INSTALL_LIBRARY_ONLY=1 \
+    CANUTO_SKILL_GARDENER_SOURCE_DIR="$SG_SOURCE_DIR" \
+    CANUTO_SKILL_GARDENER_CONFIG_SOURCE="$SG_CONFIG_SOURCE" \
+    CANUTO_SKILL_GARDENER_CONFIG="$SG_CONFIG_SOURCE" \
+    CANUTO_SKILL_GARDENER_CRONTAB_FILE="$SG_CRONTAB"
+  source "$FRAMEWORK_DIR/install.sh"
+  mkdir -p "$HOME/.claude/skills/skill-gardener"
+  cp "$FRAMEWORK_DIR/global-skills/skill-gardener/SKILL.md" "$HOME/.claude/skills/skill-gardener/SKILL.md"
+  setup_skill_gardener
+) >/dev/null 2>&1 \
+  && [ -L "$SG_HOME/.canuto/bin/canuto-skill-gardener" ] \
+  && [ -x "$SG_HOME/.canuto/bin/canuto-skill-gardener" ] \
+  && SG_TARGET="$(node -e 'process.stdout.write(require("node:fs").realpathSync(process.argv[1]))' "$SG_HOME/.canuto/bin/canuto-skill-gardener")" \
+  && printf '%s\n' "$SG_TARGET" | grep -qE '/\.canuto/lib/skill-gardener/releases/[0-9a-f]{64}/canuto-skill-gardener\.js$' \
+  && [ -f "$(dirname "$SG_TARGET")/canuto-skill-gardener-lib.js" ] \
+  && node -e 'const fs=require("node:fs"); const crypto=require("node:crypto"); const [sourceCli,targetCli,sourceLib,targetLib]=process.argv.slice(1); const hash=(file)=>crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex"); if(hash(sourceCli)!==hash(targetCli)||hash(sourceLib)!==hash(targetLib))process.exit(1)' \
+    "$SG_SOURCE_DIR/canuto-skill-gardener.js" "$SG_TARGET" "$SG_SOURCE_DIR/canuto-skill-gardener-lib.js" "$(dirname "$SG_TARGET")/canuto-skill-gardener-lib.js" \
+  && [ -f "$SG_HOME/.canuto/config/skill-gardener.json" ] \
+  && [ -d "$SG_HOME/.canuto/logs" ] \
+  && [ -f "$SG_HOME/.claude/skills/skill-gardener/SKILL.md" ]; then
+  pass "skill gardener fresh install stages runtime, config, logs and companion skill"
+else
+  fail "skill gardener fresh install is incomplete"
+fi
+mkdir -p "$SG_HOME/.canuto/config"
+node - "$SG_CONFIG_SOURCE" "$SG_HOME/.canuto/config/skill-gardener.json" <<'NODE'
+const fs = require('node:fs');
+const [source, target] = process.argv.slice(2);
+const config = JSON.parse(fs.readFileSync(source, 'utf8'));
+config.policy.detailRetentionDays += 1;
+fs.writeFileSync(target, `${JSON.stringify(config, null, 2)}\n`);
+NODE
+cp "$SG_HOME/.canuto/config/skill-gardener.json" "$SG_CONFIG_BEFORE"
+if (
+  cd "$FRAMEWORK_DIR"
+  export HOME="$SG_HOME" CANUTO_INSTALL_LIBRARY_ONLY=1 \
+    CANUTO_SKILL_GARDENER_SOURCE_DIR="$SG_SOURCE_DIR" \
+    CANUTO_SKILL_GARDENER_CONFIG_SOURCE="$SG_CONFIG_SOURCE" \
+    CANUTO_SKILL_GARDENER_CONFIG="$SG_CONFIG_SOURCE" \
+    CANUTO_SKILL_GARDENER_CRONTAB_FILE="$SG_CRONTAB"
+  source "$FRAMEWORK_DIR/install.sh"
+  setup_skill_gardener
+) >/dev/null 2>&1 \
+  && ! cmp -s "$SG_CONFIG_SOURCE" "$SG_CONFIG_BEFORE" \
+  && cmp -s "$SG_HOME/.canuto/config/skill-gardener.json" "$SG_CONFIG_BEFORE"; then
+  pass "skill gardener update preserves existing config"
+else
+  fail "skill gardener update overwrote existing config"
+fi
+git -C "$FRAMEWORK_DIR" status --porcelain --untracked-files=all > "$SG_STATUS_AFTER" 2>/dev/null || true
+if cmp -s "$SG_STATUS_BEFORE" "$SG_STATUS_AFTER"; then
+  pass "skill gardener install does not pollute the framework checkout"
+else
+  fail "skill gardener install changed the framework checkout"
+fi
+rm -f "$SG_STATUS_BEFORE" "$SG_STATUS_AFTER"
+
+SG_CONSUMER="$(mktemp -d)"
+git -C "$SG_CONSUMER" init -q
+if (
+  cd "$SG_CONSUMER"
+  export HOME="$(mktemp -d)" CANUTO_INSTALL_LIBRARY_ONLY=1 \
+    CANUTO_INSTALL_TEST_ISOLATED_HOME="$HOME" \
+    CANUTO_SKILL_GARDENER_SOURCE_DIR="$FRAMEWORK_DIR/skill-gardener" \
+    CANUTO_SKILL_GARDENER_CONFIG_SOURCE="$FRAMEWORK_DIR/config/skill-gardener.json" \
+    CANUTO_SKILL_GARDENER_CONFIG="$FRAMEWORK_DIR/config/skill-gardener.json" \
+    CANUTO_SKILL_GARDENER_CRONTAB_FILE="$SG_CONSUMER/crontab"
+  source "$FRAMEWORK_DIR/install.sh"
+  setup_skill_gardener
+) >/dev/null 2>&1 \
+  && [ ! -e "$SG_CONSUMER/skill-gardener" ] \
+  && [ ! -e "$SG_CONSUMER/config" ] \
+  && [ -z "$(git -C "$SG_CONSUMER" status --porcelain --untracked-files=all)" ]; then
+  pass "consumer install uses runtime staging without checkout pollution"
+else
+  fail "consumer install polluted checkout or failed staging"
+fi
+rm -rf "$SG_HOME" "$SG_CONSUMER"
+rm -f "$SG_CRONTAB" "$SG_CONFIG_BEFORE"
+
 PORTABILITY_HOME="$(mktemp -d)"
 mkdir -p "$PORTABILITY_HOME/.canuto/vault"
 cat > "$PORTABILITY_HOME/.canuto/vault/A.md" <<'EOF'
