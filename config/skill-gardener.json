@@ -18,7 +18,7 @@
             "/srv/dev/worktrees/lucrando-ai/main"
           ],
           "aliases": ["Papiro"],
-          "historyRoots": ["/srv/dev/worktrees/lucrando-ai/main/.codex/sessions"]
+          "historyRoots": ["~/.codex/sessions", "~/.codex/archived_sessions"]
         }
       }
     },
@@ -39,7 +39,7 @@
             "/srv/dev/worktrees/papiro/main"
           ],
           "aliases": ["Papiro"],
-          "historyRoots": ["/srv/dev/worktrees/papiro/main/.codex/sessions"]
+          "historyRoots": ["~/.codex/sessions", "~/.codex/archived_sessions"]
         }
       }
     },
@@ -59,10 +59,10 @@
           "provider": "codex",
           "remote": true,
           "roots": [
-            "/srv/dev/worktrees/mecesa-v1/main"
+            "/srv/dev/worktrees/mecesa/main"
           ],
           "aliases": ["Papiro"],
-          "historyRoots": ["/srv/dev/worktrees/mecesa-v1/main/.codex/sessions"]
+          "historyRoots": ["~/.codex/sessions", "~/.codex/archived_sessions"]
         }
       }
     }
@@ -84,7 +84,7 @@
       "roots": ["~/.hermes/skills"],
       "pluginRoots": ["~/.hermes/plugins"],
       "systemRoots": ["~/.hermes/system/skills"],
-      "historyRoots": ["~/.hermes/sessions", "~/.hermes/history"]
+      "historyRoots": ["~/.hermes/sessions"]
     },
     "opencode": {
       "roots": [],

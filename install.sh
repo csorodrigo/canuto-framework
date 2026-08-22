@@ -2999,6 +2999,70 @@ NODE
   return "$install_rc"
 }
 
+skill_gardener_migrate_legacy_config() {
+  local library_file="$1"
+  local config_file="$2"
+  local candidate_file="$3"
+  node - "$library_file" "$config_file" "$candidate_file" <<'NODE'
+const fs = require('node:fs');
+const path = require('node:path');
+const library = require(path.resolve(process.argv[2]));
+const configPath = path.resolve(process.argv[3]);
+const candidatePath = path.resolve(process.argv[4]);
+const legacyRemoteHistory = {
+  'lucrando-ai': '/srv/dev/worktrees/lucrando-ai/main/.codex/sessions',
+  papiro: '/srv/dev/worktrees/papiro/main/.codex/sessions',
+  'mecesa-v1': '/srv/dev/worktrees/mecesa-v1/main/.codex/sessions',
+};
+const canonicalRemoteHistory = ['~/.codex/sessions', '~/.codex/archived_sessions'];
+const legacyMecesaRoot = '/srv/dev/worktrees/mecesa-v1/main';
+let raw;
+try {
+  raw = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  library.loadConfig(configPath);
+} catch {
+  try { fs.unlinkSync(candidatePath); } catch {}
+  process.exit(1);
+}
+let changed = false;
+for (const [logicalProjectId, project] of Object.entries(raw.projects || {})) {
+  for (const surface of Object.values(project?.surfaces || {})) {
+    if (surface?.remote === true && surface.provider === 'codex') {
+      if (Array.isArray(surface.historyRoots) && surface.historyRoots.length === 1 && surface.historyRoots[0] === legacyRemoteHistory[logicalProjectId]) {
+        surface.historyRoots = [...canonicalRemoteHistory];
+        changed = true;
+      }
+      if (logicalProjectId === 'mecesa-v1' && Array.isArray(surface.roots) && surface.roots.length === 1 && surface.roots[0] === legacyMecesaRoot) {
+        surface.roots = ['/srv/dev/worktrees/mecesa/main'];
+        changed = true;
+      }
+    }
+  }
+}
+if (raw.providers?.hermes && Array.isArray(raw.providers.hermes.historyRoots)
+  && raw.providers.hermes.historyRoots.length === 2
+  && raw.providers.hermes.historyRoots[0] === '~/.hermes/sessions'
+  && raw.providers.hermes.historyRoots[1] === '~/.hermes/history') {
+  raw.providers.hermes.historyRoots = ['~/.hermes/sessions'];
+  changed = true;
+}
+if (!changed) {
+  try { fs.unlinkSync(candidatePath); } catch {}
+  process.exit(0);
+}
+try {
+  if (!candidatePath || candidatePath === configPath) throw new Error('invalid-migration-candidate');
+  const mode = fs.statSync(configPath).mode & 0o777;
+  fs.writeFileSync(candidatePath, `${JSON.stringify(raw, null, 2)}\n`, { mode: mode || 0o600, flag: 'wx' });
+  fs.chmodSync(candidatePath, mode || 0o600);
+  library.loadConfig(candidatePath);
+} catch {
+  try { fs.unlinkSync(candidatePath); } catch {}
+  process.exit(1);
+}
+NODE
+}
+
 setup_skill_gardener() {
   local source_dir="${CANUTO_SKILL_GARDENER_SOURCE_DIR:-skill-gardener}"
   local cli_source="$source_dir/canuto-skill-gardener.js"
@@ -3018,6 +3082,7 @@ setup_skill_gardener() {
   local release_tmp="$releases_dir/.tmp-$nonce"
   local release_dir=""
   local link_tmp="$bin_dir/.canuto-skill-gardener-$nonce"
+  local migration_tmp="$config_dst.tmp-migrate-$nonce"
   local config_created=0
   local config_created_hash=""
   local lock_acquired=0
@@ -3026,6 +3091,7 @@ setup_skill_gardener() {
   local lib_hash=""
   local digest=""
   local config_validated_hash=""
+  local config_source_hash=""
 
   mkdir -p "$staging_dir" "$bin_dir" "$releases_dir" "$config_dir" "$HOME/.canuto/logs" || { warn "Could not prepare Skill Gardener staging."; return 1; }
   if [ -f "$cli_source" ]; then
@@ -3093,6 +3159,35 @@ NODE
   if [ -e "$config_dst" ]; then
     if ! validate_skill_gardener_config "$staged_lib" "$config_dst" >/dev/null 2>&1; then
       warn "Existing Skill Gardener config is invalid; preserving it and aborting activation."
+      rm -f -- "$migration_tmp"
+      rm -rf "$release_tmp"
+      release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
+      return 1
+    fi
+    config_source_hash=$(skill_gardener_sha256_file "$config_dst") || {
+      warn "Could not hash the existing Skill Gardener config."
+      rm -f -- "$migration_tmp"
+      rm -rf "$release_tmp"
+      release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
+      return 1
+    }
+    if ! skill_gardener_migrate_legacy_config "$staged_lib" "$config_dst" "$migration_tmp"; then
+      warn "Legacy Skill Gardener config migration failed; preserving the existing runtime."
+      rm -f -- "$migration_tmp"
+      rm -rf "$release_tmp"
+      release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
+      return 1
+    fi
+    if [ -f "$migration_tmp" ] && ! validate_skill_gardener_config "$staged_lib" "$migration_tmp" >/dev/null 2>&1; then
+      warn "Migrated Skill Gardener config candidate is invalid; preserving the existing runtime."
+      rm -f -- "$migration_tmp"
+      rm -rf "$release_tmp"
+      release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
+      return 1
+    fi
+    if [ "$(skill_gardener_sha256_file "$config_dst")" != "$config_source_hash" ]; then
+      warn "Skill Gardener config changed during migration staging; preserving the existing runtime."
+      rm -f -- "$migration_tmp"
       rm -rf "$release_tmp"
       release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
       return 1
@@ -3100,6 +3195,7 @@ NODE
   else
     if [ ! -f "$staged_config" ] || [ ! -s "$staged_config" ]; then
       warn "Skill Gardener config is unavailable."
+      rm -f -- "$migration_tmp"
       rm -rf "$release_tmp"
       release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
       return 1
@@ -3107,6 +3203,7 @@ NODE
     local config_tmp="$config_dst.tmp-$nonce"
     if ! cp "$staged_config" "$config_tmp"; then
       rm -f "$config_tmp" 2>/dev/null || true
+      rm -f -- "$migration_tmp"
       rm -rf "$release_tmp"
       release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
       return 1
@@ -3119,12 +3216,14 @@ NODE
     elif [ "$config_rc" -eq 2 ]; then
       if ! validate_skill_gardener_config "$staged_lib" "$config_dst" >/dev/null 2>&1; then
         warn "Concurrent Skill Gardener config winner is invalid; aborting activation."
+        rm -f -- "$migration_tmp"
         rm -rf "$release_tmp"
         release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
         return 1
       fi
     else
       warn "Could not install Skill Gardener config atomically."
+      rm -f -- "$migration_tmp"
       rm -rf "$release_tmp"
       release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
       return 1
@@ -3133,6 +3232,7 @@ NODE
   if ! validate_skill_gardener_config "$staged_lib" "$config_dst" >/dev/null 2>&1; then
     warn "Skill Gardener config is invalid after materialization; preserving it and aborting activation."
     if [ "$config_created" -eq 1 ] && [ "$(skill_gardener_sha256_file "$config_dst")" = "$config_created_hash" ]; then rm -f "$config_dst"; fi
+    rm -f -- "$migration_tmp"
     rm -rf "$release_tmp"
     release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
     return 1
@@ -3140,6 +3240,7 @@ NODE
   config_validated_hash=$(skill_gardener_sha256_file "$config_dst") || {
     warn "Could not hash the validated Skill Gardener config."
     if [ "$config_created" -eq 1 ] && [ "$(skill_gardener_sha256_file "$config_dst")" = "$config_created_hash" ]; then rm -f "$config_dst"; fi
+    rm -f -- "$migration_tmp"
     rm -rf "$release_tmp"
     release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
     return 1
@@ -3149,6 +3250,7 @@ NODE
     if ! verify_skill_gardener_release "$release_dir" "$cli_hash" "$lib_hash"; then
       warn "Existing immutable Skill Gardener release failed verification."
       if [ "$config_created" -eq 1 ] && [ "$(skill_gardener_sha256_file "$config_dst")" = "$config_created_hash" ]; then rm -f "$config_dst"; fi
+      rm -f -- "$migration_tmp"
       rm -rf "$release_tmp"
       release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
       return 1
@@ -3162,6 +3264,7 @@ NODE
     then
       warn "Could not atomically materialize immutable Skill Gardener release."
       if [ "$config_created" -eq 1 ] && [ "$(skill_gardener_sha256_file "$config_dst")" = "$config_created_hash" ]; then rm -f "$config_dst"; fi
+      rm -f -- "$migration_tmp"
       rm -rf "$release_tmp"
       release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
       return 1
@@ -3170,6 +3273,7 @@ NODE
   if ! verify_skill_gardener_release "$release_dir" "$cli_hash" "$lib_hash"; then
     warn "Final Skill Gardener release failed verification."
     if [ "$config_created" -eq 1 ] && [ "$(skill_gardener_sha256_file "$config_dst")" = "$config_created_hash" ]; then rm -f "$config_dst"; fi
+    rm -f -- "$migration_tmp"
     release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
     return 1
   fi
@@ -3177,6 +3281,7 @@ NODE
   if ! ln -s "../lib/skill-gardener/releases/$digest/canuto-skill-gardener.js" "$link_tmp"; then
     warn "Could not prepare Skill Gardener activation link."
     if [ "$config_created" -eq 1 ] && [ "$(skill_gardener_sha256_file "$config_dst")" = "$config_created_hash" ]; then rm -f "$config_dst"; fi
+    rm -f -- "$migration_tmp"
     release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
     return 1
   fi
@@ -3187,6 +3292,7 @@ NODE
     warn "Skill Gardener config changed before activation; preserving the old runtime."
     rm -f "$link_tmp"
     if [ "$config_created" -eq 1 ] && [ "$(skill_gardener_sha256_file "$config_dst")" = "$config_created_hash" ]; then rm -f "$config_dst"; fi
+    rm -f -- "$migration_tmp"
     rm -rf "$release_tmp"
     release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
     return 1
@@ -3199,11 +3305,30 @@ NODE
     warn "Could not atomically activate Skill Gardener CLI."
     rm -f "$link_tmp"
     if [ "$config_created" -eq 1 ] && [ "$(skill_gardener_sha256_file "$config_dst")" = "$config_created_hash" ]; then rm -f "$config_dst"; fi
+    rm -f -- "$migration_tmp"
     release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
     return 1
   fi
+  if [ -f "$migration_tmp" ]; then
+    if ! node - "$migration_tmp" "$config_dst" "$config_validated_hash" <<'NODE'
+const fs = require('node:fs');
+const crypto = require('node:crypto');
+const candidate = process.argv[2];
+const destination = process.argv[3];
+const expectedHash = process.argv[4];
+const currentHash = crypto.createHash('sha256').update(fs.readFileSync(destination)).digest('hex');
+if (currentHash !== expectedHash) process.exit(2);
+fs.renameSync(candidate, destination);
+NODE
+    then
+      warn "Could not atomically publish migrated Skill Gardener config; the new runtime remains active with the original config."
+      rm -f -- "$migration_tmp"
+      release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
+      return 1
+    fi
+  fi
   if ! release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1; then
-    warn "Skill Gardener materialization lock cleanup failed; release left inactive until reviewed."
+    warn "Skill Gardener materialization lock cleanup failed after activation; the active release is usable, but lock cleanup requires review."
     return 1
   fi
   lock_acquired=0

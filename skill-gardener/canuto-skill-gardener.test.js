@@ -189,6 +189,95 @@ test('parses Codex, Claude and Hermes fixtures into verified usage and candidate
   }
 });
 
+test('accepts valid JSONL records above 64 KiB and rejects records above the bounded maximum', () => {
+  const accepted = JSON.stringify({
+    event: 'Skill',
+    skill: 'audit',
+    event_id: 'large-valid-line',
+    timestamp: '2026-08-03T03:00:00.000Z',
+    detail: 'x'.repeat(70 * 1024),
+  });
+  const acceptedResult = gardener.parseCodexEvents({ text: `${accepted}\n`, hmacKey: 'large-line-key' });
+  assert.equal(acceptedResult.ok, true);
+  assert.equal(acceptedResult.events.length, 1);
+
+  const oversizedResult = gardener.parseCodexEvents({ text: `${'x'.repeat(gardener.MAX_LINE_BYTES + 1)}\n`, hmacKey: 'large-line-key' });
+  assert.equal(oversizedResult.ok, false);
+  assert.equal(oversizedResult.reason, 'line-overflow');
+});
+
+test('parses Hermes JSON session documents with inherited session context and accepts empty message histories', () => {
+  const home = tempDir();
+  const skillPath = path.join(home, '.hermes', 'skills', 'audit', 'SKILL.md');
+  const audit = gardener.makeSkillIdentity({ name: 'audit', content: '# audit\n', hmacKey: 'hermes-document-key' });
+  const catalog = {
+    _byPath: new Map([[path.resolve(skillPath), audit]]),
+    _byName: new Map([['audit', new Set([audit.skillKey])]]),
+  };
+  const document = JSON.stringify({
+    session_id: 'hermes-document-session',
+    cwd: home,
+    created_at: '2026-08-03T03:00:00.000Z',
+    messages: [
+      { role: 'assistant', timestamp: '2026-08-03T03:01:00.000Z', content: [{ type: 'tool_use', id: 'hermes-read-1', name: 'Read', input: { file_path: skillPath } }] },
+      { role: 'tool', timestamp: '2026-08-03T03:01:01.000Z', content: [{ type: 'tool_result', tool_use_id: 'hermes-read-1', content: '# audit', is_error: false }] },
+    ],
+  });
+  const parsed = gardener.parseHermesEvents({ text: document, catalog, home, hmacKey: 'hermes-document-key' });
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.events.filter((event) => event.kind === 'verified_usage' && event.skillKey === audit.skillKey).length, 1);
+  assert.equal(parsed.events[0].timestamp, '2026-08-03T03:01:01.000Z');
+
+  const historical = gardener.parseHermesEvents({
+    text: JSON.stringify({
+      session_id: 'hermes-historical-session',
+      session_start: '2026-07-01T03:00:00.000Z',
+      last_updated: '2026-08-20T03:00:00.000Z',
+      cwd: home,
+      messages: [
+        { role: 'assistant', content: [{ type: 'tool_use', id: 'hermes-historical-read', name: 'Read', input: { file_path: skillPath } }] },
+        { role: 'tool', content: [{ type: 'tool_result', tool_use_id: 'hermes-historical-read', content: '# audit', is_error: false }] },
+      ],
+    }),
+    catalog,
+    home,
+    hmacKey: 'hermes-document-key',
+    fallbackTimestamp: '2026-08-22T00:00:00.000Z',
+  });
+  assert.equal(historical.events.filter((event) => event.kind === 'verified_usage' && event.skillKey === audit.skillKey).length, 1);
+  assert.equal(historical.events[0].timestamp, '2026-07-01T03:00:00.000Z');
+
+  const empty = gardener.parseHermesEvents({
+    text: JSON.stringify({ session_id: 'hermes-empty-session', messages: [{ role: 'user', content: 'nothing to inspect' }] }),
+    catalog,
+    home,
+    hmacKey: 'hermes-document-key',
+  });
+  assert.deepEqual(empty, { ok: true, events: [] });
+
+  for (const [timestampField, timestamp] of [
+    ['session_start', '2026-08-03T04:00:00.000Z'],
+    ['last_updated', '2026-08-03T05:00:00.000Z'],
+  ]) {
+    const inherited = gardener.parseHermesEvents({
+      text: JSON.stringify({
+        session_id: `hermes-${timestampField}`,
+        cwd: home,
+        [timestampField]: timestamp,
+        messages: [
+          { role: 'assistant', content: [{ type: 'tool_use', id: `read-${timestampField}`, name: 'Read', input: { file_path: skillPath } }] },
+          { role: 'tool', content: [{ type: 'tool_result', tool_use_id: `read-${timestampField}`, content: '# audit', is_error: false }] },
+        ],
+      }),
+      catalog,
+      home,
+      hmacKey: 'hermes-document-key',
+    });
+    assert.equal(inherited.ok, true);
+    assert.equal(inherited.events[0].timestamp, timestamp);
+  }
+});
+
 test('maps global real sessions by cwd before deduplication and leaves unknown sessions UNMAPPED', async () => {
   const root = tempDir();
   const home = path.join(root, 'home');
@@ -259,6 +348,157 @@ test('overlapping project and global histories use one mapped provider source an
   const projectCoverage = result.report.coverageScopes.filter((scope) => ['alpha', 'beta'].includes(scope.logicalProjectId));
   assert.equal(projectCoverage.length > 0, true);
   assert.equal(projectCoverage.every((scope) => scope.sourceComplete === false), true);
+});
+
+test('each local history file is consumed once without the shared audit full-file pass', async () => {
+  const root = tempDir();
+  const home = path.join(root, 'home');
+  const skills = path.join(home, '.codex', 'skills');
+  const history = path.join(root, 'history');
+  const historyFile = path.join(history, 'session.jsonl');
+  const eventLog = path.join(root, 'event-log.sh');
+  writeFile(path.join(skills, 'audit', 'SKILL.md'), '# audit\n');
+  writeFile(historyFile, `${JSON.stringify({ event: 'Skill', skill: 'audit', event_id: 'single-read', timestamp: '2026-08-20T00:01:00.000Z' })}\n`);
+  writeFile(eventLog, '#!/bin/sh\nexit 0\n', 0o755);
+  const config = { projects: {}, providers: { ...emptyProviderConfig(), codex: { roots: [skills], pluginRoots: [], historyRoots: [history] } } };
+  const originalReadFileSync = fs.readFileSync;
+  const realHistoryFile = fs.realpathSync(historyFile);
+  let historyReads = 0;
+  fs.readFileSync = function countedRead(file, ...args) {
+    if (path.resolve(String(file)) === realHistoryFile) historyReads += 1;
+    return originalReadFileSync.call(fs, file, ...args);
+  };
+  let result;
+  try {
+    result = await gardener.runGardener('backfill', { home, config, vaultRoot: path.join(root, 'vault'), eventLogPath: eventLog, frameworkRoot: path.join(root, 'missing-framework'), now: '2026-08-21T00:00:00.000Z', hmacKey: 'single-read-key', runId: '20260821060003-5555555555' });
+  } finally {
+    fs.readFileSync = originalReadFileSync;
+  }
+  assert.equal(result.exitCode, 0);
+  assert.equal(historyReads, 1);
+});
+
+test('remote sources deduplicate by alias/provider/history root and map only matched remote sessions', () => {
+  const root = tempDir();
+  const home = path.join(root, 'home');
+  const alpha = path.join(root, 'worktrees', 'alpha', 'main');
+  const beta = path.join(root, 'worktrees', 'beta', 'main');
+  const config = gardener.normalizeConfig({
+    projects: {
+      alpha: { surfaces: { remote: { provider: 'codex', remote: true, roots: [alpha], aliases: ['Papiro'], historyRoots: ['~/.codex/sessions', '~/.codex/archived_sessions'] } } },
+      beta: { surfaces: { remote: { provider: 'codex', remote: true, roots: [beta], aliases: ['Papiro'], historyRoots: ['~/.codex/sessions', '~/.codex/archived_sessions'] } } },
+    },
+    providers: emptyProviderConfig(),
+  });
+  const sources = gardener.collectSources(config, { home, hmacKey: 'remote-dedup-key' }).filter((source) => source.remoteAlias);
+  assert.equal(sources.length, 2);
+  assert.deepEqual(sources.map((source) => source.path).sort(), ['~/.codex/archived_sessions', '~/.codex/sessions']);
+  assert.equal(sources.every((source) => source.remoteMappings.length === 2), true);
+
+  const remoteHome = path.join(root, 'remote-home');
+  const history = path.join(remoteHome, '.codex', 'sessions');
+  const scriptPath = path.join(root, 'remote-collector.js');
+  const session = (id, cwd, eventId, detail = '') => [
+    JSON.stringify({ type: 'session_meta', payload: { id, timestamp: '2026-08-20T00:00:00.000Z', cwd } }),
+    JSON.stringify({ event: 'Skill', skill: 'audit', event_id: eventId, timestamp: '2026-08-20T00:01:00.000Z', detail }),
+  ].join('\n') + '\n';
+  writeFile(path.join(history, 'alpha.jsonl'), session('alpha-session', alpha, 'remote-alpha', 'x'.repeat(70 * 1024)));
+  writeFile(path.join(history, 'beta.jsonl'), [
+    JSON.stringify({ type: 'session_meta', payload: { id: 'beta-session', timestamp: '2026-08-20T00:00:00.000Z', cwd: beta } }),
+    JSON.stringify({ type: 'event_msg', payload: { type: 'Skill', skill: 'audit', event_id: 'remote-beta', timestamp: '2026-08-20T00:01:00.000Z' } }),
+  ].join('\n') + '\n');
+  writeFile(path.join(history, 'unmatched.jsonl'), session('unmatched-session', path.join(root, 'elsewhere'), 'remote-unmatched'));
+  writeFile(scriptPath, gardener.buildRemoteCollectorScript({
+    provider: 'codex',
+    historyRoots: ['~/.codex/sessions'],
+    skillKeys: { audit: 'c'.repeat(64) },
+    hmacKey: 'remote-map-key',
+    surfaceAlias: 'Papiro',
+    projectMappings: [
+      { logicalProjectId: 'alpha', surfaceId: 'remote', surfaceAlias: 'Alpha', roots: [alpha] },
+      { logicalProjectId: 'beta', surfaceId: 'remote', surfaceAlias: 'Beta', roots: [beta] },
+    ],
+  }));
+  const collected = execFileSync(process.execPath, [scriptPath], { encoding: 'utf8', env: { ...process.env, HOME: remoteHome } });
+  const parsed = gardener.parseRemoteNdjson(collected, { expectedProvider: 'codex' });
+  assert.equal(parsed.ok, true);
+  assert.deepEqual(parsed.events.map((event) => event.logicalProjectId).sort(), ['alpha', 'beta']);
+  assert.deepEqual(parsed.events.map((event) => event.surfaceAlias).sort(), ['Alpha', 'Beta']);
+});
+
+test('remote path-confirmed reads resolve divergent variants and ambiguous names fail closed', () => {
+  const root = tempDir();
+  const remoteHome = path.join(root, 'remote-home');
+  const history = path.join(root, 'history');
+  const firstPath = path.join(remoteHome, '.codex', 'skills', 'audit', 'SKILL.md');
+  const secondPath = path.join(remoteHome, '.claude', 'skills', 'audit', 'SKILL.md');
+  const firstContent = '# audit codex variant\n';
+  const secondContent = '# audit claude variant\n';
+  writeFile(firstPath, firstContent);
+  writeFile(secondPath, secondContent);
+  const first = gardener.makeSkillIdentity({ name: 'audit', content: firstContent, hmacKey: 'remote-variants-key' });
+  const second = gardener.makeSkillIdentity({ name: 'audit', content: secondContent, hmacKey: 'remote-variants-key' });
+  writeFile(path.join(history, 'session.jsonl'), [
+    { type: 'response_item', payload: { type: 'function_call', name: 'exec_command', call_id: 'remote-rtk-first', arguments: JSON.stringify({ cmd: `/opt/homebrew/bin/rtk sed -n '1p' ${firstPath}` }) } },
+    { type: 'response_item', payload: { type: 'function_call_output', call_id: 'remote-rtk-first', output: firstContent, exit_code: 0 } },
+    { type: 'response_item', payload: { type: 'function_call', name: 'exec_command', call_id: 'remote-rtk-second', arguments: JSON.stringify({ cmd: `rtk sed -n '1p' ${secondPath}` }) } },
+    { type: 'response_item', payload: { type: 'function_call_output', call_id: 'remote-rtk-second', output: secondContent, exit_code: 0 } },
+    { type: 'response_item', payload: { type: 'function_call', name: 'exec_command', call_id: 'remote-rtk-failed', arguments: JSON.stringify({ cmd: `rtk sed -n '1p' ${firstPath}` }) } },
+    { type: 'response_item', payload: { type: 'function_call_output', call_id: 'remote-rtk-failed', output: 'permission denied', exit_code: 1 } },
+    { event: 'Skill', skill: 'audit', event_id: 'remote-ambiguous-name' },
+  ].map(JSON.stringify).join('\n') + '\n');
+  const scriptPath = path.join(root, 'collector.js');
+  writeFile(scriptPath, gardener.buildRemoteCollectorScript({
+    provider: 'codex',
+    historyRoots: [history],
+    skillVariants: { audit: { [first.contentHash]: first.skillKey, [second.contentHash]: second.skillKey } },
+    hmacKey: 'remote-variants-key',
+    surfaceAlias: 'Papiro',
+    logicalProjectId: 'remote-project',
+  }));
+  const collected = execFileSync(process.execPath, [scriptPath], { encoding: 'utf8', env: { ...process.env, HOME: remoteHome } });
+  const parsed = gardener.parseRemoteNdjson(collected, { expectedProvider: 'codex' });
+  assert.equal(parsed.ok, true);
+  const confirmed = parsed.events.filter((event) => event.verification === 'confirmed_skill_file_read');
+  assert.deepEqual(confirmed.map((event) => event.skillKey).sort(), [first.skillKey, second.skillKey].sort());
+  const native = parsed.events.find((event) => event.eventKey === gardener.hmac('native:codex:remote-ambiguous-name', 'remote-variants-key'));
+  assert.equal(native.skillKey, gardener.hmac('name:audit', 'remote-variants-key'));
+  assert.notEqual(native.skillKey, first.skillKey);
+  assert.notEqual(native.skillKey, second.skillKey);
+});
+
+test('remote Hermes documents inherit session_start before last_updated', () => {
+  const root = tempDir();
+  const remoteHome = path.join(root, 'remote-home');
+  const history = path.join(root, 'history');
+  const skillPath = path.join(remoteHome, '.hermes', 'skills', 'audit', 'SKILL.md');
+  const content = '# audit hermes\n';
+  writeFile(skillPath, content);
+  const audit = gardener.makeSkillIdentity({ name: 'audit', content, hmacKey: 'remote-hermes-time-key' });
+  writeFile(path.join(history, 'session.json'), JSON.stringify({
+    session_id: 'remote-hermes-historical',
+    session_start: '2026-07-01T03:00:00.000Z',
+    last_updated: '2026-08-20T03:00:00.000Z',
+    messages: [
+      { role: 'assistant', content: [{ type: 'tool_use', id: 'remote-hermes-read', name: 'Read', input: { file_path: skillPath } }] },
+      { role: 'tool', content: [{ type: 'tool_result', tool_use_id: 'remote-hermes-read', content, is_error: false }] },
+    ],
+  }));
+  const scriptPath = path.join(root, 'collector.js');
+  writeFile(scriptPath, gardener.buildRemoteCollectorScript({
+    provider: 'hermes',
+    historyRoots: [history],
+    skillVariants: { audit: { [audit.contentHash]: audit.skillKey } },
+    hmacKey: 'remote-hermes-time-key',
+    surfaceAlias: 'Papiro',
+    logicalProjectId: 'remote-project',
+  }));
+  const collected = execFileSync(process.execPath, [scriptPath], { encoding: 'utf8', env: { ...process.env, HOME: remoteHome } });
+  const parsed = gardener.parseRemoteNdjson(collected, { expectedProvider: 'hermes' });
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.events.length, 1);
+  assert.equal(parsed.events[0].skillKey, audit.skillKey);
+  assert.equal(parsed.events[0].timestamp, '2026-07-01T03:00:00.000Z');
 });
 
 test('OpenCode is explicit: no roots is NOT_CONFIGURED and configured roots are NOT_IMPLEMENTED without coverage', async () => {
@@ -443,6 +683,41 @@ test('generic shell mentions never count as verified usage and structured reads 
   const shellResult = gardener.parseCodexEvents({ text: shellOnly, catalog, home, hmacKey: 'read-key', fallbackTimestamp: '2026-08-21T00:00:00.000Z' });
   assert.equal(shellResult.events.some((event) => event.kind === 'verified_usage'), false);
 
+  const successfulShellRead = [
+    { type: 'response_item', payload: { type: 'function_call', name: 'exec_command', call_id: 'shell-read-1', arguments: JSON.stringify({ cmd: `rtk sed -n '1p' ${skillPath}` }) } },
+    { type: 'response_item', payload: { type: 'function_call_output', call_id: 'shell-read-1', output: '# audit', exit_code: 0 } },
+  ].map(JSON.stringify).join('\n');
+  const successfulShellResult = gardener.parseCodexEvents({ text: successfulShellRead, catalog, home, hmacKey: 'read-key', fallbackTimestamp: '2026-08-21T00:00:00.000Z' });
+  assert.equal(successfulShellResult.events.filter((event) => event.kind === 'verified_usage').length, 1);
+
+  const absoluteWrapperRead = [
+    { type: 'response_item', payload: { type: 'function_call', name: 'exec_command', call_id: 'shell-read-absolute-rtk', arguments: JSON.stringify({ cmd: `/opt/homebrew/bin/rtk sed -n '1p' ${skillPath}` }) } },
+    { type: 'response_item', payload: { type: 'function_call_output', call_id: 'shell-read-absolute-rtk', output: '# audit', exit_code: 0 } },
+  ].map(JSON.stringify).join('\n');
+  const absoluteWrapperResult = gardener.parseCodexEvents({ text: absoluteWrapperRead, catalog, home, hmacKey: 'read-key', fallbackTimestamp: '2026-08-21T00:00:00.000Z' });
+  assert.equal(absoluteWrapperResult.events.filter((event) => event.kind === 'verified_usage').length, 1);
+
+  const failedShellRead = [
+    { type: 'response_item', payload: { type: 'function_call', name: 'exec_command', call_id: 'shell-read-failed', arguments: JSON.stringify({ cmd: `rtk sed -n '1p' ${skillPath}` }) } },
+    { type: 'response_item', payload: { type: 'function_call_output', call_id: 'shell-read-failed', output: 'permission denied', exit_code: 1 } },
+  ].map(JSON.stringify).join('\n');
+  const failedShellResult = gardener.parseCodexEvents({ text: failedShellRead, catalog, home, hmacKey: 'read-key', fallbackTimestamp: '2026-08-21T00:00:00.000Z' });
+  assert.equal(failedShellResult.events.some((event) => event.kind === 'verified_usage'), false);
+
+  const commandEndRead = [
+    { type: 'response_item', payload: { type: 'function_call', name: 'exec_command', call_id: 'shell-end-1', arguments: JSON.stringify({ cmd: `cat ${skillPath}` }) } },
+    { type: 'event_msg', payload: { type: 'exec_command_end', call_id: 'shell-end-1', command: ['cat', skillPath], exit_code: 0, aggregated_output: '# audit' } },
+  ].map(JSON.stringify).join('\n');
+  const commandEndResult = gardener.parseCodexEvents({ text: commandEndRead, catalog, home, hmacKey: 'read-key', fallbackTimestamp: '2026-08-21T00:00:00.000Z' });
+  assert.equal(commandEndResult.events.filter((event) => event.kind === 'verified_usage').length, 1);
+
+  const failedCommandEndRead = [
+    { type: 'response_item', payload: { type: 'function_call', name: 'exec_command', call_id: 'shell-end-failed', arguments: JSON.stringify({ cmd: `cat ${skillPath}` }) } },
+    { type: 'event_msg', payload: { type: 'exec_command_end', call_id: 'shell-end-failed', command: ['cat', skillPath], exit_code: 1, aggregated_output: 'permission denied' } },
+  ].map(JSON.stringify).join('\n');
+  const failedCommandEndResult = gardener.parseCodexEvents({ text: failedCommandEndRead, catalog, home, hmacKey: 'read-key', fallbackTimestamp: '2026-08-21T00:00:00.000Z' });
+  assert.equal(failedCommandEndResult.events.some((event) => event.kind === 'verified_usage'), false);
+
   const structuredRead = [
     { type: 'response_item', payload: { type: 'function_call', name: 'Read', call_id: 'read-1', arguments: JSON.stringify({ file_path: skillPath }) } },
     { type: 'response_item', payload: { type: 'function_call_output', call_id: 'read-1', output: '# audit' } },
@@ -451,11 +726,32 @@ test('generic shell mentions never count as verified usage and structured reads 
   assert.equal(readResult.events.filter((event) => event.kind === 'verified_usage').length, 1);
 });
 
-test('remote limits reject invalid schema, oversized lines and failed SSH without retaining raw data', async () => {
+test('shell reads resolve project, global, plugin and Hermes skill paths through the catalog index', () => {
+  const home = tempDir();
+  const entries = [
+    ['project-audit', path.join(home, 'project', '.agents', 'skills', 'project-audit', 'SKILL.md')],
+    ['codex-audit', path.join(home, '.codex', 'skills', 'codex-audit', 'SKILL.md')],
+    ['claude-plugin', path.join(home, '.claude', 'plugins', 'pkg', 'skills', 'claude-plugin', 'SKILL.md')],
+    ['hermes-audit', path.join(home, '.hermes', 'skills', 'hermes-audit', 'SKILL.md')],
+  ];
+  const installations = entries.map(([name, sourcePath]) => gardener.makeSkillIdentity({ name, content: `# ${name}\n`, hmacKey: 'path-index-key', sourcePath }));
+  const catalog = {
+    _byPath: new Map(entries.map(([name, sourcePath], index) => [path.resolve(sourcePath), installations[index]])),
+    _byName: new Map(entries.map(([name], index) => [name, new Set([installations[index].skillKey])])),
+  };
+  const records = [];
+  for (const [index, [, sourcePath]] of entries.entries()) {
+    records.push({ type: 'response_item', payload: { type: 'function_call', name: 'exec_command', call_id: `path-read-${index}`, arguments: JSON.stringify({ cmd: `sed -n '1p' ${sourcePath}` }) } });
+    records.push({ type: 'response_item', payload: { type: 'function_call_output', call_id: `path-read-${index}`, output: '# skill', exit_code: 0 } });
+  }
+  const parsed = gardener.parseCodexEvents({ text: records.map(JSON.stringify).join('\n'), catalog, home, hmacKey: 'path-index-key', fallbackTimestamp: '2026-08-21T00:00:00.000Z' });
+  assert.equal(parsed.ok, true);
+  assert.deepEqual(parsed.events.filter((event) => event.kind === 'verified_usage').map((event) => event.skillKey).sort(), installations.map((item) => item.skillKey).sort());
+});
+
+test('remote limits reject invalid schema, bounded streams and failed SSH without retaining raw data', async () => {
   const unknown = gardener.parseRemoteNdjson('{"schemaVersion":1,"kind":"verified_usage","eventKey":"' + 'a'.repeat(64) + '","skillKey":"' + 'b'.repeat(64) + '","prompt":"secret"}');
-  const oversized = gardener.parseRemoteNdjson(`${'x'.repeat(gardener.MAX_LINE_BYTES + 1)}\n`);
   assert.equal(unknown.ok, false);
-  assert.equal(oversized.reason, 'line-overflow');
   const child = new EventEmitter();
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
@@ -498,7 +794,10 @@ test('remote limits reject invalid schema, oversized lines and failed SSH withou
   assert.equal(invalidOutput.reason, 'schema-invalid');
 
   const remoteRoot = tempDir();
+  const remoteHome = tempDir();
   const outsideRoot = tempDir();
+  const remoteAudit = gardener.makeSkillIdentity({ name: 'audit', content: '# audit\n', hmacKey: 'remote-key' });
+  writeFile(path.join(remoteHome, '.codex', 'skills', 'audit', 'SKILL.md'), '# audit\n');
   writeFile(path.join(outsideRoot, 'outside.jsonl'), JSON.stringify({ type: 'response_item', payload: { type: 'function_call', name: 'exec_command', call_id: 'outside', arguments: JSON.stringify({ cmd: 'sed -n 1p ~/.codex/skills/audit/SKILL.md' }) } }) + '\n');
   writeFile(path.join(remoteRoot, 'valid.jsonl'), [
     { type: 'response_item', payload: { type: 'function_call', name: 'exec_command', call_id: 'shell-mention', arguments: JSON.stringify({ cmd: 'printf ~/.codex/skills/audit/SKILL.md' }) } },
@@ -508,8 +807,8 @@ test('remote limits reject invalid schema, oversized lines and failed SSH withou
   ].map(JSON.stringify).join('\n') + '\n');
   fs.symlinkSync(path.join(outsideRoot, 'outside.jsonl'), path.join(remoteRoot, 'outside.jsonl'));
   const scriptPath = path.join(remoteRoot, 'collector.js');
-  writeFile(scriptPath, gardener.buildRemoteCollectorScript({ provider: 'codex', historyRoots: [remoteRoot], skillKeys: { audit: 'c'.repeat(64) }, hmacKey: 'remote-key', surfaceAlias: 'Papiro', logicalProjectId: 'alpha' }));
-  const collected = execFileSync(process.execPath, [scriptPath], { encoding: 'utf8' });
+  writeFile(scriptPath, gardener.buildRemoteCollectorScript({ provider: 'codex', historyRoots: [remoteRoot], skillVariants: { audit: { [remoteAudit.contentHash]: remoteAudit.skillKey } }, hmacKey: 'remote-key', surfaceAlias: 'Papiro', logicalProjectId: 'alpha' }));
+  const collected = execFileSync(process.execPath, [scriptPath], { encoding: 'utf8', env: { ...process.env, HOME: remoteHome } });
   const collectedEvents = gardener.parseRemoteNdjson(collected, { expectedProvider: 'codex' });
   assert.equal(collectedEvents.ok, true);
   assert.equal(collectedEvents.events.length, 1);
@@ -1545,6 +1844,31 @@ test('immutable installer validates before atomic activation', () => {
   assert.deepEqual(fs.readFileSync(configPath), configBefore);
 });
 
+test('installer keeps exact legacy config and old runtime when activation fails', () => {
+  const root = tempDir();
+  const home = path.join(root, 'home');
+  fs.mkdirSync(home, { recursive: true });
+  const first = runInstallerLibrary(home);
+  assert.equal(first.status, 0, first.stderr);
+  const stable = path.join(home, '.canuto', 'bin', 'canuto-skill-gardener');
+  const oldRuntime = fs.realpathSync(stable);
+  const configPath = path.join(home, '.canuto', 'config', 'skill-gardener.json');
+  const legacy = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  legacy.projects['lucrando-ai'].surfaces['ssh-papiro'].historyRoots = ['/srv/dev/worktrees/lucrando-ai/main/.codex/sessions'];
+  legacy.projects.papiro.surfaces['ssh-papiro'].historyRoots = ['/srv/dev/worktrees/papiro/main/.codex/sessions'];
+  legacy.projects['mecesa-v1'].surfaces['ssh-papiro'].roots = ['/srv/dev/worktrees/mecesa-v1/main'];
+  legacy.projects['mecesa-v1'].surfaces['ssh-papiro'].historyRoots = ['/srv/dev/worktrees/mecesa-v1/main/.codex/sessions'];
+  legacy.providers.hermes.historyRoots = ['~/.hermes/sessions', '~/.hermes/history'];
+  writeFile(configPath, `${JSON.stringify(legacy, null, 2)}\n`);
+  const originalConfig = fs.readFileSync(configPath);
+
+  const failed = runInstallerLibrary(home, { CANUTO_SKILL_GARDENER_TEST_FAIL_ACTIVATION: '1' });
+  assert.equal(failed.status, 1);
+  assert.equal(fs.realpathSync(stable), oldRuntime);
+  assert.deepEqual(fs.readFileSync(configPath), originalConfig);
+  assert.deepEqual(fs.readdirSync(path.dirname(configPath)).filter((name) => name.includes('.tmp-migrate-')), []);
+});
+
 test('installer aborts activation when config changes after validation', () => {
   const root = tempDir();
   const home = path.join(root, 'home');
@@ -1578,6 +1902,35 @@ test('installer preserves valid config race winner and rejects invalid winner', 
   assert.equal(invalid.status, 1);
   assert.equal(fs.existsSync(path.join(invalidHome, '.canuto', 'bin', 'canuto-skill-gardener')), false);
   assert.equal(fs.readFileSync(invalidConfigPath, 'utf8'), '{broken');
+});
+
+test('installer atomically migrates only the exact legacy Skill Gardener defaults', () => {
+  const root = tempDir();
+  const home = path.join(root, 'home');
+  fs.mkdirSync(home, { recursive: true });
+  const first = runInstallerLibrary(home);
+  assert.equal(first.status, 0, first.stderr);
+  const configPath = path.join(home, '.canuto', 'config', 'skill-gardener.json');
+  const legacy = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  legacy.projects['lucrando-ai'].surfaces['ssh-papiro'].historyRoots = ['/srv/dev/worktrees/lucrando-ai/main/.codex/sessions'];
+  legacy.projects.papiro.surfaces['ssh-papiro'].historyRoots = ['/srv/dev/worktrees/papiro/main/.codex/sessions'];
+  legacy.projects['mecesa-v1'].surfaces['ssh-papiro'].roots = ['/srv/dev/worktrees/mecesa-v1/main'];
+  legacy.projects['mecesa-v1'].surfaces['ssh-papiro'].historyRoots = ['/srv/dev/worktrees/mecesa-v1/main/.codex/sessions'];
+  legacy.providers.hermes.historyRoots = ['~/.hermes/sessions', '~/.hermes/history'];
+  legacy.projects['lucrando-ai'].surfaces.mac.historyRoots = ['/custom/history'];
+  legacy.providers.hermes.pluginRoots = ['/custom/hermes/plugins'];
+  writeFile(configPath, `${JSON.stringify(legacy, null, 2)}\n`);
+
+  const migrated = runInstallerLibrary(home);
+  assert.equal(migrated.status, 0, migrated.stderr);
+  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  assert.deepEqual(config.projects['lucrando-ai'].surfaces['ssh-papiro'].historyRoots, ['~/.codex/sessions', '~/.codex/archived_sessions']);
+  assert.deepEqual(config.projects.papiro.surfaces['ssh-papiro'].historyRoots, ['~/.codex/sessions', '~/.codex/archived_sessions']);
+  assert.deepEqual(config.projects['mecesa-v1'].surfaces['ssh-papiro'].roots, ['/srv/dev/worktrees/mecesa/main']);
+  assert.deepEqual(config.projects['mecesa-v1'].surfaces['ssh-papiro'].historyRoots, ['~/.codex/sessions', '~/.codex/archived_sessions']);
+  assert.deepEqual(config.providers.hermes.historyRoots, ['~/.hermes/sessions']);
+  assert.deepEqual(config.projects['lucrando-ai'].surfaces.mac.historyRoots, ['/custom/history']);
+  assert.deepEqual(config.providers.hermes.pluginRoots, ['/custom/hermes/plugins']);
 });
 
 test('installer cleanup refuses a lock nonce mismatch', () => {
