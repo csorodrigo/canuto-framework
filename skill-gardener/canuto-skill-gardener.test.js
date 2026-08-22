@@ -501,6 +501,64 @@ test('remote Hermes documents inherit session_start before last_updated', () => 
   assert.equal(parsed.events[0].timestamp, '2026-07-01T03:00:00.000Z');
 });
 
+test('remote collector ignores only proven non-event corruption and non-Hermes JSON documents', () => {
+  const root = tempDir();
+  const history = path.join(root, 'history');
+  const scriptPath = path.join(root, 'collector.js');
+  writeFile(path.join(history, 'sessions-index.json'), '{\n  "sessions": []\n}\n');
+  writeFile(path.join(history, 'session.jsonl'), [
+    JSON.stringify({ event: 'Skill', skill: 'audit', event_id: 'valid-skill' }),
+    '{"type":"response_item","payload":{"type":"reasoning","summary":"truncated',
+    '\0\0\0',
+  ].join('\n') + '\n');
+  writeFile(scriptPath, gardener.buildRemoteCollectorScript({
+    provider: 'codex',
+    historyRoots: [history],
+    skillKeys: { audit: 'a'.repeat(64) },
+    hmacKey: 'corruption-key',
+    surfaceAlias: 'Remote',
+    logicalProjectId: 'alpha',
+  }));
+  const parsed = gardener.parseRemoteNdjson(execFileSync(process.execPath, [scriptPath], { encoding: 'utf8' }));
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.events.length, 1);
+  assert.equal(parsed.events[0].skillKey, 'a'.repeat(64));
+
+  writeFile(path.join(history, 'unsafe.jsonl'), '{"type":"response_item","payload":{"type":"function_call"\n');
+  assert.throws(
+    () => execFileSync(process.execPath, [scriptPath], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }),
+    (error) => error.status === 1,
+  );
+});
+
+test('local Claude history scans JSONL while ignoring pretty JSON indexes and tool results', async () => {
+  const root = tempDir();
+  const history = path.join(root, 'history');
+  const eventLog = path.join(root, 'event-log.sh');
+  writeFile(path.join(history, 'sessions-index.json'), '{\n  "sessions": []\n}\n');
+  writeFile(path.join(history, 'tool-results', 'tool.json'), '{\n  "result": "not history"\n}\n');
+  writeFile(path.join(history, 'session.jsonl'), `${JSON.stringify({ event: 'Skill', skill: 'audit', event_id: 'claude-valid', timestamp: '2026-08-20T00:00:00.000Z' })}\n`);
+  writeFile(eventLog, '#!/bin/sh\nexit 0\n', 0o755);
+  const config = {
+    projects: {},
+    providers: { ...emptyProviderConfig(), claude: { roots: [], pluginRoots: [], historyRoots: [history] } },
+  };
+  const result = await gardener.runGardener('backfill', {
+    home: path.join(root, 'home'),
+    config,
+    vaultRoot: path.join(root, 'vault'),
+    eventLogPath: eventLog,
+    frameworkRoot: path.join(root, 'missing-framework'),
+    now: '2026-08-21T00:00:00.000Z',
+    hmacKey: 'claude-jsonl-key',
+    runId: '20260821060004-6666666666',
+  });
+  assert.equal(result.exitCode, 0);
+  const source = result.report.sources.find((item) => item.provider === 'claude');
+  assert.equal(source.status, 'COMPLETE');
+  assert.equal(source.events, 1);
+});
+
 test('OpenCode is explicit: no roots is NOT_CONFIGURED and configured roots are NOT_IMPLEMENTED without coverage', async () => {
   assert.equal(gardener.sourceStatus('opencode', [], []), 'NOT_CONFIGURED');
   assert.equal(gardener.sourceStatus('opencode', ['/configured'], ['/history']), 'NOT_IMPLEMENTED');
