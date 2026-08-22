@@ -1,0 +1,6 @@
+{"type":"session_meta","payload":{"id":"codex-fixture-session","timestamp":"2026-08-01T03:00:00.000Z","cwd":"~/.fixture-project"}}
+{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"inspect the audit skill"}]}}
+{"type":"response_item","payload":{"type":"function_call","name":"exec_command","call_id":"codex-read-1","arguments":"{\"cmd\":\"sed -n '1,120p' ~/.codex/skills/audit/SKILL.md\"}"}}
+{"type":"response_item","payload":{"type":"function_call_output","call_id":"codex-read-1","output":"---\nname: audit\n---"}}
+{"type":"response_item","payload":{"type":"function_call","name":"exec_command","call_id":"codex-signal-1","arguments":"{\"cmd\":\"rg audit .agents/skills\"}"}}
+{"type":"event_msg","payload":{"type":"Skill","skill":"audit","event_id":"codex-native-skill-1","timestamp":"2026-08-01T03:03:00.000Z"}}

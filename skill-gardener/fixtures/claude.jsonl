@@ -1,0 +1,5 @@
+{"type":"system","session_id":"claude-fixture-session","timestamp":"2026-08-02T03:00:00.000Z","cwd":"~/.fixture-project"}
+{"type":"user","session_id":"claude-fixture-session","timestamp":"2026-08-02T03:00:30.000Z","cwd":"~/.fixture-project","message":{"role":"user","content":"inspect the audit skill"}}
+{"type":"assistant","session_id":"claude-fixture-session","timestamp":"2026-08-02T03:01:00.000Z","cwd":"~/.fixture-project","message":{"role":"assistant","content":[{"type":"tool_use","id":"claude-read-1","name":"Read","input":{"file_path":"~/.claude/skills/audit/SKILL.md"}}]}}
+{"type":"user","session_id":"claude-fixture-session","timestamp":"2026-08-02T03:01:01.000Z","cwd":"~/.fixture-project","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"claude-read-1","content":"---\nname: audit\n---","is_error":false}]}}
+{"type":"assistant","session_id":"claude-fixture-session","timestamp":"2026-08-02T03:02:00.000Z","cwd":"~/.fixture-project","message":{"role":"assistant","content":[{"type":"tool_use","id":"claude-signal-1","name":"Bash","input":{"command":"rg audit .agents/skills"}}]}}
