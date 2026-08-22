@@ -40,7 +40,7 @@ const parseFrontmatter = sharedAudit.parseFrontmatter || function parseFrontmatt
 const SCHEMA_VERSION = 1;
 const MARKER = '# canuto-skill-gardener:v1';
 const CRON_SCHEDULE = '0 3 * * 0';
-const MAX_LINE_BYTES = 64 * 1024;
+const MAX_LINE_BYTES = 64 * 1024 * 1024;
 const MAX_REMOTE_STDOUT_BYTES = 128 * 1024 * 1024;
 const MAX_REMOTE_STDERR_BYTES = 1 * 1024 * 1024;
 const REMOTE_CONNECT_TIMEOUT_MS = 10 * 1000;
@@ -228,7 +228,7 @@ function defaultConfig() {
         roots: ['~/.hermes/skills'],
         pluginRoots: ['~/.hermes/plugins'],
         systemRoots: ['~/.hermes/system/skills'],
-        historyRoots: ['~/.hermes/sessions', '~/.hermes/history'],
+        historyRoots: ['~/.hermes/sessions'],
       },
       opencode: {
         roots: [],
@@ -787,9 +787,10 @@ function publicInstallation(installation) {
   return output;
 }
 
-function findSkillByPath(catalog, candidatePath, home = os.homedir()) {
+function findSkillByPath(catalog, candidatePath, home = os.homedir(), baseDir = '') {
   if (!candidatePath || !catalog?._byPath) return null;
-  const resolved = path.resolve(expandHome(candidatePath, home));
+  const expanded = expandHome(candidatePath, home);
+  const resolved = path.resolve(baseDir ? expandHome(baseDir, home) : process.cwd(), expanded);
   const direct = catalog._byPath.get(resolved);
   if (direct) return direct;
   try { return catalog._byPath.get(path.resolve(fs.realpathSync(resolved))) || null; } catch { return null; }
@@ -944,7 +945,8 @@ function extractStructuredReadRequest(record) {
 function correlatedToolResult(record) {
   const payload = nestedPayload(record);
   const type = normalizeName(payload.type || record.type || '');
-  if (!['function-call-output', 'tool-result', 'read-result'].includes(type) && record.toolUseResult === undefined) return null;
+  const shellCommandEnd = type === 'exec-command-end';
+  if (!['function-call-output', 'tool-result', 'read-result'].includes(type) && !shellCommandEnd && record.toolUseResult === undefined) return null;
   const callId = safeText(
     extractRecordValue(payload, ['call_id', 'callId', 'tool_use_id', 'toolUseId'])
       || extractRecordValue(record, ['call_id', 'callId', 'tool_use_id', 'toolUseId']),
@@ -957,7 +959,8 @@ function correlatedToolResult(record) {
     || ['error', 'failure', 'failed', 'timeout'].includes(status)
     || (exitCode !== undefined && parseNumber(exitCode, 1) !== 0);
   const hasResult = Object.hasOwn(payload, 'output') || Object.hasOwn(payload, 'content')
-    || Object.hasOwn(payload, 'result') || record.toolUseResult !== undefined;
+    || Object.hasOwn(payload, 'result') || record.toolUseResult !== undefined
+    || (shellCommandEnd && (Object.hasOwn(payload, 'exit_code') || Object.hasOwn(payload, 'exitCode') || Object.hasOwn(payload, 'status') || Object.hasOwn(payload, 'aggregated_output')));
   return { callId, success: hasResult && !failed };
 }
 
@@ -972,6 +975,74 @@ function commandFromRecord(record) {
     } catch { return ''; }
   }
   return '';
+}
+
+const SHELL_TOOL_NAMES = new Set(['bash', 'exec', 'exec-command', 'run-shell-command', 'shell', 'terminal', 'zsh', 'sh']);
+const SHELL_READ_COMMANDS = new Set(['awk', 'bat', 'cat', 'cut', 'diff', 'file', 'grep', 'head', 'jq', 'less', 'more', 'nl', 'rg', 'sed', 'sort', 'tail', 'tr', 'wc']);
+
+function shellTokens(command) {
+  return String(command || '').match(/(?:\\.|[^\s"'`|;&()<>])+/g) || [];
+}
+
+function cleanShellToken(token) {
+  return String(token || '').replace(/^[`'"(\[]+/, '').replace(/[`'",;|&)>\]]+$/, '');
+}
+
+function shellCommandName(token) {
+  return normalizeName(path.basename(String(token || '')));
+}
+
+function shellReadExecutable(command) {
+  const tokens = shellTokens(command).map(cleanShellToken).filter(Boolean);
+  let index = 0;
+  while (index < tokens.length) {
+    const token = tokens[index];
+    const commandName = shellCommandName(token);
+    if (commandName === 'env' || commandName === 'command' || commandName === 'sudo' || /^[A-Za-z_][A-Za-z0-9_]*=/.test(token)) {
+      index += 1;
+      continue;
+    }
+    if (commandName === 'bash' || commandName === 'sh' || commandName === 'zsh') {
+      index += 1;
+      while (index < tokens.length && tokens[index].startsWith('-')) index += 1;
+      continue;
+    }
+    if (commandName === 'rtk') {
+      index += 1;
+      while (index < tokens.length && tokens[index].startsWith('-')) index += 1;
+      continue;
+    }
+    return commandName;
+  }
+  return '';
+}
+
+function candidatePathsFromCommand(command) {
+  const candidates = [];
+  for (const rawToken of shellTokens(command)) {
+    const token = cleanShellToken(rawToken);
+    if (!/\.md$/i.test(token)) continue;
+    if (!/(?:^|\/)\.(?:agents|codex|claude|hermes)\//i.test(token)) continue;
+    candidates.push(token);
+  }
+  return [...new Set(candidates)];
+}
+
+function extractShellSkillReadRequests(record, context) {
+  const payload = nestedPayload(record);
+  const type = normalizeName(payload.type || record.type || '');
+  const name = normalizeName(payload.name || record.name || '');
+  if (!['tool-use', 'function-call', 'read', 'shell'].includes(type) && !SHELL_TOOL_NAMES.has(name)) return [];
+  if (!SHELL_TOOL_NAMES.has(name) && type !== 'shell') return [];
+  const command = commandFromRecord(record);
+  if (!SHELL_READ_COMMANDS.has(shellReadExecutable(command))) return [];
+  const callId = getNativeId(record);
+  if (!callId) return [];
+  const baseDir = sessionHints(record).cwd || context.cwd || '';
+  return candidatePathsFromCommand(command)
+    .map((candidatePath) => findSkillByPath(context.catalog, candidatePath, context.home || os.homedir(), baseDir))
+    .filter(Boolean)
+    .map((installation) => ({ callId, skillKey: installation.skillKey }));
 }
 
 function fingerprintSignal(record, context) {
@@ -1002,36 +1073,10 @@ function fingerprintSignal(record, context) {
   };
 }
 
-function sharedParserEvidence(filePath, provider, catalog, home = '') {
-  if (!filePath || !sharedAudit) return { cwd: '', sessionId: '', skillReads: [] };
-  const originalHome = process.env.HOME;
-  if (home) process.env.HOME = home;
-  try {
-    if (provider === 'codex' && typeof sharedAudit.parseCodexLogMeta === 'function' && typeof sharedAudit.parseCodexLogRecord === 'function') {
-      const meta = sharedAudit.parseCodexLogMeta(filePath);
-      if (!meta) return { cwd: '', sessionId: '', skillReads: [] };
-      const skillCatalog = (catalog?._installations || [])
-        .map((installation) => ({ path: installation._sourcePath, id: installation.name }))
-        .filter((skill) => skill.path && skill.id);
-      const parsed = sharedAudit.parseCodexLogRecord(meta, '', skillCatalog, null);
-      return { cwd: meta.cwd || '', sessionId: meta.session_id || '', skillReads: [] };
-    }
-    if (provider === 'claude' && typeof sharedAudit.parseClaudeProjectLogRecord === 'function') {
-      const parsed = sharedAudit.parseClaudeProjectLogRecord(filePath, '', null, new Map());
-      return { cwd: parsed._cwd || '', sessionId: parsed.session_id || '', skillReads: [] };
-    }
-  } catch {
-    return { cwd: '', sessionId: '', skillReads: [] };
-  } finally {
-    if (originalHome === undefined) delete process.env.HOME;
-    else process.env.HOME = originalHome;
-  }
-  return { cwd: '', sessionId: '', skillReads: [] };
-}
-
 function updateSessionContext(record, context) {
   const hints = sessionHints(record);
   const hasHints = Boolean(hints.cwd || hints.gitCommonDir || hints.alias);
+  if (hints.cwd) context.cwd = safeText(hints.cwd, 2000);
   if (!hasHints || context.mapSessions !== true) return;
   const mapped = mapSessionToProject(record, context.projectMappings || [], context.home || os.homedir());
   if (mapped) {
@@ -1083,28 +1128,19 @@ function expandRealProviderRecords(provider, record) {
         __normalizedProviderRecord: true,
       }));
   }
-  return [];
-}
-
-function appendSharedSkillEvents(events, context, evidence, filePath) {
-  for (const skillId of evidence?.skillReads || []) {
-    const normalized = normalizeName(skillId);
-    const variants = context.catalog?._byName?.get(normalized);
-    if (!variants || variants.size !== 1) continue;
-    const skillKey = [...variants][0];
-    if (events.some((event) => event.kind === 'verified_usage' && event.skillKey === skillKey)) continue;
-    events.push(makeUsageEvent({
-      provider: context.provider,
-      context,
-      skillKey,
-      known: true,
-      record: { timestamp: context.fallbackTimestamp },
-      position: Number.MAX_SAFE_INTEGER,
-      nativeId: `shared:${context.provider}:${sha256(filePath || '')}:${normalized}`,
-      sessionId: context.sessionId,
-      verification: 'shared_framework_parser_skill_read',
-    }));
+  if (provider === 'hermes' && Array.isArray(record.content)) {
+    return record.content
+      .filter((chunk) => chunk && ['tool-use', 'tool-result'].includes(normalizeName(chunk.type)))
+      .map((chunk) => ({
+        ...chunk,
+        type: normalizeName(chunk.type) === 'tool-use' ? 'tool_use' : 'tool_result',
+        sessionId: record.sessionId || record.session_id || '',
+        timestamp: record.timestamp || '',
+        cwd: record.cwd || '',
+        __normalizedProviderRecord: true,
+      }));
   }
+  return [];
 }
 
 function parseProviderRecord(provider, record, context, position) {
@@ -1137,17 +1173,19 @@ function parseProviderRecord(provider, record, context, position) {
     if (pending) {
       context.pendingSkillReads.delete(toolResult.callId);
       if (toolResult.success) {
-        events.push(makeUsageEvent({
-          provider,
-          context,
-          skillKey: pending.skillKey,
-          known: true,
-          record,
-          position,
-          nativeId: `${toolResult.callId}:confirmed-read`,
-          sessionId,
-          verification: 'confirmed_skill_file_read',
-        }));
+        for (const skillKey of pending.skillKeys || [pending.skillKey]) {
+          events.push(makeUsageEvent({
+            provider,
+            context,
+            skillKey,
+            known: true,
+            record,
+            position,
+            nativeId: `${toolResult.callId}:confirmed-read:${skillKey}`,
+            sessionId,
+            verification: 'confirmed_skill_file_read',
+          }));
+        }
       }
     }
     return { events };
@@ -1163,10 +1201,22 @@ function parseProviderRecord(provider, record, context, position) {
     }
   } else {
     const readRequest = extractStructuredReadRequest(record);
-    const installation = findSkillByPath(context.catalog, readRequest?.readPath, context.home || os.homedir());
-    if (installation && readRequest) {
+    const shellRequests = extractShellSkillReadRequests(record, context);
+    const installations = [];
+    if (readRequest) {
+      const installation = findSkillByPath(context.catalog, readRequest.readPath, context.home || os.homedir(), context.cwd || '');
+      if (installation) installations.push({ callId: readRequest.callId, skillKey: installation.skillKey });
+    }
+    installations.push(...shellRequests);
+    if (installations.length > 0) {
       if (!context.pendingSkillReads) context.pendingSkillReads = new Map();
-      context.pendingSkillReads.set(readRequest.callId, { skillKey: installation.skillKey });
+      const byCallId = new Map();
+      for (const request of installations) {
+        const skillKeys = byCallId.get(request.callId) || [];
+        if (!skillKeys.includes(request.skillKey)) skillKeys.push(request.skillKey);
+        byCallId.set(request.callId, skillKeys);
+      }
+      for (const [callId, skillKeys] of byCallId) context.pendingSkillReads.set(callId, { skillKeys });
     }
     const fingerprint = fingerprintSignal(record, context);
     if (fingerprint) {
@@ -1209,6 +1259,30 @@ function validateRemoteEvent(event) {
   return Object.keys(event).every((key) => CLOSED_REMOTE_KEYS.has(key) || key === 'knownSkill');
 }
 
+function parseHermesSessionDocument(text) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed.startsWith('{')) return null;
+  let document;
+  try { document = JSON.parse(trimmed); } catch { return null; }
+  if (!document || typeof document !== 'object' || Array.isArray(document) || !Object.hasOwn(document, 'messages')) return null;
+  if (!Array.isArray(document.messages)) return { error: 'schema-invalid' };
+  const sessionId = safeText(document.session_id || document.sessionId || document.id, 160);
+  const timestamp = safeText(document.session_start || document.sessionStart || document.started_at || document.timestamp || document.created_at || document.createdAt || document.last_updated || document.lastUpdated, 80);
+  const cwd = safeText(document.cwd || document.working_directory || document.workingDirectory, 2000);
+  const records = [];
+  for (const message of document.messages) {
+    if (!message || typeof message !== 'object' || Array.isArray(message)) return { error: 'schema-invalid' };
+    records.push({
+      ...message,
+      session_id: message.session_id || message.sessionId || sessionId,
+      sessionId: message.sessionId || message.session_id || sessionId,
+      timestamp: message.timestamp || message.created_at || message.createdAt || timestamp,
+      cwd: message.cwd || message.working_directory || message.workingDirectory || cwd,
+    });
+  }
+  return { records };
+}
+
 function parseProviderNdjson({ provider, text, context = {}, lineLimit = MAX_LINE_BYTES, ...input }) {
   const normalizedProvider = normalizeProvider(provider);
   if (!normalizedProvider || typeof text !== 'string') return { ok: false, reason: 'schema-invalid', events: [] };
@@ -1225,14 +1299,16 @@ function parseProviderNdjson({ provider, text, context = {}, lineLimit = MAX_LIN
     mapSessions: input.mapSessions === true || context.mapSessions === true,
   };
   const events = [];
-  const evidence = sharedParserEvidence(input.filePath || context.filePath, normalizedProvider, runtimeContext.catalog, runtimeContext.home || os.homedir());
-  if (evidence.sessionId && !runtimeContext.sessionId) runtimeContext.sessionId = evidence.sessionId;
-  if (evidence.cwd) updateSessionContext({ cwd: evidence.cwd }, runtimeContext);
-  runtimeContext.sharedSkillReads = evidence.skillReads;
-  for (const item of iterateJsonlRecords(text)) {
+  const effectiveLineLimit = Math.min(MAX_LINE_BYTES, Math.max(1, parseNumber(lineLimit, MAX_LINE_BYTES)));
+  const hermesDocument = normalizedProvider === 'hermes' ? parseHermesSessionDocument(text) : null;
+  if (hermesDocument?.error) return { ok: false, reason: hermesDocument.error, events: [] };
+  const items = hermesDocument
+    ? hermesDocument.records.map((record, position) => ({ position, line: '', record }))
+    : iterateJsonlRecords(text, effectiveLineLimit);
+  for (const item of items) {
     const { position, line } = item;
-    if (Buffer.byteLength(line) > lineLimit) return { ok: false, reason: 'line-overflow', events: [] };
-    if (item.error || !item.record) return { ok: false, reason: 'schema-invalid', events: [] };
+    if (line && Buffer.byteLength(line) > effectiveLineLimit) return { ok: false, reason: 'line-overflow', events: [] };
+    if (item.error || !item.record) return { ok: false, reason: item.error || 'schema-invalid', events: [] };
     const record = item.record;
     const result = parseProviderRecord(normalizedProvider, record, runtimeContext, position);
     if (result.error) return { ok: false, reason: result.error, events: [] };
@@ -1241,15 +1317,18 @@ function parseProviderNdjson({ provider, text, context = {}, lineLimit = MAX_LIN
       events.push(event);
     }
   }
-  appendSharedSkillEvents(events, runtimeContext, evidence, input.filePath || context.filePath);
   return { ok: true, events };
 }
 
-function* iterateJsonlRecords(text) {
+function* iterateJsonlRecords(text, lineLimit = MAX_LINE_BYTES) {
   const lines = String(text || '').split(/\r?\n/);
   for (let position = 0; position < lines.length; position += 1) {
     const line = lines[position];
     if (!line.trim()) continue;
+    if (Buffer.byteLength(line) > lineLimit) {
+      yield { position, line, record: null, error: 'line-overflow' };
+      continue;
+    }
     try {
       yield { position, line, record: JSON.parse(line) };
     } catch {
@@ -1287,32 +1366,61 @@ function parseRemoteNdjson(text, options = {}) {
   return { ok: true, events };
 }
 
-function buildRemoteCollectorScript({ provider, historyRoots = [], skillKeys = {}, hmacKey = '', surfaceAlias = 'UNMAPPED', logicalProjectId = '' }) {
-  const payload = JSON.stringify({ provider, historyRoots, skillKeys, hmacKey, surfaceAlias, logicalProjectId });
+function buildRemoteCollectorScript({ provider, historyRoots = [], skillKeys = {}, skillVariants = {}, hmacKey = '', surfaceAlias = 'UNMAPPED', logicalProjectId = '', projectMappings = [] }) {
+  const variantLookup = Object.keys(skillVariants).length > 0 ? skillVariants : skillKeys;
+  const flatSkillKeys = {};
+  for (const [name, variants] of Object.entries(variantLookup)) {
+    if (typeof variants === 'string') {
+      flatSkillKeys[name] = variants;
+      continue;
+    }
+    if (!variants || typeof variants !== 'object' || Array.isArray(variants)) continue;
+    const keys = [...new Set(Object.values(variants).filter((value) => typeof value === 'string'))];
+    if (keys.length === 1) flatSkillKeys[name] = keys[0];
+  }
+  const payload = JSON.stringify({ provider, historyRoots, skillKeys: flatSkillKeys, skillVariants: variantLookup, hmacKey, surfaceAlias, logicalProjectId, projectMappings });
   return `#!/usr/bin/env node
 'use strict';
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const cfg = ${payload};
+const rawSkillKeys = cfg.skillKeys || {};
+cfg.skillKeys = new Proxy(rawSkillKeys, { get: (target, property) => target[property] || (/^[a-f0-9]{64}$/i.test(String(property)) ? String(property) : undefined) });
 const key = cfg.hmacKey || 'canuto-skill-gardener-unconfigured';
-const h = (v) => crypto.createHmac('sha256', key).update(String(v)).digest('hex');
-const iso = (v) => { const n = Date.parse(String(v || '')); return Number.isFinite(n) ? new Date(n).toISOString() : new Date(0).toISOString(); };
+const h = (value) => crypto.createHmac('sha256', key).update(String(value)).digest('hex');
+const iso = (value) => { const parsed = Date.parse(String(value || '')); return Number.isFinite(parsed) ? new Date(parsed).toISOString() : new Date(0).toISOString(); };
 const MAX_LINE = ${MAX_LINE_BYTES};
 const MAX_STDOUT = ${MAX_REMOTE_STDOUT_BYTES};
-const normalize = (v) => String(v || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+const normalize = (value) => String(value || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+const expandHome = (value) => { const text = String(value || ''); const home = os.homedir(); if (text === '~') return home; if (text.startsWith('~/')) return path.join(home, text.slice(2)); return text.replace(/^\\$HOME(?=\\/|$)/, home); };
 const within = (child, parent) => { const relative = path.relative(parent, child); return relative === '' || (relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative)); };
 let stdoutBytes = 0;
 const emit = (event) => { const line = JSON.stringify(event) + '\\n'; stdoutBytes += Buffer.byteLength(line); if (stdoutBytes > MAX_STDOUT) throw new Error('stdout-overflow'); process.stdout.write(line); };
-const skillFromPath = (value) => { const match = String(value || '').match(/(?:\\.agents|\\.codex|\\.claude|\\.hermes)\\/[^\\s'"]*skills\\/([^\\/]+)(?:\\/SKILL\\.md|\\.md)(?:$|[\\s'"])/i); return normalize(match ? match[1] : ''); };
 const parsedInput = (payload) => { if (payload.input && typeof payload.input === 'object') return payload.input; if (typeof payload.arguments === 'string') { try { return JSON.parse(payload.arguments); } catch { return {}; } } return {}; };
-const skillName = (payload, record) => { const input = parsedInput(payload); const direct = payload.skill || payload.skillName || payload.skill_name || input.skill || input.skillName || record.skill; if (direct) return normalize(direct); return skillFromPath(input.file_path || input.filePath || input.path); };
-const recordsFor = (record) => { if (cfg.provider === 'codex' && record.type === 'response_item') { const payload = record.payload || {}; return ['function_call', 'function_call_output'].includes(payload.type) ? [payload] : []; } if (cfg.provider === 'claude' && ['assistant', 'user'].includes(record.type)) return (Array.isArray(record.message?.content) ? record.message.content : []).filter((chunk) => ['tool_use', 'tool_result'].includes(chunk?.type)); return [record]; };
-const pendingReads = new Map();
-const processRecord = (record, position) => { for (const payload of recordsFor(record)) { const input = parsedInput(payload); const type = normalize(payload.type || record.type); const name = normalize(payload.name || record.name); const skill = skillName(payload, record); const nativeId = String(payload.eventId || payload.event_id || payload.id || payload.call_id || record.eventId || record.event_id || ''); const resultId = String(payload.call_id || payload.tool_use_id || payload.toolUseId || record.call_id || record.tool_use_id || ''); const session = String(payload.sessionId || payload.session_id || record.sessionId || record.session_id || 'remote'); const timestamp = iso(payload.timestamp || payload.ts || record.timestamp); const isSkill = type === 'skill' || type === 'skill-usage' || type === 'skill-used' || name === 'skill' || record.event === 'Skill'; const key = cfg.skillKeys[skill] || h('name:' + skill); if (isSkill && skill) { emit({schemaVersion:1,kind:'verified_usage',eventKey:nativeId ? h('native:' + cfg.provider + ':' + nativeId) : h('fallback:' + cfg.provider + ':' + session + ':' + position + ':' + key),skillKey:key,timestamp,provider:cfg.provider,surfaceAlias:cfg.surfaceAlias,logicalProjectId:cfg.logicalProjectId,verification:'native_skill_event'}); continue; } if ((type === 'skill-missing' || record.event === 'skill-missing' || input.missing === true) && skill) { emit({schemaVersion:1,kind:'candidate_signal',eventKey:nativeId ? h('native:' + cfg.provider + ':' + nativeId) : h('fallback:' + cfg.provider + ':' + session + ':' + position + ':' + skill),signalKey:h('missing:' + skill),timestamp,provider:cfg.provider,surfaceAlias:cfg.surfaceAlias,logicalProjectId:cfg.logicalProjectId,fingerprint:'skill-missing',count:1}); continue; } const directRead = ['read', 'read-file', 'file-read'].includes(name) && ['tool-use', 'function-call', 'read'].includes(type) && skill && nativeId; if (directRead) { pendingReads.set(nativeId, {skillKey:key}); continue; } const isResult = ['function-call-output', 'tool-result', 'read-result'].includes(type); if (isResult && resultId) { const pending = pendingReads.get(resultId); pendingReads.delete(resultId); const status = normalize(payload.status || payload.result_family || ''); const failed = payload.is_error === true || ['error','failure','failed','timeout'].includes(status) || (payload.exit_code !== undefined && Number(payload.exit_code) !== 0); const hasResult = Object.prototype.hasOwnProperty.call(payload, 'output') || Object.prototype.hasOwnProperty.call(payload, 'content') || Object.prototype.hasOwnProperty.call(payload, 'result'); if (pending && hasResult && !failed) emit({schemaVersion:1,kind:'verified_usage',eventKey:h('native:' + cfg.provider + ':' + resultId + ':confirmed-read'),skillKey:pending.skillKey,timestamp,provider:cfg.provider,surfaceAlias:cfg.surfaceAlias,logicalProjectId:cfg.logicalProjectId,verification:'confirmed_skill_file_read'}); } } };
-  const readLines = async function* (file) { const stream = fs.createReadStream(file, { encoding: 'utf8' }); let pending = ''; for await (const chunk of stream) { const lines = (pending + chunk).split(/\\r?\\n/); pending = lines.pop() || ''; if (Buffer.byteLength(pending) > MAX_LINE + 2) throw new Error('line-overflow'); for (const line of lines) { if (Buffer.byteLength(line) > MAX_LINE) throw new Error('line-overflow'); yield line; } } if (pending) { if (Buffer.byteLength(pending) > MAX_LINE) throw new Error('line-overflow'); yield pending; } };
+const sessionHints = (record) => { const payload = record && record.payload && typeof record.payload === 'object' ? record.payload : record || {}; return { cwd: payload.cwd || payload.working_directory || payload.workingDirectory || record.cwd || record.working_directory || record.workingDirectory || '' }; };
+const mapSession = (record) => { const cwdHint = sessionHints(record).cwd; if (!cwdHint || !Array.isArray(cfg.projectMappings) || cfg.projectMappings.length === 0) return null; const cwd = path.resolve(expandHome(cwdHint)); const candidates = []; for (const mapping of cfg.projectMappings) for (const root of mapping.roots || []) { const resolvedRoot = path.resolve(expandHome(root)); if (within(cwd, resolvedRoot)) candidates.push({ mapping, length: resolvedRoot.length }); } if (candidates.length === 0) return null; const maxLength = Math.max(...candidates.map((item) => item.length)); const best = candidates.filter((item) => item.length === maxLength); const identities = new Set(best.map((item) => item.mapping.logicalProjectId + '\\u0000' + item.mapping.surfaceId)); return identities.size === 1 ? best[0].mapping : null; };
+const mappingValues = (state) => { if (Array.isArray(cfg.projectMappings) && cfg.projectMappings.length > 0) { if (!state.mapping) return null; return { logicalProjectId: state.mapping.logicalProjectId || 'UNMAPPED', surfaceAlias: state.mapping.surfaceAlias || 'UNMAPPED' }; } return { logicalProjectId: cfg.logicalProjectId || 'UNMAPPED', surfaceAlias: cfg.surfaceAlias || 'UNMAPPED' }; };
+const skillVariants = cfg.skillVariants || {};
+const maxSkillBytes = 4 * 1024 * 1024;
+const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
+const skillFromPath = (value) => { const parts = String(value || '').split('/'); const marker = parts.findIndex((part) => ['.agents', '.codex', '.claude', '.hermes'].includes(part.toLowerCase())); if (marker < 0) return ''; const skills = parts.findIndex((part, index) => index > marker && part.toLowerCase() === 'skills'); const name = skills >= 0 ? parts[skills + 1] : ''; const last = parts[parts.length - 1] || ''; return name && /\\.md$/i.test(last) ? normalize(name) : ''; };
+const skillPathInfo = (value, record) => { const raw = String(value || ''); if (!raw) return null; const expanded = expandHome(raw); const cwd = sessionHints(record || {}).cwd || process.cwd(); const absolute = path.resolve(path.isAbsolute(expanded) ? expanded : path.join(expandHome(cwd), expanded)); const parts = absolute.split(path.sep); const markerIndex = parts.findIndex((part) => ['.agents', '.codex', '.claude', '.hermes'].includes(part.toLowerCase())); if (markerIndex < 0) return null; const marker = parts[markerIndex].toLowerCase(); const skillsIndex = parts.findIndex((part, index) => index > markerIndex && part.toLowerCase() === 'skills'); const name = skillsIndex >= 0 ? normalize(parts[skillsIndex + 1]) : ''; const last = parts[parts.length - 1] || ''; if (!name || !/\\.md$/i.test(last)) return null; const allowedRoots = []; if (['.codex', '.claude', '.hermes'].includes(marker)) allowedRoots.push(path.join(os.homedir(), marker)); if (marker === '.agents') for (const mapping of cfg.projectMappings || []) for (const root of mapping.roots || []) allowedRoots.push(path.join(path.resolve(expandHome(root)), '.agents')); for (const allowedRoot of allowedRoots) { if (!within(absolute, path.resolve(allowedRoot))) continue; try { const realRoot = fs.realpathSync(allowedRoot); const realFile = fs.realpathSync(absolute); const stat = fs.statSync(realFile); if (!stat.isFile() || !within(realFile, realRoot) || stat.size > maxSkillBytes) continue; return { name, file: realFile }; } catch {} } return null; };
+const readSkillHash = (file) => { let fd; try { fd = fs.openSync(file, 'r'); const initial = fs.fstatSync(fd); if (!initial.isFile() || initial.size > maxSkillBytes) return ''; const buffer = Buffer.allocUnsafe(Math.min(maxSkillBytes + 1, Math.max(1, initial.size + 1))); const bytes = fs.readSync(fd, buffer, 0, buffer.length, 0); const final = fs.fstatSync(fd); if (!final.isFile() || final.size > maxSkillBytes || final.size !== bytes) return ''; return sha256(buffer.subarray(0, bytes)); } catch { return ''; } finally { if (fd !== undefined) try { fs.closeSync(fd); } catch {} } };
+const keyForPath = (value, record) => { const info = skillPathInfo(value, record); if (!info) return ''; const contentHash = readSkillHash(info.file); if (!contentHash) return ''; const variants = skillVariants[info.name]; return variants && typeof variants === 'object' && typeof variants[contentHash] === 'string' ? variants[contentHash] : ''; };
+const shellReadCommands = new Set(['awk', 'bat', 'cat', 'cut', 'diff', 'file', 'grep', 'head', 'jq', 'less', 'more', 'nl', 'rg', 'sed', 'sort', 'tail', 'tr', 'wc']);
+const shellToolNames = new Set(['bash', 'exec', 'exec-command', 'run-shell-command', 'shell', 'terminal', 'zsh', 'sh']);
+const commandText = (payload) => { const input = parsedInput(payload); return typeof input.command === 'string' ? input.command : typeof input.cmd === 'string' ? input.cmd : ''; };
+const shellExecutable = (command) => { const tokens = String(command || '').trim().split(/\\s+/).map((token) => token.replace(/^['"(\\[]+/, '').replace(/['",;|&)>\\]]+$/, '')).filter(Boolean); let index = 0; while (index < tokens.length) { const token = tokens[index]; const commandName = normalize(path.basename(token)); if (commandName === 'env' || commandName === 'command' || commandName === 'sudo' || /^[A-Za-z_][A-Za-z0-9_]*=/.test(token)) { index += 1; continue; } if (commandName === 'bash' || commandName === 'sh' || commandName === 'zsh') { index += 1; while (index < tokens.length && tokens[index].startsWith('-')) index += 1; continue; } if (commandName === 'rtk') { index += 1; while (index < tokens.length && tokens[index].startsWith('-')) index += 1; continue; } return commandName; } return ''; };
+const shellSkills = (payload) => { const command = commandText(payload); if (!shellReadCommands.has(shellExecutable(command))) return []; return String(command).trim().split(/\\s+/).map((token) => token.replace(/^['"(\\[]+/, '').replace(/['",;|&)>\\]]+$/, '')).map((token) => keyForPath(token, payload)).filter(Boolean); };
+const skillName = (payload, record) => { const input = parsedInput(payload); const direct = payload.skill || payload.skillName || payload.skill_name || input.skill || input.skillName || record.skill; if (direct) return normalize(direct); const readPath = input.file_path || input.filePath || input.path; return readPath ? keyForPath(readPath, payload || record) : ''; };
+const recordsFor = (record) => { if (cfg.provider === 'codex' && record.type === 'response_item') { const payload = record.payload || {}; return ['function_call', 'function_call_output'].includes(payload.type) ? [{ ...payload, cwd: record.cwd || payload.cwd || '', timestamp: record.timestamp || payload.timestamp || '', session_id: record.session_id || payload.session_id || '' }] : []; } if (cfg.provider === 'codex' && record.payload && typeof record.payload === 'object') return [{ ...record, ...record.payload, cwd: record.cwd || record.payload.cwd || '', timestamp: record.timestamp || record.payload.timestamp || '', session_id: record.session_id || record.payload.session_id || '' }]; if (cfg.provider === 'claude' && ['assistant', 'user'].includes(record.type)) return (Array.isArray(record.message?.content) ? record.message.content : []).filter((chunk) => ['tool_use', 'tool_result'].includes(chunk?.type)).map((chunk) => ({ ...chunk, timestamp: record.timestamp || chunk.timestamp || '', cwd: record.cwd || chunk.cwd || '', session_id: record.session_id || chunk.session_id || '' })); if (cfg.provider === 'hermes' && Array.isArray(record.content)) return record.content.filter((chunk) => chunk && ['tool_use', 'tool_result', 'tool-use', 'tool-result'].includes(chunk.type)).map((chunk) => ({ ...chunk, type: normalize(chunk.type) === 'tool-use' ? 'tool_use' : 'tool_result', timestamp: record.timestamp || chunk.timestamp || '', cwd: record.cwd || chunk.cwd || '', session_id: record.session_id || chunk.session_id || '' })); return [record]; };
+const processRecord = (record, position, state) => { const hints = sessionHints(record); if (hints.cwd) state.mapping = mapSession(record); if (record.session_id || record.sessionId || record.payload?.session_id || record.payload?.sessionId) state.sessionId = String(record.session_id || record.sessionId || record.payload.session_id || record.payload.sessionId); for (const payload of recordsFor(record)) { const mapped = mappingValues(state); if (!mapped) continue; const input = parsedInput(payload); const type = normalize(payload.type || record.type); const name = normalize(payload.name || record.name); const skill = skillName(payload, record); const nativeId = String(payload.eventId || payload.event_id || payload.id || payload.call_id || record.eventId || record.event_id || ''); const resultId = String(payload.call_id || payload.tool_use_id || payload.toolUseId || record.call_id || record.tool_use_id || ''); const session = String(payload.sessionId || payload.session_id || record.sessionId || record.session_id || state.sessionId || 'remote'); const timestamp = iso(payload.timestamp || payload.ts || record.timestamp); const provider = cfg.provider; const keyFor = (nameValue) => cfg.skillKeys[nameValue] || h('name:' + nameValue); const isResult = ['function-call-output', 'tool-result', 'read-result', 'exec-command-end'].includes(type); if (isResult && resultId) { const pending = state.pendingReads.get(resultId); state.pendingReads.delete(resultId); const status = normalize(payload.status || payload.result_family || ''); const failed = payload.is_error === true || ['error', 'failure', 'failed', 'timeout'].includes(status) || (payload.exit_code !== undefined && Number(payload.exit_code) !== 0); const hasResult = Object.prototype.hasOwnProperty.call(payload, 'output') || Object.prototype.hasOwnProperty.call(payload, 'content') || Object.prototype.hasOwnProperty.call(payload, 'result') || (type === 'exec-command-end' && (Object.prototype.hasOwnProperty.call(payload, 'exit_code') || Object.prototype.hasOwnProperty.call(payload, 'exitCode') || Object.prototype.hasOwnProperty.call(payload, 'status') || Object.prototype.hasOwnProperty.call(payload, 'aggregated_output'))); if (pending && hasResult && !failed) for (const pendingKey of pending.skillKeys) emit({ schemaVersion: 1, kind: 'verified_usage', eventKey: h('native:' + provider + ':' + resultId + ':confirmed-read:' + pendingKey), skillKey: pendingKey, timestamp, provider, surfaceAlias: mapped.surfaceAlias, logicalProjectId: mapped.logicalProjectId, verification: 'confirmed_skill_file_read' }); continue; } const isSkill = type === 'skill' || type === 'skill-usage' || type === 'skill-used' || name === 'skill' || record.event === 'Skill'; if (isSkill && skill) { const key = keyFor(skill); emit({ schemaVersion: 1, kind: 'verified_usage', eventKey: nativeId ? h('native:' + provider + ':' + nativeId) : h('fallback:' + provider + ':' + session + ':' + position + ':' + key), skillKey: key, timestamp, provider, surfaceAlias: mapped.surfaceAlias, logicalProjectId: mapped.logicalProjectId, verification: 'native_skill_event' }); continue; } if ((type === 'skill-missing' || record.event === 'skill-missing' || input.missing === true) && skill) { emit({ schemaVersion: 1, kind: 'candidate_signal', eventKey: nativeId ? h('native:' + provider + ':' + nativeId) : h('fallback:' + provider + ':' + session + ':' + position + ':' + skill), signalKey: h('missing:' + skill), timestamp, provider, surfaceAlias: mapped.surfaceAlias, logicalProjectId: mapped.logicalProjectId, fingerprint: 'skill-missing', count: 1 }); continue; } const directRead = ['read', 'read-file', 'file-read'].includes(name) && ['tool-use', 'function-call', 'read'].includes(type) && skill && nativeId; const shellRead = shellToolNames.has(name) || type === 'shell'; const shellSkillNames = shellRead ? [...new Set(shellSkills(payload))] : []; const requestedSkills = directRead ? [skill] : shellSkillNames; if (requestedSkills.length > 0 && nativeId) state.pendingReads.set(nativeId, { skillKeys: [...new Set(requestedSkills.map(keyFor))] }); } };
+const readLines = async function* (file) { const stream = fs.createReadStream(file, { encoding: 'utf8' }); let pending = ''; for await (const chunk of stream) { const lines = (pending + chunk).split(/\\r?\\n/); pending = lines.pop() || ''; if (Buffer.byteLength(pending) > MAX_LINE + 2) throw new Error('line-overflow'); for (const line of lines) { if (Buffer.byteLength(line) > MAX_LINE) throw new Error('line-overflow'); yield line; } } if (pending) { if (Buffer.byteLength(pending) > MAX_LINE) throw new Error('line-overflow'); yield pending; } };
 const collectFiles = (root, depth, allowlistedRoot, files) => { if (depth > 8) return; const entries = fs.readdirSync(root, { withFileTypes: true }); for (const entry of entries) { const file = path.join(root, entry.name); const linkStat = fs.lstatSync(file); let real = file; if (linkStat.isSymbolicLink()) { real = fs.realpathSync(file); if (!within(real, allowlistedRoot)) continue; } if (linkStat.isDirectory() || (linkStat.isSymbolicLink() && fs.statSync(file).isDirectory())) collectFiles(file, depth + 1, allowlistedRoot, files); else if ((linkStat.isFile() || (linkStat.isSymbolicLink() && fs.statSync(file).isFile())) && (file.endsWith('.jsonl') || file.endsWith('.json'))) files.push(file); } };
-const main = async () => { if (cfg.provider === 'opencode') throw new Error('not-implemented'); const files = []; for (const configuredRoot of (cfg.historyRoots || [])) { if (typeof configuredRoot !== 'string' || !configuredRoot) continue; const rootStat = fs.lstatSync(configuredRoot); const allowlistedRoot = fs.realpathSync(configuredRoot); if (!rootStat.isDirectory() && !fs.statSync(configuredRoot).isDirectory()) throw new Error('root-invalid'); collectFiles(allowlistedRoot, 0, allowlistedRoot, files); } for (const file of files.sort()) { let position = 0; for await (const line of readLines(file)) { if (!line.trim()) continue; let record; try { record = JSON.parse(line); } catch { throw new Error('schema-invalid'); } if (!record || typeof record !== 'object' || Array.isArray(record)) throw new Error('schema-invalid'); processRecord(record, position); position += 1; } } };
+const hermesDocumentRecords = (file) => { const text = fs.readFileSync(file, 'utf8'); if (Buffer.byteLength(text) > MAX_STDOUT) throw new Error('document-overflow'); let document; try { document = JSON.parse(text); } catch { throw new Error('schema-invalid'); } if (!document || typeof document !== 'object' || Array.isArray(document)) throw new Error('schema-invalid'); if (!Object.prototype.hasOwnProperty.call(document, 'messages')) return [document]; if (!Array.isArray(document.messages)) throw new Error('schema-invalid'); const sessionId = document.session_id || document.sessionId || document.id || ''; const timestamp = document.session_start || document.sessionStart || document.started_at || document.timestamp || document.created_at || document.createdAt || document.last_updated || document.lastUpdated || ''; const cwd = document.cwd || document.working_directory || document.workingDirectory || ''; return document.messages.map((message) => { if (!message || typeof message !== 'object' || Array.isArray(message)) throw new Error('schema-invalid'); return { ...message, session_id: message.session_id || message.sessionId || sessionId, sessionId: message.sessionId || message.session_id || sessionId, timestamp: message.timestamp || message.created_at || message.createdAt || timestamp, cwd: message.cwd || message.working_directory || message.workingDirectory || cwd }; }); };
+const main = async () => { if (cfg.provider === 'opencode') throw new Error('not-implemented'); const files = []; for (const configuredRoot of (cfg.historyRoots || [])) { if (typeof configuredRoot !== 'string' || !configuredRoot) continue; const resolvedRoot = path.resolve(expandHome(configuredRoot)); const rootStat = fs.lstatSync(resolvedRoot); const allowlistedRoot = fs.realpathSync(resolvedRoot); if (!rootStat.isDirectory() && !fs.statSync(resolvedRoot).isDirectory()) throw new Error('root-invalid'); collectFiles(allowlistedRoot, 0, allowlistedRoot, files); } for (const file of [...new Set(files)].sort()) { const state = { mapping: null, sessionId: '', pendingReads: new Map() }; if (cfg.provider === 'hermes' && file.endsWith('.json')) { for (const [position, record] of hermesDocumentRecords(file).entries()) processRecord(record, position, state); continue; } let position = 0; for await (const line of readLines(file)) { if (!line.trim()) continue; let record; try { record = JSON.parse(line); } catch { throw new Error('schema-invalid'); } if (!record || typeof record !== 'object' || Array.isArray(record)) throw new Error('schema-invalid'); processRecord(record, position, state); position += 1; } } };
 main().catch(() => { process.stderr.write('remote-collector-failed\\n'); process.exitCode = 1; });
 `;
 }
@@ -1435,11 +1543,26 @@ function sourceHistoryFiles(sourcePath) {
   return files.sort();
 }
 
-function prefixHash(filePath, bytes = 4096) {
+function prefixHash(filePath, bytes = 4096, content = null) {
   try {
     const length = Math.max(0, Math.min(Number(bytes) || 0, 4096));
-    return sha256(fs.readFileSync(filePath).subarray(0, length));
+    const buffer = Buffer.isBuffer(content) ? content : fs.readFileSync(filePath);
+    return sha256(buffer.subarray(0, length));
   } catch { return ''; }
+}
+
+function* iterateBufferLines(buffer, start, end) {
+  let lineStart = start;
+  for (let index = start; index < end; index += 1) {
+    if (buffer[index] !== 0x0a) continue;
+    let lineEnd = index;
+    if (lineEnd > lineStart && buffer[lineEnd - 1] === 0x0d) lineEnd -= 1;
+    yield {
+      line: buffer.subarray(lineStart, lineEnd).toString('utf8'),
+      byteLength: lineEnd - lineStart,
+    };
+    lineStart = index + 1;
+  }
 }
 
 function readLocalSource({ source, cursor = {}, context, full = false }) {
@@ -1466,8 +1589,10 @@ function readLocalSource({ source, cursor = {}, context, full = false }) {
     const previousPrefixLength = previous.prefixLength === undefined
       ? Math.min(Math.max(0, parseNumber(previous.size, 0)), 4096)
       : Math.min(Math.max(0, parseNumber(previous.prefixLength, 0)), 4096);
+    let buffer;
+    try { buffer = fs.readFileSync(file); } catch { partial = true; reason = 'source-read'; continue; }
     const prefixLengthToCompare = previous.size === undefined ? Math.min(stat.size, 4096) : previousPrefixLength;
-    const prefix = prefixHash(file, prefixLengthToCompare);
+    const prefix = prefixHash(file, prefixLengthToCompare, buffer);
     const rewritten = previous.size !== undefined && (
       stat.size < previous.size
       || previous.offset > stat.size
@@ -1477,8 +1602,6 @@ function readLocalSource({ source, cursor = {}, context, full = false }) {
       partial = true;
       reason = 'source-truncated-or-rewritten';
     }
-    let buffer;
-    try { buffer = fs.readFileSync(file); } catch { partial = true; reason = 'source-read'; continue; }
     const start = full || rewritten ? 0 : Math.min(Math.max(0, previous.offset || 0), buffer.length);
     const fileContext = {
       ...context,
@@ -1490,20 +1613,40 @@ function readLocalSource({ source, cursor = {}, context, full = false }) {
       surfaceId: source.surfaceId || 'UNMAPPED',
       mapSessions: source.mapSessions === true,
     };
-    const evidence = sharedParserEvidence(file, source.provider, context.catalog, context.home || os.homedir());
-    if (evidence.sessionId) fileContext.sessionId = evidence.sessionId;
-    if (evidence.cwd) updateSessionContext({ cwd: evidence.cwd }, fileContext);
-    fileContext.sharedSkillReads = evidence.skillReads;
+
+    if (source.provider === 'hermes' && file.toLowerCase().endsWith('.json')) {
+      const result = parseHermesEvents({ text: buffer.toString('utf8'), context: fileContext });
+      if (!result.ok) {
+        partial = true;
+        reason = result.reason || 'schema-invalid';
+        continue;
+      }
+      for (const event of result.events || []) {
+        if (!validateClosedEvent(event)) { partial = true; reason = 'schema-invalid'; break; }
+        events.push(event);
+        firstTimestamp = firstTimestamp || event.timestamp;
+        lastTimestamp = event.timestamp;
+      }
+      if (partial) continue;
+      nextCursors[fileToken] = {
+        identity: fileToken,
+        offset: buffer.length,
+        size: stat.size,
+        mtimeMs: stat.mtimeMs,
+        prefixHash: prefixHash(file, Math.min(stat.size, 4096), buffer),
+        prefixLength: Math.min(stat.size, 4096),
+      };
+      continue;
+    }
     const unread = buffer.subarray(start);
     const lastLf = unread.lastIndexOf(0x0a);
     const completePrefixEnd = lastLf === -1 ? start : start + lastLf + 1;
-    const completeChunk = buffer.subarray(start, completePrefixEnd).toString('utf8');
-    const completeLines = lastLf === -1 ? [] : completeChunk.split(/\r?\n/);
     let linePosition = 0;
-    for (const line of completeLines) {
+    for (const item of iterateBufferLines(buffer, start, completePrefixEnd)) {
       linePosition += 1;
+      const line = item.line;
       if (!line.trim()) continue;
-      if (Buffer.byteLength(line) > MAX_LINE_BYTES) {
+      if (item.byteLength > MAX_LINE_BYTES) {
         partial = true; reason = 'line-overflow'; break;
       }
       let record;
@@ -1518,7 +1661,6 @@ function readLocalSource({ source, cursor = {}, context, full = false }) {
       }
       if (partial && reason === 'schema-invalid') break;
     }
-    appendSharedSkillEvents(events, fileContext, evidence, file);
     if (partial && ['line-overflow', 'schema-invalid'].includes(reason)) {
       continue;
     }
@@ -1527,7 +1669,7 @@ function readLocalSource({ source, cursor = {}, context, full = false }) {
       offset: completePrefixEnd,
       size: stat.size,
       mtimeMs: stat.mtimeMs,
-      prefixHash: prefixHash(file, Math.min(stat.size, 4096)),
+      prefixHash: prefixHash(file, Math.min(stat.size, 4096), buffer),
       prefixLength: Math.min(stat.size, 4096),
     };
   }
@@ -1756,6 +1898,7 @@ function collectSources(config, options = {}) {
   const home = options.home || os.homedir();
   const hmacKey = options.hmacKey || 'canuto-skill-gardener-unconfigured';
   const sources = [];
+  const remoteGroups = new Map();
   const globalHistoryPaths = configuredProviderHistoryPaths(config, home);
   for (const [logicalProjectId, project] of Object.entries(config.projects)) {
     if (options.project && options.project !== logicalProjectId) continue;
@@ -1790,24 +1933,41 @@ function collectSources(config, options = {}) {
         }
         continue;
       }
-      for (const root of surface.historyRoots) {
-        const configuredPath = canonicalConfiguredPath(resolvePath(root.path, process.cwd(), home));
-        if (!surface.remote && globalHistoryPaths.get(surface.provider)?.has(configuredPath)) continue;
-        const candidates = surface.remote ? [] : configuredRootCandidates(root, home);
-        if (surface.remote) {
-          sources.push({
-            sourceId: makeSourceId(`remote-history|${logicalProjectId}|${surfaceId}|${root.path}`, hmacKey),
+      if (surface.remote) {
+        for (const root of surface.historyRoots || []) {
+          const remoteAlias = root.alias || surface.aliases[0] || 'UNMAPPED';
+          const remoteProvider = surface.provider || 'codex';
+          const groupKey = `${remoteAlias}\u0000${remoteProvider}\u0000${root.path}`;
+          let group = remoteGroups.get(groupKey);
+          if (!group) {
+            group = {
+              provider: remoteProvider,
+              sourceAlias: remoteAlias,
+              path: root.path,
+              remoteAlias,
+              remoteMappings: [],
+              mappingKeys: new Set(),
+            };
+            remoteGroups.set(groupKey, group);
+          }
+          const mapping = {
             logicalProjectId,
             surfaceId,
-            sourceAlias: root.alias || surface.aliases[0] || 'UNMAPPED',
-            provider: surface.provider || 'codex',
-            kind: 'history',
-            path: root.path,
-            remoteAlias: surface.aliases[0] || 'UNMAPPED',
-            mapSessions: false,
-          });
-          continue;
+            surfaceAlias: remoteAlias,
+            roots: (surface.roots || []).map((entry) => entry.path).filter(Boolean),
+          };
+          const mappingKey = `${logicalProjectId}\u0000${surfaceId}`;
+          if (!group.mappingKeys.has(mappingKey)) {
+            group.mappingKeys.add(mappingKey);
+            group.remoteMappings.push(mapping);
+          }
         }
+        continue;
+      }
+      for (const root of surface.historyRoots) {
+        const configuredPath = canonicalConfiguredPath(resolvePath(root.path, process.cwd(), home));
+        if (globalHistoryPaths.get(surface.provider)?.has(configuredPath)) continue;
+        const candidates = configuredRootCandidates(root, home);
         if (candidates.length === 0) {
           sources.push({
             sourceId: makeSourceId(`missing-history|${logicalProjectId}|${surfaceId}|${root.path}`, hmacKey),
@@ -1838,6 +1998,20 @@ function collectSources(config, options = {}) {
         }
       }
     }
+  }
+  for (const group of remoteGroups.values()) {
+    sources.push({
+      sourceId: makeSourceId(`remote-history|${group.provider}|${group.remoteAlias}|${group.path}`, hmacKey),
+      logicalProjectId: '',
+      surfaceId: 'remote',
+      sourceAlias: group.sourceAlias,
+      provider: group.provider,
+      kind: 'history',
+      path: group.path,
+      remoteAlias: group.remoteAlias,
+      mapSessions: false,
+      remoteMappings: group.remoteMappings,
+    });
   }
   for (const provider of PROVIDERS) {
     const settings = config.providers[provider] || {};
@@ -2191,12 +2365,19 @@ function buildCoverageBySkill({ catalog, state, sources = [], now }) {
         intervals: mergeIntervals(intervals),
         complete120d: hasContinuousCoverage(intervals, negativeStart, now),
       };
-      const matchingSources = sources.filter((source) => (
-        source.provider === installation.provider
-        && (source.surfaceId || 'UNMAPPED') === (installation.surfaceId || 'UNMAPPED')
-        && (source.logicalProjectId || 'UNMAPPED') === (installation.logicalProjectId || 'UNMAPPED')
-        && (source.sourceAlias || 'UNMAPPED') === (installation.sourceAlias || 'UNMAPPED')
-      ));
+      const matchingSources = sources.filter((source) => {
+        const directMatch = source.provider === installation.provider
+          && (source.surfaceId || 'UNMAPPED') === (installation.surfaceId || 'UNMAPPED')
+          && (source.logicalProjectId || 'UNMAPPED') === (installation.logicalProjectId || 'UNMAPPED')
+          && (source.sourceAlias || 'UNMAPPED') === (installation.sourceAlias || 'UNMAPPED');
+        const remoteMatch = source.provider === installation.provider
+          && (source.remoteMappings || []).some((mapping) => (
+            mapping.surfaceId === installation.surfaceId
+            && mapping.logicalProjectId === installation.logicalProjectId
+            && (mapping.surfaceAlias || 'UNMAPPED') === (installation.sourceAlias || 'UNMAPPED')
+          ));
+        return directMatch || remoteMatch;
+      });
       if (matchingSources.some((source) => source.status && source.status !== 'COMPLETE')) scopes[scopeKey].complete120d = false;
     }
     const scopeValues = Object.values(scopes);
@@ -2717,11 +2898,37 @@ async function runGardener(mode, options = {}) {
       };
       let result;
       if (source.remoteAlias && source.remoteAlias !== 'UNMAPPED' && options.remote !== false) {
-        const skillKeys = {};
-        for (const variant of catalog.variants) skillKeys[variant.name] = variant.skillKey;
-        result = await collectRemoteSource({ alias: source.remoteAlias, payload: { provider: source.provider, historyRoots: [source.path], skillKeys, hmacKey: runtime.hmacKey, surfaceAlias: source.sourceAlias || 'UNMAPPED', logicalProjectId: source.logicalProjectId || 'UNMAPPED' } });
-        const previousComplete = (state.coverage?.[source.sourceId] || []).filter((interval) => interval.status === 'COMPLETE').sort((left, right) => Date.parse(right.end) - Date.parse(left.end))[0];
-        result.coverage = { sourceId: source.sourceId, provider: source.provider, surfaceId: source.surfaceId || 'UNMAPPED', surfaceAlias: source.sourceAlias || 'UNMAPPED', logicalProjectId: source.logicalProjectId || 'UNMAPPED', start: previousComplete?.end || runtime.now, end: runtime.now, status: result.ok ? 'COMPLETE' : 'PARTIAL', reason: result.reason || '' };
+        const skillVariants = {};
+        for (const variant of catalog.variants) {
+          const variants = skillVariants[variant.name] || {};
+          variants[variant.contentHash] = variant.skillKey;
+          skillVariants[variant.name] = variants;
+        }
+        result = await collectRemoteSource({ alias: source.remoteAlias, payload: { provider: source.provider, historyRoots: [source.path], skillVariants, hmacKey: runtime.hmacKey, surfaceAlias: source.sourceAlias || 'UNMAPPED', logicalProjectId: source.logicalProjectId || 'UNMAPPED', projectMappings: source.remoteMappings || [] } });
+        const previousCoverage = state.coverage?.[source.sourceId] || [];
+        const previousComplete = previousCoverage.filter((interval) => interval.status === 'COMPLETE').sort((left, right) => Date.parse(right.end) - Date.parse(left.end))[0];
+        const remoteCoverage = (source.remoteMappings || []).map((mapping) => ({
+          sourceId: source.sourceId,
+          provider: source.provider,
+          surfaceId: mapping.surfaceId || 'UNMAPPED',
+          surfaceAlias: mapping.surfaceAlias || source.sourceAlias || 'UNMAPPED',
+          logicalProjectId: mapping.logicalProjectId || 'UNMAPPED',
+          start: previousComplete?.end || runtime.now,
+          end: runtime.now,
+          status: result.ok ? 'COMPLETE' : 'PARTIAL',
+          reason: result.reason || '',
+        }));
+        result.coverage = remoteCoverage.length > 0 ? remoteCoverage : {
+          sourceId: source.sourceId,
+          provider: source.provider,
+          surfaceId: source.surfaceId || 'UNMAPPED',
+          surfaceAlias: source.sourceAlias || 'UNMAPPED',
+          logicalProjectId: source.logicalProjectId || 'UNMAPPED',
+          start: previousComplete?.end || runtime.now,
+          end: runtime.now,
+          status: result.ok ? 'COMPLETE' : 'PARTIAL',
+          reason: result.reason || '',
+        };
       } else {
         result = readLocalSource({ source, cursor: state.cursors?.[source.sourceId] || {}, context, full });
       }
@@ -2734,7 +2941,7 @@ async function runGardener(mode, options = {}) {
           newEventEntries.push({ event, priority });
         }
         stagedCursors[source.sourceId] = result.cursors || {};
-        stagedCoverage[source.sourceId] = [{ ...result.coverage }];
+        stagedCoverage[source.sourceId] = Array.isArray(result.coverage) ? result.coverage.map((coverage) => ({ ...coverage })) : [{ ...result.coverage }];
         promoted.push(source.sourceId);
       }
     }
