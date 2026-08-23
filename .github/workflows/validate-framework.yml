@@ -1,83 +1,63 @@
-name: Validate Framework
+name: Bootstrap Canuto v1.8.0 release
 
 on:
   pull_request:
     branches: [main]
+  push:
+    branches:
+      - codex/cross-platform-release-1.8.0-20260823
+
+permissions:
+  contents: write
 
 jobs:
-  validate:
+  bootstrap:
+    if: github.actor != 'github-actions[bot]' && (github.ref_name == 'codex/cross-platform-release-1.8.0-20260823' || github.head_ref == 'codex/cross-platform-release-1.8.0-20260823')
     runs-on: ubuntu-latest
-
+    timeout-minutes: 45
     steps:
-      - name: Checkout
+      - name: Checkout release branch
         uses: actions/checkout@v4
+        with:
+          ref: codex/cross-platform-release-1.8.0-20260823
+          fetch-depth: 0
 
-      - name: Install dependencies
+      - name: Apply release patch
+        run: |
+          python3 tools/apply-cross-platform-release.py
+          chmod +x tests/cross-consumer-e2e.sh
+
+      - name: Validate Linux release candidate
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq jq
+          /bin/bash -n install.sh
+          /bin/bash -n test-framework.sh
+          /bin/bash -n tests/cross-consumer-e2e.sh
+          node --test skill-gardener/canuto-skill-gardener.test.js
+          node --test .agents/tools/framework-session-audit.test.js
+          /bin/bash test-framework.sh --verbose
+          CANUTO_E2E_SOURCE_SHA="$(git rev-parse HEAD)" /bin/bash tests/cross-consumer-e2e.sh
+          CANUTO_SOURCE_DIR="$PWD" \
+          CANUTO_SOURCE_KIND=ref \
+          CANUTO_SOURCE_REF="$(git rev-parse HEAD)" \
+          CANUTO_SOURCE_TRANSPORT=local \
+          CANUTO_BOOTSTRAPPED=1 \
+            /bin/bash install.sh --check
+          /bin/bash .agents/hooks/check-references.sh
+          /bin/bash .agents/hooks/check-orphans.sh
+          git diff --check
 
-      - name: Syntax check all shell scripts
+      - name: Remove one-shot automation
         run: |
-          echo "── Checking shell script syntax ──"
-          ERRORS=0
-          while IFS= read -r script; do
-            if bash -n "$script" 2>/dev/null; then
-              echo "  ✓ $script"
-            else
-              echo "  ✗ $script"
-              ERRORS=$((ERRORS + 1))
-            fi
-          done < <(find . -name "*.sh" -type f)
-          if [ $ERRORS -gt 0 ]; then
-            echo "Found $ERRORS script(s) with syntax errors"
-            exit 1
-          fi
-          echo "All scripts pass syntax check"
+          rm -f tools/apply-cross-platform-release.py
+          rm -f .github/workflows/apply-cross-platform-release.yml
 
-      - name: Validate skill frontmatter
+      - name: Publish release candidate
         run: |
-          echo "── Checking skill frontmatter ──"
-          ERRORS=0
-          for skill in .agents/skills/*.md; do
-            [ -f "$skill" ] || continue
-            name=$(basename "$skill")
-            # Skip non-skill artifacts that may live under .agents/skills/
-            if [ "$name" = "CLAUDE.md" ]; then
-              echo "  - $name skipped (skill directory instructions)"
-              continue
-            fi
-            first=$(head -1 "$skill")
-            if echo "$first" | grep -q "^shortDescription:"; then
-              echo "  ✓ $name (legacy frontmatter)"
-            elif [ "$first" = "---" ] && awk '
-                NR == 1 { next }
-                /^---$/ { closed = 1; exit (found && closed ? 0 : 1) }
-                /^(shortDescription|description|skill):/ { found = 1 }
-                END { exit (found && closed ? 0 : 1) }
-              ' "$skill"; then
-              echo "  ✓ $name (yaml frontmatter)"
-            else
-              echo "  ✗ $name missing shortDescription/description/skill"
-              ERRORS=$((ERRORS + 1))
-            fi
-          done
-          if [ $ERRORS -gt 0 ]; then
-            echo "Found $ERRORS skill(s) with missing frontmatter"
-            exit 1
-          fi
-          echo "All skills have valid frontmatter"
-
-      - name: Run test framework
-        run: bash test-framework.sh --verbose
-
-      - name: Install check
-        run: CANUTO_SOURCE_DIR="$PWD" bash install.sh --check
-
-      - name: Check vault references
-        continue-on-error: true
-        run: bash .agents/hooks/check-references.sh
-
-      - name: Check vault orphans
-        continue-on-error: true
-        run: bash .agents/hooks/check-orphans.sh
+          git config user.name "canuto-release-bot"
+          git config user.email "canuto-release-bot@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "release: prepare cross-platform Canuto v1.8.0"
+          git push origin HEAD:codex/cross-platform-release-1.8.0-20260823
