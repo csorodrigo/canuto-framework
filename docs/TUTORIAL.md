@@ -12,7 +12,7 @@ open docs/TUTORIAL-VISUAL.html
 
 ```bash
 cd /caminho/do/projeto
-curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/stable/install.sh | bash
 ```
 
 ### Projeto que ja usa o framework
@@ -453,7 +453,7 @@ Resultado: **HEALTHY** | **DEGRADED** | **BROKEN**
 
 ```bash
 # ── Fresh install (projeto novo) ──
-curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/stable/install.sh | bash
 
 # ── Atualizar framework (ja instalado) ──
 # O install.sh local se autoatualiza antes de aplicar o update
@@ -469,7 +469,7 @@ bash install.sh --repair
 bash install.sh --doctor
 
 # ── Migrar de v1.5 para v1.6 (UMA VEZ so, converte flat-file → Obsidian) ──
-curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --migrate --api-key SUA_KEY
+curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/stable/install.sh | bash -s -- --migrate --api-key SUA_KEY
 
 # ── Instalar skill opcional ──
 bash install.sh --skill adr --skill session-goals

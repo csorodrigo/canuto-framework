@@ -38,4 +38,4 @@ tags:
 - Blind A/B comparison agent (custo alto, ROI baixo para o estágio atual)
 - Scripts bundled Python (stack do Canuto é TS/Bun)
 
-**Related:** [[sessions/2026-03-23c]], [[instincts/I-013-evals-inline-frontmatter]], [[instincts/I-014-near-misses-mais-valiosos]]
+**Related:** [[sessions/2026-03-23c]], [[instincts/I-016-evals-inline-frontmatter]], [[instincts/I-018-near-misses-mais-valiosos]]

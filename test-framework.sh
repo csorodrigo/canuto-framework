@@ -451,20 +451,41 @@ rm -rf "$SG_HOME" "$SG_CONSUMER"
 rm -f "$SG_CRONTAB" "$SG_CONFIG_BEFORE"
 
 PORTABILITY_HOME="$(mktemp -d)"
-mkdir -p "$PORTABILITY_HOME/.canuto/vault"
+mkdir -p \
+  "$PORTABILITY_HOME/.canuto/vault/.obsidian/templates" \
+  "$PORTABILITY_HOME/.canuto/vault/sessions"
 cat > "$PORTABILITY_HOME/.canuto/vault/A.md" <<'EOF'
 [[B]]
 [Local](B.md)
+[[sessions/]]
 EOF
 cat > "$PORTABILITY_HOME/.canuto/vault/B.md" <<'EOF'
 [[A]]
 EOF
+cat > "$PORTABILITY_HOME/.canuto/vault/.obsidian/templates/session.md" <<'EOF'
+[[sessions/{{date:YYYY-MM-DD}}]]
+EOF
 
 if HOME="$PORTABILITY_HOME" CLAUDE_PROJECT_DIR="$FRAMEWORK_DIR" bash "$AGENTS_DIR/hooks/check-references.sh" >/dev/null 2>&1; then
-  pass "check-references.sh portable runtime"
+  pass "check-references.sh accepts notes, directory navigation and template placeholders"
 else
-  fail "check-references.sh portable runtime failed"
+  fail "check-references.sh rejected a valid portable vault fixture"
 fi
+
+cat > "$PORTABILITY_HOME/.canuto/vault/Broken.md" <<'EOF'
+[[definitely-missing-note]]
+EOF
+if HOME="$PORTABILITY_HOME" CLAUDE_PROJECT_DIR="$FRAMEWORK_DIR" bash "$AGENTS_DIR/hooks/check-references.sh" >/dev/null 2>&1; then
+  fail "check-references.sh accepted a genuinely broken wikilink"
+else
+  pass "check-references.sh still fails closed for a genuinely broken wikilink"
+fi
+rm -f "$PORTABILITY_HOME/.canuto/vault/Broken.md"
+rm -rf "$PORTABILITY_HOME/.canuto/vault/.obsidian"
+cat > "$PORTABILITY_HOME/.canuto/vault/A.md" <<'EOF'
+[[B]]
+[Local](B.md)
+EOF
 
 if HOME="$PORTABILITY_HOME" CLAUDE_PROJECT_DIR="$FRAMEWORK_DIR" bash "$AGENTS_DIR/hooks/check-orphans.sh" >/dev/null 2>&1; then
   pass "check-orphans.sh portable runtime"
@@ -754,7 +775,7 @@ echo ""
 # ═══════════════════════════════════════════════════════════════════════════
 echo "── Test 9: Documentation ──"
 
-DOCS=(TUTORIAL.md TROUBLESHOOTING.md PLUGIN-REGISTRY.md CLAUDE-EXAMPLES.md FEATURE-MAP.md)
+DOCS=(TUTORIAL.md TROUBLESHOOTING.md PLUGIN-REGISTRY.md CLAUDE-EXAMPLES.md FEATURE-MAP.md RELEASE-PROMOTION.md)
 for doc in "${DOCS[@]}"; do
   if [ -f "$FRAMEWORK_DIR/docs/$doc" ]; then
     pass "docs/$doc exists"
@@ -2865,7 +2886,14 @@ for SOURCE_CASE in bad-channel bad-version bad-ref selector-conflict custom-conf
     selector-conflict) SOURCE_ARGS=(--dry-run --update --channel edge --version 1.8.0); SOURCE_ENV=() ;;
     custom-conflict) SOURCE_ARGS=(--dry-run --update --channel edge); SOURCE_ENV=(CANUTO_REPO_URL=https://example.invalid/canuto) ;;
   esac
-  (cd "$SOURCE_EMPTY" && env HOME="$SOURCE_HOME" "${SOURCE_ENV[@]}" /bin/bash "$FRAMEWORK_DIR/install.sh" "${SOURCE_ARGS[@]}" >/dev/null 2>&1) || SOURCE_RC=$?
+  # Bash 3.2 + `set -u` rejects expansion of SOURCE_ENV when the
+  # environment list is intentionally empty. Keep the exact same parser cases,
+  # but call env without an empty-array expansion in that branch.
+  if [ "${#SOURCE_ENV[@]}" -gt 0 ]; then
+    (cd "$SOURCE_EMPTY" && env HOME="$SOURCE_HOME" "${SOURCE_ENV[@]}" /bin/bash "$FRAMEWORK_DIR/install.sh" "${SOURCE_ARGS[@]}" >/dev/null 2>&1) || SOURCE_RC=$?
+  else
+    (cd "$SOURCE_EMPTY" && env HOME="$SOURCE_HOME" /bin/bash "$FRAMEWORK_DIR/install.sh" "${SOURCE_ARGS[@]}" >/dev/null 2>&1) || SOURCE_RC=$?
+  fi
   if [ "$SOURCE_RC" -eq 64 ] && [ -z "$(find "$SOURCE_EMPTY" -mindepth 1 -print -quit)" ]; then
     pass "22c parser rejeita $SOURCE_CASE antes de mutar"
   else
@@ -3014,6 +3042,80 @@ else
 fi
 
 rm -rf "$SOURCE_ROOT"
+echo ""
+# ═══════════════════════════════════════════════════════════════════════════
+# TEST 23: Release v1.8.0 e prova cross-platform
+# ═══════════════════════════════════════════════════════════════════════════
+echo "── Test 23: Release v1.8.0 e prova cross-platform ──"
+
+RELEASE_VERSION=$(tr -d '[:space:]' < "$FRAMEWORK_DIR/.agents/VERSION")
+MANIFEST_VERSION=$(python3 - "$FRAMEWORK_DIR/distribution/release.json" <<'PYEOF'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as fh:
+    print(json.load(fh)["version"])
+PYEOF
+)
+if [ "$RELEASE_VERSION" = "1.8.0" ] \
+  && [ "$MANIFEST_VERSION" = "$RELEASE_VERSION" ] \
+  && grep -q '^# Canuto Framework v1\.8$' "$FRAMEWORK_DIR/README.md" \
+  && grep -q '^# Canuto Framework v1\.8 Summary$' "$FRAMEWORK_DIR/SUMMARY.md"; then
+  pass "23a VERSION, release manifest, README e SUMMARY convergem em 1.8.0"
+else
+  fail "23a superfícies de versão divergiram: VERSION=$RELEASE_VERSION manifest=$MANIFEST_VERSION"
+fi
+
+CI_RELEASE_FILE="$FRAMEWORK_DIR/.github/workflows/validate-framework.yml"
+if grep -q 'ubuntu-latest' "$CI_RELEASE_FILE" \
+  && grep -q 'macos-14' "$CI_RELEASE_FILE" \
+  && grep -q "'releases/\*\*'" "$CI_RELEASE_FILE" \
+  && grep -q '^[[:space:]]*- stable$' "$CI_RELEASE_FILE" \
+  && grep -q '/bin/bash tests/cross-consumer-e2e.sh' "$CI_RELEASE_FILE" \
+  && grep -q 'shell: /bin/bash' "$CI_RELEASE_FILE"; then
+  pass "23b CI declara Ubuntu, macOS, release/stable e E2E com /bin/bash"
+else
+  fail "23b matriz ou triggers cross-platform incompletos"
+fi
+
+if grep -A2 'Check vault references' "$CI_RELEASE_FILE" | grep -q 'continue-on-error' \
+  || grep -A2 'Check vault orphans' "$CI_RELEASE_FILE" | grep -q 'continue-on-error'; then
+  fail "23c integridade do vault ainda é informativa"
+else
+  pass "23c referências e órfãos bloqueiam a release"
+fi
+
+if [ -x "$FRAMEWORK_DIR/tests/cross-consumer-e2e.sh" ] \
+  && grep -q 'consumer beta with space' "$FRAMEWORK_DIR/tests/cross-consumer-e2e.sh" \
+  && grep -q 'rendered identical CODEX.md' "$FRAMEWORK_DIR/tests/cross-consumer-e2e.sh" \
+  && grep -q 'Refusing --update in a dirty worktree' "$FRAMEWORK_DIR/tests/cross-consumer-e2e.sh"; then
+  pass "23d E2E cobre dois consumidores, path com espaço, CODEX divergente e WIP"
+else
+  fail "23d cross-consumer E2E ausente, não executável ou incompleto"
+fi
+
+RELEASE_FRAMEWORK_BLOCK=$(sed -n '/^FRAMEWORK_FILES=(/,/^)/p' "$FRAMEWORK_DIR/install.sh")
+if printf '%s\n' "$RELEASE_FRAMEWORK_BLOCK" | grep -qF '"distribution/release.json"' \
+  && printf '%s\n' "$RELEASE_FRAMEWORK_BLOCK" | grep -qF '"docs/RELEASE-PROMOTION.md"' \
+  && python3 -m json.tool "$FRAMEWORK_DIR/distribution/release.json" >/dev/null; then
+  pass "23e manifesto e política de promoção são distribuídos e válidos"
+else
+  fail "23e manifesto/política fora da distribuição ou JSON inválido"
+fi
+
+CURRENT_DOCS=(README.md SUMMARY.md TUTORIAL.md .agents/TUTORIAL.md docs/TUTORIAL.md docs/TROUBLESHOOTING.md)
+STALE_MAIN_URL=""
+for current_doc in "${CURRENT_DOCS[@]}"; do
+  [ -f "$FRAMEWORK_DIR/$current_doc" ] || continue
+  if grep -q 'raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh' "$FRAMEWORK_DIR/$current_doc"; then
+    STALE_MAIN_URL="$current_doc"
+    break
+  fi
+done
+if [ -z "$STALE_MAIN_URL" ]; then
+  pass "23f documentação operacional usa stable, não main implícito"
+else
+  fail "23f URL de instalação edge ainda aparece como default em $STALE_MAIN_URL"
+fi
+
 echo ""
 # ═══════════════════════════════════════════════════════════════════════════
 # SUMMARY

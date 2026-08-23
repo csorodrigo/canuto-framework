@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "version": "1.8.0",
+  "releaseRef": "releases/1.8.0",
+  "channels": {
+    "stable": "refs/heads/stable",
+    "edge": "refs/heads/main",
+    "release": "refs/heads/releases/1.8.0"
+  },
+  "requiredReceipts": [
+    {
+      "id": "framework-suite",
+      "platforms": [
+        "ubuntu-latest",
+        "macos-14"
+      ],
+      "finalShaRequired": true
+    },
+    {
+      "id": "skill-gardener-suite",
+      "platforms": [
+        "ubuntu-latest",
+        "macos-14"
+      ],
+      "finalShaRequired": true
+    },
+    {
+      "id": "cross-consumer-e2e",
+      "consumers": 2,
+      "requirements": [
+        "different-project-slugs",
+        "path-with-space",
+        "rendered-codex-divergence",
+        "source-receipt",
+        "check-idempotency",
+        "dirty-tree-refusal"
+      ]
+    },
+    {
+      "id": "vault-integrity",
+      "checks": [
+        "references",
+        "orphans"
+      ]
+    }
+  ],
+  "promotion": {
+    "order": [
+      "main",
+      "releases/1.8.0",
+      "stable"
+    ],
+    "stableRequires": [
+      "main-matrix-green",
+      "release-matrix-green",
+      "cross-consumer-green",
+      "final-sha-consistent"
+    ],
+    "rollback": "bash install.sh --rollback <version>",
+    "strongestPin": "bash install.sh --update --ref <commit-sha>"
+  }
+}
