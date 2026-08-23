@@ -68,6 +68,12 @@ jobs:
           fi
           echo "All skills have valid frontmatter"
 
+      - name: Test vault integrator foundation
+        run: python3 .agents/tests/vault-integrator-test.py
+
+      - name: Smoke vault integrator installer
+        run: bash .agents/tests/vault-integrator-setup-test.sh
+
       - name: Run test framework
         run: bash test-framework.sh --verbose
 
