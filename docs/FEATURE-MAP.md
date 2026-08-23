@@ -8,10 +8,10 @@
 | Area | Status | Entry Points | Notes |
 |------|--------|--------------|-------|
 | Fresh install | implemented | `install.sh` | Bootstraps `.agents/`, hooks, vault, Codex, and docs; leaves changes unstaged unless `--commit` is explicit |
-| Update flow | implemented | `install.sh --update` | Refreshes installer logic, applies framework updates, and never treats `--yes` as commit authorization |
+| Update flow | implemented | `install.sh --update` | Defaults to `stable`; supports explicit edge, release/version and exact-ref pinning; never treats `--yes` as commit authorization |
 | Runtime repair | implemented | `install.sh --repair` | Provisions strict runtime dependencies, reinstalls hooks, rewires MCP/config, recreates missing bootstrap files |
 | One-command diagnosis | implemented | `install.sh --doctor`, `install.sh --health` | Installs/verifies dependencies, runs repair plus consumer/Codex health validation, and fails if the complete environment is not ready |
-| Consumer smoke test | implemented | `install.sh --test`, `.agents/tools/canuto-consumer-smoke.sh` | Validates project-facing install state |
+| Consumer smoke test | implemented | `install.sh --test`, `.agents/tools/canuto-consumer-smoke.sh` | Validates project-facing install state and source receipt structure |
 | Codex health check | implemented | `.agents/tools/codex-health-check.sh` | Verifies CLI, profiles, trust, hooks, MCPs, contexts, dependency checks, and RTK activation |
 | Cross-project session audit | implemented | `.agents/tools/framework-session-audit.js`, `.agents/tools/framework-session-audit-lib.js` | Audits the latest up-to-200 sessions per project across workspaces, vault artifacts, and Codex logs; emits inventory, NDJSON dataset, JSON summaries, and markdown report |
 | Federated skill gardener | partial | `~/.canuto/bin/canuto-skill-gardener`, `skill-gardener/`, `global-skills/skill-gardener/SKILL.md` | Deterministic report-only inventory/usage audit with HMAC keys, coverage-aware classifications, remote read-only collection, receipts and explicit cron; remains partial until post-merge canary and real cron validation |
