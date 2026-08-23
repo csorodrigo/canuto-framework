@@ -12,6 +12,7 @@
 #   bash .agents/tools/canuto-update-all.sh              # atualiza desatualizados
 #   bash .agents/tools/canuto-update-all.sh --dry-run    # só relata, não toca
 #   bash .agents/tools/canuto-update-all.sh --force      # atualiza mesmo em dia
+#   bash .agents/tools/canuto-update-all.sh --commit     # autoriza commit por projeto
 #   bash .agents/tools/canuto-update-all.sh /path/a /path/b   # paths extras
 #   bash .agents/tools/canuto-update-all.sh --scan ~/projetos # bootstrap: acha
 #       projetos com .agents/ sob o diretório (1ª rodada, registro ainda vazio)
@@ -21,8 +22,9 @@
 # DENTRO do projeto (o instalador do projeto se auto-atualiza do main antes de
 # aplicar). Saída completa de cada projeto vai para um log em $TMPDIR.
 #
-# Contrato de segurança: NUNCA faz push. O commit local é o do próprio
-# install.sh (--yes). Projetos com working tree sujo são PULADOS — update no
+# Contrato de segurança: NUNCA faz push. Por padrão também NÃO commita;
+# `--commit` é a autorização explícita encaminhada ao install.sh. Projetos com
+# working tree sujo são PULADOS — update no
 # meio de trabalho não commitado mistura mudança de framework com mudança de
 # produto.
 #
@@ -43,12 +45,22 @@ err()  { echo -e "${RED}[update-all]${RESET} ✗ $1"; }
 
 DRY_RUN=0
 FORCE=0
+COMMIT=0
+COMMIT_POLICY="default"
 EXTRA_PATHS=()
 SCAN_DIRS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY_RUN=1 ;;
     --force)   FORCE=1 ;;
+    --commit)
+      [ "$COMMIT_POLICY" != "no-commit" ] || { err "--commit conflita com --no-commit"; exit 64; }
+      COMMIT=1; COMMIT_POLICY="commit"
+      ;;
+    --no-commit)
+      [ "$COMMIT_POLICY" != "commit" ] || { err "--no-commit conflita com --commit"; exit 64; }
+      COMMIT=0; COMMIT_POLICY="no-commit"
+      ;;
     --scan)
       # Bootstrap do registro: varre um diretório-contêiner atrás de projetos
       # com .agents/. É o caminho para a PRIMEIRA rodada em máquinas cujos
@@ -223,7 +235,9 @@ for proj in "${PROJECTS[@]}"; do
   # guardados por [[ -t 0 ]] (API key do Obsidian, "install Codex?") que o
   # --yes NÃO cobre — com o stdin do TTY herdado, o prompt iria para o log e
   # a rodada congelaria em silêncio no primeiro projeto.
-  if (cd "$proj" && bash "$FRESH_INSTALLER" --update --yes </dev/null) >"$plog" 2>&1; then
+  UPDATE_INSTALL_ARGS=(--update --yes)
+  [ "$COMMIT" -eq 1 ] && UPDATE_INSTALL_ARGS+=(--commit)
+  if (cd "$proj" && bash "$FRESH_INSTALLER" "${UPDATE_INSTALL_ARGS[@]}" </dev/null) >"$plog" 2>&1; then
     new_ver="$(head -1 "$proj/.agents/VERSION" 2>/dev/null | tr -d '[:space:]')"
     if [ "$new_ver" = "$REMOTE_VERSION" ]; then
       add_report "ATUALIZADO" "$name" "$local_ver" "$new_ver" "log: $plog"

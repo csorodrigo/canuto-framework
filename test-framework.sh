@@ -537,9 +537,9 @@ if [ -f "$FRAMEWORK_DIR/install.sh" ]; then
   INSTALL_STATIC_PATTERNS=(
     'install|update|contract|check|skill|migrate|repair|doctor|test|deps)'
     '"install.sh"'
-    '--test)    MODE="test"'
-    '--repair)  MODE="repair"'
-    '--doctor|--health) MODE="doctor"'
+    '--test) set_requested_mode "test"'
+    '--repair) set_requested_mode "repair"'
+    '--doctor|--health) set_requested_mode "doctor"'
     'rtk init -g --auto-patch'
     'rtk init -g --codex'
     '--deps-only|--deps'
@@ -967,11 +967,11 @@ contract_hook_before=$(cksum < "$contract_only_tmp/.agents/hooks/product-gate.sh
 
 contract_only_ok=true
 ( cd "$contract_only_tmp" \
-  && CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" bash "$FRAMEWORK_DIR/install.sh" --contract-only --yes >/dev/null 2>&1 ) \
+  && CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" bash "$FRAMEWORK_DIR/install.sh" --contract-only --yes --commit >/dev/null 2>&1 ) \
   || contract_only_ok=false
 contract_first_head=$(git -C "$contract_only_tmp" rev-parse HEAD 2>/dev/null || true)
 ( cd "$contract_only_tmp" \
-  && CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" bash "$FRAMEWORK_DIR/install.sh" --contract-only --yes >/dev/null 2>&1 ) \
+  && CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" bash "$FRAMEWORK_DIR/install.sh" --contract-only --yes --commit >/dev/null 2>&1 ) \
   || contract_only_ok=false
 contract_second_head=$(git -C "$contract_only_tmp" rev-parse HEAD 2>/dev/null || true)
 contract_names=$(git -C "$contract_only_tmp" diff-tree --no-commit-id --name-only -r "$contract_first_head" | sort)
@@ -1010,7 +1010,7 @@ git -C "$contract_fail_tmp" commit --no-verify -qm fixture
 contract_fail_head=$(git -C "$contract_fail_tmp" rev-parse HEAD)
 contract_fail_out=$(mktemp)
 if ( cd "$contract_fail_tmp" \
-  && CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" bash "$FRAMEWORK_DIR/install.sh" --contract-only --yes ) >"$contract_fail_out" 2>&1; then
+  && CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" bash "$FRAMEWORK_DIR/install.sh" --contract-only --yes --commit ) >"$contract_fail_out" 2>&1; then
   fail "--contract-only saiu verde quando o pre-commit rejeitou o commit"
 elif [ "$contract_fail_head" = "$(git -C "$contract_fail_tmp" rev-parse HEAD)" ] \
   && grep -q 'Git commit failed' "$contract_fail_out" \
@@ -2636,6 +2636,143 @@ else
   fail "20e docs/SKILL-GARDENER-CONFIG.md ausente"
 fi
 
+echo ""
+# ═══════════════════════════════════════════════════════════════════════════
+# TEST 21: Consentimento explícito para commit (ADR-0016)
+# ═══════════════════════════════════════════════════════════════════════════
+echo "── Test 21: Consentimento explícito para commit ──"
+
+CONSENT_ROOT=$(mktemp -d)
+CONSENT_HOME="$CONSENT_ROOT/home"
+mkdir -p "$CONSENT_HOME"
+
+make_contract_consumer() {
+  local repo="$1"
+  mkdir -p "$repo"
+  git -C "$repo" init -q
+  git -C "$repo" config user.name "Canuto Consent Test"
+  git -C "$repo" config user.email "consent@example.invalid"
+  printf '# Consumer Claude\n' > "$repo/CLAUDE.md"
+  printf '# Consumer Agents\n' > "$repo/AGENTS.md"
+  git -C "$repo" add CLAUDE.md AGENTS.md
+  git -C "$repo" commit -q -m "test: initial consumer"
+}
+
+NO_COMMIT_REPO="$CONSENT_ROOT/no-commit"
+make_contract_consumer "$NO_COMMIT_REPO"
+NO_COMMIT_BEFORE=$(git -C "$NO_COMMIT_REPO" rev-parse HEAD)
+if (cd "$NO_COMMIT_REPO" && HOME="$CONSENT_HOME" CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" \
+    /bin/bash "$FRAMEWORK_DIR/install.sh" --contract-only --yes </dev/null >/dev/null 2>&1); then
+  NO_COMMIT_AFTER=$(git -C "$NO_COMMIT_REPO" rev-parse HEAD)
+  if [ "$NO_COMMIT_AFTER" = "$NO_COMMIT_BEFORE" ] \
+     && git -C "$NO_COMMIT_REPO" diff --cached --quiet \
+     && [ -n "$(git -C "$NO_COMMIT_REPO" status --porcelain)" ]; then
+    pass "21a --yes aplica o contrato sem stage nem commit"
+  else
+    fail "21a --yes alterou HEAD/index ou não deixou diff inspecionável"
+  fi
+else
+  fail "21a contract-only sem --commit falhou"
+fi
+
+COMMIT_REPO="$CONSENT_ROOT/explicit-commit"
+make_contract_consumer "$COMMIT_REPO"
+COMMIT_COUNT_BEFORE=$(git -C "$COMMIT_REPO" rev-list --count HEAD)
+if (cd "$COMMIT_REPO" && HOME="$CONSENT_HOME" CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" \
+    /bin/bash "$FRAMEWORK_DIR/install.sh" --contract-only --yes --commit </dev/null >/dev/null 2>&1); then
+  COMMIT_COUNT_AFTER=$(git -C "$COMMIT_REPO" rev-list --count HEAD)
+  COMMIT_PATHS=$(git -C "$COMMIT_REPO" diff-tree --no-commit-id --name-only -r HEAD | LC_ALL=C sort | tr '\n' ' ')
+  if [ "$COMMIT_COUNT_AFTER" -eq $((COMMIT_COUNT_BEFORE + 1)) ] \
+     && [ -z "$(git -C "$COMMIT_REPO" status --porcelain)" ] \
+     && [ "$COMMIT_PATHS" = ".agents/OPERATING-CONTRACT.md AGENTS.md CLAUDE.md " ]; then
+    pass "21b --commit cria um commit limitado aos três paths declarados"
+  else
+    fail "21b commit explícito não convergiu ou incluiu paths indevidos: $COMMIT_PATHS"
+  fi
+else
+  fail "21b contract-only com --commit falhou"
+fi
+
+PARSER_DIR="$CONSENT_ROOT/parser"
+mkdir -p "$PARSER_DIR"
+if (cd "$PARSER_DIR" && /bin/bash "$FRAMEWORK_DIR/install.sh" --help >/dev/null 2>&1) \
+   && [ -z "$(find "$PARSER_DIR" -mindepth 1 -print -quit)" ]; then
+  pass "21c --help sai 0 sem mutar o diretório"
+else
+  fail "21c --help falhou ou criou artefatos"
+fi
+
+if (cd "$PARSER_DIR" && HOME="$CONSENT_HOME" CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" \
+    /bin/bash "$FRAMEWORK_DIR/install.sh" --dry-run --yes >/dev/null 2>&1) \
+   && [ -z "$(find "$PARSER_DIR" -mindepth 1 -print -quit)" ]; then
+  pass "21d --dry-run resolve o modo sem mutação"
+else
+  fail "21d --dry-run falhou ou criou artefatos"
+fi
+
+for PARSER_CASE in unknown missing-skill missing-api conflicting-mode conflicting-commit commit-readonly positional; do
+  PARSER_RC=0
+  case "$PARSER_CASE" in
+    unknown) PARSER_ARGS=(--definitely-unknown) ;;
+    missing-skill) PARSER_ARGS=(--skill) ;;
+    missing-api) PARSER_ARGS=(--api-key) ;;
+    conflicting-mode) PARSER_ARGS=(--update --check) ;;
+    conflicting-commit) PARSER_ARGS=(--commit --no-commit) ;;
+    commit-readonly) PARSER_ARGS=(--check --commit) ;;
+    positional) PARSER_ARGS=(unexpected-positional) ;;
+  esac
+  (cd "$PARSER_DIR" && /bin/bash "$FRAMEWORK_DIR/install.sh" "${PARSER_ARGS[@]}" >/dev/null 2>&1) || PARSER_RC=$?
+  if [ "$PARSER_RC" -eq 64 ] && [ -z "$(find "$PARSER_DIR" -mindepth 1 -print -quit)" ]; then
+    pass "21e parser rejeita $PARSER_CASE antes de mutar"
+  else
+    fail "21e parser $PARSER_CASE retornou $PARSER_RC ou criou artefatos"
+  fi
+done
+
+UPDATE_SOURCE="$CONSENT_ROOT/update-source"
+UPDATE_TMP="$CONSENT_ROOT/update-tmp"
+mkdir -p "$UPDATE_SOURCE/.agents" "$UPDATE_TMP"
+printf '9.9.9\n' > "$UPDATE_SOURCE/.agents/VERSION"
+cat > "$UPDATE_SOURCE/install.sh" <<'STUBEOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > .captured-installer-args
+mkdir -p .agents
+printf '9.9.9\n' > .agents/VERSION
+STUBEOF
+chmod +x "$UPDATE_SOURCE/install.sh"
+
+make_update_consumer() {
+  local repo="$1"
+  mkdir -p "$repo/.agents"
+  git -C "$repo" init -q
+  git -C "$repo" config user.name "Canuto Update Test"
+  git -C "$repo" config user.email "update@example.invalid"
+  printf '1.0.0\n' > "$repo/.agents/VERSION"
+  git -C "$repo" add .agents/VERSION
+  git -C "$repo" commit -q -m "test: old framework"
+}
+
+UPDATE_DEFAULT_REPO="$CONSENT_ROOT/update-default"
+make_update_consumer "$UPDATE_DEFAULT_REPO"
+if CANUTO_SOURCE_DIR="$UPDATE_SOURCE" CANUTO_VAULT_DIR="$CONSENT_ROOT/empty-vault" TMPDIR="$UPDATE_TMP" \
+   /bin/bash "$FRAMEWORK_DIR/.agents/tools/canuto-update-all.sh" "$UPDATE_DEFAULT_REPO" >/dev/null 2>&1 \
+   && ! grep -qx -- '--commit' "$UPDATE_DEFAULT_REPO/.captured-installer-args"; then
+  pass "21f update-all não encaminha --commit por padrão"
+else
+  fail "21f update-all encaminhou commit implícito ou falhou"
+fi
+
+UPDATE_COMMIT_REPO="$CONSENT_ROOT/update-commit"
+make_update_consumer "$UPDATE_COMMIT_REPO"
+if CANUTO_SOURCE_DIR="$UPDATE_SOURCE" CANUTO_VAULT_DIR="$CONSENT_ROOT/empty-vault" TMPDIR="$UPDATE_TMP" \
+   /bin/bash "$FRAMEWORK_DIR/.agents/tools/canuto-update-all.sh" --commit "$UPDATE_COMMIT_REPO" >/dev/null 2>&1 \
+   && grep -qx -- '--commit' "$UPDATE_COMMIT_REPO/.captured-installer-args"; then
+  pass "21g update-all encaminha --commit somente quando explícito"
+else
+  fail "21g update-all não respeitou autorização explícita"
+fi
+
+rm -rf "$CONSENT_ROOT"
 echo ""
 # ═══════════════════════════════════════════════════════════════════════════
 # SUMMARY

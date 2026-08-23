@@ -1,22 +1,19 @@
 #!/usr/bin/env bash
 # =============================================================================
 # Canuto Framework — Installer / Updater
-# Usage:
-#   Fresh install:    curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash
-#   Local run:        bash install.sh
-#   Update only:      bash install.sh --update
-#   Update via curl:  curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --update
-#   Contract only:    bash install.sh --contract-only
-#   Check versions:   bash install.sh --check
-#   Smoke test:       bash install.sh --test
-#   Repair runtime:   bash install.sh --repair
-#   Doctor mode:      bash install.sh --doctor
-#   Dependency setup: bash install.sh --deps-only
-#   Migrate from v1:  bash install.sh --migrate
-#   With API key:     bash install.sh --migrate --api-key YOUR_OBSIDIAN_API_KEY
-#   Via curl + key:   curl ... | bash -s -- --migrate --api-key YOUR_KEY
-#   Install a skill:  bash install.sh --skill pr-description --skill health-check
-#   JSON health:      bash install.sh --test --json
+#
+# Common usage:
+#   Fresh install:    bash install.sh [--yes] [--commit]
+#   Update:           bash install.sh --update [--yes] [--commit]
+#   Contract only:    bash install.sh --contract-only [--yes] [--commit]
+#   Install skills:   bash install.sh --skill NAME [--skill NAME] [--commit]
+#   Preview:          bash install.sh --dry-run [MODE]
+#   Help:             bash install.sh --help
+#
+# Consent boundary:
+#   --yes confirms operational prompts. It NEVER authorizes a Git commit.
+#   --commit is the only flag that authorizes staging and committing declared
+#   framework paths. The default, and --no-commit, leave changes unstaged.
 # =============================================================================
 
 set -euo pipefail
@@ -25,13 +22,17 @@ REPO_URL="${CANUTO_REPO_URL:-https://raw.githubusercontent.com/csorodrigo/canuto
 SOURCE_DIR="${CANUTO_SOURCE_DIR:-}"
 AGENTS_DIR=".agents"
 CLAUDE_MD="CLAUDE.md"
-TMP_DIR=$(mktemp -d)
+TMP_DIR=""
 MODE="auto" # auto | install | update | contract | check | skill | migrate | repair | doctor | test | deps
 ORIGINAL_ARGS=("$@")
 SCRIPT_SOURCE="${BASH_SOURCE[0]:-$0}"
 SKILLS_TO_INSTALL=()
 JSON_OUTPUT=false
 AUTO_YES=false
+COMMIT_CHANGES=false
+COMMIT_POLICY="default" # default | commit | no-commit
+DRY_RUN=false
+OBSIDIAN_API_KEY_ARG=""
 
 # ── Colors ─────────────────────────────────────────────────────────────────
 GREEN='\033[0;32m'
@@ -43,43 +44,151 @@ RESET='\033[0m'
 log()    { echo -e "${CYAN}[canuto]${RESET} $1"; }
 ok()     { echo -e "${GREEN}[canuto]${RESET} \u2713 $1"; }
 warn()   { echo -e "${YELLOW}[canuto]${RESET} \u26a0 $1"; }
-error()  { echo -e "${RED}[canuto]${RESET} \u2717 $1"; exit 1; }
+error()  { echo -e "${RED}[canuto]${RESET} \u2717 $1" >&2; exit 1; }
 
-# ── Parse args ──────────────────────────────────────────────────────────────
-while [[ $# -gt 0 ]]; do
-  case $1 in
-    --update) MODE="update" ;;
-    --contract-only) MODE="contract" ;;
-    --check)   MODE="check"   ;;
-    --test)    MODE="test"    ;;
-    --migrate) MODE="migrate" ;;
-    --repair)  MODE="repair"  ;;
-    --deps-only|--deps) MODE="deps" ;;
-    --doctor|--health) MODE="doctor" ;;
+print_help() {
+  cat <<'HELPEOF'
+Canuto Framework installer/updater
+
+Usage:
+  bash install.sh [MODE] [OPTIONS]
+
+Modes (choose at most one):
+  --update             update an existing Canuto consumer
+  --contract-only      synchronize only the shared operating contract
+  --check              compare installed framework files with the source
+  --test               run consumer validation
+  --migrate            migrate a legacy installation
+  --repair             repair the local runtime
+  --doctor, --health   repair and validate the runtime
+  --deps, --deps-only  provision runtime dependencies
+  --skill NAME         install one skill; may be repeated
+
+Options:
+  --yes                accept operational prompts; never commits
+  --commit             explicitly stage and commit declared framework paths
+  --no-commit          leave changes unstaged and uncommitted (default)
+  --dry-run            report the selected mutating operation without changes
+  --api-key VALUE      Obsidian API key used by migration/setup
+  --json               machine-readable output where supported
+  -h, --help           show this help without modifying the repository
+
+Examples:
+  bash install.sh --update --yes
+  bash install.sh --update --yes --commit
+  bash install.sh --contract-only --commit
+  bash install.sh --skill health-check --no-commit
+  bash install.sh --dry-run --update
+HELPEOF
+}
+
+usage_error() {
+  echo -e "${RED}[canuto]${RESET} \u2717 $1" >&2
+  echo "" >&2
+  print_help >&2
+  exit 64
+}
+
+set_requested_mode() {
+  local requested="$1"
+  if [ "$MODE" != "auto" ] && [ "$MODE" != "$requested" ]; then
+    usage_error "Conflicting modes: --$MODE and --$requested"
+  fi
+  MODE="$requested"
+}
+
+# ── Strict argument parsing ─────────────────────────────────────────────────
+# A sourced library must not parse the caller's positional parameters as CLI
+# options. Save/clear them for the library seam and restore them before return.
+if [ "${CANUTO_INSTALL_LIBRARY_ONLY:-0}" = "1" ]; then
+  set --
+fi
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --update) set_requested_mode "update" ;;
+    --contract-only) set_requested_mode "contract" ;;
+    --check) set_requested_mode "check" ;;
+    --test) set_requested_mode "test" ;;
+    --migrate) set_requested_mode "migrate" ;;
+    --repair) set_requested_mode "repair" ;;
+    --deps-only|--deps) set_requested_mode "deps" ;;
+    --doctor|--health) set_requested_mode "doctor" ;;
     --json) JSON_OUTPUT=true ;;
     --yes) AUTO_YES=true ;;
+    --commit)
+      [ "$COMMIT_POLICY" != "no-commit" ] || usage_error "--commit conflicts with --no-commit"
+      COMMIT_POLICY="commit"
+      COMMIT_CHANGES=true
+      ;;
+    --no-commit)
+      [ "$COMMIT_POLICY" != "commit" ] || usage_error "--no-commit conflicts with --commit"
+      COMMIT_POLICY="no-commit"
+      COMMIT_CHANGES=false
+      ;;
+    --dry-run) DRY_RUN=true ;;
     --skill)
+      [ $# -ge 2 ] || usage_error "--skill requires a value"
+      case "$2" in ""|-*) usage_error "--skill requires a non-option value" ;; esac
+      SKILLS_TO_INSTALL+=("$2")
       shift
-      SKILLS_TO_INSTALL+=("$1")
       ;;
     --api-key)
+      [ $# -ge 2 ] || usage_error "--api-key requires a value"
+      case "$2" in ""|--*) usage_error "--api-key requires a value" ;; esac
+      OBSIDIAN_API_KEY_ARG="$2"
       shift
-      OBSIDIAN_API_KEY_ARG="$1"
       ;;
+    -h|--help)
+      print_help
+      exit 0
+      ;;
+    --)
+      shift
+      [ $# -eq 0 ] || usage_error "Positional arguments are not supported: $*"
+      break
+      ;;
+    -*) usage_error "Unknown option: $1" ;;
+    *) usage_error "Unexpected positional argument: $1" ;;
   esac
   shift
 done
 
-# ── Detect mode ──────────────────────────────────────────────────────────────
-if [ "$MODE" = "auto" ]; then
-  if [ "${#SKILLS_TO_INSTALL[@]}" -gt 0 ]; then
-    MODE="skill"
-  elif [ -d "$AGENTS_DIR" ]; then
-    MODE="update"
-  else
-    MODE="install"
+if [ "${#SKILLS_TO_INSTALL[@]}" -gt 0 ]; then
+  if [ "$MODE" != "auto" ] && [ "$MODE" != "skill" ]; then
+    usage_error "--skill cannot be combined with another mode"
   fi
+  MODE="skill"
 fi
+
+# ── Detect implicit install/update mode ─────────────────────────────────────
+if [ "$MODE" = "auto" ]; then
+  if [ -d "$AGENTS_DIR" ]; then MODE="update"; else MODE="install"; fi
+fi
+
+if [ "$COMMIT_CHANGES" = true ]; then
+  case "$MODE" in
+    install|update|contract|skill|migrate) ;;
+    *) usage_error "--commit is not valid with mode '$MODE'" ;;
+  esac
+fi
+
+if [ "$DRY_RUN" = true ]; then
+  [ "$COMMIT_CHANGES" = false ] || usage_error "--dry-run conflicts with --commit"
+  case "$MODE" in
+    install|update|contract|skill|migrate)
+      echo "Canuto dry-run"
+      echo "mode=$MODE"
+      echo "commit=false"
+      if [ "${#SKILLS_TO_INSTALL[@]}" -gt 0 ]; then
+        printf 'skills=%s\n' "$(IFS=,; echo "${SKILLS_TO_INSTALL[*]}")"
+      fi
+      exit 0
+      ;;
+    *) usage_error "--dry-run is supported only for install, update, contract, skill, or migrate" ;;
+  esac
+fi
+
+TMP_DIR=$(mktemp -d) || error "Could not create a temporary directory."
 
 emit_repair_warnings() {
   local repair_rc="$1"
@@ -4297,9 +4406,58 @@ print(f"\033[0;32m[canuto]\033[0m \u2713 onboarding-report.md ({len(matches)} pr
 PYEOF
 }
 
+# Commit only explicitly declared framework paths. Unrelated staged changes are
+# ignored by `git commit --only` and remain staged. Without --commit this helper
+# does not touch the index at all.
+commit_declared_paths() {
+  local message="$1"
+  shift
+
+  [ "${GIT_AVAILABLE:-false}" = true ] || return 0
+  if [ "$COMMIT_CHANGES" != true ]; then
+    warn "Changes were applied but left unstaged and uncommitted. Re-run with --commit to authorize a framework commit."
+    return 0
+  fi
+
+  local requested_paths=("$@")
+  local commit_paths=()
+  local path=""
+  for path in "${requested_paths[@]}"; do
+    [ -n "$path" ] || continue
+    if [ -e "$path" ] || [ -L "$path" ] || git ls-files --error-unmatch -- "$path" >/dev/null 2>&1; then
+      commit_paths+=("$path")
+    fi
+  done
+
+  if [ "${#commit_paths[@]}" -eq 0 ]; then
+    log "No declared framework paths exist or are tracked; nothing to commit."
+    return 0
+  fi
+
+  for path in "${commit_paths[@]}"; do
+    git add -f -A -- "$path" || {
+      warn "Could not stage declared framework path: $path"
+      return 1
+    }
+  done
+
+  if git diff --cached --quiet -- "${commit_paths[@]}"; then
+    log "Nothing to commit — declared framework paths are already synchronized."
+    return 0
+  fi
+
+  if git commit --only -m "$message" -- "${commit_paths[@]}"; then
+    ok "Committed declared framework paths only."
+    return 0
+  fi
+  warn "Git commit failed; declared framework paths remain staged for inspection."
+  return 1
+}
+
 # Test-only library seam: source installer helpers without entering an install
 # mode. It performs no setup and is used by framework smoke tests.
 if [ "${CANUTO_INSTALL_LIBRARY_ONLY:-0}" = "1" ]; then
+  set -- "${ORIGINAL_ARGS[@]}"
   return 0 2>/dev/null || exit 0
 fi
 
@@ -4324,25 +4482,9 @@ if [ "$MODE" = "contract" ]; then
   ensure_shared_operating_contract_reference "AGENTS.md"
 
   if [ "$GIT_AVAILABLE" = true ]; then
-    # Some consumers intentionally ignore `.agents/*` or Markdown entrypoints.
-    # Force-add exactly the three contract paths; never force-add a directory or
-    # any runtime/product implementation file.
-    git add -f ".agents/OPERATING-CONTRACT.md" "$CLAUDE_MD" "AGENTS.md"
-    git ls-files --error-unmatch \
-      ".agents/OPERATING-CONTRACT.md" "$CLAUDE_MD" "AGENTS.md" >/dev/null 2>&1 \
-      || error "Shared contract files were written but are not all tracked by Git."
-
-    if confirm_yes "Commit shared operating contract? [Y/n] " "Y"; then
-      if git diff --cached --quiet; then
-        log "Nothing to commit — shared operating contract already synchronized."
-      elif git commit -m "docs: sync shared Canuto operating contract"; then
-        ok "Committed shared operating contract."
-      else
-        error "Git commit failed; contract files remain staged for inspection."
-      fi
-    else
-      warn "Contract files are staged but not committed."
-    fi
+    commit_declared_paths "docs: sync shared Canuto operating contract" \
+      ".agents/OPERATING-CONTRACT.md" "$CLAUDE_MD" "AGENTS.md" \
+      || error "Shared contract commit failed; inspect the staged paths."
   fi
 
   local_contract_hash=$(sha256_file ".agents/OPERATING-CONTRACT.md" 2>/dev/null || true)
@@ -4471,6 +4613,7 @@ if [ "$MODE" = "skill" ]; then
   echo ""
 
   INSTALLED=()
+  INSTALLED_FILES=()
   for skill_name in "${SKILLS_TO_INSTALL[@]}"; do
     log "Installing skill: $skill_name..."
     skill_files=()
@@ -4479,31 +4622,28 @@ if [ "$MODE" = "skill" ]; then
       skill_files+=("$skill_file")
     done < <(skill_remote_files "$skill_name")
     installed_skill=true
+    skill_downloaded_files=()
     for skill_file in "${skill_files[@]}"; do
       if ! download "$skill_file" "$skill_file"; then
         installed_skill=false
         break
       fi
+      skill_downloaded_files+=("$skill_file")
     done
 
     if [ "$installed_skill" = true ]; then
       ok "Installed: $skill_name"
       INSTALLED+=("$skill_name")
+      INSTALLED_FILES+=("${skill_downloaded_files[@]}")
     else
       warn "Skill '$skill_name' not found. Check registry.md for available skills."
     fi
   done
 
   if [ "${#INSTALLED[@]}" -gt 0 ] && [ "$GIT_AVAILABLE" = true ]; then
-    git add ".agents/skills/" 2>/dev/null || true
-    echo ""
-    read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Commit installed skills? [Y/n] ")" COMMIT_ANSWER
-    COMMIT_ANSWER="${COMMIT_ANSWER:-Y}"
-    if [[ "$COMMIT_ANSWER" =~ ^[Yy]$ ]]; then
-      SKILL_LIST=$(IFS=', '; echo "${INSTALLED[*]}")
-      git commit -m "chore: install Canuto skills ($SKILL_LIST)"
-      ok "Committed!"
-    fi
+    SKILL_LIST=$(IFS=', '; echo "${INSTALLED[*]}")
+    commit_declared_paths "chore: install Canuto skills ($SKILL_LIST)" "${INSTALLED_FILES[@]}" \
+      || error "Skill installation commit failed; inspect the staged paths."
   fi
 
   echo ""
@@ -4655,18 +4795,13 @@ if [ "$MODE" = "migrate" ]; then
     fi
   fi
 
-  # ── Step 7: Commit ──────────────────────────────────────────────────────
+  # ── Step 7: Optional explicit commit ─────────────────────────────────────
   if [ "$GIT_AVAILABLE" = true ]; then
-    echo ""
-    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" "CODEX.md" ".context.md" "docs/" 2>/dev/null || true
-    if confirm_yes "Commit migration? [Y/n] " "Y"; then
-      if git diff --cached --quiet; then
-        log "Nothing to commit — framework already up to date."
-      else
-        git commit -m "chore: migrate Canuto Framework to v1.5 (Obsidian vault)"
-        ok "Committed!"
-      fi
-    fi
+    MIGRATE_COMMIT_PATHS=("${FRAMEWORK_FILES[@]}" "${INSTALL_ONLY_FILES[@]}" \
+      "$CLAUDE_MD" "AGENTS.md" "CODEX.md" ".context.md" ".gitignore" ".agents/memory")
+    commit_declared_paths "chore: migrate Canuto Framework to the Obsidian vault" \
+      "${MIGRATE_COMMIT_PATHS[@]}" \
+      || error "Migration commit failed; inspect the staged paths."
   fi
 
   echo ""
@@ -4725,30 +4860,18 @@ if [ "$MODE" = "install" ]; then
   fi
   register_project_path
 
+  INSTALL_FW_VER=$(head -1 "$AGENTS_DIR/VERSION" 2>/dev/null | tr -d '[:space:]')
+  [ -n "$INSTALL_FW_VER" ] || INSTALL_FW_VER="?"
   if [ "$GIT_AVAILABLE" = true ]; then
-    echo ""
-    log "Staging files for git..."
-    # Um path POR VEZ: `git add` com vários pathspecs é tudo-ou-nada — um
-    # único ausente (.context.md só existe com aprovação) fazia o comando
-    # inteiro falhar em silêncio e NADA era stageado; o commit em seguida
-    # falhava e o update saía não-zero com os arquivos na verdade aplicados.
-    # (install.sh e .claude/agents/ entram no add: estão em FRAMEWORK_FILES e
-    # ficavam untracked/modified para sempre no consumidor.)
-    for add_path in "$AGENTS_DIR" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs" "CODEX.md" "install.sh" ".claude/agents"; do
-      [ -e "$add_path" ] && git add "$add_path" 2>/dev/null || true
+    INSTALL_COMMIT_PATHS=("${FRAMEWORK_FILES[@]}" "${INSTALL_ONLY_FILES[@]}" \
+      "$CLAUDE_MD" "AGENTS.md" "CODEX.md" ".context.md" ".gitignore" \
+      ".agents/plugins/.gitkeep")
+    for install_vault_dir in "${VAULT_DIRS[@]}"; do
+      INSTALL_COMMIT_PATHS+=("$install_vault_dir/.gitkeep")
     done
-    echo ""
-    if confirm_yes "Commit now? [Y/n] " "Y"; then
-      # Versão real do carimbo recém-baixado — "v1.6" hardcoded aqui nascia
-      # defasado no mesmo release que criou .agents/VERSION para evitar isso.
-      INSTALL_FW_VER=$(head -1 "$AGENTS_DIR/VERSION" 2>/dev/null | tr -d '[:space:]')
-      [ -n "$INSTALL_FW_VER" ] || INSTALL_FW_VER="?"
-      git commit -m "chore: add Canuto Framework v$INSTALL_FW_VER" \
-        && ok "Committed!" \
-        || warn "Nada para commitar."
-    else
-      warn "Files staged but not committed. Run 'git commit' when ready."
-    fi
+    commit_declared_paths "chore: add Canuto Framework v$INSTALL_FW_VER" \
+      "${INSTALL_COMMIT_PATHS[@]}" \
+      || error "Framework installation commit failed; inspect the staged paths."
   fi
 
   echo ""
@@ -4820,48 +4943,17 @@ if [ "$MODE" = "update" ]; then
   [ -n "$FW_VER" ] || FW_VER="?"
 
   if [ "$GIT_AVAILABLE" = true ]; then
-    echo ""
-    log "Staging updated files..."
-    # Um path POR VEZ: `git add` com vários pathspecs é tudo-ou-nada — um
-    # único ausente (.context.md só existe com aprovação) fazia o comando
-    # inteiro falhar em silêncio e NADA era stageado; o commit em seguida
-    # falhava e o update saía não-zero com os arquivos na verdade aplicados.
-    # (install.sh e .claude/agents/ entram no add: estão em FRAMEWORK_FILES e
-    # ficavam untracked/modified para sempre no consumidor.)
-    for add_path in "$AGENTS_DIR" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs" "CODEX.md" "install.sh" ".claude/agents"; do
-      [ -e "$add_path" ] && git add "$add_path" 2>/dev/null || true
-    done
-
-    # Estado de runtime NUNCA entra no commit do consumidor. `git add .agents/`
-    # varre o diretório inteiro e arrastava junto o event log da máquina — que
-    # carrega o slug de QUEM gerou o evento. Foi assim que um evento com
-    # "project":"canuto-framework-v1" foi parar dentro de um repo de produto:
-    # vazamento de identidade exatamente do tipo que o ADR-0003 veta.
-    for runtime_path in \
-      "$AGENTS_DIR/vault/events" \
-      "$AGENTS_DIR/tmp" \
-      "$AGENTS_DIR/.cache" \
-      "$AGENTS_DIR/memory"; do
-      git reset -q -- "$runtime_path" 2>/dev/null || true
-    done
-
-    # E ignora daqui para frente, para não reaparecer no próximo `git add -A`
-    # que alguém rodar à mão.
+    # Runtime state is never a declared commit path. Keep ignore rules current
+    # so a later manual `git add -A` does not absorb machine-local state.
     if [ -f ".gitignore" ] && ! grep -q "^\.agents/vault/events/" .gitignore 2>/dev/null; then
       printf '\n# Canuto — estado de runtime por máquina (nunca versionar)\n.agents/vault/events/\n.agents/tmp/\n.agents/.cache/\n' >> .gitignore
-      git add .gitignore 2>/dev/null || true
       ok "Runtime do Canuto adicionado ao .gitignore"
     fi
-    echo ""
-    if confirm_yes "Commit now? [Y/n] " "Y"; then
-      # Guardado: sem diff (re-run com --force, ou nada mudou) o commit sai
-      # não-zero e, sob set -e, derrubava um update que deu certo.
-      git commit -m "chore: update Canuto Framework to v$FW_VER" \
-        && ok "Committed!" \
-        || warn "Nada novo para commitar (arquivos já em dia)."
-    else
-      warn "Files staged but not committed. Run 'git commit' when ready."
-    fi
+    UPDATE_COMMIT_PATHS=("${FRAMEWORK_FILES[@]}" "${INSTALL_ONLY_FILES[@]}" \
+      "$CLAUDE_MD" "AGENTS.md" "CODEX.md" ".context.md" ".gitignore")
+    commit_declared_paths "chore: update Canuto Framework to v$FW_VER" \
+      "${UPDATE_COMMIT_PATHS[@]}" \
+      || error "Framework update commit failed; inspect the staged paths."
   fi
 
   if ! run_install_validation; then

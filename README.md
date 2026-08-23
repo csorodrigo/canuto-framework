@@ -190,6 +190,8 @@ bash install.sh --update
 
 `bash install.sh --update` is now the standard path. The installer refreshes itself from `main` before applying the update, so it still works even if the local `install.sh` is stale.
 
+By default, install/update changes remain **unstaged and uncommitted**. `--yes` only answers operational prompts. Use `--commit` separately when a local framework commit is intended.
+
 `--update` never overwrites `vault/` or `plugins/`; it updates personas, skills, hooks, runtime helpers, and support docs. `CLAUDE.md` and `AGENTS.md` are **merged section by section** (missing framework sections/rules are added; your custom content is never replaced).
 
 O contrato comum fica em `.agents/OPERATING-CONTRACT.md`. Ele é distribuído a
