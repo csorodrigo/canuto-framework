@@ -23,7 +23,9 @@ jobs:
           fetch-depth: 0
 
       - name: Apply guarded patch
-        run: python3 tools/apply-explicit-commit-consent.py
+        run: |
+          python3 tools/fix-explicit-consent-patcher.py
+          python3 tools/apply-explicit-commit-consent.py
 
       - name: Validate syntax and behavioral gates
         run: |
@@ -35,6 +37,7 @@ jobs:
 
       - name: Remove one-shot automation
         run: |
+          rm -f tools/fix-explicit-consent-patcher.py
           rm -f tools/apply-explicit-commit-consent.py
           rm -f .github/workflows/apply-explicit-commit-consent.yml
 
