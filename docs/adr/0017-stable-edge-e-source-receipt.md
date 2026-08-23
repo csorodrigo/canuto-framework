@@ -19,6 +19,9 @@ podiam parecer igualmente atualizados.
   compatibilidade com instaladores antigos.
 - Install/update completos gravam `.agents/SOURCE-RECEIPT.json` de forma
   atômica e determinística, com source ref, versão e digest SHA-256 do manifesto.
+- Leitura de receipt é parsing JSON estrutural, não busca textual: JSON compacto
+  e formatado são equivalentes; arquivo inválido ou sem `sourceRef` falha
+  fechado e nunca vira prova de source atual.
 - `update-all` compara versão e receipt, mas não declara `OK` apenas com
   esses metadados: quando ambos coincidem, executa `install.sh --check` completo
   contra o source selecionado. Ref móvel com conteúdo novo não passa por verde.
