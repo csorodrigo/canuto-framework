@@ -24,6 +24,7 @@ jobs:
 
       - name: Apply release patch
         run: |
+          python3 tools/fix-cross-consumer-patcher.py
           python3 tools/apply-cross-platform-release.py
           chmod +x tests/cross-consumer-e2e.sh
 
@@ -50,6 +51,7 @@ jobs:
 
       - name: Remove one-shot automation
         run: |
+          rm -f tools/fix-cross-consumer-patcher.py
           rm -f tools/apply-cross-platform-release.py
           rm -f .github/workflows/apply-cross-platform-release.yml
 
