@@ -1198,6 +1198,8 @@ FRAMEWORK_FILES=(
   ".agents/tools/brief-compose.sh"
   ".agents/tools/memory-usage.sh"
   ".agents/tools/delegation-ledger.sh"
+  "distribution/release.json"
+  "docs/RELEASE-PROMOTION.md"
 )
 
 INSTALL_ONLY_FILES=(

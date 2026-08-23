@@ -22,4 +22,4 @@ tags:
 
 **Trade-offs:** Updates não são automáticos — o usuário precisa manualmente aplicar mudanças do template central. Aceito: o framework é estável e updates são raros; autonomia do projeto > conveniência de sync automático.
 
-**Related:** [[decisions/D-009-stack-lock]]
+**Related:** [[decisions/D-009-stack-lock-library-drift]]

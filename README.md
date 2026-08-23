@@ -1,8 +1,8 @@
-# Canuto Framework v1.6
+# Canuto Framework v1.8
 
 Personal multi-agent framework for AI-assisted development. Claude-first by default, Codex-maestro when you are talking directly to Codex. Obsidian-native memory.
 
-This release keeps the v1.6 Obsidian-native runtime and adds a sharper learning-loop layer: project diagnosis, rework detection, session-end learning, pending triage, and safe vault write-back preview.
+Version 1.8 hardens the operational platform: machine-blind defaults, explicit Git consent, stable/edge source pinning, deterministic receipts, and cross-platform consumer validation now sit alongside the Obsidian-native learning loop.
 
 ## O que mudou em 2026-07 (absorção edge-of-chaos)
 
@@ -32,6 +32,7 @@ Decisões completas (com alternativas rejeitadas e porquê): [`docs/adr/`](docs/
 - [`SUMMARY.md`](SUMMARY.md): short operational summary of the framework, learning loop, and skill activation model.
 - [`TUTORIAL.md`](TUTORIAL.md): step-by-step usage, update, session, and rollout guide.
 - [`registry.md`](registry.md): core, optional, and global skill registry.
+- [`docs/RELEASE-PROMOTION.md`](docs/RELEASE-PROMOTION.md): stable/edge promotion, pinning, receipts, and rollback.
 
 ## Structure
 
@@ -207,7 +208,7 @@ cd my-project
 bash install.sh --update
 ```
 
-`bash install.sh --update` is now the standard path. The installer refreshes itself from `main` before applying the update, so it still works even if the local `install.sh` is stale.
+`bash install.sh --update` is the standard stable path. The installer refreshes itself from the selected source ref before applying the update, so a stale local copy does not silently choose another channel.
 
 By default, install/update changes remain **unstaged and uncommitted**. `--yes` only answers operational prompts. Use `--commit` separately when a local framework commit is intended.
 
@@ -275,7 +276,7 @@ futuros ou da comunidade.
 ### One-time migration from v1.5 (flat-file memory) to v1.6 (Obsidian vault)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --migrate
+curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/stable/install.sh | bash -s -- --migrate
 ```
 
 ### Passive vs Explicit
