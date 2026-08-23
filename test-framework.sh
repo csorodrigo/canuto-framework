@@ -958,9 +958,11 @@ cat > "$contract_only_tmp/.agents/hooks/product-gate.sh" <<'EOF'
 echo product-only
 EOF
 git -C "$contract_only_tmp" init -q
+git -C "$contract_only_tmp" config user.name Canuto
+git -C "$contract_only_tmp" config user.email canuto@example.invalid
 git -C "$contract_only_tmp" add .gitignore
 git -C "$contract_only_tmp" add -f .agents/hooks/product-gate.sh
-git -C "$contract_only_tmp" -c user.name=Canuto -c user.email=canuto@example.invalid commit -qm fixture
+git -C "$contract_only_tmp" commit -qm fixture
 contract_hook_before=$(cksum < "$contract_only_tmp/.agents/hooks/product-gate.sh")
 
 contract_only_ok=true
@@ -1000,9 +1002,11 @@ exit 1
 EOF
 chmod +x "$contract_fail_tmp/.hooks/pre-commit"
 git -C "$contract_fail_tmp" init -q
+git -C "$contract_fail_tmp" config user.name Canuto
+git -C "$contract_fail_tmp" config user.email canuto@example.invalid
 git -C "$contract_fail_tmp" config core.hooksPath .hooks
 git -C "$contract_fail_tmp" add .hooks/pre-commit AGENTS.md CLAUDE.md
-git -C "$contract_fail_tmp" -c user.name=Canuto -c user.email=canuto@example.invalid commit --no-verify -qm fixture
+git -C "$contract_fail_tmp" commit --no-verify -qm fixture
 contract_fail_head=$(git -C "$contract_fail_tmp" rev-parse HEAD)
 contract_fail_out=$(mktemp)
 if ( cd "$contract_fail_tmp" \
