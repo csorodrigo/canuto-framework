@@ -1,0 +1,52 @@
+name: Apply identity-blind defaults
+
+on:
+  push:
+    branches:
+      - codex/identity-blind-defaults-20260823
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: codex/identity-blind-defaults-20260823
+          fetch-depth: 0
+
+      - name: Apply guarded patch
+        run: python3 tools/apply-identity-blind-defaults.py
+
+      - name: Validate JSON and JavaScript
+        run: |
+          python3 -m json.tool config/skill-gardener.json >/dev/null
+          python3 -m json.tool config/skill-gardener.schema.json >/dev/null
+          node --check skill-gardener/canuto-skill-gardener.js
+          node --check skill-gardener/canuto-skill-gardener-lib.js
+          node --test skill-gardener/canuto-skill-gardener.test.js
+
+      - name: Run framework gate
+        run: |
+          bash -n install.sh
+          bash -n test-framework.sh
+          bash test-framework.sh
+          git diff --check
+
+      - name: Remove one-shot automation
+        run: |
+          rm -f tools/apply-identity-blind-defaults.py
+          rm -f .github/workflows/apply-identity-blind-defaults.yml
+
+      - name: Commit hardened result
+        run: |
+          git config user.name "canuto-hardening-bot"
+          git config user.email "canuto-hardening-bot@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "fix(identity): make Skill Gardener defaults machine-blind"
+          git push origin HEAD:codex/identity-blind-defaults-20260823
