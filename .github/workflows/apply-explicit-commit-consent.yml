@@ -26,12 +26,14 @@ jobs:
         run: |
           python3 tools/fix-explicit-consent-patcher.py
           python3 tools/apply-explicit-commit-consent.py
+          python3 tools/refine-explicit-consent-output.py
 
       - name: Validate syntax and behavioral gates
         run: |
           /bin/bash -n install.sh
           /bin/bash -n .agents/tools/canuto-update-all.sh
           /bin/bash -n test-framework.sh
+          node --test skill-gardener/canuto-skill-gardener.test.js
           /bin/bash test-framework.sh
           git diff --check
 
@@ -39,6 +41,7 @@ jobs:
         run: |
           rm -f tools/fix-explicit-consent-patcher.py
           rm -f tools/apply-explicit-commit-consent.py
+          rm -f tools/refine-explicit-consent-output.py
           rm -f .github/workflows/apply-explicit-commit-consent.yml
 
       - name: Commit hardened result
