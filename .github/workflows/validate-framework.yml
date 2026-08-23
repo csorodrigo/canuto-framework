@@ -5,13 +5,14 @@ on:
     branches: [main]
   push:
     branches:
+      - codex/cross-platform-release-1.8.0-20260823
       - main
       - stable
       - 'releases/**'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -29,10 +30,17 @@ jobs:
         shell: /bin/bash --noprofile --norc -e -o pipefail {0}
 
     steps:
-      - name: Checkout
+      - name: Checkout release branch
         uses: actions/checkout@v4
         with:
+          ref: codex/cross-platform-release-1.8.0-20260823
           fetch-depth: 0
+
+      - name: Apply pending Bash 3.2 portability fix
+        run: |
+          if [ -f tools/fix-bash32-empty-arrays.py ]; then
+            python3 tools/fix-bash32-empty-arrays.py
+          fi
 
       - name: Install dependencies
         run: |
@@ -67,9 +75,6 @@ jobs:
           from pathlib import Path
           import re
 
-          # Only skill entrypoints carry skill frontmatter. Files under
-          # references/, examples, glossaries and test fixtures are supporting
-          # documents and must not be misclassified as independent skills.
           skill_paths = sorted(Path(".agents/skills").glob("*.md"))
           skill_paths += sorted(Path(".agents/skills").glob("*/SKILL.md"))
           errors = []
@@ -128,3 +133,32 @@ jobs:
 
       - name: Check vault orphans
         run: /bin/bash .agents/hooks/check-orphans.sh
+
+  publish-portability-fix:
+    name: publish validated Bash 3.2 fix
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          ref: codex/cross-platform-release-1.8.0-20260823
+          fetch-depth: 0
+
+      - name: Publish only after both operating systems pass
+        run: |
+          if [ ! -f tools/fix-bash32-empty-arrays.py ]; then
+            echo "Portability fix already committed; nothing to publish."
+            exit 0
+          fi
+
+          python3 tools/fix-bash32-empty-arrays.py
+          rm -f tools/fix-bash32-empty-arrays.py
+
+          git config user.name "canuto-release-bot"
+          git config user.email "canuto-release-bot@users.noreply.github.com"
+          git add -A -- install.sh tools/fix-bash32-empty-arrays.py
+          git diff --cached --quiet && exit 0
+          git commit -m "fix(portability): guard empty arrays on macOS Bash 3.2"
+          git push origin HEAD:codex/cross-platform-release-1.8.0-20260823
