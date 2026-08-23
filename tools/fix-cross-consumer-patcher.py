@@ -38,9 +38,10 @@ new_assembly = r'''  (
     write_source_receipt .agents/SOURCE-RECEIPT.json framework install "${FRAMEWORK_FILES[@]}" >/dev/null
   )
 '''
-if text.count(old_assembly) != 1:
-    raise SystemExit(f"consumer assembly block expected once, found {text.count(old_assembly)}")
-text = text.replace(old_assembly, new_assembly, 1)
+assembly_count = text.count(old_assembly)
+if assembly_count != 2:
+    raise SystemExit(f"consumer render blocks expected twice, found {assembly_count}")
+text = text.replace(old_assembly, new_assembly)
 
 old_smoke = r'''  HOME="$E2E_HOME" CLAUDE_PROJECT_DIR="$destination" \
     /bin/bash "$destination/.agents/tools/canuto-consumer-smoke.sh" --json > "$smoke_json" \
@@ -65,4 +66,4 @@ if text.count(old_smoke) != 1:
 text = text.replace(old_smoke, new_smoke, 1)
 
 path.write_text(text, encoding="utf-8")
-print("cross-consumer assembly now enforces contract references, permissions, and diagnostic smoke output")
+print("cross-consumer renders now enforce contract references, permissions, and diagnostic smoke output")
