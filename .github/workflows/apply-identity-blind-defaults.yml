@@ -25,6 +25,12 @@ jobs:
       - name: Apply guarded patch
         run: python3 tools/apply-identity-blind-defaults.py
 
+      - name: Diagnose legacy identity coupling
+        run: |
+          grep -nE 'rodrigooliveira|lucrando-ai|mecesa-v1|ssh-papiro|/srv/dev/worktrees' \
+            install.sh skill-gardener/canuto-skill-gardener.test.js \
+            skill-gardener/canuto-skill-gardener-lib.js || true
+
       - name: Validate JSON and JavaScript
         run: |
           python3 -m json.tool config/skill-gardener.json >/dev/null
