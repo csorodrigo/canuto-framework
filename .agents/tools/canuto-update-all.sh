@@ -22,7 +22,7 @@
 #
 # Por projeto: compara versão E source receipt local com o source selecionado e,
 # quando desatualizado (ou --force), roda `bash install.sh --update --yes`
-# DENTRO do projeto (o instalador do projeto se auto-atualiza do main antes de
+# DENTRO do projeto usando o instalador fresco do source ref selecionado.
 # aplicar). Saída completa de cada projeto vai para um log em $TMPDIR.
 #
 # Contrato de segurança: NUNCA faz push. Por padrão também NÃO commita;
@@ -44,6 +44,7 @@ SOURCE_KIND=""
 SOURCE_REF=""
 SOURCE_CHANNEL=""
 SOURCE_VERSION=""
+SOURCE_TRANSPORT="${CANUTO_SOURCE_TRANSPORT:-}"
 CLI_SOURCE_SELECTOR_COUNT=0
 CLI_SOURCE_CHANNEL=""
 CLI_SOURCE_VERSION=""
@@ -80,6 +81,9 @@ resolve_source() {
     SOURCE_KIND="${env_kind:-custom}"; SOURCE_REF="${env_ref:-custom}"
     SOURCE_CHANNEL="$env_channel"; SOURCE_VERSION="$env_version"
     REPO_RAW="${REPO_URL_OVERRIDE%/}"
+    if [ -z "$SOURCE_TRANSPORT" ]; then
+      if [ -n "${CANUTO_SOURCE_DIR:-}" ]; then SOURCE_TRANSPORT="local"; else SOURCE_TRANSPORT="custom-url"; fi
+    fi
     return 0
   fi
   if [ -n "$CLI_SOURCE_CHANNEL" ]; then
@@ -105,6 +109,15 @@ resolve_source() {
   fi
   validate_ref "$SOURCE_REF" || { err "source ref resolvida é inválida: $SOURCE_REF"; exit 64; }
   REPO_RAW="${REPO_BASE%/}/$SOURCE_REF"
+  if [ -z "$SOURCE_TRANSPORT" ]; then
+    if [ -n "${CANUTO_SOURCE_DIR:-}" ]; then
+      SOURCE_TRANSPORT="local"
+    elif [ "$REPO_BASE" = "https://raw.githubusercontent.com/csorodrigo/canuto-framework" ]; then
+      SOURCE_TRANSPORT="raw-github"
+    else
+      SOURCE_TRANSPORT="remote-url"
+    fi
+  fi
 }
 receipt_ref() {
   local receipt="$1"
@@ -267,6 +280,12 @@ export CANUTO_SOURCE_KIND="$SOURCE_KIND"
 export CANUTO_SOURCE_REF="$SOURCE_REF"
 export CANUTO_SOURCE_CHANNEL="$SOURCE_CHANNEL"
 export CANUTO_SOURCE_VERSION="$SOURCE_VERSION"
+export CANUTO_SOURCE_TRANSPORT="$SOURCE_TRANSPORT"
+if [ "$ROLLBACK" -eq 1 ]; then
+  export CANUTO_ROLLBACK_REQUESTED=true
+else
+  export CANUTO_ROLLBACK_REQUESTED=false
+fi
 SOURCE_SUPPORTS_RECEIPT=0
 grep -q 'SOURCE-RECEIPT.json' "$FRESH_INSTALLER" 2>/dev/null && SOURCE_SUPPORTS_RECEIPT=1
 

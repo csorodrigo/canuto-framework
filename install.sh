@@ -26,12 +26,12 @@ SOURCE_KIND=""
 SOURCE_REF=""
 SOURCE_CHANNEL=""
 SOURCE_VERSION=""
-SOURCE_TRANSPORT=""
+SOURCE_TRANSPORT="${CANUTO_SOURCE_TRANSPORT:-}"
 CLI_SOURCE_CHANNEL=""
 CLI_SOURCE_VERSION=""
 CLI_SOURCE_REF=""
 CLI_SOURCE_SELECTOR_COUNT=0
-ROLLBACK_REQUESTED=false
+ROLLBACK_REQUESTED="${CANUTO_ROLLBACK_REQUESTED:-false}"
 REFRESH_ARGS=()
 AGENTS_DIR=".agents"
 CLAUDE_MD="CLAUDE.md"
@@ -155,6 +155,11 @@ resolve_source_selection() {
   local env_channel="${CANUTO_SOURCE_CHANNEL:-${CANUTO_CHANNEL:-}}"
   local env_version="${CANUTO_SOURCE_VERSION:-${CANUTO_VERSION:-}}"
 
+  case "$ROLLBACK_REQUESTED" in
+    true|false) ;;
+    *) usage_error "CANUTO_ROLLBACK_REQUESTED must be true or false" ;;
+  esac
+
   if [ -n "$REPO_URL_OVERRIDE" ]; then
     [ "$CLI_SOURCE_SELECTOR_COUNT" -eq 0 ] || usage_error "CANUTO_REPO_URL cannot be combined with a CLI source selector"
     SOURCE_KIND="${env_kind:-custom}"
@@ -162,7 +167,9 @@ resolve_source_selection() {
     SOURCE_CHANNEL="$env_channel"
     SOURCE_VERSION="$env_version"
     REPO_URL="${REPO_URL_OVERRIDE%/}"
-    SOURCE_TRANSPORT="custom-url"
+    if [ -z "$SOURCE_TRANSPORT" ]; then
+      if [ -n "$SOURCE_DIR" ]; then SOURCE_TRANSPORT="local"; else SOURCE_TRANSPORT="custom-url"; fi
+    fi
     return 0
   fi
 
@@ -200,7 +207,15 @@ resolve_source_selection() {
 
   validate_source_ref "$SOURCE_REF" || usage_error "Resolved source ref is invalid: $SOURCE_REF"
   REPO_URL="${REPO_BASE%/}/$SOURCE_REF"
-  if [ -n "$SOURCE_DIR" ]; then SOURCE_TRANSPORT="local"; else SOURCE_TRANSPORT="raw-github"; fi
+  if [ -z "$SOURCE_TRANSPORT" ]; then
+    if [ -n "$SOURCE_DIR" ]; then
+      SOURCE_TRANSPORT="local"
+    elif [ "$REPO_BASE" = "https://raw.githubusercontent.com/csorodrigo/canuto-framework" ]; then
+      SOURCE_TRANSPORT="raw-github"
+    else
+      SOURCE_TRANSPORT="remote-url"
+    fi
+  fi
 }
 
 build_refresh_args() {
@@ -965,6 +980,8 @@ refresh_from_remote_installer_if_needed() {
       CANUTO_SOURCE_REF="$SOURCE_REF" \
       CANUTO_SOURCE_CHANNEL="$SOURCE_CHANNEL" \
       CANUTO_SOURCE_VERSION="$SOURCE_VERSION" \
+      CANUTO_SOURCE_TRANSPORT="$SOURCE_TRANSPORT" \
+      CANUTO_ROLLBACK_REQUESTED="$ROLLBACK_REQUESTED" \
       bash "$remote_installer" "${REFRESH_ARGS[@]}"
     exit $?
   fi

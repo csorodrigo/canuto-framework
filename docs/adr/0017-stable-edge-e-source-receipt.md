@@ -15,7 +15,8 @@ podiam parecer igualmente atualizados.
 - `--version X` resolve para `releases/X`; `--ref` aceita pin exato.
 - `--rollback X` é update explícito a partir de `releases/X`.
 - O bootstrap remove os seletores da argv do instalador filho e propaga o
-  endpoint/ref por ambiente, mantendo compatibilidade com instaladores antigos.
+  endpoint/ref, o transporte e a intenção de rollback por ambiente, mantendo
+  compatibilidade com instaladores antigos.
 - Install/update completos gravam `.agents/SOURCE-RECEIPT.json` de forma
   atômica e determinística, com source ref, versão e digest SHA-256 do manifesto.
 - `update-all` compara versão e receipt; source divergente não é `OK`.

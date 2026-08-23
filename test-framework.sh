@@ -2686,7 +2686,7 @@ if (cd "$COMMIT_REPO" && HOME="$CONSENT_HOME" CANUTO_SOURCE_DIR="$FRAMEWORK_DIR"
   if [ "$COMMIT_COUNT_AFTER" -eq $((COMMIT_COUNT_BEFORE + 1)) ] \
      && [ -z "$(git -C "$COMMIT_REPO" status --porcelain)" ] \
      && [ "$COMMIT_PATHS" = ".agents/CONTRACT-RECEIPT.json .agents/OPERATING-CONTRACT.md AGENTS.md CLAUDE.md " ]; then
-    pass "21b --commit cria um commit limitado aos três paths declarados"
+    pass "21b --commit cria um commit limitado aos paths declarados"
   else
     fail "21b commit explícito não convergiu ou incluiu paths indevidos: $COMMIT_PATHS"
   fi
@@ -2919,7 +2919,7 @@ printf '9.9.9\n' > "$UPDATE_SOURCE/.agents/VERSION"
 cat > "$UPDATE_SOURCE/install.sh" <<'STUBEOF'
 #!/usr/bin/env bash
 # SOURCE-RECEIPT.json support marker
-printf '%s|%s|%s|%s\n' "${CANUTO_SOURCE_KIND:-}" "${CANUTO_SOURCE_REF:-}" "${CANUTO_SOURCE_CHANNEL:-}" "${CANUTO_SOURCE_VERSION:-}" > .captured-source
+printf '%s|%s|%s|%s|%s|%s\n' "${CANUTO_SOURCE_KIND:-}" "${CANUTO_SOURCE_REF:-}" "${CANUTO_SOURCE_CHANNEL:-}" "${CANUTO_SOURCE_VERSION:-}" "${CANUTO_SOURCE_TRANSPORT:-}" "${CANUTO_ROLLBACK_REQUESTED:-}" > .captured-source
 mkdir -p .agents
 printf '9.9.9\n' > .agents/VERSION
 python3 - <<'PYEOF'
@@ -2949,7 +2949,7 @@ EDGE_REPO="$SOURCE_ROOT/edge-consumer"
 make_source_consumer "$EDGE_REPO" 9.9.9 stable
 if CANUTO_SOURCE_DIR="$UPDATE_SOURCE" CANUTO_VAULT_DIR="$SOURCE_ROOT/empty-vault" TMPDIR="$UPDATE_TMP" \
    /bin/bash "$FRAMEWORK_DIR/.agents/tools/canuto-update-all.sh" --channel edge "$EDGE_REPO" >/dev/null 2>&1 \
-   && [ "$(cat "$EDGE_REPO/.captured-source")" = "edge|main|edge|" ]; then
+   && [ "$(cat "$EDGE_REPO/.captured-source")" = "edge|main|edge||local|false" ]; then
   pass "22e update-all troca source mesmo com VERSION igual"
 else
   fail "22e update-all não propagou edge/main ou pulou por VERSION igual"
@@ -2959,10 +2959,30 @@ ROLLBACK_REPO="$SOURCE_ROOT/rollback-consumer"
 make_source_consumer "$ROLLBACK_REPO" 1.0.0 main
 if CANUTO_SOURCE_DIR="$UPDATE_SOURCE" CANUTO_VAULT_DIR="$SOURCE_ROOT/empty-vault" TMPDIR="$UPDATE_TMP" \
    /bin/bash "$FRAMEWORK_DIR/.agents/tools/canuto-update-all.sh" --rollback 1.7.0 "$ROLLBACK_REPO" >/dev/null 2>&1 \
-   && [ "$(cat "$ROLLBACK_REPO/.captured-source")" = "version|releases/1.7.0||1.7.0" ]; then
+   && [ "$(cat "$ROLLBACK_REPO/.captured-source")" = "version|releases/1.7.0||1.7.0|local|true" ]; then
   pass "22f update-all propaga rollback fixado"
 else
   fail "22f update-all não propagou rollback fixado"
+fi
+
+BOOTSTRAP_SOURCE="$SOURCE_ROOT/bootstrap-source"
+BOOTSTRAP_WORK="$SOURCE_ROOT/bootstrap-work"
+BOOTSTRAP_CAPTURE="$SOURCE_ROOT/bootstrap-capture"
+mkdir -p "$BOOTSTRAP_SOURCE/releases/1.7.0" "$BOOTSTRAP_WORK"
+cat > "$BOOTSTRAP_SOURCE/releases/1.7.0/install.sh" <<'BOOTEOF'
+#!/usr/bin/env bash
+printf '%s|%s|%s|%s|%s|%s\n' "${CANUTO_SOURCE_KIND:-}" "${CANUTO_SOURCE_REF:-}" "${CANUTO_SOURCE_CHANNEL:-}" "${CANUTO_SOURCE_VERSION:-}" "${CANUTO_SOURCE_TRANSPORT:-}" "${CANUTO_ROLLBACK_REQUESTED:-}" > "$CANUTO_BOOTSTRAP_CAPTURE"
+BOOTEOF
+chmod +x "$BOOTSTRAP_SOURCE/releases/1.7.0/install.sh"
+if (cd "$BOOTSTRAP_WORK" \
+    && HOME="$SOURCE_HOME" \
+       CANUTO_REPO_BASE="file://$BOOTSTRAP_SOURCE" \
+       CANUTO_BOOTSTRAP_CAPTURE="$BOOTSTRAP_CAPTURE" \
+       /bin/bash "$FRAMEWORK_DIR/install.sh" --rollback 1.7.0 --yes </dev/null >/dev/null 2>&1) \
+   && [ "$(cat "$BOOTSTRAP_CAPTURE" 2>/dev/null)" = "version|releases/1.7.0||1.7.0|remote-url|true" ]; then
+  pass "22g bootstrap preserva rollback, ref fixado e transporte no instalador filho"
+else
+  fail "22g bootstrap perdeu rollback/ref/transporte: $(cat "$BOOTSTRAP_CAPTURE" 2>/dev/null || echo ausente)"
 fi
 
 rm -rf "$SOURCE_ROOT"
