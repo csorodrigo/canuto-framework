@@ -35,6 +35,7 @@ grep no repo falhando o build.
   nunca distribuídos também era um bug de "genótipo ≠ o que se declara").
 
 - Defaults instaláveis e configurações bootstrap são identidade-cegas: projetos, hosts e paths reais vivem somente em `~/.canuto/config/`.
+- Configuração local válida é propriedade da máquina: o instalador valida e preserva seus bytes; não migra topologia ou paths silenciosamente.
 
 ## Consequências
 

@@ -2001,26 +2001,21 @@ test('installer preserves valid config race winner and rejects invalid winner', 
   assert.equal(fs.readFileSync(invalidConfigPath, 'utf8'), '{broken');
 });
 
-test('installer atomically migrates only generic project-local history defaults', () => {
+test('installer preserves existing valid machine-owned config byte-for-byte', () => {
   const root = tempDir();
   const home = path.join(root, 'home');
   fs.mkdirSync(home, { recursive: true });
   const first = runInstallerLibrary(home);
   assert.equal(first.status, 0, first.stderr);
   const configPath = path.join(home, '.canuto', 'config', 'skill-gardener.json');
-  const legacy = makeSyntheticLegacyConfig();
-  writeFile(configPath, `${JSON.stringify(legacy, null, 2)}\n`);
+  const machineOwned = makeSyntheticLegacyConfig();
+  writeFile(configPath, `${JSON.stringify(machineOwned, null, 2)}\n`);
+  const original = fs.readFileSync(configPath);
 
-  const migrated = runInstallerLibrary(home);
-  assert.equal(migrated.status, 0, migrated.stderr);
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  assert.deepEqual(config.projects.alpha.surfaces.remote.historyRoots, ['~/.codex/sessions', '~/.codex/archived_sessions']);
-  assert.deepEqual(config.projects.beta.surfaces.remote.historyRoots, ['~/.codex/sessions', '~/.codex/archived_sessions']);
-  assert.deepEqual(config.projects.alpha.surfaces.remote.roots, ['/opt/canuto-fixtures/alpha/main']);
-  assert.deepEqual(config.projects.beta.surfaces.customRemote.historyRoots, ['/custom/remote-history']);
-  assert.deepEqual(config.providers.hermes.historyRoots, ['~/.hermes/sessions']);
-  assert.deepEqual(config.projects.alpha.surfaces.local.historyRoots, ['/custom/history']);
-  assert.deepEqual(config.providers.hermes.pluginRoots, ['/custom/hermes/plugins']);
+  const activated = runInstallerLibrary(home);
+  assert.equal(activated.status, 0, activated.stderr);
+  assert.deepEqual(fs.readFileSync(configPath), original);
+  assert.deepEqual(fs.readdirSync(path.dirname(configPath)).filter((name) => name.includes('.tmp-migrate-')), []);
 });
 
 test('installer cleanup refuses a lock nonce mismatch', () => {
