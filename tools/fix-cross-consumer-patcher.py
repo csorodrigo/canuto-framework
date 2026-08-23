@@ -33,6 +33,7 @@ new_assembly = r'''  (
     merge_agents_md >/dev/null
     ensure_shared_operating_contract_reference "$CLAUDE_MD" >/dev/null
     ensure_shared_operating_contract_reference "AGENTS.md" >/dev/null
+    ensure_project_bootstrap_files >/dev/null
     render_codex_md >/dev/null
     setup_local_script_permissions
     write_source_receipt .agents/SOURCE-RECEIPT.json framework install "${FRAMEWORK_FILES[@]}" >/dev/null
@@ -84,4 +85,4 @@ if text.count(old_smoke_tail) != 1:
 text = text.replace(old_smoke_tail, new_smoke_tail, 1)
 
 path.write_text(text, encoding="utf-8")
-print("cross-consumer renders now enforce contract references, permissions, and portable diagnostic smoke output")
+print("cross-consumer renders now create project-owned bootstrap files, enforce contract references, permissions, and portable diagnostic smoke output")
