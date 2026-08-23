@@ -83,14 +83,19 @@ fi
 
 emit_repair_warnings() {
   local repair_rc="$1"
+  local failure_mask=0
   case "$repair_rc" in
-    10) warn "Runtime dependency repair failed; local repairs were continued." ;;
-    20) warn "Skill gardener repair failed; the remaining local repairs were continued." ;;
-    30)
-      warn "Runtime dependency repair failed; local repairs were continued."
-      warn "Skill gardener repair failed; the remaining local repairs were continued."
-      ;;
+    10) failure_mask=1 ;;
+    20) failure_mask=2 ;;
+    30) failure_mask=3 ;;
+    40) failure_mask=4 ;;
+    50) failure_mask=8 ;;
+    10[1-9]|11[0-5]) failure_mask=$((repair_rc - 100)) ;;
   esac
+  [ $((failure_mask & 1)) -eq 0 ] || warn "Runtime dependency repair failed; local repairs were continued."
+  [ $((failure_mask & 2)) -eq 0 ] || warn "Skill gardener repair failed; the remaining local repairs were continued."
+  [ $((failure_mask & 4)) -eq 0 ] || warn "Skill refactor runtime repair failed; the remaining local repairs were continued."
+  [ $((failure_mask & 8)) -eq 0 ] || warn "Global skill installation failed; runtime repairs were continued."
 }
 
 handle_repair_outcome() {
@@ -98,7 +103,7 @@ handle_repair_outcome() {
   local repair_rc="$2"
   local validation_rc="${3:-0}"
   case "$repair_rc" in
-    0|10|20|30) ;;
+    0|10|20|30|40|50|10[1-9]|11[0-5]) ;;
     *) warn "Invalid repair outcome: $repair_rc"; return 30 ;;
   esac
   case "$mode" in
@@ -154,7 +159,7 @@ handle_repair_outcome() {
 if [ -n "${CANUTO_INSTALL_TEST_DISPATCH_REPAIR_RC:-}" ] && [ "${CANUTO_INSTALL_LIBRARY_ONLY:-0}" != "1" ]; then
   TEST_REPAIR_RC="$CANUTO_INSTALL_TEST_DISPATCH_REPAIR_RC"
   case "$TEST_REPAIR_RC" in
-    0|10|20|30) ;;
+    0|10|20|30|40|50|10[1-9]|11[0-5]) ;;
     *) echo "Invalid CANUTO_INSTALL_TEST_DISPATCH_REPAIR_RC: $TEST_REPAIR_RC" >&2; rm -rf "$TMP_DIR"; exit 1 ;;
   esac
   TEST_ISOLATED_HOME="${CANUTO_INSTALL_TEST_ISOLATED_HOME:-}"
@@ -3017,6 +3022,9 @@ repair_runtime() {
   # e reportado no RETORNO, depois de reparar tudo que não depende dela.
   local deps_rc=0
   local gardener_rc=0
+  local refactor_rc=0
+  local global_skills_rc=0
+  local failure_mask=0
   setup_deps || deps_rc=10
   setup_local_script_permissions
   merge_claude_md
@@ -3030,8 +3038,9 @@ repair_runtime() {
   setup_codex
   setup_codex_mcps
   setup_gstack
-  setup_global_skills
+  setup_global_skills || global_skills_rc=50
   setup_skill_gardener || gardener_rc=20
+  setup_skill_refactor || refactor_rc=40
 
   mkdir -p ".agents/tmp"
   if [ ! -f ".agents/tmp/.gitkeep" ]; then
@@ -3041,10 +3050,19 @@ repair_runtime() {
   if [ -f ".gitignore" ] && ! grep -q ".agents/tmp/" ".gitignore" 2>/dev/null; then
     echo ".agents/tmp/" >> ".gitignore"
   fi
-  if [ "$deps_rc" -ne 0 ] && [ "$gardener_rc" -ne 0 ]; then return 30; fi
-  if [ "$deps_rc" -ne 0 ]; then return 10; fi
-  if [ "$gardener_rc" -ne 0 ]; then return 20; fi
-  return 0
+  [ "$deps_rc" -eq 0 ] || failure_mask=$((failure_mask | 1))
+  [ "$gardener_rc" -eq 0 ] || failure_mask=$((failure_mask | 2))
+  [ "$refactor_rc" -eq 0 ] || failure_mask=$((failure_mask | 4))
+  [ "$global_skills_rc" -eq 0 ] || failure_mask=$((failure_mask | 8))
+  case "$failure_mask" in
+    0) return 0 ;;
+    1) return 10 ;;
+    2) return 20 ;;
+    3) return 30 ;;
+    4) return 40 ;;
+    8) return 50 ;;
+    *) return $((100 + failure_mask)) ;;
+  esac
 }
 
 # ── setup_gstack ─────────────────────────────────────────────────────────────
@@ -3082,8 +3100,10 @@ setup_gstack() {
 # Downloads Canuto-adapted global skills (slash commands) to ~/.claude/skills/.
 # Uses the existing download() helper — no duplicate curl/wget logic.
 setup_global_skills() {
+  local failures=0
   local -a global_skills=(
     "skill-gardener"
+    "skill-refactor"
     # Canuto originals
     "ask-canuto"
     "co-plan"
@@ -3114,15 +3134,22 @@ setup_global_skills() {
     local dst="$HOME/.claude/skills/${skill}/SKILL.md"
     if [ -f "$remote" ]; then
       mkdir -p "$(dirname "$dst")"
-      cp "$remote" "$dst" \
-        && ok "/$skill" \
-        || warn "Could not copy local skill $remote"
+      if cp "$remote" "$dst"; then ok "/$skill"; else warn "Could not copy local skill $remote"; failures=1; fi
     else
-      download "$remote" "$dst" \
-        && ok "/$skill" \
-        || warn "Could not download $remote"
+      if download "$remote" "$dst"; then ok "/$skill"; else warn "Could not download $remote"; failures=1; fi
+    fi
+    if [ "$skill" = "skill-refactor" ]; then
+      local metadata_remote="global-skills/${skill}/agents/openai.yaml"
+      local metadata_dst="$HOME/.claude/skills/${skill}/agents/openai.yaml"
+      mkdir -p "$(dirname "$metadata_dst")"
+      if [ -f "$metadata_remote" ]; then
+        cp "$metadata_remote" "$metadata_dst" || { warn "Could not copy local skill metadata $metadata_remote"; failures=1; }
+      else
+        download "$metadata_remote" "$metadata_dst" || { warn "Could not download $metadata_remote"; failures=1; }
+      fi
     fi
   done
+  return "$failures"
 }
 
 # ── setup_skill_gardener ────────────────────────────────────────────────────
@@ -3582,6 +3609,105 @@ NODE
   fi
   lock_acquired=0
   ok "Installed immutable Skill Gardener release: $cli_dst"
+  return 0
+}
+
+verify_skill_refactor_release() {
+  local release_dir="$1"
+  local expected_cli_hash="$2"
+  local expected_lib_hash="$3"
+  local expected_gardener_hash="$4"
+  local cli_file="$release_dir/skill-refactor/canuto-skill-refactor.js"
+  local lib_file="$release_dir/skill-refactor/canuto-skill-refactor-lib.js"
+  local gardener_file="$release_dir/skill-gardener/canuto-skill-gardener-lib.js"
+  [ -d "$release_dir" ] && [ ! -L "$release_dir" ] || return 1
+  [ -f "$cli_file" ] && [ -f "$lib_file" ] && [ -f "$gardener_file" ] || return 1
+  [ "$(skill_gardener_sha256_file "$cli_file")" = "$expected_cli_hash" ] || return 1
+  [ "$(skill_gardener_sha256_file "$lib_file")" = "$expected_lib_hash" ] || return 1
+  [ "$(skill_gardener_sha256_file "$gardener_file")" = "$expected_gardener_hash" ] || return 1
+  node --check "$cli_file" >/dev/null 2>&1 || return 1
+  node --check "$lib_file" >/dev/null 2>&1 || return 1
+  node --check "$gardener_file" >/dev/null 2>&1 || return 1
+  [ -x "$cli_file" ] || return 1
+}
+
+setup_skill_refactor() {
+  local source_dir="${CANUTO_SKILL_REFACTOR_SOURCE_DIR:-skill-refactor}"
+  local gardener_source_dir="${CANUTO_SKILL_REFACTOR_GARDENER_SOURCE_DIR:-${CANUTO_SKILL_GARDENER_SOURCE_DIR:-skill-gardener}}"
+  local staging_root="$TMP_DIR/skill-refactor-runtime"
+  local staged_refactor="$staging_root/skill-refactor"
+  local staged_gardener="$staging_root/skill-gardener"
+  local cli_source="$source_dir/canuto-skill-refactor.js"
+  local lib_source="$source_dir/canuto-skill-refactor-lib.js"
+  local gardener_source="$gardener_source_dir/canuto-skill-gardener-lib.js"
+  local staged_cli="$staged_refactor/canuto-skill-refactor.js"
+  local staged_lib="$staged_refactor/canuto-skill-refactor-lib.js"
+  local staged_gardener_lib="$staged_gardener/canuto-skill-gardener-lib.js"
+  local bin_dir="$HOME/.canuto/bin"
+  local releases_dir="$HOME/.canuto/lib/skill-refactor/releases"
+  local cli_dst="$bin_dir/canuto-skill-refactor"
+  local nonce="skill-refactor-$(date +%s)-$$-${RANDOM}"
+  local release_tmp="$releases_dir/.tmp-$nonce"
+  local link_tmp="$bin_dir/.canuto-skill-refactor-$nonce"
+  local cli_hash=""
+  local lib_hash=""
+  local gardener_hash=""
+  local digest=""
+  local release_dir=""
+
+  mkdir -p "$staged_refactor" "$staged_gardener" "$bin_dir" "$releases_dir" || { warn "Could not prepare Skill Refactor staging."; return 1; }
+  if [ -f "$cli_source" ]; then cp "$cli_source" "$staged_cli"; else download "skill-refactor/canuto-skill-refactor.js" "$staged_cli"; fi || { warn "Skill Refactor CLI source unavailable."; return 1; }
+  if [ -f "$lib_source" ]; then cp "$lib_source" "$staged_lib"; else download "skill-refactor/canuto-skill-refactor-lib.js" "$staged_lib"; fi || { warn "Skill Refactor library source unavailable."; return 1; }
+  if [ -f "$gardener_source" ]; then cp "$gardener_source" "$staged_gardener_lib"; else download "skill-gardener/canuto-skill-gardener-lib.js" "$staged_gardener_lib"; fi || { warn "Skill Refactor gardener dependency unavailable."; return 1; }
+  chmod 0755 "$staged_cli" || return 1
+  node --check "$staged_cli" >/dev/null 2>&1 && node --check "$staged_lib" >/dev/null 2>&1 && node --check "$staged_gardener_lib" >/dev/null 2>&1 || { warn "Skill Refactor release contains invalid JavaScript."; return 1; }
+  node "$staged_cli" --help >/dev/null 2>&1 || { warn "Staged Skill Refactor CLI help failed."; return 1; }
+
+  cli_hash=$(skill_gardener_sha256_file "$staged_cli") || return 1
+  lib_hash=$(skill_gardener_sha256_file "$staged_lib") || return 1
+  gardener_hash=$(skill_gardener_sha256_file "$staged_gardener_lib") || return 1
+  digest=$(node - "$cli_hash" "$lib_hash" "$gardener_hash" <<'NODE'
+const crypto = require('node:crypto');
+process.stdout.write(crypto.createHash('sha256').update(`canuto-skill-refactor-release-v1\0${process.argv[2]}\0${process.argv[3]}\0${process.argv[4]}`).digest('hex'));
+NODE
+  ) || return 1
+  release_dir="$releases_dir/$digest"
+  mkdir -p "$release_tmp/skill-refactor" "$release_tmp/skill-gardener" || return 1
+  cp "$staged_cli" "$release_tmp/skill-refactor/canuto-skill-refactor.js" \
+    && cp "$staged_lib" "$release_tmp/skill-refactor/canuto-skill-refactor-lib.js" \
+    && cp "$staged_gardener_lib" "$release_tmp/skill-gardener/canuto-skill-gardener-lib.js" \
+    && chmod 0755 "$release_tmp/skill-refactor/canuto-skill-refactor.js" \
+    || { rm -rf "$release_tmp"; return 1; }
+  verify_skill_refactor_release "$release_tmp" "$cli_hash" "$lib_hash" "$gardener_hash" || { rm -rf "$release_tmp"; warn "Staged Skill Refactor release failed verification."; return 1; }
+
+  if ! acquire_skill_gardener_materialize_lock "$releases_dir" "$nonce"; then rm -rf "$release_tmp"; warn "Skill Refactor materialization is already locked."; return 1; fi
+  if [ -e "$release_dir" ]; then
+    verify_skill_refactor_release "$release_dir" "$cli_hash" "$lib_hash" "$gardener_hash" || { rm -rf "$release_tmp"; release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true; return 1; }
+    rm -rf "$release_tmp"
+  elif ! node - "$release_tmp" "$release_dir" <<'NODE'
+const fs = require('node:fs');
+fs.renameSync(process.argv[2], process.argv[3]);
+NODE
+  then
+    rm -rf "$release_tmp"
+    release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
+    warn "Could not atomically materialize Skill Refactor release."
+    return 1
+  fi
+  verify_skill_refactor_release "$release_dir" "$cli_hash" "$lib_hash" "$gardener_hash" || { release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true; return 1; }
+  rm -f "$link_tmp"
+  ln -s "../lib/skill-refactor/releases/$digest/skill-refactor/canuto-skill-refactor.js" "$link_tmp" || { release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true; return 1; }
+  if ! node - "$link_tmp" "$cli_dst" <<'NODE'
+const fs = require('node:fs');
+fs.renameSync(process.argv[2], process.argv[3]);
+NODE
+  then
+    rm -f "$link_tmp"
+    release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || true
+    return 1
+  fi
+  release_skill_gardener_materialize_lock "$releases_dir" "$nonce" >/dev/null 2>&1 || { warn "Skill Refactor lock cleanup failed."; return 1; }
+  ok "Installed immutable Skill Refactor release: $cli_dst"
   return 0
 }
 

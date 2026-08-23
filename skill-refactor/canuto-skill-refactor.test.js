@@ -93,6 +93,10 @@ function scanFixture(t, setup = {}) {
   writeSkill(globalB, 'resource-diverge', 'shared-entrypoint', { skillText: shared, files: { 'references/rules.md': 'rules B\n' } });
   writeSkill(globalA, 'broken-meta', 'broken', { skillText: '---\nname: broken-meta\n---\n\n# Broken\n' });
   writeSkill(globalA, 'secret-bundle', 'secret', { files: { '.env.production': 'DO_NOT_COPY=secret-value\n' } });
+  writeSkill(path.join(globalA, 'build'), 'legit-build');
+  writeSkill(path.join(globalA, 'dist'), 'legit-dist');
+  writeSkill(path.join(globalA, 'coverage'), 'legit-coverage');
+  writeSkill(path.join(globalA, 'fixtures'), 'legit-fixtures');
   writeSkill(plugins, 'managed-only');
   writeSkill(globalA, 'managed-collision', 'author-copy');
   writeSkill(plugins, 'managed-collision', 'managed-copy');
@@ -125,6 +129,7 @@ const attemptPath = path.join(cwd, '.fake-attempt');
 let attempt = 1;
 try { attempt = Number(fs.readFileSync(attemptPath, 'utf8')) + 1; } catch {}
 fs.writeFileSync(attemptPath, String(attempt));
+if (process.env.FAKE_ENV_OUTPUT) fs.writeFileSync(process.env.FAKE_ENV_OUTPUT, JSON.stringify(process.env));
 if (process.env.FAKE_DELEGATE_FAIL === 'always' || (process.env.FAKE_DELEGATE_FAIL === 'first' && attempt === 1)) process.exit(7);
 const task = fs.readFileSync(taskPath, 'utf8');
 const name = task.match(/Logical skill name: ([^\\n]+)/)[1].trim();
@@ -144,7 +149,8 @@ fs.writeFileSync(resultPath, 'candidate generated\\n');
 
 async function withEnv(values, callback) {
   const previous = {};
-  for (const [key, value] of Object.entries(values)) {
+  const scoped = { ...values };
+  for (const [key, value] of Object.entries(scoped)) {
     previous[key] = process.env[key];
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
@@ -155,6 +161,33 @@ async function withEnv(values, callback) {
       else process.env[key] = value;
     }
   }
+}
+
+function testValidator(root) {
+  const target = path.join(root, 'test-quick-validate.py');
+  writeFile(target, `#!/usr/bin/env python3
+import pathlib
+import sys
+
+candidate = pathlib.Path(sys.argv[1])
+sys.exit(0 if (candidate / 'SKILL.md').is_file() and (candidate / 'SKILL.md').read_text().startswith('---') else 1)
+`, 0o700);
+  return target;
+}
+
+function withTestEnv(fixture, values, callback) {
+  return withEnv(values, callback);
+}
+
+function runWithTestDelegate(fixture, delegate, options = {}) {
+  return lib.runWorkspace({
+    ...options,
+    workspace: fixture.workspace,
+    delegatePath: delegate,
+    allowTestDelegate: true,
+    validatorPath: testValidator(fixture.root),
+    allowTestValidator: true,
+  });
 }
 
 test('CLI parser is strict and supports JSON before the command', () => {
@@ -180,6 +213,10 @@ test('scan classifies the full estate and preserves resource-only divergence', (
   assert.equal(byName.get('old-skill').classification, 'INACTIVE');
   assert.equal(byName.get('project-conflict').classification, 'BLOCKED_PROVENANCE');
   assert.equal(byName.get('secret-bundle').state, 'BLOCKED');
+  assert.equal(byName.get('legit-build').classification, 'KEEP');
+  assert.equal(byName.get('legit-dist').classification, 'KEEP');
+  assert.equal(byName.get('legit-coverage').classification, 'KEEP');
+  assert.equal(byName.get('legit-fixtures').classification, 'KEEP');
 
   const provenance = JSON.parse(fs.readFileSync(path.join(fixture.workspace, 'provenance.json'), 'utf8'));
   const divergent = provenance.items[byName.get('resource-diverge').workItemId];
@@ -207,6 +244,37 @@ test('scan is idempotent and refuses both live-root overlap and scan replacement
   );
 });
 
+test('run, validate, queue and preview revalidate a workspace relocated under a live root', async (t) => {
+  const fixture = scanFixture(t);
+  const relocatedRoot = path.join(fixture.live, 'relocated-live-root');
+  fs.mkdirSync(relocatedRoot, { recursive: true });
+  const config = JSON.parse(fs.readFileSync(fixture.configPath, 'utf8'));
+  config.providers.codex.roots.push(relocatedRoot);
+  writeFile(fixture.configPath, `${JSON.stringify(config, null, 2)}\n`);
+  const relocatedWorkspace = path.join(relocatedRoot, 'workspace');
+  fs.renameSync(fixture.workspace, relocatedWorkspace);
+  await assert.rejects(() => lib.runWorkspace({ workspace: relocatedWorkspace, limit: 0 }), (error) => error.code === 'workspace-live-root');
+  for (const operation of [
+    () => lib.validateWorkspace({ workspace: relocatedWorkspace }),
+    () => lib.queueWorkspace(relocatedWorkspace),
+    () => lib.previewWorkspace(relocatedWorkspace, 'needs-merge'),
+  ]) assert.throws(operation, (error) => error.code === 'workspace-live-root');
+});
+
+test('generated reconciliation failure is visible in status and exit code', async (t) => {
+  const fixture = scanFixture(t);
+  const entry = lib.loadedWorkspace(fixture.workspace).entries.find((item) => item.state.state === 'PENDING');
+  const statePath = path.join(fixture.workspace, 'work-items', entry.skill.name, 'state.json');
+  writeFile(statePath, `${JSON.stringify({ ...entry.state, state: 'GENERATED' }, null, 2)}\n`);
+  const result = await lib.runWorkspace({ workspace: fixture.workspace, workers: 1, limit: 0 });
+  const failed = result.results.find((item) => item.name === entry.skill.name);
+  assert.equal(failed.state, 'FAILED');
+  assert.equal(failed.claimed, false);
+  assert.equal(result.status, 'PARTIAL');
+  assert.equal(result.exitCode, 2);
+  assert.equal(result.counts.failedOrBlocked, 1);
+});
+
 test('candidate validation rejects broken references, scaffolds and stale copies', (t) => {
   const root = tempDir(t);
   const candidate = writeSkill(root, 'candidate-one', 'candidate', {
@@ -228,6 +296,43 @@ test('candidate validation rejects broken references, scaffolds and stale copies
   assert.ok(invalidContract.reasons.includes('unexpected-frontmatter-key'));
   writeFile(path.join(candidate, 'SKILL.md'), `${skillText('candidate-one', 'candidate')}\nTags: tasks, todo, reminders.\n`);
   assert.equal(lib.validateCandidate(candidate, 'candidate-one').valid, true);
+  writeFile(path.join(candidate, 'SKILL.md'), `${skillText('candidate-one', 'candidate')}\nAção segura com acentuação.\n`);
+  assert.equal(lib.validateCandidate(candidate, 'candidate-one').valid, true);
+});
+
+test('oversized source files are represented as blocked work instead of being read wholesale', (t) => {
+  const fixture = scanFixture(t, {
+    beforeScan({ globalA }) {
+      writeFile(path.join(globalA, 'oversized-source', 'SKILL.md'), Buffer.alloc(lib.MAX_FILE_BYTES + 1, 'x'));
+    },
+  });
+  const item = lib.loadedWorkspace(fixture.workspace).entries.find((entry) => entry.skill.name === 'oversized-source');
+  assert.equal(item.state.state, 'BLOCKED');
+  assert.equal(item.state.reason, 'source-file-too-large');
+  assert.ok(item.skill.reasons.includes('source-file-too-large'));
+});
+
+test('bounded reads fail closed when the pathname is replaced during the read', (t) => {
+  const root = tempDir(t);
+  const target = path.join(root, 'mutable.txt');
+  const oldTarget = path.join(root, 'mutable.old.txt');
+  writeFile(target, 'original content\n');
+  const originalReadSync = fs.readSync;
+  let swapped = false;
+  fs.readSync = (...args) => {
+    const bytes = originalReadSync(...args);
+    if (!swapped) {
+      swapped = true;
+      fs.renameSync(target, oldTarget);
+      writeFile(target, 'replacement content\n');
+    }
+    return bytes;
+  };
+  try {
+    assert.throws(() => lib.readFileBounded(target, lib.MAX_FILE_BYTES, { failureCode: 'file-mutated', tooLargeCode: 'file-too-large' }), (error) => error.code === 'file-mutated');
+  } finally {
+    fs.readSync = originalReadSync;
+  }
 });
 
 test('fake delegate validates a candidate, records coverage and leaves live sources unchanged', async (t) => {
@@ -237,11 +342,11 @@ test('fake delegate validates a candidate, records coverage and leaves live sour
   const before = lib.sha256(fs.readFileSync(sourcePath));
   const contract = path.join(fixture.root, 'contract.md');
   writeFile(contract, skillText('skill-creator-contract', 'contract'));
-  const result = await withEnv({
+  const result = await withTestEnv(fixture, {
     CANUTO_SKILL_REFACTOR_DELEGATE: delegate,
     CANUTO_SKILL_REFACTOR_CONTRACT: contract,
     FAKE_DELEGATE_FAIL: undefined,
-  }, () => lib.runWorkspace({ workspace: fixture.workspace, workers: 0, limit: 1 }));
+  }, () => runWithTestDelegate(fixture, delegate, { workers: 0, limit: 1 }));
   assert.equal(result.workers, 1);
   assert.equal(result.claimed, 1);
   assert.equal(result.results[0].state, 'VALIDATED', JSON.stringify(result.results));
@@ -255,16 +360,92 @@ test('fake delegate validates a candidate, records coverage and leaves live sour
   assert.doesNotMatch(coverage, /PENDING/);
 });
 
+test('concurrent resumes claim one work item and conditional unlock preserves a replacement owner', async (t) => {
+  const fixture = scanFixture(t);
+  const delegate = slowCountingDelegate(fixture.root);
+  const counter = path.join(fixture.root, 'resume-counter.json');
+  const contract = path.join(fixture.root, 'contract.md');
+  writeFile(contract, skillText('skill-creator-contract', 'contract'));
+  const first = lib.loadedWorkspace(fixture.workspace).entries.find((entry) => entry.state.state === 'PENDING');
+  const statePath = path.join(fixture.workspace, 'work-items', first.skill.name, 'state.json');
+  writeFile(statePath, `${JSON.stringify({ ...first.state, state: 'RUNNING', pid: 999999, delegatePid: 999999 }, null, 2)}\n`);
+  const lockRelease = lib.acquireLock(fixture.workspace, first.skill);
+  assert.equal(typeof lockRelease, 'function');
+  const lockPath = path.join(fixture.workspace, 'work-items', first.skill.name, '.claim.lock');
+  const displacedPath = `${lockPath}.displaced`;
+  fs.renameSync(lockPath, displacedPath);
+  writeFile(lockPath, JSON.stringify({ pid: process.pid, token: 'replacement-owner', createdAt: new Date().toISOString() }));
+  lockRelease();
+  assert.equal(JSON.parse(fs.readFileSync(lockPath, 'utf8')).token, 'replacement-owner');
+  fs.rmSync(lockPath, { force: true });
+  fs.rmSync(displacedPath, { force: true });
+  const competingOwner = lib.acquireLock(fixture.workspace, first.skill);
+  assert.equal(typeof competingOwner, 'function');
+  assert.equal(lib.acquireLock(fixture.workspace, first.skill), null);
+  competingOwner();
+
+  const originalWriteFileSync = fs.writeFileSync;
+  let publishedOwner;
+  let injecting = false;
+  fs.writeFileSync = function interceptLockPublication(target, value, ...args) {
+    const result = originalWriteFileSync.call(fs, target, value, ...args);
+    if (!injecting && typeof target === 'number' && String(value).includes('"token"')) {
+      injecting = true;
+      publishedOwner = lib.acquireLock(fixture.workspace, first.skill);
+    }
+    return result;
+  };
+  let displacedPublisher;
+  try { displacedPublisher = lib.acquireLock(fixture.workspace, first.skill); } finally { fs.writeFileSync = originalWriteFileSync; }
+  assert.equal(displacedPublisher, null);
+  assert.equal(typeof publishedOwner, 'function');
+  publishedOwner();
+
+  const results = await withTestEnv(fixture, { CANUTO_SKILL_REFACTOR_DELEGATE: delegate, CANUTO_SKILL_REFACTOR_CONTRACT: contract, FAKE_COUNTER: counter, FAKE_DELAY_MS: '5000' },
+    () => Promise.all([
+      runWithTestDelegate(fixture, delegate, { workers: 1, resume: true, limit: 1 }),
+      runWithTestDelegate(fixture, delegate, { workers: 1, resume: true, limit: 1 }),
+    ]));
+  const itemResults = results.flatMap((result) => result.results).filter((item) => item.name === first.skill.name);
+  assert.equal(itemResults.filter((item) => item.claimed).length, 1, JSON.stringify(results));
+});
+
+test('delegate receives only the isolated allowlist and untrusted paths are rejected', async (t) => {
+  const fixture = scanFixture(t);
+  const delegate = fakeDelegate(fixture.root);
+  const contract = path.join(fixture.root, 'contract.md');
+  const envOutput = path.join(fixture.root, 'delegate-env.json');
+  writeFile(contract, skillText('skill-creator-contract', 'contract'));
+  process.env.CANUTO_SKILL_REFACTOR_TEST_ALLOW_DELEGATE = '1';
+  try { assert.equal(lib.trustedDelegatePath(delegate), false); } finally { delete process.env.CANUTO_SKILL_REFACTOR_TEST_ALLOW_DELEGATE; }
+  assert.equal(lib.trustedDelegatePath(delegate, true), true);
+  const canonicalValidator = lib.defaultValidatorPath();
+  process.env.CANUTO_SKILL_REFACTOR_VALIDATOR = delegate;
+  try { assert.equal(lib.defaultValidatorPath(), canonicalValidator); } finally { delete process.env.CANUTO_SKILL_REFACTOR_VALIDATOR; }
+  const result = await withTestEnv(fixture, {
+    CANUTO_SKILL_REFACTOR_DELEGATE: delegate,
+    CANUTO_SKILL_REFACTOR_CONTRACT: contract,
+    FAKE_ENV_OUTPUT: envOutput,
+    SECRET_NOT_ALLOWED: 'must-not-cross-boundary',
+  }, () => runWithTestDelegate(fixture, delegate, { workers: 1, limit: 1 }));
+  assert.equal(result.results[0].state, 'VALIDATED', JSON.stringify(result.results));
+  const childEnv = JSON.parse(fs.readFileSync(envOutput, 'utf8'));
+  assert.equal(childEnv.CODEX_DELEGATE_SANDBOX, 'workspace-write');
+  assert.equal(childEnv.CODEX_DELEGATE_CWD, path.join(fixture.workspace, 'work-items', result.results[0].name));
+  assert.equal(childEnv.SECRET_NOT_ALLOWED, undefined);
+  assert.equal(childEnv.CANUTO_SKILL_REFACTOR_DELEGATE, undefined);
+});
+
 test('delegate retries once and a missing coverage decision cannot pass', async (t) => {
   const fixture = scanFixture(t);
   const delegate = fakeDelegate(fixture.root);
   const contract = path.join(fixture.root, 'contract.md');
   writeFile(contract, skillText('skill-creator-contract', 'contract'));
-  const retried = await withEnv({
+  const retried = await withTestEnv(fixture, {
     CANUTO_SKILL_REFACTOR_DELEGATE: delegate,
     CANUTO_SKILL_REFACTOR_CONTRACT: contract,
     FAKE_DELEGATE_FAIL: 'first',
-  }, () => lib.runWorkspace({ workspace: fixture.workspace, workers: 1, limit: 1 }));
+  }, () => runWithTestDelegate(fixture, delegate, { workers: 1, limit: 1 }));
   assert.equal(retried.results[0].state, 'VALIDATED', JSON.stringify(retried.results));
   const state = lib.loadedWorkspace(fixture.workspace).entries.find((entry) => entry.skill.name === retried.results[0].name).state;
   assert.equal(state.attempts, 2);
@@ -281,8 +462,83 @@ test('validate reports pending refactors as partial instead of a false-ready est
   const result = lib.validateWorkspace({ workspace: fixture.workspace });
   assert.equal(result.status, 'PARTIAL');
   assert.ok(result.results.some((item) => item.state === 'PENDING' && item.valid === false && item.reason === 'pending'));
+  assert.ok(result.results.some((item) => item.name === 'project-conflict' && item.state === 'BLOCKED' && item.valid === false && item.reason === 'multiple-project-provenance'));
+  assert.equal(result.exitCode, 2);
   assert.equal(result.liveSources.status, 'UNVERIFIED');
   assert.equal(result.liveSources.unchanged, false);
+});
+
+test('validate fails closed when a KEEP entrypoint or resource changes or the estate gains a skill after scan', (t) => {
+  const mutated = scanFixture(t);
+  fs.appendFileSync(path.join(mutated.globalA, 'keep-one', 'SKILL.md'), '\nMudança após o scan.\n');
+  const mutatedResult = lib.validateWorkspace({ workspace: mutated.workspace });
+  assert.equal(mutatedResult.status, 'PARTIAL');
+  assert.equal(mutatedResult.exitCode, 2);
+  assert.equal(mutatedResult.liveSources.status, 'UNVERIFIED');
+  assert.equal(mutatedResult.results[0].reason, 'estate-drift');
+
+  const resourceMutated = scanFixture(t, {
+    beforeScan({ globalA }) {
+      writeFile(path.join(globalA, 'keep-one', 'references', 'rules.md'), 'rules before scan\n');
+    },
+  });
+  fs.writeFileSync(path.join(resourceMutated.globalA, 'keep-one', 'references', 'rules.md'), 'rules after scan\n');
+  const resourceMutatedResult = lib.validateWorkspace({ workspace: resourceMutated.workspace });
+  assert.equal(resourceMutatedResult.status, 'PARTIAL');
+  assert.equal(resourceMutatedResult.exitCode, 2);
+  assert.equal(resourceMutatedResult.liveSources.status, 'UNVERIFIED');
+  assert.equal(resourceMutatedResult.results[0].reason, 'estate-drift');
+
+  const added = scanFixture(t);
+  writeSkill(added.globalA, 'added-after-scan', 'new estate member');
+  const addedResult = lib.validateWorkspace({ workspace: added.workspace });
+  assert.equal(addedResult.status, 'PARTIAL');
+  assert.equal(addedResult.exitCode, 2);
+  assert.equal(addedResult.results[0].reason, 'estate-drift');
+});
+
+test('managed and deeply nested uninspectable bundles remain blocked', (t) => {
+  const managed = scanFixture(t, {
+    beforeScan({ plugins }) {
+      writeFile(path.join(plugins, 'managed-only', '.env.production'), 'DO_NOT_COPY=secret-value\n');
+    },
+  });
+  const managedScan = managed.result.manifest.items.find((item) => item.name === 'managed-only');
+  assert.equal(managedScan.classification, 'MANAGED');
+  assert.equal(managedScan.state, 'BLOCKED');
+  assert.ok(managedScan.reasons.includes('secret-looking-file'));
+  const initialValidation = lib.validateWorkspace({ workspace: managed.workspace });
+  const initialManaged = initialValidation.results.find((item) => item.name === 'managed-only');
+  assert.equal(initialValidation.status, 'PARTIAL');
+  assert.equal(initialManaged.valid, false);
+  assert.equal(initialManaged.reason, 'secret-looking-file');
+  fs.writeFileSync(path.join(managed.plugins, 'managed-only', '.env.production'), 'DO_NOT_COPY=changed-secret\n');
+  const mutatedValidation = lib.validateWorkspace({ workspace: managed.workspace });
+  assert.equal(mutatedValidation.status, 'PARTIAL');
+  assert.equal(mutatedValidation.results.find((item) => item.name === 'managed-only').valid, false);
+
+  const deep = scanFixture(t, {
+    beforeScan({ globalA }) {
+      let directory = path.join(globalA, 'keep-one');
+      for (let depth = 0; depth < 33; depth += 1) directory = path.join(directory, `level-${depth}`);
+      writeFile(path.join(directory, 'rules.md'), 'too deep\n');
+    },
+  });
+  const deepSkill = deep.result.manifest.items.find((item) => item.name === 'keep-one');
+  assert.equal(deepSkill.state, 'BLOCKED');
+  assert.ok(deepSkill.reasons.includes('source-depth-exceeded'));
+  const deepValidation = lib.validateWorkspace({ workspace: deep.workspace });
+  assert.equal(deepValidation.status, 'PARTIAL');
+  assert.equal(deepValidation.results.find((item) => item.name === 'keep-one').valid, false);
+
+  const candidateRoot = path.join(deep.root, 'deep-candidate');
+  writeSkill(path.dirname(candidateRoot), path.basename(candidateRoot), 'deep candidate');
+  let candidateDirectory = candidateRoot;
+  for (let depth = 0; depth < 33; depth += 1) candidateDirectory = path.join(candidateDirectory, `level-${depth}`);
+  writeFile(path.join(candidateDirectory, 'rules.md'), 'too deep\n');
+  const candidateValidation = lib.validateCandidate(candidateRoot, 'deep-candidate', []);
+  assert.equal(candidateValidation.valid, false);
+  assert.ok(candidateValidation.reasons.includes('candidate-depth-exceeded'));
 });
 
 test('source mutation blocks a queued item before delegation', async (t) => {
@@ -293,8 +549,8 @@ test('source mutation blocks a queued item before delegation', async (t) => {
   const delegate = fakeDelegate(fixture.root);
   const contract = path.join(fixture.root, 'contract.md');
   writeFile(contract, skillText('skill-creator-contract', 'contract'));
-  const result = await withEnv({ CANUTO_SKILL_REFACTOR_DELEGATE: delegate, CANUTO_SKILL_REFACTOR_CONTRACT: contract },
-    () => lib.runWorkspace({ workspace: fixture.workspace, workers: 1, limit: 1 }));
+  const result = await withTestEnv(fixture, { CANUTO_SKILL_REFACTOR_DELEGATE: delegate, CANUTO_SKILL_REFACTOR_CONTRACT: contract },
+    () => runWithTestDelegate(fixture, delegate, { workers: 1, limit: 1 }));
   assert.equal(result.results[0].state, 'BLOCKED');
   assert.equal(result.results[0].reason, 'source-mutated');
 });
@@ -349,19 +605,19 @@ test('resume reclaims a dead RUNNING item and does not delegate when a valid rec
   const statePath = path.join(fixture.workspace, 'work-items', first.skill.name, 'state.json');
   const state = { ...first.state, state: 'RUNNING', pid: 999999, delegatePid: 999999 };
   writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`);
-  const skipped = await withEnv({ CANUTO_SKILL_REFACTOR_DELEGATE: delegate, CANUTO_SKILL_REFACTOR_CONTRACT: contract },
-    () => lib.runWorkspace({ workspace: fixture.workspace, workers: 1 }));
+  const skipped = await withTestEnv(fixture, { CANUTO_SKILL_REFACTOR_DELEGATE: delegate, CANUTO_SKILL_REFACTOR_CONTRACT: contract },
+    () => runWithTestDelegate(fixture, delegate, { workers: 1 }));
   assert.equal(lib.loadedWorkspace(fixture.workspace).entries.find((entry) => entry.skill.name === first.skill.name).state.state, 'RUNNING');
-  const resumed = await withEnv({ CANUTO_SKILL_REFACTOR_DELEGATE: delegate, CANUTO_SKILL_REFACTOR_CONTRACT: contract },
-    () => lib.runWorkspace({ workspace: fixture.workspace, workers: 1, resume: true, limit: 1 }));
+  const resumed = await withTestEnv(fixture, { CANUTO_SKILL_REFACTOR_DELEGATE: delegate, CANUTO_SKILL_REFACTOR_CONTRACT: contract },
+    () => runWithTestDelegate(fixture, delegate, { workers: 1, resume: true, limit: 1 }));
   assert.equal(resumed.results[0].state, 'VALIDATED', JSON.stringify(resumed.results));
   const loaded = lib.loadedWorkspace(fixture.workspace);
   const validated = loaded.entries.find((entry) => entry.state.state === 'VALIDATED');
   const validatedStatePath = path.join(fixture.workspace, 'work-items', validated.skill.name, 'state.json');
   const validatedState = { ...validated.state, state: 'RUNNING', pid: 999999, delegatePid: 999999 };
   writeFile(validatedStatePath, `${JSON.stringify(validatedState, null, 2)}\n`);
-  const receiptRun = await withEnv({ CANUTO_SKILL_REFACTOR_DELEGATE: delegate, CANUTO_SKILL_REFACTOR_CONTRACT: contract, FAKE_DELEGATE_FAIL: 'always' },
-    () => lib.runWorkspace({ workspace: fixture.workspace, workers: 1, resume: true }));
+  const receiptRun = await withTestEnv(fixture, { CANUTO_SKILL_REFACTOR_DELEGATE: delegate, CANUTO_SKILL_REFACTOR_CONTRACT: contract, FAKE_DELEGATE_FAIL: 'always' },
+    () => runWithTestDelegate(fixture, delegate, { workers: 1, resume: true }));
   assert.equal(receiptRun.results.find((entry) => entry.name === validated.skill.name).state, 'VALIDATED');
 });
 test('source symlink escapes are quarantined before a delegate can run', (t) => {
@@ -401,8 +657,8 @@ test('all duplicate source paths for a resource-divergent variant are revalidate
   const delegate = fakeDelegate(fixture.root);
   const contract = path.join(fixture.root, 'contract.md');
   writeFile(contract, skillText('skill-creator-contract', 'contract'));
-  const result = await withEnv({ CANUTO_SKILL_REFACTOR_DELEGATE: delegate, CANUTO_SKILL_REFACTOR_CONTRACT: contract },
-    () => lib.runWorkspace({ workspace: fixture.workspace, workers: 4, limit: 20 }));
+  const result = await withTestEnv(fixture, { CANUTO_SKILL_REFACTOR_DELEGATE: delegate, CANUTO_SKILL_REFACTOR_CONTRACT: contract },
+    () => runWithTestDelegate(fixture, delegate, { workers: 4, limit: 20 }));
   const item = result.results.find((entry) => entry.name === 'resource-diverge');
   assert.ok(item, JSON.stringify(result.results));
   assert.equal(item.state, 'BLOCKED');
@@ -441,7 +697,7 @@ async function update(delta) {
     const coverage = path.join(process.cwd(), 'coverage.md');
     fs.writeFileSync(coverage, fs.readFileSync(coverage, 'utf8').replace('status: prepared', 'status: completed').replace(/preservation-decision: PENDING/g, 'preservation-decision: Preserved bounded workflow decisions.'));
     fs.writeFileSync(resultPath, 'generated');
-    await wait(100);
+    await wait(Number(process.env.FAKE_DELAY_MS || 100));
   } finally { await update(-1); }
 })().catch((error) => { process.stderr.write(String(error.stack || error)); process.exitCode = 1; });
 `, 0o700);
@@ -463,8 +719,8 @@ test('bounded concurrency never exceeds the requested worker count', async (t) =
   const counter = path.join(fixture.root, 'delegate-counter.json');
   const contract = path.join(fixture.root, 'contract.md');
   writeFile(contract, skillText('skill-creator-contract', 'contract'));
-  const result = await withEnv({ CANUTO_SKILL_REFACTOR_DELEGATE: delegate, CANUTO_SKILL_REFACTOR_CONTRACT: contract, FAKE_COUNTER: counter },
-    () => lib.runWorkspace({ workspace: fixture.workspace, workers: 2, limit: 20 }));
+  const result = await withTestEnv(fixture, { CANUTO_SKILL_REFACTOR_DELEGATE: delegate, CANUTO_SKILL_REFACTOR_CONTRACT: contract, FAKE_COUNTER: counter },
+    () => runWithTestDelegate(fixture, delegate, { workers: 2, limit: 20 }));
   assert.equal(result.status, 'READY', JSON.stringify(result.results));
   assert.ok(JSON.parse(fs.readFileSync(counter, 'utf8')).max <= 2);
   for (let index = 1; index <= 4; index += 1) {
@@ -482,8 +738,8 @@ test('tampered source snapshots are blocked before delegation', async (t) => {
   const delegate = fakeDelegate(fixture.root);
   const contract = path.join(fixture.root, 'contract.md');
   writeFile(contract, skillText('skill-creator-contract', 'contract'));
-  const result = await withEnv({ CANUTO_SKILL_REFACTOR_DELEGATE: delegate, CANUTO_SKILL_REFACTOR_CONTRACT: contract },
-    () => lib.runWorkspace({ workspace: fixture.workspace, workers: 1, limit: 1 }));
+  const result = await withTestEnv(fixture, { CANUTO_SKILL_REFACTOR_DELEGATE: delegate, CANUTO_SKILL_REFACTOR_CONTRACT: contract },
+    () => runWithTestDelegate(fixture, delegate, { workers: 1, limit: 1 }));
   assert.equal(result.results[0].state, 'BLOCKED');
   assert.equal(result.results[0].reason, 'source-snapshot-mutated');
 });
@@ -494,8 +750,8 @@ test('hung delegates are terminated by the bounded timeout', async (t) => {
   writeFile(delegate, '#!/usr/bin/env node\nsetInterval(() => {}, 1000);\n', 0o700);
   const contract = path.join(fixture.root, 'contract.md');
   writeFile(contract, skillText('skill-creator-contract', 'contract'));
-  const result = await withEnv({ CANUTO_SKILL_REFACTOR_DELEGATE: delegate, CANUTO_SKILL_REFACTOR_CONTRACT: contract },
-    () => lib.runWorkspace({ workspace: fixture.workspace, workers: 1, limit: 1, delegateTimeoutMs: 50 }));
+  const result = await withTestEnv(fixture, { CANUTO_SKILL_REFACTOR_DELEGATE: delegate, CANUTO_SKILL_REFACTOR_CONTRACT: contract },
+    () => runWithTestDelegate(fixture, delegate, { workers: 1, limit: 1, delegateTimeoutMs: 50 }));
   assert.equal(result.results[0].state, 'FAILED');
   assert.equal(result.results[0].reason, 'delegate-failed');
   const state = lib.loadedWorkspace(fixture.workspace).entries.find((entry) => entry.skill.name === result.results[0].name).state;
@@ -515,8 +771,8 @@ test('legacy Markdown sources are snapshotted as folders and can complete valida
   const delegate = fakeDelegate(fixture.root);
   const contract = path.join(fixture.root, 'contract.md');
   writeFile(contract, skillText('skill-creator-contract', 'contract'));
-  const result = await withEnv({ CANUTO_SKILL_REFACTOR_DELEGATE: delegate, CANUTO_SKILL_REFACTOR_CONTRACT: contract },
-    () => lib.runWorkspace({ workspace: fixture.workspace, workers: 1, limit: 20 }));
+  const result = await withTestEnv(fixture, { CANUTO_SKILL_REFACTOR_DELEGATE: delegate, CANUTO_SKILL_REFACTOR_CONTRACT: contract },
+    () => runWithTestDelegate(fixture, delegate, { workers: 1, limit: 20 }));
   const completed = result.results.find((entry) => entry.name === 'legacy-source');
   assert.equal(completed.state, 'VALIDATED', JSON.stringify(result.results));
 });

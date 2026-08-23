@@ -21,6 +21,9 @@ const DEFAULT_DELEGATE_TIMEOUT_MS = 15 * 60 * 1000;
 const DELEGATE_KILL_GRACE_MS = 5 * 1000;
 const HASH_PREFIX_LENGTH = 16;
 const DEFAULT_HMAC_KEY = 'canuto-skill-refactor-inventory';
+const MAX_WORKSPACE_FILE_BYTES = 32 * 1024 * 1024;
+const MAX_VALIDATOR_OUTPUT_BYTES = 64 * 1024;
+const STATE_LOCK_NAME = '.state.lock';
 
 const CLASSIFICATIONS = Object.freeze([
   'KEEP',
@@ -83,6 +86,55 @@ function isoNow() {
 
 function sleep(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function sameFileIdentity(left, right) {
+  for (const key of ['dev', 'ino', 'size', 'mtimeMs', 'ctimeMs']) {
+    if (left?.[key] !== undefined && right?.[key] !== undefined && left[key] !== right[key]) return false;
+  }
+  return true;
+}
+
+function sameFileObject(left, right) {
+  return left?.dev !== undefined && right?.dev !== undefined && left.dev === right.dev
+    && left?.ino !== undefined && right?.ino !== undefined && left.ino === right.ino;
+}
+
+function readFileBounded(filePath, limit, options = {}) {
+  const target = path.resolve(filePath);
+  const failureCode = options.failureCode || 'file-read-failed';
+  const tooLargeCode = options.tooLargeCode || failureCode;
+  let fd;
+  try {
+    const pathBefore = fs.lstatSync(target);
+    if (!pathBefore.isFile() || pathBefore.isSymbolicLink()) throw new RefactorError(failureCode, failureCode);
+    const noFollow = fs.constants.O_NOFOLLOW || 0;
+    fd = fs.openSync(target, fs.constants.O_RDONLY | noFollow);
+    const before = fs.fstatSync(fd);
+    if (!before.isFile()) throw new RefactorError(failureCode, failureCode);
+    if (before.size > limit) throw new RefactorError(tooLargeCode, tooLargeCode);
+    if (!sameFileIdentity(pathBefore, before)) throw new RefactorError(failureCode, failureCode);
+    const buffer = Buffer.alloc(before.size);
+    let offset = 0;
+    while (offset < buffer.length) {
+      const bytes = fs.readSync(fd, buffer, offset, buffer.length - offset, offset);
+      if (!bytes) throw new RefactorError(failureCode, failureCode);
+      offset += bytes;
+    }
+    const after = fs.fstatSync(fd);
+    const pathAfter = fs.lstatSync(target);
+    if (!pathAfter.isFile() || pathAfter.isSymbolicLink() || !sameFileIdentity(before, after) || !sameFileIdentity(after, pathAfter)) {
+      throw new RefactorError(failureCode, failureCode);
+    }
+    return buffer;
+  } catch (error) {
+    if (error instanceof RefactorError) throw error;
+    throw new RefactorError(failureCode, failureCode, { cause: error.code || error.message || 'read-failed' });
+  } finally {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch { /* best effort */ }
+    }
+  }
 }
 
 function asArray(value) {
@@ -164,8 +216,13 @@ function writeJsonAtomic(filePath, value, mode = 0o600) {
 
 function readJson(filePath, code = 'workspace-invalid') {
   try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const raw = readFileBounded(filePath, MAX_WORKSPACE_FILE_BYTES, {
+      failureCode: 'workspace-read-failed',
+      tooLargeCode: 'workspace-file-too-large',
+    });
+    return JSON.parse(raw.toString('utf8'));
   } catch (error) {
+    if (error instanceof RefactorError && error.code === 'workspace-file-too-large') throw error;
     if (error instanceof SyntaxError) throw new RefactorError(code, code);
     if (error.code === 'ENOENT') throw new RefactorError(code, code);
     throw new RefactorError(code, code);
@@ -173,9 +230,10 @@ function readJson(filePath, code = 'workspace-invalid') {
 }
 
 function readTextBounded(filePath, limit = MAX_RESULT_BYTES) {
-  const stat = fs.statSync(filePath);
-  if (!stat.isFile() || stat.size > limit) throw new RefactorError('result-too-large', 'delegate result exceeds the bounded result size');
-  return fs.readFileSync(filePath, 'utf8');
+  return readFileBounded(filePath, limit, {
+    failureCode: 'result-read-failed',
+    tooLargeCode: 'result-too-large',
+  }).toString('utf8');
 }
 
 function publicHash(value) {
@@ -267,7 +325,10 @@ function validateWorkspaceLocation(workspace, config, inventory, options = {}) {
 }
 
 function defaultConfigPath() {
-  return path.resolve(process.env.CANUTO_SKILL_GARDENER_CONFIG || path.join(__dirname, '..', 'config', 'skill-gardener.json'));
+  if (process.env.CANUTO_SKILL_GARDENER_CONFIG) return path.resolve(process.env.CANUTO_SKILL_GARDENER_CONFIG);
+  const installed = path.join(os.homedir(), '.canuto', 'config', 'skill-gardener.json');
+  if (fs.existsSync(installed)) return path.resolve(installed);
+  return path.resolve(path.join(__dirname, '..', 'config', 'skill-gardener.json'));
 }
 
 function defaultFrameworkRoot() {
@@ -282,13 +343,11 @@ function defaultContractPath() {
 }
 
 function defaultValidatorPath() {
-  return path.resolve(process.env.CANUTO_SKILL_REFACTOR_VALIDATOR
-    || path.join(os.homedir(), '.codex', 'skills', '.system', 'skill-creator', 'scripts', 'quick_validate.py'));
+  return path.resolve(path.join(os.homedir(), '.codex', 'skills', '.system', 'skill-creator', 'scripts', 'quick_validate.py'));
 }
 
 function defaultDelegatePath() {
-  return process.env.CANUTO_SKILL_REFACTOR_DELEGATE
-    || path.join(os.homedir(), '.codex', 'bin', 'codex-delegate.sh');
+  return path.join(os.homedir(), '.codex', 'bin', 'codex-delegate.sh');
 }
 
 function inventoryForConfig(config, options = {}) {
@@ -304,7 +363,7 @@ function inactiveComponent(component) {
   if (!value) return false;
   if (value === '_archive' || value === 'archive' || value === 'archives') return true;
   if (value === 'backup' || value === 'backups' || value === 'retired') return true;
-  if (value === 'node_modules' || value === '.next' || value === 'build' || value === 'coverage' || value === 'dist') return true;
+  if (value === 'node_modules' || value === '.next') return true;
   if (value.includes('.bak') || value.startsWith('_retired-')) return true;
   return false;
 }
@@ -391,7 +450,10 @@ function readSourceEntrypoint(installation, expectedName) {
     const stat = fs.lstatSync(sourcePath);
     if (!stat.isFile() || stat.isSymbolicLink()) return { sourcePath, missing: true, content: '', actualHash: '', frontmatter: { valid: false, reasons: ['source-not-regular-file'] } };
     if (stat.size > MAX_FILE_BYTES) return { sourcePath, oversized: true, content: '', actualHash: '', frontmatter: { valid: false, reasons: ['source-file-too-large'] } };
-    const content = fs.readFileSync(sourcePath, 'utf8');
+    const content = readFileBounded(sourcePath, MAX_FILE_BYTES, {
+      failureCode: 'source-mutated',
+      tooLargeCode: 'source-file-too-large',
+    }).toString('utf8');
     return {
       sourcePath,
       content,
@@ -400,7 +462,10 @@ function readSourceEntrypoint(installation, expectedName) {
       lines: linesIn(content),
       mutated: installation.contentHash && sha256(content) !== installation.contentHash,
     };
-  } catch {
+  } catch (error) {
+    if (error instanceof RefactorError && error.code === 'source-file-too-large') {
+      return { sourcePath, oversized: true, content: '', actualHash: '', frontmatter: { valid: false, reasons: ['source-file-too-large'] } };
+    }
     return { sourcePath, missing: true, content: '', actualHash: '', frontmatter: { valid: false, reasons: ['source-unreadable'] } };
   }
 }
@@ -430,7 +495,10 @@ function inspectSourceBundle(sourcePath) {
   if (stat.isFile() && path.basename(resolved) !== 'SKILL.md') {
     if (stat.size > MAX_FILE_BYTES) return { ok: false, reason: 'source-file-too-large', sourcePath: resolved };
     try {
-      const content = fs.readFileSync(resolved);
+      const content = readFileBounded(resolved, MAX_FILE_BYTES, {
+        failureCode: 'source-mutated',
+        tooLargeCode: 'source-file-too-large',
+      });
       return {
         ok: true,
         mode: 'legacy',
@@ -441,8 +509,8 @@ function inspectSourceBundle(sourcePath) {
         totalBytes: content.length,
         fileCount: 1,
       };
-    } catch {
-      return { ok: false, reason: 'source-mutated', sourcePath: resolved };
+    } catch (error) {
+      return { ok: false, reason: error.code === 'source-file-too-large' ? error.code : 'source-mutated', sourcePath: resolved };
     }
   }
 
@@ -454,7 +522,8 @@ function inspectSourceBundle(sourcePath) {
   let failure = null;
 
   function walk(directory, depth) {
-    if (failure || depth > 32) return;
+    if (failure) return;
+    if (depth > 32) { failure = 'source-depth-exceeded'; return; }
     let realDirectory;
     try { realDirectory = fs.realpathSync(directory); } catch { failure = 'source-mutated'; return; }
     if (!isWithin(root, realDirectory)) { failure = 'source-path-escape'; return; }
@@ -488,7 +557,15 @@ function inspectSourceBundle(sourcePath) {
       fileCount += 1;
       if (fileCount > MAX_BUNDLE_FILES || totalBytes > MAX_BUNDLE_BYTES) { failure = 'source-bundle-too-large'; return; }
       let content;
-      try { content = fs.readFileSync(candidate); } catch { failure = 'source-mutated'; return; }
+      try {
+        content = readFileBounded(candidate, MAX_FILE_BYTES, {
+          failureCode: 'source-mutated',
+          tooLargeCode: 'source-file-too-large',
+        });
+      } catch (error) {
+        failure = error.code || 'source-mutated';
+        return;
+      }
       entries.push({ relative, type: 'file', bytes: content.length, hash: sha256(content) });
     }
   }
@@ -525,7 +602,10 @@ function copySourceBundle(bundle, destination) {
     }
     const source = bundle.mode === 'legacy' ? bundle.sourcePath : path.join(bundle.root, entry.relative);
     if (!isWithin(bundle.mode === 'legacy' ? path.dirname(bundle.sourcePath) : bundle.root, source)) throw new RefactorError('source-path-escape', 'snapshot source escaped its folder');
-    const content = fs.readFileSync(source);
+    const content = readFileBounded(source, MAX_FILE_BYTES, {
+      failureCode: 'source-mutated',
+      tooLargeCode: 'source-file-too-large',
+    });
     if (content.length !== entry.bytes || sha256(content) !== entry.hash) throw new RefactorError('source-mutated', 'source changed while snapshotting');
     fs.writeFileSync(target, content, { mode: 0o600 });
     fs.chmodSync(target, 0o600);
@@ -593,7 +673,11 @@ function classifyLogicalName(name, installations) {
   const activeAuthor = active.filter((item) => !['plugin', 'system'].includes(item.installationKind));
   const reasons = new Set();
   if (active.length === 0) return { name, classification: 'INACTIVE', reasons: ['inactive-source'], active, activeAuthor, all };
-  if (activeAuthor.length === 0) return { name, classification: 'MANAGED', reasons: ['managed-installation'], active, activeAuthor, all };
+  if (activeAuthor.length === 0) {
+    const managedReasons = sourceReasonSet(active);
+    managedReasons.add('managed-installation');
+    return { name, classification: 'MANAGED', reasons: [...managedReasons].sort(), active, activeAuthor, all };
+  }
 
   const project = activeAuthor.filter((item) => item.installationKind === 'project');
   const provenanceKeys = [...new Set(project.map((item) => item.provenance.key))].sort();
@@ -677,15 +761,19 @@ function publicSkillRecord(classification, grouped, itemId) {
   const all = grouped.all;
   const active = grouped.active;
   const variants = [...new Set(active.map((item) => item.contentHash))].sort();
+  const bundles = [...new Set(active.map((item) => item.bundleHash || item.contentHash))].sort();
   const providers = [...new Set(all.map((item) => item.provider))].sort();
   const kinds = [...new Set(all.map((item) => item.installationKind))].sort();
   const aliases = [...new Set(all.map((item) => normalizeAlias(item.sourceAlias)))].sort();
+  const bundleInspectionFailed = active.some((item) => Boolean(item.bundleReason));
   return {
     name: classification.name,
     classification: classification.classification,
     reasons: classification.reasons,
     variantHashes: variants,
     variantHashPrefixes: variants.map(hashPrefix),
+    bundleHashes: bundles,
+    bundleHashPrefixes: bundles.map(hashPrefix),
     counts: {
       installations: all.length,
       activeInstallations: active.length,
@@ -696,7 +784,7 @@ function publicSkillRecord(classification, grouped, itemId) {
     kinds,
     aliases,
     workItemId: classification.classification === 'REFACTOR' ? itemId : null,
-    state: classification.classification === 'REFACTOR' ? 'PENDING' : classification.classification === 'BLOCKED_PROVENANCE' ? 'BLOCKED' : 'NOT_APPLICABLE',
+    state: classification.classification === 'REFACTOR' ? 'PENDING' : classification.classification === 'BLOCKED_PROVENANCE' || bundleInspectionFailed ? 'BLOCKED' : 'NOT_APPLICABLE',
   };
 }
 
@@ -840,6 +928,8 @@ function scanManifest(fingerprint, analysis) {
     reasons: skill.reasons,
     variantHashes: skill.variantHashes,
     variantHashPrefixes: skill.variantHashPrefixes,
+    bundleHashes: skill.bundleHashes,
+    bundleHashPrefixes: skill.bundleHashPrefixes,
     counts: skill.counts,
     providers: skill.providers,
     kinds: skill.kinds,
@@ -883,6 +973,9 @@ function loadManifest(workspace) {
 function loadProvenance(workspace) {
   const provenance = readJson(provenanceFile(workspace), 'workspace-incomplete');
   if (provenance.schemaVersion !== SCHEMA_VERSION || !provenance.items || typeof provenance.items !== 'object') throw new RefactorError('workspace-schema-incompatible', 'workspace schema is incompatible');
+  if (provenance.configPath !== undefined && (typeof provenance.configPath !== 'string' || !path.isAbsolute(provenance.configPath))) throw new RefactorError('workspace-schema-incompatible', 'workspace config path is incompatible');
+  if (provenance.frameworkRoot !== undefined && (typeof provenance.frameworkRoot !== 'string' || !path.isAbsolute(provenance.frameworkRoot))) throw new RefactorError('workspace-schema-incompatible', 'workspace framework root is incompatible');
+  if (provenance.home !== undefined && (typeof provenance.home !== 'string' || !path.isAbsolute(provenance.home))) throw new RefactorError('workspace-schema-incompatible', 'workspace home is incompatible');
   return provenance;
 }
 
@@ -891,25 +984,46 @@ function stateFile(workspace, name) {
 }
 
 function loadItemState(workspace, skill) {
-  if (!skill.workItemId) return { state: 'NOT_APPLICABLE', attempts: 0, workItemId: null, name: skill.name };
+  if (!skill.workItemId) return { state: skill.state || 'NOT_APPLICABLE', attempts: 0, workItemId: null, name: skill.name };
   const state = readJson(stateFile(workspace, skill.name), 'workspace-incomplete');
   if (state.schemaVersion !== SCHEMA_VERSION || state.workItemId !== skill.workItemId || state.name !== skill.name || !JOB_STATES.includes(state.state)) throw new RefactorError('workspace-schema-incompatible', 'work item state is incompatible');
   return state;
 }
 
+function workspaceSafetyContext(workspace, provenance) {
+  const configPath = provenance.configPath || defaultConfigPath();
+  let config;
+  try { config = gardener.loadConfig(configPath); } catch (error) { throw new RefactorError(error.message || 'config-invalid', error.message || 'config-invalid'); }
+  const home = provenance.home || os.homedir();
+  const frameworkRoot = provenance.frameworkRoot || defaultFrameworkRoot();
+  const inventory = inventoryForConfig(config, { home, frameworkRoot });
+  validateWorkspaceLocation(workspace, config, inventory, { home, frameworkRoot });
+  return { config, inventory, configPath, home, frameworkRoot };
+}
+
+function assertWorkspaceSafe(workspace) {
+  const target = pathKey(workspace);
+  let stat;
+  try { stat = fs.lstatSync(target); } catch { throw new RefactorError('workspace-invalid', 'workspace is unavailable'); }
+  if (!stat.isDirectory() || stat.isSymbolicLink()) throw new RefactorError('workspace-unsafe', 'workspace path is not a directory');
+  const provenance = loadProvenance(target);
+  return workspaceSafetyContext(target, provenance);
+}
+
 function loadedWorkspace(workspace) {
   const target = pathKey(workspace);
-  const manifest = loadManifest(target);
   const provenance = loadProvenance(target);
+  const safety = workspaceSafetyContext(target, provenance);
+  const manifest = loadManifest(target);
   const entries = manifest.items.map((skill) => ({ skill, state: loadItemState(target, skill), privateItem: provenance.items[skill.workItemId] || null }));
-  return { workspace: target, manifest, provenance, entries };
+  return { workspace: target, manifest, provenance, entries, ...safety };
 }
 
 function writeItemState(workspace, name, state) {
   writeJsonAtomic(stateFile(workspace, name), state, 0o600);
 }
 
-function updateManifestState(workspace, name, state) {
+function updateManifestStateUnsafe(workspace, name, state) {
   const manifest = loadManifest(workspace);
   const skill = manifest.items.find((item) => item.name === name);
   if (!skill) throw new RefactorError('workspace-incomplete', 'work item is missing from manifest');
@@ -926,19 +1040,27 @@ const TRANSITIONS = Object.freeze({
 });
 
 function transitionItem(workspace, skill, nextState, patch = {}) {
-  const current = loadItemState(workspace, skill);
-  if (current.state !== nextState && !TRANSITIONS[current.state]?.has(nextState)) throw new RefactorError('invalid-state-transition', 'invalid work item state transition');
-  const next = { ...current, ...patch, schemaVersion: SCHEMA_VERSION, name: skill.name, workItemId: skill.workItemId, state: nextState };
-  writeItemState(workspace, skill.name, next);
-  updateManifestState(workspace, skill.name, nextState);
-  return next;
+  assertWorkspaceSafe(workspace);
+  return withStateLock(workspace, () => {
+    assertWorkspaceSafe(workspace);
+    const current = loadItemState(workspace, skill);
+    if (current.state !== nextState && !TRANSITIONS[current.state]?.has(nextState)) throw new RefactorError('invalid-state-transition', 'invalid work item state transition');
+    const next = { ...current, ...patch, schemaVersion: SCHEMA_VERSION, name: skill.name, workItemId: skill.workItemId, state: nextState };
+    writeItemState(workspace, skill.name, next);
+    updateManifestStateUnsafe(workspace, skill.name, nextState);
+    return next;
+  });
 }
 
 function recoverableState(workspace, skill, state, patch = {}) {
-  const next = { ...state, ...patch, schemaVersion: SCHEMA_VERSION, name: skill.name, workItemId: skill.workItemId };
-  writeItemState(workspace, skill.name, next);
-  updateManifestState(workspace, skill.name, next.state);
-  return next;
+  assertWorkspaceSafe(workspace);
+  return withStateLock(workspace, () => {
+    assertWorkspaceSafe(workspace);
+    const next = { ...state, ...patch, schemaVersion: SCHEMA_VERSION, name: skill.name, workItemId: skill.workItemId };
+    writeItemState(workspace, skill.name, next);
+    updateManifestStateUnsafe(workspace, skill.name, next.state);
+    return next;
+  });
 }
 
 function itemPrivateSources(workspace, skill, privateItem) {
@@ -1021,10 +1143,11 @@ function stageContract(workspace, skill) {
   const target = path.join(itemDirectory(workspace, skill.name), 'contract', 'SKILL.md');
   if (!fs.existsSync(source)) throw new RefactorError('contract-missing', 'skill-creator contract is unavailable');
   ensureDirectory(path.dirname(target), 0o700);
-  const stat = fs.statSync(source);
-  if (!stat.isFile() || stat.size > MAX_FILE_BYTES) throw new RefactorError('contract-invalid', 'skill-creator contract is unavailable');
-  fs.copyFileSync(source, target);
-  fs.chmodSync(target, 0o600);
+  const content = readFileBounded(source, MAX_FILE_BYTES, {
+    failureCode: 'contract-invalid',
+    tooLargeCode: 'contract-invalid',
+  });
+  writeAtomic(target, content, 0o600);
   return target;
 }
 
@@ -1149,6 +1272,9 @@ function scanWorkspace(options = {}) {
   const provenance = {
     schemaVersion: SCHEMA_VERSION,
     scanFingerprint: analysis.scanFingerprint,
+    configPath,
+    home,
+    frameworkRoot,
     items: privateItems,
   };
   writeJsonAtomic(provenanceFile(workspace), provenance, 0o600);
@@ -1163,28 +1289,143 @@ function scanWorkspace(options = {}) {
   return { status: 'READY', changed: true, manifest: finalManifest, analysis, workspace };
 }
 
-function isPidAlive(pid) {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try { process.kill(pid, 0); return true; } catch (error) { return error.code === 'EPERM'; }
+function processStartMarker(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return '';
+  const procStat = `/proc/${pid}/stat`;
+  let fd;
+  try {
+    fd = fs.openSync(procStat, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+    const stat = fs.fstatSync(fd);
+    if (stat.size > 0 && stat.size > 4096) return '';
+    const buffer = Buffer.alloc(4096);
+    const bytes = fs.readSync(fd, buffer, 0, buffer.length, 0);
+    const text = buffer.subarray(0, bytes).toString('utf8');
+    const endOfCommand = text.lastIndexOf(')');
+    const fields = endOfCommand < 0 ? [] : text.slice(endOfCommand + 1).trim().split(/\s+/);
+    return fields[19] || '';
+  } catch {
+    try {
+      return execFileSync('ps', ['-p', String(pid), '-o', 'lstart='], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1024 }).trim();
+    } catch {
+      return '';
+    }
+  } finally {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch { /* best effort */ }
+    }
+  }
 }
 
-function acquireLock(workspace, skill) {
-  const target = path.join(itemDirectory(workspace, skill.name), '.claim.lock');
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+function isPidAlive(pid, startMarker = '') {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    if (!startMarker) return true;
+    const currentMarker = processStartMarker(pid);
+    return !currentMarker || currentMarker === startMarker;
+  } catch (error) { return error.code === 'EPERM'; }
+}
+
+function readLockOwner(target) {
+  try {
+    return JSON.parse(readFileBounded(target, 16 * 1024, {
+      failureCode: 'lock-read-failed',
+      tooLargeCode: 'lock-invalid',
+    }).toString('utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function sameLockOwner(expected, actual) {
+  if (!expected || !actual) return false;
+  if (expected.token && actual.token) return expected.token === actual.token;
+  if (expected.device !== undefined && actual.device !== undefined && expected.device !== actual.device) return false;
+  if (expected.inode !== undefined && actual.inode !== undefined && expected.inode !== actual.inode) return false;
+  return expected.pid === actual.pid && expected.createdAt === actual.createdAt;
+}
+
+function releaseExclusiveLock(lock) {
+  if (lock?.fd === undefined) return;
+  try {
+    const stat = fs.fstatSync(lock.fd);
+    if (stat.dev !== lock.device || stat.ino !== lock.inode) return;
+    const released = { ...lock.owner, releasedAt: isoNow() };
+    const payload = Buffer.from(JSON.stringify(released));
+    fs.ftruncateSync(lock.fd, 0);
+    fs.writeSync(lock.fd, payload, 0, payload.length, 0);
+    fs.fsyncSync(lock.fd);
+  } catch { /* a failed release remains conservatively locked */ }
+  finally {
+    try { fs.closeSync(lock.fd); } catch { /* best effort */ }
+  }
+}
+
+function acquireExclusiveLock(target) {
+  const resolved = path.resolve(target);
+  ensureDirectory(path.dirname(resolved), 0o700);
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const token = crypto.randomBytes(16).toString('hex');
+    const staged = `${resolved}.owner-${process.pid}-${token}`;
+    let fd;
     try {
-      const fd = fs.openSync(target, 'wx', 0o600);
-      fs.writeFileSync(fd, JSON.stringify({ pid: process.pid, createdAt: isoNow() }));
-      fs.closeSync(fd);
-      return () => { try { fs.unlinkSync(target); } catch { /* best effort */ } };
+      fd = fs.openSync(staged, 'wx', 0o600);
+      const fileStat = fs.fstatSync(fd);
+      const owner = {
+        pid: process.pid,
+        startMarker: processStartMarker(process.pid),
+        token,
+        device: fileStat.dev,
+        inode: fileStat.ino,
+        createdAt: isoNow(),
+      };
+      fs.writeFileSync(fd, JSON.stringify(owner));
+      fs.fsyncSync(fd);
+      fs.linkSync(staged, resolved);
+      fs.unlinkSync(staged);
+      const lockFd = fd;
+      fd = undefined;
+      return () => releaseExclusiveLock({ target: resolved, token, device: fileStat.dev, inode: fileStat.ino, fd: lockFd, owner });
     } catch (error) {
+      if (fd !== undefined) {
+        try { fs.closeSync(fd); } catch { /* best effort */ }
+      }
+      try { fs.unlinkSync(staged); } catch { /* exact private staging path only */ }
       if (error.code !== 'EEXIST') throw error;
-      let owner = null;
-      try { owner = JSON.parse(fs.readFileSync(target, 'utf8')); } catch { owner = null; }
-      if (owner?.pid && isPidAlive(owner.pid)) return null;
-      try { fs.unlinkSync(target); } catch { return null; }
+      let observedStat;
+      try { observedStat = fs.lstatSync(resolved); } catch { continue; }
+      const owner = readLockOwner(resolved);
+      if (owner?.pid && !owner.releasedAt && isPidAlive(owner.pid, owner.startMarker)) return null;
+      const currentOwner = readLockOwner(resolved);
+      let currentStat;
+      try { currentStat = fs.lstatSync(resolved); } catch { continue; }
+      if (!sameFileIdentity(observedStat, currentStat) || (owner && currentOwner && !sameLockOwner(owner, currentOwner))) continue;
+      const stalePath = `${resolved}.stale-${process.pid}-${crypto.randomBytes(6).toString('hex')}`;
+      try { fs.renameSync(resolved, stalePath); } catch (renameError) {
+        if (renameError.code === 'ENOENT') continue;
+        return null;
+      }
+      const movedOwner = readLockOwner(stalePath);
+      let movedStat;
+      try { movedStat = fs.lstatSync(stalePath); } catch { movedStat = null; }
+      if (!movedStat || !sameFileObject(observedStat, movedStat) || (owner && !sameLockOwner(owner, movedOwner))) {
+        try { if (!fs.existsSync(resolved)) fs.renameSync(stalePath, resolved); } catch { /* preserve an unproven lock */ }
+        return null;
+      }
+      try { fs.unlinkSync(stalePath); } catch { /* exact stale path only */ }
     }
   }
   return null;
+}
+
+function withStateLock(workspace, callback) {
+  const unlock = acquireExclusiveLock(path.join(path.resolve(workspace), STATE_LOCK_NAME));
+  if (!unlock) throw new RefactorError('state-busy', 'workspace state is busy');
+  try { return callback(); } finally { unlock(); }
+}
+
+function acquireLock(workspace, skill) {
+  return acquireExclusiveLock(path.join(itemDirectory(workspace, skill.name), '.claim.lock'));
 }
 
 function redactPrivateText(value) {
@@ -1198,17 +1439,87 @@ function writeAttemptArtifacts(directory, attempt, resultPath, stderr) {
   ensureDirectory(attempts, 0o700);
   if (fs.existsSync(resultPath)) {
     try {
-      const size = fs.statSync(resultPath).size;
-      if (size <= MAX_RESULT_BYTES) fs.copyFileSync(resultPath, path.join(attempts, `attempt-${attempt}.result`));
-      else writeAtomic(path.join(attempts, `attempt-${attempt}.result`), '[result-redacted: oversized]\n', 0o600);
-    } catch { /* preserve the state even if artifact copy fails */ }
+      const content = readFileBounded(resultPath, MAX_RESULT_BYTES, {
+        failureCode: 'result-read-failed',
+        tooLargeCode: 'result-too-large',
+      });
+      writeAtomic(path.join(attempts, `attempt-${attempt}.result`), content, 0o600);
+    } catch (error) {
+      if (error.code === 'result-too-large') writeAtomic(path.join(attempts, `attempt-${attempt}.result`), '[result-redacted: oversized]\n', 0o600);
+      /* preserve the state even if artifact copy fails */
+    }
   }
   writeAtomic(path.join(attempts, `attempt-${attempt}.stderr`), redactPrivateText(String(stderr || '').slice(-MAX_STDERR_BYTES)), 0o600);
+}
+
+const DELEGATE_ENV_ALLOWLIST = Object.freeze([
+  'HOME', 'PATH', 'TMPDIR', 'TMP', 'TEMP', 'LANG', 'LC_ALL', 'LC_CTYPE', 'TZ', 'USER', 'LOGNAME', 'SHELL', 'CODEX_HOME',
+  'FAKE_DELEGATE_FAIL', 'FAKE_COUNTER', 'FAKE_ENV_OUTPUT', 'FAKE_DELAY_MS',
+]);
+
+function minimalDelegateEnv(cwd) {
+  const env = {};
+  for (const key of DELEGATE_ENV_ALLOWLIST) {
+    if (process.env[key] !== undefined) env[key] = process.env[key];
+  }
+  env.CODEX_DELEGATE_SANDBOX = 'workspace-write';
+  env.CODEX_DELEGATE_CWD = cwd;
+  return env;
+}
+
+function trustedDelegatePath(delegatePath, allowTestDelegate = false) {
+  if (typeof delegatePath !== 'string' || !path.isAbsolute(delegatePath)) return false;
+  const target = path.resolve(delegatePath);
+  let stat;
+  try {
+    const lexical = fs.lstatSync(target);
+    if (lexical.isSymbolicLink() || !lexical.isFile()) return false;
+    stat = fs.statSync(target);
+  } catch {
+    return false;
+  }
+  if (process.platform !== 'win32' && (stat.mode & 0o111) === 0) return false;
+  const production = path.resolve(path.join(os.homedir(), '.codex', 'bin', 'codex-delegate.sh'));
+  if (target === production) return true;
+  return allowTestDelegate === true;
+}
+
+function openPinnedDelegate(delegatePath, allowTestDelegate = false) {
+  if (!trustedDelegatePath(delegatePath, allowTestDelegate)) throw new RefactorError('delegate-untrusted', 'delegate path is not trusted');
+  const target = path.resolve(delegatePath);
+  const production = path.resolve(path.join(os.homedir(), '.codex', 'bin', 'codex-delegate.sh'));
+  if (allowTestDelegate && target !== production) {
+    return { executable: target, prefixArgs: [], fd: undefined, stdio: ['ignore', 'pipe', 'pipe'] };
+  }
+  let fd;
+  try {
+    const pathBefore = fs.lstatSync(target);
+    fd = fs.openSync(target, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+    const opened = fs.fstatSync(fd);
+    const pathAfter = fs.lstatSync(target);
+    if (!opened.isFile() || !sameFileIdentity(pathBefore, opened) || !sameFileIdentity(opened, pathAfter)) {
+      throw new RefactorError('delegate-untrusted', 'delegate changed while being opened');
+    }
+    return { executable: '/bin/bash', prefixArgs: ['/dev/fd/3'], fd, stdio: ['ignore', 'pipe', 'pipe', fd] };
+  } catch (error) {
+    if (fd !== undefined) try { fs.closeSync(fd); } catch { /* best effort */ }
+    if (error instanceof RefactorError) throw error;
+    throw new RefactorError('delegate-untrusted', 'delegate could not be pinned');
+  }
+}
+
+function signalDelegate(child, signal) {
+  if (!child?.pid) return;
+  try {
+    if (process.platform !== 'win32') process.kill(-child.pid, signal);
+    else child.kill(signal);
+  } catch { /* exact process group may have already exited */ }
 }
 
 function spawnDelegate(delegatePath, taskPath, resultPath, cwd, options = {}) {
   return new Promise((resolve) => {
     let child;
+    let pinned;
     let settled = false;
     let timeout;
     const finish = (result) => {
@@ -1218,12 +1529,19 @@ function spawnDelegate(delegatePath, taskPath, resultPath, cwd, options = {}) {
       resolve(result);
     };
     try {
-      child = spawn(delegatePath, ['coder', taskPath, resultPath], {
+      pinned = openPinnedDelegate(delegatePath, options.allowTestDelegate === true);
+      child = spawn(pinned.executable, [...pinned.prefixArgs, 'coder', taskPath, resultPath, cwd], {
         cwd,
-        env: { ...process.env },
-        stdio: ['ignore', 'pipe', 'pipe'],
+        env: minimalDelegateEnv(cwd),
+        detached: process.platform !== 'win32',
+        stdio: pinned.stdio,
       });
+      if (pinned.fd !== undefined) {
+        fs.closeSync(pinned.fd);
+        pinned.fd = undefined;
+      }
     } catch (error) {
+      if (pinned?.fd !== undefined) try { fs.closeSync(pinned.fd); } catch { /* best effort */ }
       finish({ code: -1, signal: null, stderr: String(error.message || error), child: null });
       return;
     }
@@ -1236,8 +1554,8 @@ function spawnDelegate(delegatePath, taskPath, resultPath, cwd, options = {}) {
     const timeoutMs = Number.isSafeInteger(options.timeoutMs) ? Math.max(10, options.timeoutMs) : DEFAULT_DELEGATE_TIMEOUT_MS;
     timeout = setTimeout(() => {
       stderr = `${stderr}\ndelegate-timeout`;
-      try { child.kill('SIGTERM'); } catch { /* exact child, best effort */ }
-      const force = setTimeout(() => { try { child.kill('SIGKILL'); } catch { /* exact child, best effort */ } }, DELEGATE_KILL_GRACE_MS);
+      signalDelegate(child, 'SIGTERM');
+      const force = setTimeout(() => signalDelegate(child, 'SIGKILL'), DELEGATE_KILL_GRACE_MS);
       force.unref?.();
     }, timeoutMs);
     timeout.unref?.();
@@ -1261,7 +1579,8 @@ function candidateFileEntries(candidateRoot) {
   let regularFiles = 0;
   const reasons = [];
   function walk(directory, depth) {
-    if (depth > 32 || reasons.length) return;
+    if (reasons.length) return;
+    if (depth > 32) { reasons.push('candidate-depth-exceeded'); return; }
     let real;
     try { real = fs.realpathSync(directory); } catch { reasons.push('candidate-path-escape'); return; }
     if (!isWithin(root, real)) { reasons.push('candidate-path-escape'); return; }
@@ -1289,7 +1608,15 @@ function candidateFileEntries(candidateRoot) {
       regularFiles += 1;
       if (regularFiles > MAX_BUNDLE_FILES || totalBytes > MAX_BUNDLE_BYTES) { reasons.push('candidate-bundle-too-large'); return; }
       let content;
-      try { content = fs.readFileSync(full); } catch { reasons.push('candidate-unreadable'); return; }
+      try {
+        content = readFileBounded(full, MAX_FILE_BYTES, {
+          failureCode: 'candidate-unreadable',
+          tooLargeCode: 'candidate-file-too-large',
+        });
+      } catch (error) {
+        reasons.push(error.code || 'candidate-unreadable');
+        return;
+      }
       entries.push({ relative, type: 'file', bytes: content.length, hash: sha256(content) });
     }
   }
@@ -1331,7 +1658,14 @@ function validateCandidate(candidateRoot, name, sourceHashes = [], options = {})
   const skillPath = path.join(root, 'SKILL.md');
   let skillContent = '';
   if (!reasons.length) {
-    try { skillContent = fs.readFileSync(skillPath, 'utf8'); } catch { reasons.push('missing-skill-md'); }
+    try {
+      skillContent = readFileBounded(skillPath, MAX_FILE_BYTES, {
+        failureCode: 'candidate-unreadable',
+        tooLargeCode: 'candidate-file-too-large',
+      }).toString('utf8');
+    } catch (error) {
+      reasons.push(error.code === 'candidate-file-too-large' ? error.code : 'missing-skill-md');
+    }
   }
   if (!fs.existsSync(skillPath)) reasons.push('missing-skill-md');
   const frontmatter = skillContent ? frontmatterContract(skillContent, name) : { valid: false, reasons: ['frontmatter-delimiters'] };
@@ -1339,8 +1673,19 @@ function validateCandidate(candidateRoot, name, sourceHashes = [], options = {})
   const corpus = files.entries.filter((entry) => entry.type === 'file');
   for (const entry of corpus) {
     const file = path.join(root, entry.relative);
+    let bytes;
     let content;
-    try { content = fs.readFileSync(file, 'utf8'); } catch { reasons.push('candidate-unreadable'); continue; }
+    try {
+      bytes = readFileBounded(file, MAX_FILE_BYTES, {
+        failureCode: 'candidate-unreadable',
+        tooLargeCode: 'candidate-file-too-large',
+      });
+      content = bytes.toString('utf8');
+    } catch (error) {
+      reasons.push(error.code || 'candidate-unreadable');
+      continue;
+    }
+    if (entry.bytes !== bytes.length || entry.hash !== sha256(bytes)) reasons.push('candidate-mutated');
     if (/(?:^|\n)[ \t]*(?:TODO|FIXME)(?:[ \t]*:.*)?[ \t]*(?:\n|$)|\[TODO:[^\]]*\]/i.test(content)) reasons.push('unfinished-scaffold-marker');
   }
   for (const reference of markdownReferences(skillContent)) {
@@ -1353,7 +1698,14 @@ function validateCandidate(candidateRoot, name, sourceHashes = [], options = {})
   const openaiPath = path.join(root, 'agents', 'openai.yaml');
   if (fs.existsSync(openaiPath)) {
     let openai = '';
-    try { openai = fs.readFileSync(openaiPath, 'utf8'); } catch { reasons.push('openai-yaml-unreadable'); }
+    try {
+      openai = readFileBounded(openaiPath, MAX_FILE_BYTES, {
+        failureCode: 'openai-yaml-unreadable',
+        tooLargeCode: 'candidate-file-too-large',
+      }).toString('utf8');
+    } catch (error) {
+      reasons.push(error.code || 'openai-yaml-unreadable');
+    }
     if (openai && openaiDefaultPrompt(openai).includes(`$${name}`) === false) reasons.push('openai-default-prompt-missing-name');
   }
   const candidateHash = skillContent ? sha256(skillContent) : '';
@@ -1372,11 +1724,55 @@ function validateCandidate(candidateRoot, name, sourceHashes = [], options = {})
   return result;
 }
 
+function runOfficialValidator(candidateRoot, options = {}) {
+  const validator = path.resolve(options.validatorPath || defaultValidatorPath());
+  const canonical = defaultValidatorPath();
+  if (validator !== canonical && options.allowTestValidator !== true) return { ok: false, reason: 'quick-validate-unavailable' };
+  let fd;
+  try {
+    const before = fs.lstatSync(validator);
+    if (before.isSymbolicLink() || !before.isFile() || before.size > MAX_FILE_BYTES) return { ok: false, reason: 'quick-validate-unavailable' };
+    fd = fs.openSync(validator, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+    const opened = fs.fstatSync(fd);
+    const after = fs.lstatSync(validator);
+    if (!opened.isFile() || !sameFileIdentity(before, opened) || !sameFileIdentity(opened, after)) return { ok: false, reason: 'quick-validate-unavailable' };
+    const output = execFileSync('python3', ['/dev/fd/3', path.resolve(candidateRoot)], {
+      cwd: path.resolve(candidateRoot),
+      env: minimalDelegateEnv(path.resolve(candidateRoot)),
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe', fd],
+      timeout: 30 * 1000,
+      maxBuffer: MAX_VALIDATOR_OUTPUT_BYTES,
+    });
+    return { ok: true, output: String(output || '').slice(0, MAX_VALIDATOR_OUTPUT_BYTES) };
+  } catch {
+    return { ok: false, reason: 'quick-validate-failed' };
+  } finally {
+    if (fd !== undefined) try { fs.closeSync(fd); } catch { /* best effort */ }
+  }
+}
+
+function validateStagedCandidate(candidateRoot, name, sourceHashes = [], options = {}) {
+  const validation = validateCandidate(candidateRoot, name, sourceHashes, { requireChanged: options.requireChanged === true });
+  if (validation.valid && options.requireOfficial !== false) {
+    const official = runOfficialValidator(candidateRoot, options);
+    if (!official.ok) validation.reasons.push(official.reason);
+  }
+  validation.reasons = [...new Set(validation.reasons)].sort();
+  validation.valid = validation.reasons.length === 0;
+  return validation;
+}
+
 function coverageValid(workspace, skill, privateItem) {
   const file = coveragePath(workspace, skill);
   if (!fs.existsSync(file)) return false;
   let content;
-  try { content = fs.readFileSync(file, 'utf8'); } catch { return false; }
+  try {
+    content = readFileBounded(file, MAX_FILE_BYTES, {
+      failureCode: 'coverage-read-failed',
+      tooLargeCode: 'coverage-too-large',
+    }).toString('utf8');
+  } catch { return false; }
   if (!/^status:\s*completed\s*$/mi.test(content) || /preservation-decision:\s*PENDING\b/i.test(content)) return false;
   return (privateItem?.sources || []).every((source) => {
     const marker = `: ${source.contentHash}`;
@@ -1414,16 +1810,24 @@ function readValidationReceipt(workspace, skill) {
   try { return readJson(target, 'validation-receipt-invalid'); } catch { return null; }
 }
 
-function validCandidateReceipt(workspace, skill, privateItem) {
+function validCandidateReceipt(workspace, skill, privateItem, options = {}) {
   const sources = revalidateItemSources(workspace, skill, privateItem);
   if (!sources.ok) return false;
   const snapshots = revalidateItemSnapshots(workspace, skill, privateItem);
   if (!snapshots.ok) return false;
   const receipt = readValidationReceipt(workspace, skill);
-  if (!receipt?.valid || !coverageValid(workspace, skill, privateItem)) return false;
+  if (!receipt?.valid || receipt.name !== skill.name || receipt.workItemId !== skill.workItemId || !coverageValid(workspace, skill, privateItem)) return false;
   const candidate = path.join(itemDirectory(workspace, skill.name), 'candidate', skill.name);
-  const validation = validateCandidate(candidate, skill.name, (privateItem?.sources || []).map((source) => source.entrypointHash), { requireChanged: true });
-  return validation.valid;
+  const validation = validateStagedCandidate(candidate, skill.name, (privateItem?.sources || []).map((source) => source.entrypointHash), {
+    requireChanged: true,
+    validatorPath: options.validatorPath,
+    allowTestValidator: options.allowTestValidator === true,
+  });
+  const sourceHashes = (privateItem?.sources || []).map((source) => ({ variantId: source.variantId, contentHash: source.contentHash }));
+  return validation.valid
+    && receipt.candidateHash === validation.candidateHash
+    && compareEntryManifests(receipt.candidateEntries, validation.entries)
+    && stableJson(receipt.sourceHashes || []) === stableJson(sourceHashes);
 }
 
 async function processItem(workspace, skill, state, privateItem, options = {}) {
@@ -1450,12 +1854,16 @@ async function processItem(workspace, skill, state, privateItem, options = {}) {
     }
     if (!fs.existsSync(taskPath)) writeAtomic(taskPath, `${makePrompt(skill, privateItem)}\n`, 0o600);
     if (!contractPath) throw new RefactorError('contract-missing', 'skill-creator contract is unavailable');
-    const configuredDelegate = defaultDelegatePath();
+    const configuredDelegate = options.delegatePath || defaultDelegatePath();
     const delegate = path.isAbsolute(configuredDelegate) || configuredDelegate.includes(path.sep)
       ? path.resolve(configuredDelegate)
       : configuredDelegate;
     if (process.env.CANUTO_SKILL_REFACTOR_OFFLINE === '1') {
       current = transitionItem(workspace, skill, 'BLOCKED', { reason: 'offline-delegate', pid: null, delegatePid: null });
+      return { name: skill.name, state: current.state, claimed: true, reason: current.reason };
+    }
+    if (!trustedDelegatePath(delegate, options.allowTestDelegate === true)) {
+      current = transitionItem(workspace, skill, 'BLOCKED', { reason: 'delegate-untrusted', pid: null, delegatePid: null });
       return { name: skill.name, state: current.state, claimed: true, reason: current.reason };
     }
     if (!fs.existsSync(delegate)) {
@@ -1465,7 +1873,7 @@ async function processItem(workspace, skill, state, privateItem, options = {}) {
     const resultPath = path.join(directory, 'result.md');
     let finalFailure = 'delegate-failed';
     for (let attempt = Math.max(1, Number(current.attempts || 0) + 1); attempt <= MAX_DELEGATE_ATTEMPTS; attempt += 1) {
-      current = recoverableState(workspace, skill, { ...current, state: 'RUNNING' }, { attempts: attempt, pid: process.pid, delegatePid: null, lastAttemptAt: isoNow() });
+      current = recoverableState(workspace, skill, { ...current, state: 'RUNNING' }, { attempts: attempt, pid: process.pid, startMarker: processStartMarker(process.pid), delegatePid: null, lastAttemptAt: isoNow() });
       const afterClaim = revalidateItemSources(workspace, skill, privateItem);
       if (!afterClaim.ok) {
         current = transitionItem(workspace, skill, 'BLOCKED', { reason: afterClaim.reason, pid: null, delegatePid: null });
@@ -1474,8 +1882,9 @@ async function processItem(workspace, skill, state, privateItem, options = {}) {
       writeCoverageReceipt(workspace, skill, privateItem, 'prepared');
       const result = await spawnDelegate(delegate, taskPath, resultPath, directory, {
         timeoutMs: options.delegateTimeoutMs,
+        allowTestDelegate: options.allowTestDelegate === true,
         onSpawn: (child) => {
-          current = recoverableState(workspace, skill, current, { pid: process.pid, delegatePid: child.pid });
+          current = recoverableState(workspace, skill, current, { pid: process.pid, startMarker: processStartMarker(process.pid), delegatePid: child.pid, delegateStartMarker: processStartMarker(child.pid) });
         },
       });
       writeAttemptArtifacts(directory, attempt, resultPath, `${result.stderr || ''}\n${result.stdout || ''}`);
@@ -1491,7 +1900,11 @@ async function processItem(workspace, skill, state, privateItem, options = {}) {
       }
       if (result.code === 0) {
         const candidatePath = path.join(directory, 'candidate', skill.name);
-        const validation = validateCandidate(candidatePath, skill.name, (privateItem?.sources || []).map((source) => source.entrypointHash), { requireChanged: true });
+        const validation = validateStagedCandidate(candidatePath, skill.name, (privateItem?.sources || []).map((source) => source.entrypointHash), {
+          requireChanged: true,
+          validatorPath: options.validatorPath,
+          allowTestValidator: options.allowTestValidator === true,
+        });
         validation.coveragePresent = coverageValid(workspace, skill, privateItem);
         if (!validation.coveragePresent) validation.reasons.push('coverage-receipt-missing');
         validation.valid = validation.valid && validation.coveragePresent;
@@ -1530,8 +1943,8 @@ function selectRunItems(loaded, options = {}) {
   for (const entry of loaded.entries.filter((item) => item.skill.classification === 'REFACTOR').sort((a, b) => a.skill.name.localeCompare(b.skill.name))) {
     if (entry.state.state === 'PENDING') selected.push({ ...entry, mode: 'delegate' });
     else if (entry.state.state === 'RUNNING' && options.resume) {
-      if (validCandidateReceipt(loaded.workspace, entry.skill, entry.privateItem)) generated.push({ ...entry, mode: 'reconcile' });
-      else if (isPidAlive(entry.state.delegatePid || entry.state.pid)) continue;
+      if (validCandidateReceipt(loaded.workspace, entry.skill, entry.privateItem, options)) generated.push({ ...entry, mode: 'reconcile' });
+      else if (isPidAlive(entry.state.delegatePid || entry.state.pid, entry.state.delegateStartMarker || entry.state.startMarker)) continue;
       else {
         const sources = revalidateItemSources(loaded.workspace, entry.skill, entry.privateItem);
         if (!sources.ok) generated.push({ ...entry, mode: 'blocked', reason: sources.reason });
@@ -1548,10 +1961,11 @@ async function runWorkspace(options = {}) {
   const selection = selectRunItems(loaded, options);
   const results = [];
   for (const entry of selection.generated) {
+    assertWorkspaceSafe(loaded.workspace);
     if (entry.mode === 'blocked') {
       const state = transitionItem(loaded.workspace, entry.skill, 'BLOCKED', { reason: entry.reason, pid: null, delegatePid: null });
       results.push({ name: entry.skill.name, state: state.state, claimed: false, reason: state.reason });
-    } else if (validCandidateReceipt(loaded.workspace, entry.skill, entry.privateItem)) {
+    } else if (validCandidateReceipt(loaded.workspace, entry.skill, entry.privateItem, options)) {
       let state;
       if (entry.state.state === 'RUNNING') {
         state = transitionItem(loaded.workspace, entry.skill, 'GENERATED', { reason: '', pid: null, delegatePid: null });
@@ -1563,10 +1977,29 @@ async function runWorkspace(options = {}) {
       }
       results.push({ name: entry.skill.name, state: state.state, claimed: false, reason: '' });
     } else if (entry.state.state === 'GENERATED') {
-      const validation = validateCandidate(candidatePathFor(loaded.workspace, entry.skill), entry.skill.name, (entry.privateItem?.sources || []).map((source) => source.entrypointHash), { requireChanged: true });
-      writeValidationReceipt(loaded.workspace, entry.skill, entry.privateItem, validation);
-      const state = transitionItem(loaded.workspace, entry.skill, 'FAILED', { reason: 'candidate-invalid', pid: null, delegatePid: null });
-      results.push({ name: entry.skill.name, state: state.state, claimed: false, reason: state.reason });
+      let validation;
+      try {
+        validation = validateStagedCandidate(candidatePathFor(loaded.workspace, entry.skill), entry.skill.name, (entry.privateItem?.sources || []).map((source) => source.entrypointHash), {
+          requireChanged: true,
+          validatorPath: options.validatorPath,
+          allowTestValidator: options.allowTestValidator === true,
+        });
+        validation.coveragePresent = coverageValid(loaded.workspace, entry.skill, entry.privateItem);
+        if (!validation.coveragePresent) validation.reasons.push('coverage-receipt-missing');
+        validation.valid = validation.valid && validation.coveragePresent;
+        writeValidationReceipt(loaded.workspace, entry.skill, entry.privateItem, validation);
+      } catch (error) {
+        const state = transitionItem(loaded.workspace, entry.skill, 'FAILED', { reason: error.code || 'candidate-invalid', pid: null, delegatePid: null });
+        results.push({ name: entry.skill.name, state: state.state, claimed: false, reason: state.reason });
+        continue;
+      }
+      if (validation.valid) {
+        const state = transitionItem(loaded.workspace, entry.skill, 'VALIDATED', { reason: '', pid: null, delegatePid: null, candidateHash: validation.candidateHash });
+        results.push({ name: entry.skill.name, state: state.state, claimed: false, reason: '' });
+      } else {
+        const state = transitionItem(loaded.workspace, entry.skill, 'FAILED', { reason: 'candidate-invalid', pid: null, delegatePid: null });
+        results.push({ name: entry.skill.name, state: state.state, claimed: false, reason: state.reason });
+      }
     }
   }
   const requestedWorkers = Number.isSafeInteger(options.workers) ? options.workers : 2;
@@ -1577,6 +2010,7 @@ async function runWorkspace(options = {}) {
       const index = cursor;
       cursor += 1;
       const entry = selection.selected[index];
+      assertWorkspaceSafe(loaded.workspace);
       const current = loadItemState(loaded.workspace, entry.skill);
       const result = await processItem(loaded.workspace, entry.skill, current, entry.privateItem, options);
       results.push(result);
@@ -1584,8 +2018,9 @@ async function runWorkspace(options = {}) {
   }
   await Promise.all(Array.from({ length: Math.min(workers, selection.selected.length) }, () => worker()));
   results.sort((a, b) => a.name.localeCompare(b.name));
+  assertWorkspaceSafe(loaded.workspace);
   const claimed = results.filter((result) => result.claimed);
-  const unsuccessful = claimed.filter((result) => ['FAILED', 'BLOCKED'].includes(result.state));
+  const unsuccessful = results.filter((result) => ['FAILED', 'BLOCKED'].includes(result.state));
   return {
     schemaVersion: SCHEMA_VERSION,
     tool: TOOL,
@@ -1615,6 +2050,7 @@ function queueWorkspace(workspace) {
     items.push({ name: entry.skill.name, classification: entry.skill.classification, state: entry.state.state, reasons: entry.skill.reasons, workItemId: entry.skill.workItemId });
   }
   items.sort((a, b) => a.name.localeCompare(b.name));
+  assertWorkspaceSafe(loaded.workspace);
   return {
     schemaVersion: SCHEMA_VERSION,
     tool: TOOL,
@@ -1662,6 +2098,7 @@ function previewWorkspace(workspace, name) {
             : entry.state.state === 'BLOCKED'
               ? 'inspect the blocked reason and create a new isolated workspace if needed'
               : 'no further staging action required';
+  assertWorkspaceSafe(loaded.workspace);
   return {
     schemaVersion: SCHEMA_VERSION,
     tool: TOOL,
@@ -1687,11 +2124,39 @@ function previewWorkspace(workspace, name) {
 
 function validateWorkspace(options = {}) {
   const loaded = loadedWorkspace(options.workspace);
+  const currentEstate = analyzeEstate(loaded.config, loaded.inventory, { home: loaded.home, frameworkRoot: loaded.frameworkRoot });
+  if (currentEstate.scanFingerprint !== loaded.manifest.scanFingerprint) {
+    return {
+      schemaVersion: SCHEMA_VERSION,
+      tool: TOOL,
+      status: 'PARTIAL',
+      liveSources: { status: 'UNVERIFIED', unchanged: false },
+      checked: 1,
+      valid: 0,
+      invalid: 1,
+      results: [{ name: '__estate__', classification: 'ESTATE', state: 'BLOCKED', valid: false, reason: 'estate-drift' }],
+      exitCode: 2,
+    };
+  }
   const results = [];
   let liveUnchanged = true;
   for (const entry of loaded.entries) {
+    assertWorkspaceSafe(loaded.workspace);
+    if (entry.skill.classification === 'BLOCKED_PROVENANCE') {
+      liveUnchanged = false;
+      results.push({ name: entry.skill.name, classification: entry.skill.classification, state: 'BLOCKED', valid: false, reason: entry.skill.reasons?.[0] || 'blocked-provenance' });
+      continue;
+    }
     if (entry.skill.classification !== 'REFACTOR') {
-      results.push({ name: entry.skill.name, classification: entry.skill.classification, state: entry.state.state, valid: true, reason: '' });
+      const blocked = entry.state.state === 'BLOCKED';
+      if (blocked) liveUnchanged = false;
+      results.push({
+        name: entry.skill.name,
+        classification: entry.skill.classification,
+        state: entry.state.state,
+        valid: !blocked,
+        reason: blocked ? entry.skill.reasons.find((reason) => reason !== 'managed-installation') || 'source-uninspectable' : '',
+      });
       continue;
     }
     const sources = revalidateItemSources(loaded.workspace, entry.skill, entry.privateItem);
@@ -1711,7 +2176,11 @@ function validateWorkspace(options = {}) {
     }
     const candidate = candidatePathFor(loaded.workspace, entry.skill);
     if (fs.existsSync(candidate)) {
-      const validation = validateCandidate(candidate, entry.skill.name, (entry.privateItem?.sources || []).map((source) => source.entrypointHash), { requireChanged: true });
+      const validation = validateStagedCandidate(candidate, entry.skill.name, (entry.privateItem?.sources || []).map((source) => source.entrypointHash), {
+        requireChanged: true,
+        validatorPath: options.validatorPath,
+        allowTestValidator: options.allowTestValidator === true,
+      });
       validation.coveragePresent = coverageValid(loaded.workspace, entry.skill, entry.privateItem);
       if (!validation.coveragePresent) validation.reasons.push('coverage-receipt-missing');
       validation.valid = validation.valid && validation.coveragePresent;
@@ -1725,6 +2194,7 @@ function validateWorkspace(options = {}) {
       results.push({ name: entry.skill.name, classification: entry.skill.classification, state: entry.state.state, valid: false, reason: entry.state.state === 'PENDING' ? 'pending' : 'candidate-missing' });
     }
   }
+  assertWorkspaceSafe(loaded.workspace);
   const invalid = results.filter((item) => !item.valid);
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -1756,23 +2226,21 @@ function doctor() {
   };
   const productionReady = isExecutable(productionDelegate);
   const selectedReady = isExecutable(selectedDelegate);
-  const overridden = Boolean(process.env.CANUTO_SKILL_REFACTOR_DELEGATE);
-  checks.delegate = { status: productionReady ? 'READY' : 'BLOCKED', overridden, selectedStatus: selectedReady ? 'READY' : 'BLOCKED' };
-  if (overridden) checks.delegateOverride = { status: selectedReady ? 'READY' : 'BLOCKED' };
+  const selectedTrusted = trustedDelegatePath(selectedDelegate);
+  checks.delegate = { status: productionReady ? 'READY' : 'BLOCKED', overridden: false, selectedStatus: selectedReady && selectedTrusted ? 'READY' : 'BLOCKED' };
   checks.validator = { status: fs.existsSync(defaultValidatorPath()) ? 'READY' : 'BLOCKED' };
   const configPath = defaultConfigPath();
   try { gardener.loadConfig(configPath); checks.config = { status: 'READY' }; } catch (error) { checks.config = { status: 'BLOCKED', reason: error.message || 'config-invalid' }; }
   const offline = process.env.CANUTO_SKILL_REFACTOR_OFFLINE === '1';
-  const fake = Boolean(process.env.CANUTO_SKILL_REFACTOR_DELEGATE);
   const requiredKeys = ['node', 'gardener', 'validator', 'config'];
   const requiredReady = requiredKeys.every((key) => checks[key]?.status === 'READY');
-  const delegateReady = offline || (overridden ? selectedReady : productionReady);
+  const delegateReady = offline || productionReady;
   const status = requiredReady && delegateReady ? 'READY' : 'BLOCKED';
   return {
     schemaVersion: SCHEMA_VERSION,
     tool: TOOL,
     status,
-    mode: offline ? 'offline' : fake ? 'fake-delegate' : 'production',
+    mode: offline ? 'offline' : 'production',
     checks,
     exitCode: status === 'READY' ? 0 : 2,
   };
@@ -1789,6 +2257,7 @@ module.exports = {
   MAX_BUNDLE_BYTES,
   MAX_RESULT_BYTES,
   MAX_STDERR_BYTES,
+  MAX_WORKSPACE_FILE_BYTES,
   MAX_QUEUE_ITEMS,
   MAX_WORKERS,
   MAX_DELEGATE_ATTEMPTS,
@@ -1813,6 +2282,7 @@ module.exports = {
   defaultContractPath,
   defaultValidatorPath,
   defaultDelegatePath,
+  acquireLock,
   inventoryForConfig,
   analyzeEstate,
   scanWorkspace,
@@ -1821,5 +2291,8 @@ module.exports = {
   runWorkspace,
   validateWorkspace,
   previewWorkspace,
+  readFileBounded,
+  runOfficialValidator,
+  trustedDelegatePath,
   doctor,
 };
