@@ -25,7 +25,10 @@ def replace_once(text: str, old: str, new: str, label: str) -> str:
 
 
 def sub_once(text: str, pattern: str, replacement: str, label: str, flags: int = 0) -> str:
-    result, count = re.subn(pattern, replacement, text, count=1, flags=flags)
+    # Use a callable replacement so backslashes intended for Bash (for example
+    # \u2713 and \033) are copied literally instead of parsed by Python's
+    # regex replacement-template grammar.
+    result, count = re.subn(pattern, lambda _match: replacement, text, count=1, flags=flags)
     if count != 1:
         raise SystemExit(f"{label}: expected one regex match, found {count}")
     return result
