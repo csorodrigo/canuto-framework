@@ -6,6 +6,7 @@
 #   Local run:        bash install.sh
 #   Update only:      bash install.sh --update
 #   Update via curl:  curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --update
+#   Contract only:    bash install.sh --contract-only
 #   Check versions:   bash install.sh --check
 #   Smoke test:       bash install.sh --test
 #   Repair runtime:   bash install.sh --repair
@@ -25,7 +26,7 @@ SOURCE_DIR="${CANUTO_SOURCE_DIR:-}"
 AGENTS_DIR=".agents"
 CLAUDE_MD="CLAUDE.md"
 TMP_DIR=$(mktemp -d)
-MODE="auto" # auto | install | update | check | skill | migrate | repair | doctor | test | deps
+MODE="auto" # auto | install | update | contract | check | skill | migrate | repair | doctor | test | deps
 ORIGINAL_ARGS=("$@")
 SCRIPT_SOURCE="${BASH_SOURCE[0]:-$0}"
 SKILLS_TO_INSTALL=()
@@ -48,6 +49,7 @@ error()  { echo -e "${RED}[canuto]${RESET} \u2717 $1"; exit 1; }
 while [[ $# -gt 0 ]]; do
   case $1 in
     --update) MODE="update" ;;
+    --contract-only) MODE="contract" ;;
     --check)   MODE="check"   ;;
     --test)    MODE="test"    ;;
     --migrate) MODE="migrate" ;;
@@ -193,7 +195,7 @@ confirm_yes() {
 # ── Confirm not running install/update flows in the framework repo itself ───
 if [ "${CANUTO_INSTALL_LIBRARY_ONLY:-0}" != "1" ] && git remote -v 2>/dev/null | grep -q "canuto-framework"; then
   case "$MODE" in
-    install|update|migrate|skill)
+    install|update|contract|migrate|skill)
       warn "This looks like the canuto-framework repo itself. Aborting."
       exit 0
       ;;
@@ -650,7 +652,7 @@ fetch_content() {
 
 should_refresh_installer() {
   case "$MODE" in
-    install|update|check|skill|migrate|repair|doctor|test|deps)
+    install|update|contract|check|skill|migrate|repair|doctor|test|deps)
       ;;
     *)
       return 1
@@ -966,6 +968,48 @@ VAULT_DIRS=(
   ".agents/vault/canvas"
   ".agents/vault/digests"
 )
+
+# ── ensure_shared_operating_contract_reference ─────────────────────────────
+# Contract-only distribution must not pull generic hooks, personas or skills
+# over a product repository. Add exactly one active reference, outside Markdown
+# fences, while preserving every existing byte of project guidance.
+ensure_shared_operating_contract_reference() {
+  local target="$1"
+  local tmp="${target}.canuto-contract.$$"
+
+  if [ -f "$target" ] && awk '
+    /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced; next }
+    !fenced && /^[[:space:]]*-[[:space:]]+Read `\.agents\/OPERATING-CONTRACT\.md` before non-trivial work;/ { found=1 }
+    END { exit(found ? 0 : 1) }
+  ' "$target" 2>/dev/null; then
+    return 0
+  fi
+
+  if [ -f "$target" ] && awk '
+    /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced }
+    END { exit(fenced ? 0 : 1) }
+  ' "$target" 2>/dev/null; then
+    {
+      cat <<'CONTRACTREF'
+## Shared Operating Contract
+- Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is the shared
+  Claude/Codex contract for evidence, authorization, WIP and cross-host drift.
+
+CONTRACTREF
+      cat "$target"
+    } > "$tmp" && mv "$tmp" "$target"
+    warn "$target had an unclosed Markdown fence; the active contract reference was preserved in a prefix outside it."
+    return 0
+  fi
+
+  cat >> "$target" <<'CONTRACTREF'
+
+## Shared Operating Contract
+- Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is the shared
+  Claude/Codex contract for evidence, authorization, WIP and cross-host drift.
+CONTRACTREF
+  ok "$target references the shared operating contract"
+}
 
 # ── merge_claude_md ─────────────────────────────────────────────────────────
 # Creates CLAUDE.md if missing.
@@ -4308,6 +4352,51 @@ PYEOF
 # mode. It performs no setup and is used by framework smoke tests.
 if [ "${CANUTO_INSTALL_LIBRARY_ONLY:-0}" = "1" ]; then
   return 0 2>/dev/null || exit 0
+fi
+
+# ── CONTRACT ONLY ───────────────────────────────────────────────────────────
+# Deliberately narrower than --update: product-owned hooks, personas, skills,
+# models, gates and installers remain untouched. This is the safe rollout path
+# for repositories whose local framework contains domain-specific wiring.
+if [ "$MODE" = "contract" ]; then
+  echo ""
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo -e "${CYAN}  Canuto Framework — Shared Contract Only${RESET}"
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo ""
+
+  if ! update_tree_is_clean; then
+    error "Refusing --contract-only in a dirty worktree. Preserve WIP and retry from a clean isolated worktree."
+  fi
+
+  download ".agents/OPERATING-CONTRACT.md" ".agents/OPERATING-CONTRACT.md" \
+    || error "Could not download the shared operating contract."
+  ensure_shared_operating_contract_reference "$CLAUDE_MD"
+  ensure_shared_operating_contract_reference "AGENTS.md"
+
+  if [ "$GIT_AVAILABLE" = true ]; then
+    # Some consumers intentionally ignore `.agents/*` and selectively unignore
+    # managed subtrees. Force-add only this canonical document; never force-add
+    # the directory or any runtime/product file.
+    git add -f ".agents/OPERATING-CONTRACT.md"
+    git add "$CLAUDE_MD" "AGENTS.md"
+    git ls-files --error-unmatch ".agents/OPERATING-CONTRACT.md" >/dev/null 2>&1 \
+      || error "Shared operating contract was written but is not tracked by Git."
+
+    if confirm_yes "Commit shared operating contract? [Y/n] " "Y"; then
+      git commit -m "docs: sync shared Canuto operating contract" \
+        && ok "Committed shared operating contract." \
+        || warn "Nothing new to commit (contract already synchronized)."
+    else
+      warn "Contract files are staged but not committed."
+    fi
+  fi
+
+  local_contract_hash=$(sha256_file ".agents/OPERATING-CONTRACT.md" 2>/dev/null || true)
+  [ -n "$local_contract_hash" ] || error "Could not calculate the shared contract hash."
+  ok "Shared contract active in Claude and Codex (sha256: ${local_contract_hash:0:12})."
+  echo ""
+  exit 0
 fi
 
 # ── CHECK ───────────────────────────────────────────────────────────────────
