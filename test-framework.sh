@@ -2919,6 +2919,10 @@ printf '9.9.9\n' > "$UPDATE_SOURCE/.agents/VERSION"
 cat > "$UPDATE_SOURCE/install.sh" <<'STUBEOF'
 #!/usr/bin/env bash
 # SOURCE-RECEIPT.json support marker
+if [ "${1:-}" = "--check" ]; then
+  [ -f .source-check-ok ] && exit 0
+  exit 1
+fi
 printf '%s|%s|%s|%s|%s|%s\n' "${CANUTO_SOURCE_KIND:-}" "${CANUTO_SOURCE_REF:-}" "${CANUTO_SOURCE_CHANNEL:-}" "${CANUTO_SOURCE_VERSION:-}" "${CANUTO_SOURCE_TRANSPORT:-}" "${CANUTO_ROLLBACK_REQUESTED:-}" > .captured-source
 mkdir -p .agents
 printf '9.9.9\n' > .agents/VERSION
@@ -2955,14 +2959,38 @@ else
   fail "22e update-all não propagou edge/main ou pulou por VERSION igual"
 fi
 
+SAME_REF_DRIFT_REPO="$SOURCE_ROOT/same-ref-drift"
+make_source_consumer "$SAME_REF_DRIFT_REPO" 9.9.9 main
+if CANUTO_SOURCE_DIR="$UPDATE_SOURCE" CANUTO_VAULT_DIR="$SOURCE_ROOT/empty-vault" TMPDIR="$UPDATE_TMP" \
+   /bin/bash "$FRAMEWORK_DIR/.agents/tools/canuto-update-all.sh" --channel edge "$SAME_REF_DRIFT_REPO" >/dev/null 2>&1 \
+   && [ -f "$SAME_REF_DRIFT_REPO/.captured-source" ]; then
+  pass "22f update-all atualiza quando VERSION/ref coincidem mas conteúdo não é provado"
+else
+  fail "22f update-all declarou OK sem prova completa de conteúdo"
+fi
+
+SAME_REF_OK_REPO="$SOURCE_ROOT/same-ref-ok"
+make_source_consumer "$SAME_REF_OK_REPO" 9.9.9 main
+touch "$SAME_REF_OK_REPO/.source-check-ok"
+git -C "$SAME_REF_OK_REPO" add .source-check-ok
+git -C "$SAME_REF_OK_REPO" commit -q -m "test: full source check is green"
+SOURCE_OK_RC=0
+SOURCE_OK_OUTPUT=$(CANUTO_SOURCE_DIR="$UPDATE_SOURCE" CANUTO_VAULT_DIR="$SOURCE_ROOT/empty-vault" TMPDIR="$UPDATE_TMP" \
+   /bin/bash "$FRAMEWORK_DIR/.agents/tools/canuto-update-all.sh" --channel edge "$SAME_REF_OK_REPO" 2>&1) || SOURCE_OK_RC=$?
+if [ "$SOURCE_OK_RC" -eq 0 ] && [ ! -e "$SAME_REF_OK_REPO/.captured-source" ]; then
+  pass "22g update-all pula somente após check completo verde"
+else
+  fail "22g update-all ignorou check verde ou executou update desnecessário (rc=$SOURCE_OK_RC): $SOURCE_OK_OUTPUT"
+fi
+
 ROLLBACK_REPO="$SOURCE_ROOT/rollback-consumer"
 make_source_consumer "$ROLLBACK_REPO" 1.0.0 main
 if CANUTO_SOURCE_DIR="$UPDATE_SOURCE" CANUTO_VAULT_DIR="$SOURCE_ROOT/empty-vault" TMPDIR="$UPDATE_TMP" \
    /bin/bash "$FRAMEWORK_DIR/.agents/tools/canuto-update-all.sh" --rollback 1.7.0 "$ROLLBACK_REPO" >/dev/null 2>&1 \
    && [ "$(cat "$ROLLBACK_REPO/.captured-source")" = "version|releases/1.7.0||1.7.0|local|true" ]; then
-  pass "22f update-all propaga rollback fixado"
+  pass "22h update-all propaga rollback fixado"
 else
-  fail "22f update-all não propagou rollback fixado"
+  fail "22h update-all não propagou rollback fixado"
 fi
 
 BOOTSTRAP_SOURCE="$SOURCE_ROOT/bootstrap-source"
@@ -2980,9 +3008,9 @@ if (cd "$BOOTSTRAP_WORK" \
        CANUTO_BOOTSTRAP_CAPTURE="$BOOTSTRAP_CAPTURE" \
        /bin/bash "$FRAMEWORK_DIR/install.sh" --rollback 1.7.0 --yes </dev/null >/dev/null 2>&1) \
    && [ "$(cat "$BOOTSTRAP_CAPTURE" 2>/dev/null)" = "version|releases/1.7.0||1.7.0|remote-url|true" ]; then
-  pass "22g bootstrap preserva rollback, ref fixado e transporte no instalador filho"
+  pass "22i bootstrap preserva rollback, ref fixado e transporte no instalador filho"
 else
-  fail "22g bootstrap perdeu rollback/ref/transporte: $(cat "$BOOTSTRAP_CAPTURE" 2>/dev/null || echo ausente)"
+  fail "22i bootstrap perdeu rollback/ref/transporte: $(cat "$BOOTSTRAP_CAPTURE" 2>/dev/null || echo ausente)"
 fi
 
 rm -rf "$SOURCE_ROOT"

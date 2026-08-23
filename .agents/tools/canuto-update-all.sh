@@ -122,7 +122,19 @@ resolve_source() {
 receipt_ref() {
   local receipt="$1"
   [ -f "$receipt" ] || return 1
-  sed -n 's/^[[:space:]]*"sourceRef":[[:space:]]*"\([^"]*\)".*/\1/p' "$receipt" | head -1
+  python3 - "$receipt" <<'PYREF'
+import json
+import sys
+try:
+    with open(sys.argv[1], encoding="utf-8") as fh:
+        value = json.load(fh).get("sourceRef", "")
+except (OSError, ValueError, TypeError, AttributeError):
+    value = ""
+if isinstance(value, str) and value:
+    print(value)
+else:
+    raise SystemExit(1)
+PYREF
 }
 
 DRY_RUN=0
@@ -326,21 +338,35 @@ for proj in "${PROJECTS[@]}"; do
     source_current=1
   fi
 
+  # Branches `stable` e `releases/*` são promovidas deliberadamente, mas
+  # continuam sendo refs móveis do Git. Versão + nome da ref não provam que o
+  # conteúdo não mudou. Antes de declarar OK, execute o check completo do
+  # instalador fresco contra o mesmo source selecionado. Falha/UNKNOWN nunca é
+  # verde; em árvore limpa leva ao update, em árvore suja leva a SKIP honesto.
+  content_current=0
+  check_log=""
+  if [ "$local_ver" = "$REMOTE_VERSION" ]      && [ "$source_current" -eq 1 ]      && [ "$FORCE" = 0 ]; then
+    check_log="$LOG_DIR/$PROJ_IDX-$name.check.log"
+    if (cd "$proj" && bash "$FRESH_INSTALLER" --check </dev/null) >"$check_log" 2>&1; then
+      content_current=1
+    fi
+  fi
+
   # Trabalho em curso = pular (nunca misturar update com mudança de produto) —
   # checado ANTES do dry-run e do check de versão, para o dry-run prometer
   # exatamente o que a rodada real faria. Só MODIFICAÇÕES RASTREADAS contam
   # (-uno): o próprio install.sh deixa arquivos untracked para trás.
   if [ -n "$(git -C "$proj" status --porcelain -uno 2>/dev/null)" ]; then
-    if [ "$local_ver" = "$REMOTE_VERSION" ] && [ "$source_current" -eq 1 ] && [ "$FORCE" = 0 ]; then
-      add_report "OK" "$name" "$local_ver" "$local_ver" "já na versão e source remotos (árvore suja; source=$SOURCE_REF) — $proj"
+    if [ "$local_ver" = "$REMOTE_VERSION" ] && [ "$source_current" -eq 1 ] && [ "$content_current" -eq 1 ] && [ "$FORCE" = 0 ]; then
+      add_report "OK" "$name" "$local_ver" "$local_ver" "versão, source e conteúdo comprovados (árvore suja; source=$SOURCE_REF) — $proj"
     else
-      add_report "SKIP" "$name" "$local_ver" "-" "mudanças não commitadas — commit/stash antes — $proj"
+      add_report "SKIP" "$name" "$local_ver" "-" "mudanças não commitadas e update necessário/não comprovado — commit/stash antes; check: ${check_log:-não executado} — $proj"
     fi
     continue
   fi
 
-  if [ "$local_ver" = "$REMOTE_VERSION" ] && [ "$source_current" -eq 1 ] && [ "$FORCE" = 0 ]; then
-    add_report "OK" "$name" "$local_ver" "$local_ver" "já na versão e source remotos (source=$SOURCE_REF) — $proj"
+  if [ "$local_ver" = "$REMOTE_VERSION" ] && [ "$source_current" -eq 1 ] && [ "$content_current" -eq 1 ] && [ "$FORCE" = 0 ]; then
+    add_report "OK" "$name" "$local_ver" "$local_ver" "versão, source e conteúdo comprovados (source=$SOURCE_REF; check=$check_log) — $proj"
     continue
   fi
 
