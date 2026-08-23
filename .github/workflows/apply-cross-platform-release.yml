@@ -4,13 +4,16 @@ on:
   push:
     branches:
       - codex/cross-platform-release-1.8.0-20260823
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
   apply:
-    if: github.actor != 'github-actions[bot]'
+    if: github.actor != 'github-actions[bot]' && (github.ref_name == 'codex/cross-platform-release-1.8.0-20260823' || github.head_ref == 'codex/cross-platform-release-1.8.0-20260823')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
