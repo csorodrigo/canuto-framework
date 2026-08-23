@@ -160,6 +160,10 @@ else
 fi
 rm -f "$PORTABILITY_HOME/.canuto/vault/Broken.md"
 rm -rf "$PORTABILITY_HOME/.canuto/vault/.obsidian"
+cat > "$PORTABILITY_HOME/.canuto/vault/A.md" <<'EOF'
+[[B]]
+[Local](B.md)
+EOF
 
 if HOME="$PORTABILITY_HOME" CLAUDE_PROJECT_DIR="$FRAMEWORK_DIR" bash "$AGENTS_DIR/hooks/check-orphans.sh" >/dev/null 2>&1; then
   pass "check-orphans.sh portable runtime"
