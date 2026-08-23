@@ -4375,18 +4375,22 @@ if [ "$MODE" = "contract" ]; then
   ensure_shared_operating_contract_reference "AGENTS.md"
 
   if [ "$GIT_AVAILABLE" = true ]; then
-    # Some consumers intentionally ignore `.agents/*` and selectively unignore
-    # managed subtrees. Force-add only this canonical document; never force-add
-    # the directory or any runtime/product file.
-    git add -f ".agents/OPERATING-CONTRACT.md"
-    git add "$CLAUDE_MD" "AGENTS.md"
-    git ls-files --error-unmatch ".agents/OPERATING-CONTRACT.md" >/dev/null 2>&1 \
-      || error "Shared operating contract was written but is not tracked by Git."
+    # Some consumers intentionally ignore `.agents/*` or Markdown entrypoints.
+    # Force-add exactly the three contract paths; never force-add a directory or
+    # any runtime/product implementation file.
+    git add -f ".agents/OPERATING-CONTRACT.md" "$CLAUDE_MD" "AGENTS.md"
+    git ls-files --error-unmatch \
+      ".agents/OPERATING-CONTRACT.md" "$CLAUDE_MD" "AGENTS.md" >/dev/null 2>&1 \
+      || error "Shared contract files were written but are not all tracked by Git."
 
     if confirm_yes "Commit shared operating contract? [Y/n] " "Y"; then
-      git commit -m "docs: sync shared Canuto operating contract" \
-        && ok "Committed shared operating contract." \
-        || warn "Nothing new to commit (contract already synchronized)."
+      if git diff --cached --quiet; then
+        log "Nothing to commit — shared operating contract already synchronized."
+      elif git commit -m "docs: sync shared Canuto operating contract"; then
+        ok "Committed shared operating contract."
+      else
+        error "Git commit failed; contract files remain staged for inspection."
+      fi
     else
       warn "Contract files are staged but not committed."
     fi

@@ -940,6 +940,8 @@ contract_only_tmp=$(mktemp -d)
 mkdir -p "$contract_only_tmp/.agents/hooks"
 cat > "$contract_only_tmp/.gitignore" <<'EOF'
 .agents/*
+/AGENTS.md
+/CLAUDE.md
 EOF
 cat > "$contract_only_tmp/AGENTS.md" <<'EOF'
 # Consumer Codex
@@ -956,7 +958,7 @@ cat > "$contract_only_tmp/.agents/hooks/product-gate.sh" <<'EOF'
 echo product-only
 EOF
 git -C "$contract_only_tmp" init -q
-git -C "$contract_only_tmp" add .gitignore AGENTS.md CLAUDE.md
+git -C "$contract_only_tmp" add .gitignore
 git -C "$contract_only_tmp" add -f .agents/hooks/product-gate.sh
 git -C "$contract_only_tmp" -c user.name=Canuto -c user.email=canuto@example.invalid commit -qm fixture
 contract_hook_before=$(cksum < "$contract_only_tmp/.agents/hooks/product-gate.sh")
@@ -986,6 +988,35 @@ else
   fail "--contract-only alterou escopo, nao versionou contrato ou nao foi idempotente"
 fi
 rm -rf "$contract_only_tmp"
+
+# Falha real de commit nao pode ser rotulada como idempotencia nem sair verde.
+contract_fail_tmp=$(mktemp -d)
+mkdir -p "$contract_fail_tmp/.hooks"
+printf '# Consumer\n' > "$contract_fail_tmp/AGENTS.md"
+printf '# Consumer\n' > "$contract_fail_tmp/CLAUDE.md"
+cat > "$contract_fail_tmp/.hooks/pre-commit" <<'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+chmod +x "$contract_fail_tmp/.hooks/pre-commit"
+git -C "$contract_fail_tmp" init -q
+git -C "$contract_fail_tmp" config core.hooksPath .hooks
+git -C "$contract_fail_tmp" add .hooks/pre-commit AGENTS.md CLAUDE.md
+git -C "$contract_fail_tmp" -c user.name=Canuto -c user.email=canuto@example.invalid commit --no-verify -qm fixture
+contract_fail_head=$(git -C "$contract_fail_tmp" rev-parse HEAD)
+contract_fail_out=$(mktemp)
+if ( cd "$contract_fail_tmp" \
+  && CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" bash "$FRAMEWORK_DIR/install.sh" --contract-only --yes ) >"$contract_fail_out" 2>&1; then
+  fail "--contract-only saiu verde quando o pre-commit rejeitou o commit"
+elif [ "$contract_fail_head" = "$(git -C "$contract_fail_tmp" rev-parse HEAD)" ] \
+  && grep -q 'Git commit failed' "$contract_fail_out" \
+  && ! grep -q 'already synchronized' "$contract_fail_out"; then
+  pass "--contract-only distingue falha real de commit de idempotencia"
+else
+  fail "--contract-only mascarou ou descreveu incorretamente a falha de commit"
+fi
+rm -rf "$contract_fail_tmp"
+rm -f "$contract_fail_out"
 
 codex_render_tmp=$(mktemp -d)
 mkdir -p "$codex_render_tmp/.agents/templates"
