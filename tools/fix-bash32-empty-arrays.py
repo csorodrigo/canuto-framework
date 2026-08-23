@@ -124,4 +124,30 @@ if text.count(old_library_return) != 1:
 text = text.replace(old_library_return, new_library_return, 1)
 
 path.write_text(text, encoding="utf-8")
-print("Bash 3.2 empty-array expansions are now guarded in installer refresh and library paths")
+
+tests_path = Path("test-framework.sh")
+tests = tests_path.read_text(encoding="utf-8")
+
+old_source_fixture = r'''  (cd "$SOURCE_EMPTY" && env HOME="$SOURCE_HOME" "${SOURCE_ENV[@]}" /bin/bash "$FRAMEWORK_DIR/install.sh" "${SOURCE_ARGS[@]}" >/dev/null 2>&1) || SOURCE_RC=$?
+'''
+new_source_fixture = r'''  # Bash 3.2 + `set -u` rejects expansion of SOURCE_ENV when the
+  # environment list is intentionally empty. Keep the exact same parser cases,
+  # but call env without an empty-array expansion in that branch.
+  if [ "${#SOURCE_ENV[@]}" -gt 0 ]; then
+    (cd "$SOURCE_EMPTY" && env HOME="$SOURCE_HOME" "${SOURCE_ENV[@]}" /bin/bash "$FRAMEWORK_DIR/install.sh" "${SOURCE_ARGS[@]}" >/dev/null 2>&1) || SOURCE_RC=$?
+  else
+    (cd "$SOURCE_EMPTY" && env HOME="$SOURCE_HOME" /bin/bash "$FRAMEWORK_DIR/install.sh" "${SOURCE_ARGS[@]}" >/dev/null 2>&1) || SOURCE_RC=$?
+  fi
+'''
+if tests.count(old_source_fixture) != 1:
+    raise SystemExit(
+        "SOURCE_ENV fixture invocation expected once, "
+        f"found {tests.count(old_source_fixture)}"
+    )
+tests = tests.replace(old_source_fixture, new_source_fixture, 1)
+tests_path.write_text(tests, encoding="utf-8")
+
+print(
+    "Bash 3.2 empty-array expansions are guarded in installer refresh, "
+    "library paths, and source-parser fixtures"
+)
