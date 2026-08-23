@@ -23,7 +23,9 @@ jobs:
           fetch-depth: 0
 
       - name: Apply source proof refinement
-        run: python3 tools/refine-source-proof.py
+        run: |
+          python3 tools/fix-source-proof-fixture.py
+          python3 tools/refine-source-proof.py
 
       - name: Validate focused and complete gates
         run: |
@@ -37,6 +39,7 @@ jobs:
 
       - name: Remove one-shot automation
         run: |
+          rm -f tools/fix-source-proof-fixture.py
           rm -f tools/refine-source-proof.py
           rm -f .github/workflows/refine-source-proof.yml
 
