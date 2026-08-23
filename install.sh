@@ -3252,64 +3252,13 @@ skill_gardener_migrate_legacy_config() {
   local library_file="$1"
   local config_file="$2"
   local candidate_file="$3"
-  node - "$library_file" "$config_file" "$candidate_file" <<'NODE'
-const fs = require('node:fs');
-const path = require('node:path');
-const library = require(path.resolve(process.argv[2]));
-const configPath = path.resolve(process.argv[3]);
-const candidatePath = path.resolve(process.argv[4]);
-const legacyRemoteHistory = {
-  'lucrando-ai': '/srv/dev/worktrees/lucrando-ai/main/.codex/sessions',
-  papiro: '/srv/dev/worktrees/papiro/main/.codex/sessions',
-  'mecesa-v1': '/srv/dev/worktrees/mecesa-v1/main/.codex/sessions',
-};
-const canonicalRemoteHistory = ['~/.codex/sessions', '~/.codex/archived_sessions'];
-const legacyMecesaRoot = '/srv/dev/worktrees/mecesa-v1/main';
-let raw;
-try {
-  raw = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  library.loadConfig(configPath);
-} catch {
-  try { fs.unlinkSync(candidatePath); } catch {}
-  process.exit(1);
-}
-let changed = false;
-for (const [logicalProjectId, project] of Object.entries(raw.projects || {})) {
-  for (const surface of Object.values(project?.surfaces || {})) {
-    if (surface?.remote === true && surface.provider === 'codex') {
-      if (Array.isArray(surface.historyRoots) && surface.historyRoots.length === 1 && surface.historyRoots[0] === legacyRemoteHistory[logicalProjectId]) {
-        surface.historyRoots = [...canonicalRemoteHistory];
-        changed = true;
-      }
-      if (logicalProjectId === 'mecesa-v1' && Array.isArray(surface.roots) && surface.roots.length === 1 && surface.roots[0] === legacyMecesaRoot) {
-        surface.roots = ['/srv/dev/worktrees/mecesa/main'];
-        changed = true;
-      }
-    }
-  }
-}
-if (raw.providers?.hermes && Array.isArray(raw.providers.hermes.historyRoots)
-  && raw.providers.hermes.historyRoots.length === 2
-  && raw.providers.hermes.historyRoots[0] === '~/.hermes/sessions'
-  && raw.providers.hermes.historyRoots[1] === '~/.hermes/history') {
-  raw.providers.hermes.historyRoots = ['~/.hermes/sessions'];
-  changed = true;
-}
-if (!changed) {
-  try { fs.unlinkSync(candidatePath); } catch {}
-  process.exit(0);
-}
-try {
-  if (!candidatePath || candidatePath === configPath) throw new Error('invalid-migration-candidate');
-  const mode = fs.statSync(configPath).mode & 0o777;
-  fs.writeFileSync(candidatePath, `${JSON.stringify(raw, null, 2)}\n`, { mode: mode || 0o600, flag: 'wx' });
-  fs.chmodSync(candidatePath, mode || 0o600);
-  library.loadConfig(candidatePath);
-} catch {
-  try { fs.unlinkSync(candidatePath); } catch {}
-  process.exit(1);
-}
-NODE
+
+  # A config efetiva é propriedade da máquina. O instalador valida, mas não
+  # reescreve uma configuração válida — nem mesmo quando reconhece um shape
+  # antigo. Correções de topologia pertencem ao onboarding/local config, não
+  # ao genótipo distribuível do framework (ADR-0003).
+  rm -f -- "$candidate_file" 2>/dev/null || true
+  validate_skill_gardener_config "$library_file" "$config_file"
 }
 
 setup_skill_gardener() {

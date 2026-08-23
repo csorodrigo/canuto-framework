@@ -2568,6 +2568,76 @@ for F2_LIB in brief-compose.sh memory-usage.sh delegation-ledger.sh; do
 done
 echo ""
 # ═══════════════════════════════════════════════════════════════════════════
+# TEST 20: Defaults identidade-cegos (ADR-0003)
+# ═══════════════════════════════════════════════════════════════════════════
+echo "── Test 20: Defaults identidade-cegos ──"
+
+SG_DEFAULT="$FRAMEWORK_DIR/config/skill-gardener.json"
+SG_SCHEMA="$FRAMEWORK_DIR/config/skill-gardener.schema.json"
+if [ ! -s "$SG_DEFAULT" ]; then
+  fail "20a config/skill-gardener.json ausente ou vazio"
+elif python3 - "$SG_DEFAULT" "$SG_SCHEMA" <<'PYEOF'
+import json
+import os
+import re
+import sys
+
+config_path, schema_path = sys.argv[1:]
+with open(config_path, encoding="utf-8") as fh:
+    cfg = json.load(fh)
+with open(schema_path, encoding="utf-8") as fh:
+    schema = json.load(fh)
+
+assert cfg.get("schemaVersion") == 1
+assert cfg.get("projects") == {}, "bootstrap default must not enumerate real projects"
+assert isinstance(cfg.get("providers"), dict) and cfg["providers"]
+assert isinstance(cfg.get("policy"), dict)
+assert schema.get("properties", {}).get("schemaVersion", {}).get("const") == 1
+
+identity_path = re.compile(r"^/(Users|home)/[^/]+/|^/srv/dev/(worktrees|repos)/")
+for provider, provider_cfg in cfg["providers"].items():
+    for key in ("roots", "pluginRoots", "systemRoots", "historyRoots"):
+        values = provider_cfg.get(key, [])
+        assert isinstance(values, list), f"{provider}.{key} must be an array"
+        for value in values:
+            assert isinstance(value, str)
+            assert not identity_path.search(value), f"identity-bearing path in {provider}.{key}: {value}"
+            assert value.startswith("~") or not os.path.isabs(value), f"absolute path in bootstrap default: {value}"
+PYEOF
+then
+  pass "20a Skill Gardener bootstrap é neutro, parseável e compatível com o schema"
+else
+  fail "20a Skill Gardener bootstrap contém identidade, path absoluto ou shape inválido"
+fi
+
+if grep -nE '"projects"[[:space:]]*:[[:space:]]*\{[[:space:]]*"' "$SG_DEFAULT" >/dev/null 2>&1; then
+  fail "20b bootstrap default enumera projeto real"
+else
+  pass "20b bootstrap default não enumera projetos"
+fi
+
+if grep -nE '/(Users|home)/[^/[:space:]\"]+|/srv/dev/(worktrees|repos)/[^/[:space:]\"]+' \
+    "$SG_DEFAULT" "$FRAMEWORK_DIR/install.sh" >/dev/null 2>&1; then
+  fail "20c default ou instalador contém identidade/topologia específica de máquina"
+else
+  pass "20c default e instalador não contêm identidade/topologia específica de máquina"
+fi
+
+if grep -qF 'config/skill-gardener.json' "$FRAMEWORK_DIR/install.sh" 2>/dev/null \
+   && grep -qF '$HOME/.canuto/config' "$FRAMEWORK_DIR/install.sh" 2>/dev/null; then
+  pass "20d instalador materializa a config efetiva fora do repositório"
+else
+  fail "20d instalador não mantém a config efetiva em ~/.canuto/config"
+fi
+
+if [ -s "$FRAMEWORK_DIR/docs/SKILL-GARDENER-CONFIG.md" ]; then
+  pass "20e política de configuração local está documentada"
+else
+  fail "20e docs/SKILL-GARDENER-CONFIG.md ausente"
+fi
+
+echo ""
+# ═══════════════════════════════════════════════════════════════════════════
 # SUMMARY
 # ═══════════════════════════════════════════════════════════════════════════
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
