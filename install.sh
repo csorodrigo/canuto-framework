@@ -1,36 +1,51 @@
 #!/usr/bin/env bash
 # =============================================================================
 # Canuto Framework — Installer / Updater
-# Usage:
-#   Fresh install:    curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash
-#   Local run:        bash install.sh
-#   Update only:      bash install.sh --update
-#   Update via curl:  curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --update
-#   Check versions:   bash install.sh --check
-#   Smoke test:       bash install.sh --test
-#   Repair runtime:   bash install.sh --repair
-#   Doctor mode:      bash install.sh --doctor
-#   Dependency setup: bash install.sh --deps-only
-#   Migrate from v1:  bash install.sh --migrate
-#   With API key:     bash install.sh --migrate --api-key YOUR_OBSIDIAN_API_KEY
-#   Via curl + key:   curl ... | bash -s -- --migrate --api-key YOUR_KEY
-#   Install a skill:  bash install.sh --skill pr-description --skill health-check
-#   JSON health:      bash install.sh --test --json
+#
+# Common usage:
+#   Fresh install:    bash install.sh [--yes] [--commit]
+#   Update:           bash install.sh --update [--yes] [--commit]
+#   Contract only:    bash install.sh --contract-only [--yes] [--commit]
+#   Install skills:   bash install.sh --skill NAME [--skill NAME] [--commit]
+#   Preview:          bash install.sh --dry-run [MODE]
+#   Help:             bash install.sh --help
+#
+# Consent boundary:
+#   --yes confirms operational prompts. It NEVER authorizes a Git commit.
+#   --commit is the only flag that authorizes staging and committing declared
+#   framework paths. The default, and --no-commit, leave changes unstaged.
 # =============================================================================
 
 set -euo pipefail
 
-REPO_URL="${CANUTO_REPO_URL:-https://raw.githubusercontent.com/csorodrigo/canuto-framework/main}"
+REPO_BASE="${CANUTO_REPO_BASE:-https://raw.githubusercontent.com/csorodrigo/canuto-framework}"
+REPO_URL_OVERRIDE="${CANUTO_REPO_URL:-}"
+REPO_URL=""
 SOURCE_DIR="${CANUTO_SOURCE_DIR:-}"
+SOURCE_KIND=""
+SOURCE_REF=""
+SOURCE_CHANNEL=""
+SOURCE_VERSION=""
+SOURCE_TRANSPORT="${CANUTO_SOURCE_TRANSPORT:-}"
+CLI_SOURCE_CHANNEL=""
+CLI_SOURCE_VERSION=""
+CLI_SOURCE_REF=""
+CLI_SOURCE_SELECTOR_COUNT=0
+ROLLBACK_REQUESTED="${CANUTO_ROLLBACK_REQUESTED:-false}"
+REFRESH_ARGS=()
 AGENTS_DIR=".agents"
 CLAUDE_MD="CLAUDE.md"
-TMP_DIR=$(mktemp -d)
-MODE="auto" # auto | install | update | check | skill | migrate | repair | doctor | test | deps
+TMP_DIR=""
+MODE="auto" # auto | install | update | contract | check | skill | migrate | repair | doctor | test | deps
 ORIGINAL_ARGS=("$@")
 SCRIPT_SOURCE="${BASH_SOURCE[0]:-$0}"
 SKILLS_TO_INSTALL=()
 JSON_OUTPUT=false
 AUTO_YES=false
+COMMIT_CHANGES=false
+COMMIT_POLICY="default" # default | commit | no-commit
+DRY_RUN=false
+OBSIDIAN_API_KEY_ARG=""
 
 # ── Colors ─────────────────────────────────────────────────────────────────
 GREEN='\033[0;32m'
@@ -42,42 +57,332 @@ RESET='\033[0m'
 log()    { echo -e "${CYAN}[canuto]${RESET} $1"; }
 ok()     { echo -e "${GREEN}[canuto]${RESET} \u2713 $1"; }
 warn()   { echo -e "${YELLOW}[canuto]${RESET} \u26a0 $1"; }
-error()  { echo -e "${RED}[canuto]${RESET} \u2717 $1"; exit 1; }
+error()  { echo -e "${RED}[canuto]${RESET} \u2717 $1" >&2; exit 1; }
 
-# ── Parse args ──────────────────────────────────────────────────────────────
-while [[ $# -gt 0 ]]; do
-  case $1 in
-    --update) MODE="update" ;;
-    --check)   MODE="check"   ;;
-    --test)    MODE="test"    ;;
-    --migrate) MODE="migrate" ;;
-    --repair)  MODE="repair"  ;;
-    --deps-only|--deps) MODE="deps" ;;
-    --doctor|--health) MODE="doctor" ;;
+print_help() {
+  cat <<'HELPEOF'
+Canuto Framework installer/updater
+
+Usage:
+  bash install.sh [MODE] [OPTIONS]
+
+Modes (choose at most one):
+  --update             update an existing Canuto consumer
+  --contract-only      synchronize only the shared operating contract
+  --check              compare installed framework files with the source
+  --test               run consumer validation
+  --migrate            migrate a legacy installation
+  --repair             repair the local runtime
+  --doctor, --health   repair and validate the runtime
+  --deps, --deps-only  provision runtime dependencies
+  --skill NAME         install one skill; may be repeated
+
+Options:
+  --yes                accept operational prompts; never commits
+  --commit             explicitly stage and commit declared framework paths
+  --no-commit          leave changes unstaged and uncommitted (default)
+  --dry-run            report the selected mutating operation without changes
+  --channel VALUE       stable (default) or edge; edge resolves to main
+  --version VERSION     pin releases/VERSION (for example 1.8.0)
+  --ref REF             pin an exact branch, tag, or commit SHA
+  --rollback VERSION    update from releases/VERSION and record rollback intent
+  --api-key VALUE      Obsidian API key used by migration/setup
+  --json               machine-readable output where supported
+  -h, --help           show this help without modifying the repository
+
+Examples:
+  bash install.sh --update --yes
+  bash install.sh --update --yes --commit
+  bash install.sh --contract-only --commit
+  bash install.sh --skill health-check --no-commit
+  bash install.sh --update --channel edge
+  bash install.sh --update --version 1.8.0
+  bash install.sh --rollback 1.7.0 --commit
+  bash install.sh --dry-run --update
+HELPEOF
+}
+
+usage_error() {
+  echo -e "${RED}[canuto]${RESET} \u2717 $1" >&2
+  echo "" >&2
+  print_help >&2
+  exit 64
+}
+
+set_requested_mode() {
+  local requested="$1"
+  if [ "$MODE" != "auto" ] && [ "$MODE" != "$requested" ]; then
+    usage_error "Conflicting modes: --$MODE and --$requested"
+  fi
+  MODE="$requested"
+}
+
+
+validate_source_channel() {
+  case "$1" in stable|edge) return 0 ;; *) return 1 ;; esac
+}
+
+validate_release_version() {
+  [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9][A-Za-z0-9.-]*)?$ ]]
+}
+
+validate_source_ref() {
+  local ref="$1"
+  [ -n "$ref" ] || return 1
+  [ "${#ref}" -le 160 ] || return 1
+  case "$ref" in
+    /*|*..*|*//*|*[^A-Za-z0-9._/-]*) return 1 ;;
+  esac
+  return 0
+}
+
+set_cli_source_selector() {
+  local kind="$1"
+  local value="$2"
+  CLI_SOURCE_SELECTOR_COUNT=$((CLI_SOURCE_SELECTOR_COUNT + 1))
+  [ "$CLI_SOURCE_SELECTOR_COUNT" -le 1 ] || usage_error "Use only one of --channel, --version, --ref, or --rollback"
+  case "$kind" in
+    channel) CLI_SOURCE_CHANNEL="$value" ;;
+    version) CLI_SOURCE_VERSION="$value" ;;
+    ref) CLI_SOURCE_REF="$value" ;;
+    *) usage_error "Internal source selector error: $kind" ;;
+  esac
+}
+
+resolve_source_selection() {
+  local env_kind="${CANUTO_SOURCE_KIND:-}"
+  local env_ref="${CANUTO_SOURCE_REF:-}"
+  local env_channel="${CANUTO_SOURCE_CHANNEL:-${CANUTO_CHANNEL:-}}"
+  local env_version="${CANUTO_SOURCE_VERSION:-${CANUTO_VERSION:-}}"
+
+  case "$ROLLBACK_REQUESTED" in
+    true|false) ;;
+    *) usage_error "CANUTO_ROLLBACK_REQUESTED must be true or false" ;;
+  esac
+
+  if [ -n "$REPO_URL_OVERRIDE" ]; then
+    [ "$CLI_SOURCE_SELECTOR_COUNT" -eq 0 ] || usage_error "CANUTO_REPO_URL cannot be combined with a CLI source selector"
+    SOURCE_KIND="${env_kind:-custom}"
+    SOURCE_REF="${env_ref:-custom}"
+    SOURCE_CHANNEL="$env_channel"
+    SOURCE_VERSION="$env_version"
+    REPO_URL="${REPO_URL_OVERRIDE%/}"
+    if [ -z "$SOURCE_TRANSPORT" ]; then
+      if [ -n "$SOURCE_DIR" ]; then SOURCE_TRANSPORT="local"; else SOURCE_TRANSPORT="custom-url"; fi
+    fi
+    return 0
+  fi
+
+  if [ -n "$CLI_SOURCE_CHANNEL" ]; then
+    validate_source_channel "$CLI_SOURCE_CHANNEL" || usage_error "--channel must be stable or edge"
+    SOURCE_CHANNEL="$CLI_SOURCE_CHANNEL"
+    SOURCE_KIND="$CLI_SOURCE_CHANNEL"
+    case "$CLI_SOURCE_CHANNEL" in stable) SOURCE_REF="stable" ;; edge) SOURCE_REF="main" ;; esac
+  elif [ -n "$CLI_SOURCE_VERSION" ]; then
+    validate_release_version "$CLI_SOURCE_VERSION" || usage_error "Invalid release version: $CLI_SOURCE_VERSION"
+    SOURCE_VERSION="$CLI_SOURCE_VERSION"
+    SOURCE_KIND="version"
+    SOURCE_REF="releases/$CLI_SOURCE_VERSION"
+  elif [ -n "$CLI_SOURCE_REF" ]; then
+    validate_source_ref "$CLI_SOURCE_REF" || usage_error "Invalid source ref: $CLI_SOURCE_REF"
+    SOURCE_KIND="ref"
+    SOURCE_REF="$CLI_SOURCE_REF"
+  elif [ -n "$env_ref" ]; then
+    validate_source_ref "$env_ref" || usage_error "Invalid CANUTO_SOURCE_REF: $env_ref"
+    SOURCE_KIND="${env_kind:-ref}"
+    SOURCE_REF="$env_ref"
+    SOURCE_CHANNEL="$env_channel"
+    SOURCE_VERSION="$env_version"
+  elif [ -n "$env_version" ]; then
+    validate_release_version "$env_version" || usage_error "Invalid CANUTO_VERSION: $env_version"
+    SOURCE_VERSION="$env_version"
+    SOURCE_KIND="version"
+    SOURCE_REF="releases/$env_version"
+  else
+    SOURCE_CHANNEL="${env_channel:-stable}"
+    validate_source_channel "$SOURCE_CHANNEL" || usage_error "CANUTO_CHANNEL must be stable or edge"
+    SOURCE_KIND="$SOURCE_CHANNEL"
+    case "$SOURCE_CHANNEL" in stable) SOURCE_REF="stable" ;; edge) SOURCE_REF="main" ;; esac
+  fi
+
+  validate_source_ref "$SOURCE_REF" || usage_error "Resolved source ref is invalid: $SOURCE_REF"
+  REPO_URL="${REPO_BASE%/}/$SOURCE_REF"
+  if [ -z "$SOURCE_TRANSPORT" ]; then
+    if [ -n "$SOURCE_DIR" ]; then
+      SOURCE_TRANSPORT="local"
+    elif [ "$REPO_BASE" = "https://raw.githubusercontent.com/csorodrigo/canuto-framework" ]; then
+      SOURCE_TRANSPORT="raw-github"
+    else
+      SOURCE_TRANSPORT="remote-url"
+    fi
+  fi
+}
+
+build_refresh_args() {
+  local skip_next=0
+  local arg=""
+  REFRESH_ARGS=()
+
+  # Bash 3.2 + `set -u` treats expansion of a declared-but-empty array as an
+  # unbound variable. Guard the expansion explicitly; this path is exercised
+  # when the installer is invoked without arguments by repair-dispatch tests.
+  if [ "${#ORIGINAL_ARGS[@]}" -gt 0 ]; then
+    for arg in "${ORIGINAL_ARGS[@]}"; do
+      if [ "$skip_next" -eq 1 ]; then
+        skip_next=0
+        continue
+      fi
+      case "$arg" in
+        --channel|--version|--ref|--rollback) skip_next=1 ;;
+        *) REFRESH_ARGS+=("$arg") ;;
+      esac
+    done
+  fi
+
+  if [ "$ROLLBACK_REQUESTED" = true ]; then
+    local has_update=false
+    if [ "${#REFRESH_ARGS[@]}" -gt 0 ]; then
+      for arg in "${REFRESH_ARGS[@]}"; do
+        [ "$arg" = "--update" ] && has_update=true
+      done
+    fi
+    if [ "$has_update" != true ]; then
+      if [ "${#REFRESH_ARGS[@]}" -gt 0 ]; then
+        REFRESH_ARGS=(--update "${REFRESH_ARGS[@]}")
+      else
+        REFRESH_ARGS=(--update)
+      fi
+    fi
+  fi
+}
+
+# ── Strict argument parsing ─────────────────────────────────────────────────
+# A sourced library must not parse the caller's positional parameters as CLI
+# options. Save/clear them for the library seam and restore them before return.
+if [ "${CANUTO_INSTALL_LIBRARY_ONLY:-0}" = "1" ]; then
+  set --
+fi
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --update) set_requested_mode "update" ;;
+    --contract-only) set_requested_mode "contract" ;;
+    --check) set_requested_mode "check" ;;
+    --test) set_requested_mode "test" ;;
+    --migrate) set_requested_mode "migrate" ;;
+    --repair) set_requested_mode "repair" ;;
+    --deps-only|--deps) set_requested_mode "deps" ;;
+    --doctor|--health) set_requested_mode "doctor" ;;
     --json) JSON_OUTPUT=true ;;
     --yes) AUTO_YES=true ;;
-    --skill)
+    --commit)
+      [ "$COMMIT_POLICY" != "no-commit" ] || usage_error "--commit conflicts with --no-commit"
+      COMMIT_POLICY="commit"
+      COMMIT_CHANGES=true
+      ;;
+    --no-commit)
+      [ "$COMMIT_POLICY" != "commit" ] || usage_error "--no-commit conflicts with --commit"
+      COMMIT_POLICY="no-commit"
+      COMMIT_CHANGES=false
+      ;;
+    --dry-run) DRY_RUN=true ;;
+    --channel)
+      [ $# -ge 2 ] || usage_error "--channel requires stable or edge"
+      case "$2" in ""|-*) usage_error "--channel requires stable or edge" ;; esac
+      set_cli_source_selector channel "$2"
       shift
-      SKILLS_TO_INSTALL+=("$1")
+      ;;
+    --version)
+      [ $# -ge 2 ] || usage_error "--version requires a semantic version"
+      case "$2" in ""|-*) usage_error "--version requires a semantic version" ;; esac
+      set_cli_source_selector version "$2"
+      shift
+      ;;
+    --ref)
+      [ $# -ge 2 ] || usage_error "--ref requires a Git ref"
+      case "$2" in ""|-*) usage_error "--ref requires a Git ref" ;; esac
+      set_cli_source_selector ref "$2"
+      shift
+      ;;
+    --rollback)
+      [ $# -ge 2 ] || usage_error "--rollback requires a semantic version"
+      case "$2" in ""|-*) usage_error "--rollback requires a semantic version" ;; esac
+      ROLLBACK_REQUESTED=true
+      set_requested_mode "update"
+      set_cli_source_selector version "$2"
+      shift
+      ;;
+    --skill)
+      [ $# -ge 2 ] || usage_error "--skill requires a value"
+      case "$2" in ""|-*) usage_error "--skill requires a non-option value" ;; esac
+      SKILLS_TO_INSTALL+=("$2")
+      shift
       ;;
     --api-key)
+      [ $# -ge 2 ] || usage_error "--api-key requires a value"
+      case "$2" in ""|--*) usage_error "--api-key requires a value" ;; esac
+      OBSIDIAN_API_KEY_ARG="$2"
       shift
-      OBSIDIAN_API_KEY_ARG="$1"
       ;;
+    -h|--help)
+      print_help
+      exit 0
+      ;;
+    --)
+      shift
+      [ $# -eq 0 ] || usage_error "Positional arguments are not supported: $*"
+      break
+      ;;
+    -*) usage_error "Unknown option: $1" ;;
+    *) usage_error "Unexpected positional argument: $1" ;;
   esac
   shift
 done
 
-# ── Detect mode ──────────────────────────────────────────────────────────────
-if [ "$MODE" = "auto" ]; then
-  if [ "${#SKILLS_TO_INSTALL[@]}" -gt 0 ]; then
-    MODE="skill"
-  elif [ -d "$AGENTS_DIR" ]; then
-    MODE="update"
-  else
-    MODE="install"
+if [ "${#SKILLS_TO_INSTALL[@]}" -gt 0 ]; then
+  if [ "$MODE" != "auto" ] && [ "$MODE" != "skill" ]; then
+    usage_error "--skill cannot be combined with another mode"
   fi
+  MODE="skill"
 fi
+
+# ── Detect implicit install/update mode ─────────────────────────────────────
+if [ "$MODE" = "auto" ]; then
+  if [ -d "$AGENTS_DIR" ]; then MODE="update"; else MODE="install"; fi
+fi
+
+resolve_source_selection
+build_refresh_args
+
+if [ "$COMMIT_CHANGES" = true ]; then
+  case "$MODE" in
+    install|update|contract|skill|migrate) ;;
+    *) usage_error "--commit is not valid with mode '$MODE'" ;;
+  esac
+fi
+
+if [ "$DRY_RUN" = true ]; then
+  [ "$COMMIT_CHANGES" = false ] || usage_error "--dry-run conflicts with --commit"
+  case "$MODE" in
+    install|update|contract|skill|migrate)
+      echo "Canuto dry-run"
+      echo "mode=$MODE"
+      echo "commit=false"
+      echo "source_kind=$SOURCE_KIND"
+      echo "source_ref=$SOURCE_REF"
+      echo "source_transport=$SOURCE_TRANSPORT"
+      [ -n "$SOURCE_CHANNEL" ] && echo "source_channel=$SOURCE_CHANNEL"
+      [ -n "$SOURCE_VERSION" ] && echo "source_version=$SOURCE_VERSION"
+      [ "$ROLLBACK_REQUESTED" = true ] && echo "rollback=true"
+      if [ "${#SKILLS_TO_INSTALL[@]}" -gt 0 ]; then
+        printf 'skills=%s\n' "$(IFS=,; echo "${SKILLS_TO_INSTALL[*]}")"
+      fi
+      exit 0
+      ;;
+    *) usage_error "--dry-run is supported only for install, update, contract, skill, or migrate" ;;
+  esac
+fi
+
+TMP_DIR=$(mktemp -d) || error "Could not create a temporary directory."
 
 emit_repair_warnings() {
   local repair_rc="$1"
@@ -193,7 +498,7 @@ confirm_yes() {
 # ── Confirm not running install/update flows in the framework repo itself ───
 if [ "${CANUTO_INSTALL_LIBRARY_ONLY:-0}" != "1" ] && git remote -v 2>/dev/null | grep -q "canuto-framework"; then
   case "$MODE" in
-    install|update|migrate|skill)
+    install|update|contract|migrate|skill)
       warn "This looks like the canuto-framework repo itself. Aborting."
       exit 0
       ;;
@@ -650,7 +955,7 @@ fetch_content() {
 
 should_refresh_installer() {
   case "$MODE" in
-    install|update|check|skill|migrate|repair|doctor|test|deps)
+    install|update|contract|check|skill|migrate|repair|doctor|test|deps)
       ;;
     *)
       return 1
@@ -678,19 +983,39 @@ refresh_from_remote_installer_if_needed() {
   fi
 
   if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
-    warn "Could not refresh installer from main (curl/wget missing). Continuing with local copy."
+    warn "Could not refresh installer from $SOURCE_REF (curl/wget missing). Continuing with local copy."
     return
   fi
 
-  log "Refreshing installer from main before proceeding..."
+  log "Refreshing installer from source ref $SOURCE_REF before proceeding..."
   local remote_installer="$TMP_DIR/install.remote.sh"
   if download "install.sh" "$remote_installer"; then
     chmod +x "$remote_installer"
-    CANUTO_BOOTSTRAPPED=1 bash "$remote_installer" "${ORIGINAL_ARGS[@]}"
+    if [ "${#REFRESH_ARGS[@]}" -gt 0 ]; then
+      CANUTO_BOOTSTRAPPED=1 \
+        CANUTO_REPO_URL="$REPO_URL" \
+        CANUTO_SOURCE_KIND="$SOURCE_KIND" \
+        CANUTO_SOURCE_REF="$SOURCE_REF" \
+        CANUTO_SOURCE_CHANNEL="$SOURCE_CHANNEL" \
+        CANUTO_SOURCE_VERSION="$SOURCE_VERSION" \
+        CANUTO_SOURCE_TRANSPORT="$SOURCE_TRANSPORT" \
+        CANUTO_ROLLBACK_REQUESTED="$ROLLBACK_REQUESTED" \
+        bash "$remote_installer" "${REFRESH_ARGS[@]}"
+    else
+      CANUTO_BOOTSTRAPPED=1 \
+        CANUTO_REPO_URL="$REPO_URL" \
+        CANUTO_SOURCE_KIND="$SOURCE_KIND" \
+        CANUTO_SOURCE_REF="$SOURCE_REF" \
+        CANUTO_SOURCE_CHANNEL="$SOURCE_CHANNEL" \
+        CANUTO_SOURCE_VERSION="$SOURCE_VERSION" \
+        CANUTO_SOURCE_TRANSPORT="$SOURCE_TRANSPORT" \
+        CANUTO_ROLLBACK_REQUESTED="$ROLLBACK_REQUESTED" \
+        bash "$remote_installer"
+    fi
     exit $?
   fi
 
-  warn "Failed to refresh installer from main. Continuing with local copy."
+  warn "Failed to refresh installer from $SOURCE_REF. Continuing with local copy."
 }
 
 if [ "${CANUTO_INSTALL_LIBRARY_ONLY:-0}" != "1" ]; then
@@ -902,6 +1227,8 @@ FRAMEWORK_FILES=(
   ".agents/tools/brief-compose.sh"
   ".agents/tools/memory-usage.sh"
   ".agents/tools/delegation-ledger.sh"
+  "distribution/release.json"
+  "docs/RELEASE-PROMOTION.md"
 )
 
 INSTALL_ONLY_FILES=(
@@ -966,6 +1293,48 @@ VAULT_DIRS=(
   ".agents/vault/canvas"
   ".agents/vault/digests"
 )
+
+# ── ensure_shared_operating_contract_reference ─────────────────────────────
+# Contract-only distribution must not pull generic hooks, personas or skills
+# over a product repository. Add exactly one active reference, outside Markdown
+# fences, while preserving every existing byte of project guidance.
+ensure_shared_operating_contract_reference() {
+  local target="$1"
+  local tmp="${target}.canuto-contract.$$"
+
+  if [ -f "$target" ] && awk '
+    /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced; next }
+    !fenced && /^[[:space:]]*-[[:space:]]+Read `\.agents\/OPERATING-CONTRACT\.md` before non-trivial work;/ { found=1 }
+    END { exit(found ? 0 : 1) }
+  ' "$target" 2>/dev/null; then
+    return 0
+  fi
+
+  if [ -f "$target" ] && awk '
+    /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced }
+    END { exit(fenced ? 0 : 1) }
+  ' "$target" 2>/dev/null; then
+    {
+      cat <<'CONTRACTREF'
+## Shared Operating Contract
+- Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is the shared
+  Claude/Codex contract for evidence, authorization, WIP and cross-host drift.
+
+CONTRACTREF
+      cat "$target"
+    } > "$tmp" && mv "$tmp" "$target"
+    warn "$target had an unclosed Markdown fence; the active contract reference was preserved in a prefix outside it."
+    return 0
+  fi
+
+  cat >> "$target" <<'CONTRACTREF'
+
+## Shared Operating Contract
+- Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is the shared
+  Claude/Codex contract for evidence, authorization, WIP and cross-host drift.
+CONTRACTREF
+  ok "$target references the shared operating contract"
+}
 
 # ── merge_claude_md ─────────────────────────────────────────────────────────
 # Creates CLAUDE.md if missing.
@@ -3208,64 +3577,13 @@ skill_gardener_migrate_legacy_config() {
   local library_file="$1"
   local config_file="$2"
   local candidate_file="$3"
-  node - "$library_file" "$config_file" "$candidate_file" <<'NODE'
-const fs = require('node:fs');
-const path = require('node:path');
-const library = require(path.resolve(process.argv[2]));
-const configPath = path.resolve(process.argv[3]);
-const candidatePath = path.resolve(process.argv[4]);
-const legacyRemoteHistory = {
-  'lucrando-ai': '/srv/dev/worktrees/lucrando-ai/main/.codex/sessions',
-  papiro: '/srv/dev/worktrees/papiro/main/.codex/sessions',
-  'mecesa-v1': '/srv/dev/worktrees/mecesa-v1/main/.codex/sessions',
-};
-const canonicalRemoteHistory = ['~/.codex/sessions', '~/.codex/archived_sessions'];
-const legacyMecesaRoot = '/srv/dev/worktrees/mecesa-v1/main';
-let raw;
-try {
-  raw = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  library.loadConfig(configPath);
-} catch {
-  try { fs.unlinkSync(candidatePath); } catch {}
-  process.exit(1);
-}
-let changed = false;
-for (const [logicalProjectId, project] of Object.entries(raw.projects || {})) {
-  for (const surface of Object.values(project?.surfaces || {})) {
-    if (surface?.remote === true && surface.provider === 'codex') {
-      if (Array.isArray(surface.historyRoots) && surface.historyRoots.length === 1 && surface.historyRoots[0] === legacyRemoteHistory[logicalProjectId]) {
-        surface.historyRoots = [...canonicalRemoteHistory];
-        changed = true;
-      }
-      if (logicalProjectId === 'mecesa-v1' && Array.isArray(surface.roots) && surface.roots.length === 1 && surface.roots[0] === legacyMecesaRoot) {
-        surface.roots = ['/srv/dev/worktrees/mecesa/main'];
-        changed = true;
-      }
-    }
-  }
-}
-if (raw.providers?.hermes && Array.isArray(raw.providers.hermes.historyRoots)
-  && raw.providers.hermes.historyRoots.length === 2
-  && raw.providers.hermes.historyRoots[0] === '~/.hermes/sessions'
-  && raw.providers.hermes.historyRoots[1] === '~/.hermes/history') {
-  raw.providers.hermes.historyRoots = ['~/.hermes/sessions'];
-  changed = true;
-}
-if (!changed) {
-  try { fs.unlinkSync(candidatePath); } catch {}
-  process.exit(0);
-}
-try {
-  if (!candidatePath || candidatePath === configPath) throw new Error('invalid-migration-candidate');
-  const mode = fs.statSync(configPath).mode & 0o777;
-  fs.writeFileSync(candidatePath, `${JSON.stringify(raw, null, 2)}\n`, { mode: mode || 0o600, flag: 'wx' });
-  fs.chmodSync(candidatePath, mode || 0o600);
-  library.loadConfig(candidatePath);
-} catch {
-  try { fs.unlinkSync(candidatePath); } catch {}
-  process.exit(1);
-}
-NODE
+
+  # A config efetiva é propriedade da máquina. O instalador valida, mas não
+  # reescreve uma configuração válida — nem mesmo quando reconhece um shape
+  # antigo. Correções de topologia pertencem ao onboarding/local config, não
+  # ao genótipo distribuível do framework (ADR-0003).
+  rm -f -- "$candidate_file" 2>/dev/null || true
+  validate_skill_gardener_config "$library_file" "$config_file"
 }
 
 setup_skill_gardener() {
@@ -4304,10 +4622,178 @@ print(f"\033[0;32m[canuto]\033[0m \u2713 onboarding-report.md ({len(matches)} pr
 PYEOF
 }
 
+# Commit only explicitly declared framework paths. Unrelated staged changes are
+# ignored by `git commit --only` and remain staged. Without --commit this helper
+# does not touch the index at all.
+commit_declared_paths() {
+  local message="$1"
+  shift
+
+  [ "${GIT_AVAILABLE:-false}" = true ] || return 0
+  if [ "$COMMIT_CHANGES" != true ]; then
+    warn "Changes were applied but left unstaged and uncommitted. Re-run with --commit to authorize a framework commit."
+    return 0
+  fi
+
+  local requested_paths=("$@")
+  local commit_paths=()
+  local path=""
+  for path in "${requested_paths[@]}"; do
+    [ -n "$path" ] || continue
+    if [ -e "$path" ] || [ -L "$path" ] || git ls-files --error-unmatch -- "$path" >/dev/null 2>&1; then
+      commit_paths+=("$path")
+    fi
+  done
+
+  if [ "${#commit_paths[@]}" -eq 0 ]; then
+    log "No declared framework paths exist or are tracked; nothing to commit."
+    return 0
+  fi
+
+  for path in "${commit_paths[@]}"; do
+    git add -f -A -- "$path" || {
+      warn "Could not stage declared framework path: $path"
+      return 1
+    }
+  done
+
+  if git diff --cached --quiet -- "${commit_paths[@]}"; then
+    log "Nothing to commit — declared framework paths are already synchronized."
+    return 0
+  fi
+
+  if git commit --only -m "$message" -- "${commit_paths[@]}"; then
+    ok "Committed declared framework paths only."
+    return 0
+  fi
+  warn "Git commit failed; declared framework paths remain staged for inspection."
+  return 1
+}
+
+# Source receipts are deterministic and atomic. They prove which logical ref
+# supplied a scope and bind it to the SHA-256 digest of the installed files.
+write_source_receipt() {
+  local output="$1"
+  local scope="$2"
+  local operation="$3"
+  shift 3
+  local manifest="$TMP_DIR/source-receipt-manifest.tsv"
+  local tmp="${output}.canuto-receipt.$$"
+  local framework_version=""
+  local manifest_hash=""
+  local file_count=0
+  local file=""
+  local hash=""
+
+  : > "$manifest" || return 1
+  for file in "$@"; do
+    [ -f "$file" ] || { warn "Source receipt cannot include missing file: $file"; rm -f "$manifest"; return 1; }
+    hash=$(sha256_file "$file" 2>/dev/null || true)
+    [ -n "$hash" ] || { warn "Source receipt could not hash: $file"; rm -f "$manifest"; return 1; }
+    printf '%s\t%s\n' "$file" "$hash" >> "$manifest" || return 1
+    file_count=$((file_count + 1))
+  done
+  manifest_hash=$(sha256_file "$manifest" 2>/dev/null || true)
+  [ -n "$manifest_hash" ] || { warn "Source receipt manifest hash unavailable."; rm -f "$manifest"; return 1; }
+  framework_version=$(head -1 "$AGENTS_DIR/VERSION" 2>/dev/null | tr -d '[:space:]' || true)
+  mkdir -p "$(dirname "$output")" || return 1
+
+  python3 - "$tmp" "$scope" "$operation" "$SOURCE_KIND" "$SOURCE_REF" \
+    "$SOURCE_CHANNEL" "$SOURCE_VERSION" "$SOURCE_TRANSPORT" \
+    "$framework_version" "$manifest_hash" "$file_count" <<'PYRECEIPT'
+import json
+import sys
+
+(output, scope, operation, source_kind, source_ref, channel, release_version,
+ transport, framework_version, manifest_hash, file_count) = sys.argv[1:]
+receipt = {
+    "schemaVersion": 1,
+    "scope": scope,
+    "operation": operation,
+    "sourceKind": source_kind,
+    "sourceRef": source_ref,
+    "transport": transport,
+    "frameworkVersion": framework_version,
+    "manifestSha256": manifest_hash,
+    "fileCount": int(file_count),
+}
+if channel:
+    receipt["channel"] = channel
+if release_version:
+    receipt["releaseVersion"] = release_version
+with open(output, "x", encoding="utf-8") as fh:
+    json.dump(receipt, fh, ensure_ascii=True, indent=2, sort_keys=True)
+    fh.write("\n")
+PYRECEIPT
+  local rc=$?
+  rm -f "$manifest"
+  [ "$rc" -eq 0 ] || { rm -f "$tmp"; return "$rc"; }
+  mv "$tmp" "$output" || { rm -f "$tmp"; return 1; }
+  ok "Source receipt: $output ($SOURCE_KIND:$SOURCE_REF, ${manifest_hash:0:12})"
+}
+
+source_receipt_ref() {
+  local receipt="$1"
+  [ -f "$receipt" ] || return 1
+  python3 - "$receipt" <<'PYREF'
+import json, sys
+try:
+    with open(sys.argv[1], encoding="utf-8") as fh:
+        value = json.load(fh).get("sourceRef", "")
+except (OSError, ValueError, TypeError):
+    value = ""
+if value:
+    print(value)
+else:
+    raise SystemExit(1)
+PYREF
+}
+
 # Test-only library seam: source installer helpers without entering an install
 # mode. It performs no setup and is used by framework smoke tests.
 if [ "${CANUTO_INSTALL_LIBRARY_ONLY:-0}" = "1" ]; then
+  if [ "${#ORIGINAL_ARGS[@]}" -gt 0 ]; then
+    set -- "${ORIGINAL_ARGS[@]}"
+  else
+    set --
+  fi
   return 0 2>/dev/null || exit 0
+fi
+
+# ── CONTRACT ONLY ───────────────────────────────────────────────────────────
+# Deliberately narrower than --update: product-owned hooks, personas, skills,
+# models, gates and installers remain untouched. This is the safe rollout path
+# for repositories whose local framework contains domain-specific wiring.
+if [ "$MODE" = "contract" ]; then
+  echo ""
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo -e "${CYAN}  Canuto Framework — Shared Contract Only${RESET}"
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo ""
+
+  if ! update_tree_is_clean; then
+    error "Refusing --contract-only in a dirty worktree. Preserve WIP and retry from a clean isolated worktree."
+  fi
+
+  download ".agents/OPERATING-CONTRACT.md" ".agents/OPERATING-CONTRACT.md" \
+    || error "Could not download the shared operating contract."
+  ensure_shared_operating_contract_reference "$CLAUDE_MD"
+  ensure_shared_operating_contract_reference "AGENTS.md"
+  write_source_receipt ".agents/CONTRACT-RECEIPT.json" "contract" "contract" \
+    ".agents/OPERATING-CONTRACT.md" "$CLAUDE_MD" "AGENTS.md" \
+    || error "Could not publish the contract source receipt."
+
+  if [ "$GIT_AVAILABLE" = true ]; then
+    commit_declared_paths "docs: sync shared Canuto operating contract" \
+      ".agents/OPERATING-CONTRACT.md" "$CLAUDE_MD" "AGENTS.md" ".agents/CONTRACT-RECEIPT.json" \
+      || error "Shared contract commit failed; inspect the staged paths."
+  fi
+
+  local_contract_hash=$(sha256_file ".agents/OPERATING-CONTRACT.md" 2>/dev/null || true)
+  [ -n "$local_contract_hash" ] || error "Could not calculate the shared contract hash."
+  ok "Shared contract active in Claude and Codex (sha256: ${local_contract_hash:0:12})."
+  echo ""
+  exit 0
 fi
 
 # ── CHECK ───────────────────────────────────────────────────────────────────
@@ -4402,6 +4888,25 @@ if [ "$MODE" = "check" ]; then
     fi
   done
 
+  if git remote -v 2>/dev/null | grep -q "canuto-framework"; then
+    log "Source receipt check skipped in the framework source repository."
+  elif [ ! -f ".agents/SOURCE-RECEIPT.json" ]; then
+    echo -e "  ${YELLOW}? UNKNOWN${RESET}    .agents/SOURCE-RECEIPT.json (legacy install; provenance absent)"
+    UNKNOWN=$((UNKNOWN + 1))
+  else
+    RECEIPT_REF=$(source_receipt_ref ".agents/SOURCE-RECEIPT.json" 2>/dev/null || true)
+    if [ "$RECEIPT_REF" = "$SOURCE_REF" ]; then
+      echo -e "  ${GREEN}✓ OK${RESET}        .agents/SOURCE-RECEIPT.json (source: $RECEIPT_REF)"
+      UP_TO_DATE=$((UP_TO_DATE + 1))
+    elif [ -n "$RECEIPT_REF" ]; then
+      echo -e "  ${YELLOW}⚠ OUTDATED${RESET}   .agents/SOURCE-RECEIPT.json (local: $RECEIPT_REF → selected: $SOURCE_REF)"
+      OUTDATED=$((OUTDATED + 1))
+    else
+      echo -e "  ${YELLOW}? UNKNOWN${RESET}    .agents/SOURCE-RECEIPT.json (invalid receipt)"
+      UNKNOWN=$((UNKNOWN + 1))
+    fi
+  fi
+
   echo ""
   echo -e "  Summary: ${GREEN}${UP_TO_DATE} up-to-date${RESET}  ${YELLOW}${OUTDATED} outdated${RESET}  ${RED}${MISSING} missing${RESET}  ${YELLOW}${UNKNOWN} unknown${RESET}"
   echo ""
@@ -4429,6 +4934,7 @@ if [ "$MODE" = "skill" ]; then
   echo ""
 
   INSTALLED=()
+  INSTALLED_FILES=()
   for skill_name in "${SKILLS_TO_INSTALL[@]}"; do
     log "Installing skill: $skill_name..."
     skill_files=()
@@ -4437,31 +4943,28 @@ if [ "$MODE" = "skill" ]; then
       skill_files+=("$skill_file")
     done < <(skill_remote_files "$skill_name")
     installed_skill=true
+    skill_downloaded_files=()
     for skill_file in "${skill_files[@]}"; do
       if ! download "$skill_file" "$skill_file"; then
         installed_skill=false
         break
       fi
+      skill_downloaded_files+=("$skill_file")
     done
 
     if [ "$installed_skill" = true ]; then
       ok "Installed: $skill_name"
       INSTALLED+=("$skill_name")
+      INSTALLED_FILES+=("${skill_downloaded_files[@]}")
     else
       warn "Skill '$skill_name' not found. Check registry.md for available skills."
     fi
   done
 
   if [ "${#INSTALLED[@]}" -gt 0 ] && [ "$GIT_AVAILABLE" = true ]; then
-    git add ".agents/skills/" 2>/dev/null || true
-    echo ""
-    read -r -p "$(echo -e "${CYAN}[canuto]${RESET} Commit installed skills? [Y/n] ")" COMMIT_ANSWER
-    COMMIT_ANSWER="${COMMIT_ANSWER:-Y}"
-    if [[ "$COMMIT_ANSWER" =~ ^[Yy]$ ]]; then
-      SKILL_LIST=$(IFS=', '; echo "${INSTALLED[*]}")
-      git commit -m "chore: install Canuto skills ($SKILL_LIST)"
-      ok "Committed!"
-    fi
+    SKILL_LIST=$(IFS=', '; echo "${INSTALLED[*]}")
+    commit_declared_paths "chore: install Canuto skills ($SKILL_LIST)" "${INSTALLED_FILES[@]}" \
+      || error "Skill installation commit failed; inspect the staged paths."
   fi
 
   echo ""
@@ -4600,6 +5103,8 @@ if [ "$MODE" = "migrate" ]; then
     rm -rf "$TMP_DIR"
     exit "$MIGRATE_OUTCOME_RC"
   fi
+  write_source_receipt ".agents/SOURCE-RECEIPT.json" "framework" "migrate" \
+    "${FRAMEWORK_FILES[@]}" || error "Could not publish the framework source receipt."
 
   # ── Step 6: Clean up old memory dir ──────────────────────────────────────
   if [ -d ".agents/memory" ] && [ "$MIGRATED" -gt 0 ]; then
@@ -4613,18 +5118,13 @@ if [ "$MODE" = "migrate" ]; then
     fi
   fi
 
-  # ── Step 7: Commit ──────────────────────────────────────────────────────
+  # ── Step 7: Optional explicit commit ─────────────────────────────────────
   if [ "$GIT_AVAILABLE" = true ]; then
-    echo ""
-    git add "$AGENTS_DIR/" "$CLAUDE_MD" "AGENTS.md" "CODEX.md" ".context.md" "docs/" 2>/dev/null || true
-    if confirm_yes "Commit migration? [Y/n] " "Y"; then
-      if git diff --cached --quiet; then
-        log "Nothing to commit — framework already up to date."
-      else
-        git commit -m "chore: migrate Canuto Framework to v1.5 (Obsidian vault)"
-        ok "Committed!"
-      fi
-    fi
+    MIGRATE_COMMIT_PATHS=("${FRAMEWORK_FILES[@]}" "${INSTALL_ONLY_FILES[@]}" \
+      "$CLAUDE_MD" "AGENTS.md" "CODEX.md" ".context.md" ".gitignore" ".agents/memory" ".agents/SOURCE-RECEIPT.json")
+    commit_declared_paths "chore: migrate Canuto Framework to the Obsidian vault" \
+      "${MIGRATE_COMMIT_PATHS[@]}" \
+      || error "Migration commit failed; inspect the staged paths."
   fi
 
   echo ""
@@ -4682,31 +5182,21 @@ if [ "$MODE" = "install" ]; then
     exit "$INSTALL_OUTCOME_RC"
   fi
   register_project_path
+  write_source_receipt ".agents/SOURCE-RECEIPT.json" "framework" "install" \
+    "${FRAMEWORK_FILES[@]}" || error "Could not publish the framework source receipt."
 
+  INSTALL_FW_VER=$(head -1 "$AGENTS_DIR/VERSION" 2>/dev/null | tr -d '[:space:]')
+  [ -n "$INSTALL_FW_VER" ] || INSTALL_FW_VER="?"
   if [ "$GIT_AVAILABLE" = true ]; then
-    echo ""
-    log "Staging files for git..."
-    # Um path POR VEZ: `git add` com vários pathspecs é tudo-ou-nada — um
-    # único ausente (.context.md só existe com aprovação) fazia o comando
-    # inteiro falhar em silêncio e NADA era stageado; o commit em seguida
-    # falhava e o update saía não-zero com os arquivos na verdade aplicados.
-    # (install.sh e .claude/agents/ entram no add: estão em FRAMEWORK_FILES e
-    # ficavam untracked/modified para sempre no consumidor.)
-    for add_path in "$AGENTS_DIR" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs" "CODEX.md" "install.sh" ".claude/agents"; do
-      [ -e "$add_path" ] && git add "$add_path" 2>/dev/null || true
+    INSTALL_COMMIT_PATHS=("${FRAMEWORK_FILES[@]}" "${INSTALL_ONLY_FILES[@]}" \
+      "$CLAUDE_MD" "AGENTS.md" "CODEX.md" ".context.md" ".gitignore" \
+      ".agents/plugins/.gitkeep" ".agents/SOURCE-RECEIPT.json")
+    for install_vault_dir in "${VAULT_DIRS[@]}"; do
+      INSTALL_COMMIT_PATHS+=("$install_vault_dir/.gitkeep")
     done
-    echo ""
-    if confirm_yes "Commit now? [Y/n] " "Y"; then
-      # Versão real do carimbo recém-baixado — "v1.6" hardcoded aqui nascia
-      # defasado no mesmo release que criou .agents/VERSION para evitar isso.
-      INSTALL_FW_VER=$(head -1 "$AGENTS_DIR/VERSION" 2>/dev/null | tr -d '[:space:]')
-      [ -n "$INSTALL_FW_VER" ] || INSTALL_FW_VER="?"
-      git commit -m "chore: add Canuto Framework v$INSTALL_FW_VER" \
-        && ok "Committed!" \
-        || warn "Nada para commitar."
-    else
-      warn "Files staged but not committed. Run 'git commit' when ready."
-    fi
+    commit_declared_paths "chore: add Canuto Framework v$INSTALL_FW_VER" \
+      "${INSTALL_COMMIT_PATHS[@]}" \
+      || error "Framework installation commit failed; inspect the staged paths."
   fi
 
   echo ""
@@ -4776,50 +5266,23 @@ if [ "$MODE" = "update" ]; then
   # passou de 1.6; versão escrita em string vira mentira no release seguinte).
   FW_VER=$(head -1 "$AGENTS_DIR/VERSION" 2>/dev/null | tr -d '[:space:]')
   [ -n "$FW_VER" ] || FW_VER="?"
+  UPDATE_OPERATION="update"
+  [ "$ROLLBACK_REQUESTED" = true ] && UPDATE_OPERATION="rollback"
+  write_source_receipt ".agents/SOURCE-RECEIPT.json" "framework" "$UPDATE_OPERATION" \
+    "${FRAMEWORK_FILES[@]}" || error "Could not publish the framework source receipt."
 
   if [ "$GIT_AVAILABLE" = true ]; then
-    echo ""
-    log "Staging updated files..."
-    # Um path POR VEZ: `git add` com vários pathspecs é tudo-ou-nada — um
-    # único ausente (.context.md só existe com aprovação) fazia o comando
-    # inteiro falhar em silêncio e NADA era stageado; o commit em seguida
-    # falhava e o update saía não-zero com os arquivos na verdade aplicados.
-    # (install.sh e .claude/agents/ entram no add: estão em FRAMEWORK_FILES e
-    # ficavam untracked/modified para sempre no consumidor.)
-    for add_path in "$AGENTS_DIR" "$CLAUDE_MD" "AGENTS.md" ".context.md" "docs" "CODEX.md" "install.sh" ".claude/agents"; do
-      [ -e "$add_path" ] && git add "$add_path" 2>/dev/null || true
-    done
-
-    # Estado de runtime NUNCA entra no commit do consumidor. `git add .agents/`
-    # varre o diretório inteiro e arrastava junto o event log da máquina — que
-    # carrega o slug de QUEM gerou o evento. Foi assim que um evento com
-    # "project":"canuto-framework-v1" foi parar dentro de um repo de produto:
-    # vazamento de identidade exatamente do tipo que o ADR-0003 veta.
-    for runtime_path in \
-      "$AGENTS_DIR/vault/events" \
-      "$AGENTS_DIR/tmp" \
-      "$AGENTS_DIR/.cache" \
-      "$AGENTS_DIR/memory"; do
-      git reset -q -- "$runtime_path" 2>/dev/null || true
-    done
-
-    # E ignora daqui para frente, para não reaparecer no próximo `git add -A`
-    # que alguém rodar à mão.
+    # Runtime state is never a declared commit path. Keep ignore rules current
+    # so a later manual `git add -A` does not absorb machine-local state.
     if [ -f ".gitignore" ] && ! grep -q "^\.agents/vault/events/" .gitignore 2>/dev/null; then
       printf '\n# Canuto — estado de runtime por máquina (nunca versionar)\n.agents/vault/events/\n.agents/tmp/\n.agents/.cache/\n' >> .gitignore
-      git add .gitignore 2>/dev/null || true
       ok "Runtime do Canuto adicionado ao .gitignore"
     fi
-    echo ""
-    if confirm_yes "Commit now? [Y/n] " "Y"; then
-      # Guardado: sem diff (re-run com --force, ou nada mudou) o commit sai
-      # não-zero e, sob set -e, derrubava um update que deu certo.
-      git commit -m "chore: update Canuto Framework to v$FW_VER" \
-        && ok "Committed!" \
-        || warn "Nada novo para commitar (arquivos já em dia)."
-    else
-      warn "Files staged but not committed. Run 'git commit' when ready."
-    fi
+    UPDATE_COMMIT_PATHS=("${FRAMEWORK_FILES[@]}" "${INSTALL_ONLY_FILES[@]}" \
+      "$CLAUDE_MD" "AGENTS.md" "CODEX.md" ".context.md" ".gitignore" ".agents/SOURCE-RECEIPT.json")
+    commit_declared_paths "chore: update Canuto Framework to v$FW_VER" \
+      "${UPDATE_COMMIT_PATHS[@]}" \
+      || error "Framework update commit failed; inspect the staged paths."
   fi
 
   if ! run_install_validation; then

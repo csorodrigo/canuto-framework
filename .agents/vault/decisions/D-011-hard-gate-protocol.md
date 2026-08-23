@@ -24,4 +24,4 @@ tags:
 
 **Trade-offs:** Adiciona fricção para tasks XS/S onde o usuário pode considerar a entrevista desnecessária. Aceito — XS tasks não passam pelo Architect. Para S tasks, o Architect já tem modo abreviado (1-2 perguntas).
 
-**Related:** [[instincts/I-001-entrevistar-antes-de-planejar]] [[instincts/I-013-hard-gate-pattern]]
+**Related:** [[instincts/I-001-entrevistar-antes-de-planejar]] [[instincts/I-017-hard-gate-pattern]]

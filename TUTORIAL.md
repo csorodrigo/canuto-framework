@@ -7,7 +7,7 @@ This tutorial explains how to install, update, use, and roll out the current Can
 From the root of the target project:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/stable/install.sh | bash
 ```
 
 The installer copies:
@@ -31,7 +31,7 @@ bash install.sh --update
 If the project does not keep a local copy of `install.sh`, run the GitHub installer in update mode:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --update
+curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/stable/install.sh | bash -s -- --update
 ```
 
 The update mode refreshes personas, core skills, `.agents/SPEC.md`, and missing `CLAUDE.md` rules. It does not touch:
@@ -51,7 +51,7 @@ CANUTO_SOURCE_DIR="$PWD" bash install.sh --check
 Use this only inside the `canuto-framework` repository or a disposable test setup. The normal project-safe path remains:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --update
+curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/stable/install.sh | bash -s -- --update
 ```
 
 Do not update many real projects from an unpublished branch unless the branch has passed `bash install.sh --test`, `CANUTO_SOURCE_DIR="$PWD" bash install.sh --check`, and at least one smoke install.

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "description": "Known historical Canuto framework vault debt as of the v1.8.0 release. The health gate rejects any new issue and rejects stale entries after debt is repaired.",
+  "orphanNotes": [
+    "decisions/D-001-lucide-animated.md",
+    "decisions/D-004-persona-tier-system.md",
+    "decisions/D-005-obsidian-vault-memoria-global.md",
+    "decisions/D-006-handoff-protocol-explicito.md",
+    "decisions/D-007-plugin-architecture.md",
+    "decisions/D-008-task-sizing-xs-s-m-l.md",
+    "decisions/D-010-convergence-detection-high-confidence.md",
+    "decisions/D-013-skill-creator-methodology.md",
+    "instincts/I-023-worktree-concurrent-sessions.md",
+    "instincts/I-024-grep-aliased-to-ripgrep.md",
+    "instincts/I-025-gpt-5-codex-phantom-slug.md",
+    "instincts/I-030-correcao-de-minor-que-vira-blocker.md",
+    "pending/P-006-round2-revisor-cego-e-merge-da-branch.md",
+    "pending/P-007-false-success-do-awk-no-patcher-do-claude-md.md",
+    "sessions/2026-03-23e.md",
+    "sessions/2026-03-25b.md",
+    "sessions/2026-04-17.md",
+    "sessions/2026-04-18.md",
+    "sessions/2026-04-18b.md",
+    "sessions/2026-08-03.md",
+    "sessions/review-threads.md"
+  ],
+  "missingMetrics": [
+    "sessions/2026-03-23c.md",
+    "sessions/2026-03-23d.md",
+    "sessions/2026-03-23e.md",
+    "sessions/2026-03-25.md",
+    "sessions/2026-03-25b.md",
+    "sessions/2026-04-17.md",
+    "sessions/2026-04-18.md",
+    "sessions/2026-04-18b.md",
+    "sessions/review-threads.md"
+  ]
+}
