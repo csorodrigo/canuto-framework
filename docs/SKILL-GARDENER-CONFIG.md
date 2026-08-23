@@ -13,7 +13,9 @@ already exist. The effective, machine-owned file is:
 
 Add projects and remote surfaces only to the effective local file. Existing
 valid local configuration is preserved byte-for-byte during install, update,
-repair, and a failed runtime activation.
+repair, and a failed runtime activation. The installer validates this file with
+the same runtime parser used by the Skill Gardener, but never rewrites a valid
+machine-owned configuration.
 
 ## Minimal local project
 
@@ -49,4 +51,5 @@ repair, and a failed runtime activation.
 
 The repository schema is `config/skill-gardener.schema.json`. Paths beginning
 with `~` are portable conventions; absolute paths belong only in the local
-configuration.
+configuration. The schema supports editor and CI validation; runtime validation
+remains authoritative.
