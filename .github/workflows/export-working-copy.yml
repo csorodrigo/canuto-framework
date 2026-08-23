@@ -1,0 +1,29 @@
+name: Export Working Copy
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Package working copy
+        run: |
+          tar --exclude=.git -czf canuto-framework-working-copy.tar.gz .
+
+      - name: Upload working copy
+        uses: actions/upload-artifact@v4
+        with:
+          name: canuto-framework-working-copy
+          path: canuto-framework-working-copy.tar.gz
+          if-no-files-found: error
+          retention-days: 1
