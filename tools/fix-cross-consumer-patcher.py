@@ -49,6 +49,7 @@ old_smoke = r'''  HOME="$E2E_HOME" CLAUDE_PROJECT_DIR="$destination" \
   python3 - "$smoke_json" <<'PYEOF' || fail "$slug consumer smoke was not HEALTHY"
 '''
 new_smoke = r'''  local smoke_rc=0
+  local smoke_parse_rc=0
   HOME="$E2E_HOME" CLAUDE_PROJECT_DIR="$destination" \
     /bin/bash "$destination/.agents/tools/canuto-consumer-smoke.sh" --json > "$smoke_json" \
     || smoke_rc=$?
@@ -56,14 +57,31 @@ new_smoke = r'''  local smoke_rc=0
     cat "$smoke_json" >&2 || true
     fail "$slug consumer smoke failed (rc=$smoke_rc)"
   fi
-  python3 - "$smoke_json" <<'PYEOF' || {
-    cat "$smoke_json" >&2 || true
-    fail "$slug consumer smoke was not HEALTHY"
-  }
+  python3 - "$smoke_json" <<'PYEOF' || smoke_parse_rc=$?
 '''
 if text.count(old_smoke) != 1:
-    raise SystemExit(f"consumer smoke block expected once, found {text.count(old_smoke)}")
+    raise SystemExit(f"consumer smoke prefix expected once, found {text.count(old_smoke)}")
 text = text.replace(old_smoke, new_smoke, 1)
 
+old_smoke_tail = r'''assert result["verdict"] == "HEALTHY", result
+assert result["counts"]["fail"] == 0, result
+PYEOF
+
+  (
+'''
+new_smoke_tail = r'''assert result["verdict"] == "HEALTHY", result
+assert result["counts"]["fail"] == 0, result
+PYEOF
+  if [ "$smoke_parse_rc" -ne 0 ]; then
+    cat "$smoke_json" >&2 || true
+    fail "$slug consumer smoke was not HEALTHY"
+  fi
+
+  (
+'''
+if text.count(old_smoke_tail) != 1:
+    raise SystemExit(f"consumer smoke heredoc tail expected once, found {text.count(old_smoke_tail)}")
+text = text.replace(old_smoke_tail, new_smoke_tail, 1)
+
 path.write_text(text, encoding="utf-8")
-print("cross-consumer renders now enforce contract references, permissions, and diagnostic smoke output")
+print("cross-consumer renders now enforce contract references, permissions, and portable diagnostic smoke output")
