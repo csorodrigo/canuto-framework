@@ -1,0 +1,37 @@
+name: Apply Bash 3.2 source-env fixture patch
+
+on:
+  push:
+    branches:
+      - codex/cross-platform-release-1.8.0-20260823
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          ref: codex/cross-platform-release-1.8.0-20260823
+          fetch-depth: 0
+
+      - name: Apply and validate exact fixture patch
+        run: |
+          python3 tools/apply-source-env-bash32.py
+          /bin/bash -n test-framework.sh
+          grep -q 'if \[ "${#SOURCE_ENV\[@\]}" -gt 0 \]; then' test-framework.sh
+
+      - name: Publish ordinary files only
+        run: |
+          rm -f tools/apply-source-env-bash32.py
+          git config user.name "canuto-release-bot"
+          git config user.email "canuto-release-bot@users.noreply.github.com"
+          git add -A -- test-framework.sh tools/apply-source-env-bash32.py
+          git diff --cached --quiet && exit 0
+          git commit -m "fix(portability): guard empty source fixture env on Bash 3.2"
+          git push origin HEAD:codex/cross-platform-release-1.8.0-20260823
