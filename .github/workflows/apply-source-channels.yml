@@ -26,6 +26,7 @@ jobs:
         run: |
           python3 tools/fix-source-patcher.py
           python3 tools/apply-source-channels.py
+          python3 tools/refine-source-channel-tests.py
 
       - name: Validate source-channel implementation
         run: |
@@ -41,6 +42,7 @@ jobs:
         run: |
           rm -f tools/fix-source-patcher.py
           rm -f tools/apply-source-channels.py
+          rm -f tools/refine-source-channel-tests.py
           rm -f .github/workflows/apply-source-channels.yml
 
       - name: Commit source-channel implementation
