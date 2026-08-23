@@ -1,62 +1,14 @@
-name: Apply cross-platform release v1.8.0
+name: Apply cross-platform release v1.8.0 (disabled bootstrap duplicate)
 
 on:
-  push:
-    branches:
-      - codex/cross-platform-release-1.8.0-20260823
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  apply:
-    if: github.actor != 'github-actions[bot]' && (github.ref_name == 'codex/cross-platform-release-1.8.0-20260823' || github.head_ref == 'codex/cross-platform-release-1.8.0-20260823')
+  disabled:
+    if: false
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     steps:
-      - name: Checkout branch
-        uses: actions/checkout@v4
-        with:
-          ref: codex/cross-platform-release-1.8.0-20260823
-          fetch-depth: 0
-
-      - name: Apply release patch
-        run: |
-          python3 tools/apply-cross-platform-release.py
-          chmod +x tests/cross-consumer-e2e.sh
-
-      - name: Validate Linux release candidate
-        run: |
-          /bin/bash -n install.sh
-          /bin/bash -n test-framework.sh
-          /bin/bash -n tests/cross-consumer-e2e.sh
-          node --test skill-gardener/canuto-skill-gardener.test.js
-          node --test .agents/tools/framework-session-audit.test.js
-          /bin/bash test-framework.sh --verbose
-          CANUTO_E2E_SOURCE_SHA="$(git rev-parse HEAD)" /bin/bash tests/cross-consumer-e2e.sh
-          CANUTO_SOURCE_DIR="$PWD" \
-          CANUTO_SOURCE_KIND=ref \
-          CANUTO_SOURCE_REF="$(git rev-parse HEAD)" \
-          CANUTO_SOURCE_TRANSPORT=local \
-          CANUTO_BOOTSTRAPPED=1 \
-            /bin/bash install.sh --check
-          /bin/bash .agents/hooks/check-references.sh
-          /bin/bash .agents/hooks/check-orphans.sh
-          git diff --check
-
-      - name: Remove one-shot automation
-        run: |
-          rm -f tools/apply-cross-platform-release.py
-          rm -f .github/workflows/apply-cross-platform-release.yml
-
-      - name: Commit release candidate
-        run: |
-          git config user.name "canuto-release-bot"
-          git config user.email "canuto-release-bot@users.noreply.github.com"
-          git add -A
-          git diff --cached --quiet && exit 0
-          git commit -m "release: prepare cross-platform Canuto v1.8.0"
-          git push origin HEAD:codex/cross-platform-release-1.8.0-20260823
+      - run: echo "The trusted validate-framework bootstrap owns this one-shot release application."
