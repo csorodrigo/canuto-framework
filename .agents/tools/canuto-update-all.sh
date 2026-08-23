@@ -239,14 +239,16 @@ for proj in "${PROJECTS[@]}"; do
   [ "$COMMIT" -eq 1 ] && UPDATE_INSTALL_ARGS+=(--commit)
   if (cd "$proj" && bash "$FRESH_INSTALLER" "${UPDATE_INSTALL_ARGS[@]}" </dev/null) >"$plog" 2>&1; then
     new_ver="$(head -1 "$proj/.agents/VERSION" 2>/dev/null | tr -d '[:space:]')"
+    commit_note=""
+    [ "$COMMIT" -eq 1 ] || commit_note="; mudanças não commitadas (--commit não informado)"
     if [ "$new_ver" = "$REMOTE_VERSION" ]; then
-      add_report "ATUALIZADO" "$name" "$local_ver" "$new_ver" "log: $plog"
+      add_report "ATUALIZADO" "$name" "$local_ver" "$new_ver" "log: $plog$commit_note"
     else
       # O instalador rodou mas o carimbo não avançou (ex.: install.sh do
       # projeto anterior a este release, sem .agents/VERSION na lista).
       # Chamar isso de ATUALIZADO esconderia exatamente o drift que o
       # comando existe para eliminar.
-      add_report "PARCIAL" "$name" "$local_ver" "${new_ver:-?}" "instalador aplicado, mas VERSION não chegou a $REMOTE_VERSION — rode de novo (o install.sh do projeto foi renovado nesta rodada); log: $plog"
+      add_report "PARCIAL" "$name" "$local_ver" "${new_ver:-?}" "instalador aplicado, mas VERSION não chegou a $REMOTE_VERSION — rode de novo (o install.sh do projeto foi renovado nesta rodada); log: $plog$commit_note"
     fi
   else
     add_report "FALHA" "$name" "$local_ver" "-" "install.sh --update falhou — log: $plog"

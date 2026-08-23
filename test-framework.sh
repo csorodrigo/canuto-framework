@@ -2693,24 +2693,66 @@ else
   fail "21b contract-only com --commit falhou"
 fi
 
+PRESERVE_REPO="$CONSENT_ROOT/preserve-user-index"
+mkdir -p "$PRESERVE_REPO"
+git -C "$PRESERVE_REPO" init -q
+git -C "$PRESERVE_REPO" config user.name "Canuto Consent Test"
+git -C "$PRESERVE_REPO" config user.email "consent@example.invalid"
+printf 'framework-initial\n' > "$PRESERVE_REPO/framework.txt"
+printf 'user-initial\n' > "$PRESERVE_REPO/user.txt"
+git -C "$PRESERVE_REPO" add framework.txt user.txt
+git -C "$PRESERVE_REPO" commit -q -m "test: initial paths"
+printf 'framework-change\n' > "$PRESERVE_REPO/framework.txt"
+printf 'user-change\n' > "$PRESERVE_REPO/user.txt"
+git -C "$PRESERVE_REPO" add user.txt
+if (
+  cd "$PRESERVE_REPO"
+  export CANUTO_INSTALL_LIBRARY_ONLY=1 HOME="$CONSENT_HOME"
+  source "$FRAMEWORK_DIR/install.sh"
+  GIT_AVAILABLE=true
+  COMMIT_CHANGES=true
+  HELPER_RC=0
+  commit_declared_paths "test: framework-only commit" framework.txt || HELPER_RC=$?
+  rm -rf "$TMP_DIR"
+  exit "$HELPER_RC"
+); then
+  PRESERVE_COMMIT_PATHS=$(git -C "$PRESERVE_REPO" diff-tree --no-commit-id --name-only -r HEAD | LC_ALL=C sort | tr '\n' ' ')
+  PRESERVE_STAGED_PATHS=$(git -C "$PRESERVE_REPO" diff --cached --name-only | LC_ALL=C sort | tr '\n' ' ')
+  if [ "$PRESERVE_COMMIT_PATHS" = "framework.txt " ] \
+     && [ "$PRESERVE_STAGED_PATHS" = "user.txt " ]; then
+    pass "21c commit --only preserva staging não relacionado"
+  else
+    fail "21c commit absorveu ou removeu staging do usuário: commit=$PRESERVE_COMMIT_PATHS staged=$PRESERVE_STAGED_PATHS"
+  fi
+else
+  fail "21c helper de commit por paths falhou"
+fi
+
+if ! grep -Eq 'confirm_yes[[:space:]]+"Commit|read[^\n]*Commit' "$FRAMEWORK_DIR/install.sh" \
+   && [ "$(grep -c 'commit_declared_paths ' "$FRAMEWORK_DIR/install.sh")" -ge 5 ]; then
+  pass "21d nenhum fluxo mantém prompt de commit implícito"
+else
+  fail "21d prompt de commit implícito ou fluxo fora do helper ainda existe"
+fi
+
 PARSER_DIR="$CONSENT_ROOT/parser"
 mkdir -p "$PARSER_DIR"
 if (cd "$PARSER_DIR" && /bin/bash "$FRAMEWORK_DIR/install.sh" --help >/dev/null 2>&1) \
    && [ -z "$(find "$PARSER_DIR" -mindepth 1 -print -quit)" ]; then
-  pass "21c --help sai 0 sem mutar o diretório"
+  pass "21e --help sai 0 sem mutar o diretório"
 else
-  fail "21c --help falhou ou criou artefatos"
+  fail "21e --help falhou ou criou artefatos"
 fi
 
 if (cd "$PARSER_DIR" && HOME="$CONSENT_HOME" CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" \
     /bin/bash "$FRAMEWORK_DIR/install.sh" --dry-run --yes >/dev/null 2>&1) \
    && [ -z "$(find "$PARSER_DIR" -mindepth 1 -print -quit)" ]; then
-  pass "21d --dry-run resolve o modo sem mutação"
+  pass "21f --dry-run resolve o modo sem mutação"
 else
-  fail "21d --dry-run falhou ou criou artefatos"
+  fail "21f --dry-run falhou ou criou artefatos"
 fi
 
-for PARSER_CASE in unknown missing-skill missing-api conflicting-mode conflicting-commit commit-readonly positional; do
+for PARSER_CASE in unknown missing-skill missing-api conflicting-mode conflicting-commit commit-readonly dryrun-commit positional; do
   PARSER_RC=0
   case "$PARSER_CASE" in
     unknown) PARSER_ARGS=(--definitely-unknown) ;;
@@ -2719,13 +2761,14 @@ for PARSER_CASE in unknown missing-skill missing-api conflicting-mode conflictin
     conflicting-mode) PARSER_ARGS=(--update --check) ;;
     conflicting-commit) PARSER_ARGS=(--commit --no-commit) ;;
     commit-readonly) PARSER_ARGS=(--check --commit) ;;
+    dryrun-commit) PARSER_ARGS=(--dry-run --commit) ;;
     positional) PARSER_ARGS=(unexpected-positional) ;;
   esac
   (cd "$PARSER_DIR" && /bin/bash "$FRAMEWORK_DIR/install.sh" "${PARSER_ARGS[@]}" >/dev/null 2>&1) || PARSER_RC=$?
   if [ "$PARSER_RC" -eq 64 ] && [ -z "$(find "$PARSER_DIR" -mindepth 1 -print -quit)" ]; then
-    pass "21e parser rejeita $PARSER_CASE antes de mutar"
+    pass "21g parser rejeita $PARSER_CASE antes de mutar"
   else
-    fail "21e parser $PARSER_CASE retornou $PARSER_RC ou criou artefatos"
+    fail "21g parser $PARSER_CASE retornou $PARSER_RC ou criou artefatos"
   fi
 done
 
@@ -2757,9 +2800,9 @@ make_update_consumer "$UPDATE_DEFAULT_REPO"
 if CANUTO_SOURCE_DIR="$UPDATE_SOURCE" CANUTO_VAULT_DIR="$CONSENT_ROOT/empty-vault" TMPDIR="$UPDATE_TMP" \
    /bin/bash "$FRAMEWORK_DIR/.agents/tools/canuto-update-all.sh" "$UPDATE_DEFAULT_REPO" >/dev/null 2>&1 \
    && ! grep -qx -- '--commit' "$UPDATE_DEFAULT_REPO/.captured-installer-args"; then
-  pass "21f update-all não encaminha --commit por padrão"
+  pass "21h update-all não encaminha --commit por padrão"
 else
-  fail "21f update-all encaminhou commit implícito ou falhou"
+  fail "21h update-all encaminhou commit implícito ou falhou"
 fi
 
 UPDATE_COMMIT_REPO="$CONSENT_ROOT/update-commit"
@@ -2767,9 +2810,9 @@ make_update_consumer "$UPDATE_COMMIT_REPO"
 if CANUTO_SOURCE_DIR="$UPDATE_SOURCE" CANUTO_VAULT_DIR="$CONSENT_ROOT/empty-vault" TMPDIR="$UPDATE_TMP" \
    /bin/bash "$FRAMEWORK_DIR/.agents/tools/canuto-update-all.sh" --commit "$UPDATE_COMMIT_REPO" >/dev/null 2>&1 \
    && grep -qx -- '--commit' "$UPDATE_COMMIT_REPO/.captured-installer-args"; then
-  pass "21g update-all encaminha --commit somente quando explícito"
+  pass "21i update-all encaminha --commit somente quando explícito"
 else
-  fail "21g update-all não respeitou autorização explícita"
+  fail "21i update-all não respeitou autorização explícita"
 fi
 
 rm -rf "$CONSENT_ROOT"
