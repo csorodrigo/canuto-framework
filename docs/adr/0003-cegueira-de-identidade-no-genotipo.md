@@ -34,6 +34,8 @@ grep no repo falhando o build.
   bidirecional FRAMEWORK_FILES ↔ `.agents/skills/` (o drift dos 30 arquivos
   nunca distribuídos também era um bug de "genótipo ≠ o que se declara").
 
+- Defaults instaláveis e configurações bootstrap são identidade-cegas: projetos, hosts e paths reais vivem somente em `~/.canuto/config/`.
+
 ## Consequências
 
 - (+) As duas regressões conhecidas ficam estruturalmente impossíveis de

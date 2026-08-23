@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/csorodrigo/canuto-framework/config/skill-gardener.schema.json",
+  "title": "Canuto Federated Skill Gardener configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "projects",
+    "providers",
+    "policy"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "projects": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "surfaces"
+        ],
+        "properties": {
+          "surfaces": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [
+                "provider",
+                "roots"
+              ],
+              "properties": {
+                "provider": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "roots": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "historyRoots": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "aliases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "remote": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "providers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "roots",
+          "pluginRoots",
+          "systemRoots",
+          "historyRoots"
+        ],
+        "properties": {
+          "roots": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pluginRoots": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "systemRoots": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "historyRoots": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "detailRetentionDays",
+        "fingerprintFamilies",
+        "evalAdapter"
+      ],
+      "properties": {
+        "detailRetentionDays": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fingerprintFamilies": {
+          "type": "object"
+        },
+        "evalAdapter": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

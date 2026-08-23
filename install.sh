@@ -3214,13 +3214,21 @@ const path = require('node:path');
 const library = require(path.resolve(process.argv[2]));
 const configPath = path.resolve(process.argv[3]);
 const candidatePath = path.resolve(process.argv[4]);
-const legacyRemoteHistory = {
-  'lucrando-ai': '/srv/dev/worktrees/lucrando-ai/main/.codex/sessions',
-  papiro: '/srv/dev/worktrees/papiro/main/.codex/sessions',
-  'mecesa-v1': '/srv/dev/worktrees/mecesa-v1/main/.codex/sessions',
-};
 const canonicalRemoteHistory = ['~/.codex/sessions', '~/.codex/archived_sessions'];
-const legacyMecesaRoot = '/srv/dev/worktrees/mecesa-v1/main';
+
+function isProjectLocalCodexHistory(surface) {
+  if (!surface || surface.remote !== true || surface.provider !== 'codex') return false;
+  if (!Array.isArray(surface.historyRoots) || surface.historyRoots.length !== 1) return false;
+  if (!Array.isArray(surface.roots) || surface.roots.length === 0) return false;
+  const historyRoot = surface.historyRoots[0];
+  if (typeof historyRoot !== 'string' || !path.isAbsolute(historyRoot)) return false;
+  const normalizedHistory = path.resolve(historyRoot);
+  return surface.roots.some((root) => {
+    if (typeof root !== 'string' || !path.isAbsolute(root)) return false;
+    return normalizedHistory === path.join(path.resolve(root), '.codex', 'sessions');
+  });
+}
+
 let raw;
 try {
   raw = JSON.parse(fs.readFileSync(configPath, 'utf8'));
@@ -3230,17 +3238,11 @@ try {
   process.exit(1);
 }
 let changed = false;
-for (const [logicalProjectId, project] of Object.entries(raw.projects || {})) {
+for (const project of Object.values(raw.projects || {})) {
   for (const surface of Object.values(project?.surfaces || {})) {
-    if (surface?.remote === true && surface.provider === 'codex') {
-      if (Array.isArray(surface.historyRoots) && surface.historyRoots.length === 1 && surface.historyRoots[0] === legacyRemoteHistory[logicalProjectId]) {
-        surface.historyRoots = [...canonicalRemoteHistory];
-        changed = true;
-      }
-      if (logicalProjectId === 'mecesa-v1' && Array.isArray(surface.roots) && surface.roots.length === 1 && surface.roots[0] === legacyMecesaRoot) {
-        surface.roots = ['/srv/dev/worktrees/mecesa/main'];
-        changed = true;
-      }
+    if (isProjectLocalCodexHistory(surface)) {
+      surface.historyRoots = [...canonicalRemoteHistory];
+      changed = true;
     }
   }
 }
