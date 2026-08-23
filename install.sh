@@ -841,8 +841,8 @@ FRAMEWORK_FILES=(
   ".agents/tools/otel-emit.sh"
   ".agents/tools/vault-sync.sh"
   # Codex economy + integration skills (Fase 3)
-  # Codex fallback persona (distributed to every project on update)
-  "CODEX.md"
+  # CODEX.md e gerado por render_codex_md com slug e regras do consumidor;
+  # somente o template pode ser distribuido/hash-checked como arquivo canonico.
   ".agents/templates/CODEX.md"
   # Learning-loop, QA and design skills (sync 2026-07-26 — previously in the
   # repo but never distributed; test-framework.sh now enforces this list stays
