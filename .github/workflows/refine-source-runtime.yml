@@ -23,7 +23,9 @@ jobs:
           fetch-depth: 0
 
       - name: Apply provenance refinement
-        run: python3 tools/refine-source-runtime.py
+        run: |
+          python3 tools/fix-source-runtime-refiner.py
+          python3 tools/refine-source-runtime.py
 
       - name: Validate focused and complete gates
         run: |
@@ -37,6 +39,7 @@ jobs:
 
       - name: Remove one-shot automation
         run: |
+          rm -f tools/fix-source-runtime-refiner.py
           rm -f tools/refine-source-runtime.py
           rm -f .github/workflows/refine-source-runtime.yml
 
