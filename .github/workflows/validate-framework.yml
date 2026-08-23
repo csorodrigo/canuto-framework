@@ -37,6 +37,7 @@ jobs:
           /bin/bash -n test-framework.sh
           /bin/bash -n tests/cross-consumer-e2e.sh
           /bin/bash -n .agents/hooks/check-references.sh
+          /bin/bash -n .agents/hooks/check-orphans.sh
           node --test skill-gardener/canuto-skill-gardener.test.js
           node --test .agents/tools/framework-session-audit.test.js
           /bin/bash test-framework.sh --verbose
@@ -62,6 +63,15 @@ jobs:
         run: |
           git config user.name "canuto-release-bot"
           git config user.email "canuto-release-bot@users.noreply.github.com"
+
+          # GITHUB_TOKEN has contents:write but not workflows:write. Preserve the
+          # generated final matrix as an ordinary file, restore this bootstrap
+          # workflow before the bot push, then promote the staged workflow with
+          # the GitHub connector after the validated candidate lands.
+          mkdir -p distribution
+          cp .github/workflows/validate-framework.yml distribution/validate-framework.release.yml
+          git checkout origin/codex/cross-platform-release-1.8.0-20260823 -- .github/workflows/validate-framework.yml
+
           git add -A
           git diff --cached --quiet && exit 0
           git commit -m "release: prepare cross-platform Canuto v1.8.0"
