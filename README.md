@@ -163,7 +163,7 @@ Exemplos de `CLAUDE.md`: [docs/CLAUDE-EXAMPLES.md](docs/CLAUDE-EXAMPLES.md)
 
 ```bash
 cd my-project
-curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/stable/install.sh | bash
 ```
 
 Roda em **macOS e Linux**. Sem Homebrew (VPS), o instalador usa `apt`/`dnf` e
@@ -180,6 +180,25 @@ To view the visual guide locally:
 ```bash
 open docs/TUTORIAL-VISUAL.html
 ```
+
+
+### Release channels, pinning and rollback
+
+The default source is **`stable`**. `main` is the explicit **edge** channel:
+
+```bash
+bash install.sh --update                    # stable
+bash install.sh --update --channel edge     # main
+bash install.sh --update --version 1.8.0    # releases/1.8.0
+bash install.sh --update --ref <commit-sha> # exact pin
+bash install.sh --rollback 1.7.0            # explicit rollback
+```
+
+A full install/update writes `.agents/SOURCE-RECEIPT.json`, binding the selected
+ref and framework version to a deterministic SHA-256 manifest of the installed
+framework files. `canuto-update-all.sh` compares both version and source ref, so
+switching from stable to edge (or between pinned releases with equal version
+text) is not reported as already current.
 
 ### Update an existing project that already uses Canuto
 
