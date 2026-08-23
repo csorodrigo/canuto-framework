@@ -595,6 +595,9 @@ test('inventory accepts SKILL.md, legacy markdown, plugins and safe symlinks wit
   writeFile(path.join(globalSkills, 'audit', 'SKILL.md'), '# Audit\nproject\n');
   writeFile(path.join(pluginSkills, 'audit', 'SKILL.md'), '# Audit\nplugin\n');
   writeFile(path.join(pluginSkills, 'alias.md'), '# Audit\nproject\n');
+  writeFile(path.join(pluginSkills, 'audit', 'references', 'provider.md'), '# Provider reference\n');
+  writeFile(path.join(globalSkills, 'gstack', 'test', 'fixtures', 'synthetic', 'SKILL.md'), '# Synthetic fixture\n');
+  writeFile(path.join(projectSkills, 'audit', 'README.md'), '# Audit documentation\n');
   fs.symlinkSync(path.join(projectSkills, 'audit'), path.join(projectSkills, 'cycle'), 'dir');
   const config = gardener.normalizeConfig({
     projects: { demo: { surfaces: { mac: { roots: [path.join(root, 'project')], aliases: ['Mac'], historyRoots: [] } } } },
@@ -609,6 +612,9 @@ test('inventory accepts SKILL.md, legacy markdown, plugins and safe symlinks wit
   assert.equal(inventory.dedupCandidates.length >= 1, true);
   assert.equal(inventory.installations.some((item) => item.name === 'legacy'), true);
   assert.equal(inventory.installations.some((item) => item.name === 'alias'), true);
+  assert.equal(inventory.installations.some((item) => item.name === 'provider'), false);
+  assert.equal(inventory.installations.some((item) => item.name === 'readme'), false);
+  assert.equal(inventory.installations.some((item) => item.name === 'synthetic'), false);
   assert.equal(inventory.installations.some((item) => JSON.stringify(item).includes(root)), false);
 });
 
@@ -1401,6 +1407,10 @@ test('loadConfig and loadState fail closed without artifacts', async () => {
     assert.throws(() => gardener.loadConfig(storedPath), { message: 'config-invalid' }, JSON.stringify(value));
   }
   assert.equal(gardener.loadConfig(path.join(__dirname, '..', 'config', 'skill-gardener.json')).schemaVersion, 1);
+  assert.deepEqual(
+    gardener.loadConfig(path.join(__dirname, '..', 'config', 'skill-gardener.json')).providers.codex.roots.map((root) => root.path),
+    ['~/.codex/skills', '~/.agents/skills'],
+  );
   const loop = path.join(root, 'config-loop');
   fs.symlinkSync('config-loop', loop);
   assert.throws(() => gardener.loadConfig(loop), { message: 'config-read-failed' });

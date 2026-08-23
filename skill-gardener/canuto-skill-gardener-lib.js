@@ -213,7 +213,7 @@ function defaultConfig() {
     projects: {},
     providers: {
       codex: {
-        roots: ['~/.codex/skills'],
+        roots: ['~/.codex/skills', '~/.agents/skills'],
         pluginRoots: ['~/.codex/plugins'],
         systemRoots: ['~/.codex/system/skills'],
         historyRoots: ['~/.codex/sessions', '~/.codex/archived_sessions'],
@@ -591,6 +591,7 @@ function scanSkillFiles(rootPath) {
     if (!isWithin(real, allowlistedRoot) || visited.has(real)) return;
     visited.add(real);
     for (const entry of listEntries(real)) {
+      if (entry.isDirectory() && ['fixtures', '__fixtures__', 'node_modules', '.git', '.next', 'coverage', 'dist', 'build'].includes(entry.name)) continue;
       const candidate = path.join(real, entry.name);
       let stat;
       try {
@@ -612,7 +613,8 @@ function scanSkillFiles(rootPath) {
       if (!stat.isFile() || !entry.name.endsWith('.md')) continue;
       const relative = path.relative(allowlistedRoot, candidate);
       const parts = relative.split(path.sep);
-      const isSkillFile = entry.name === 'SKILL.md' || parts.length === 1 || parts.includes('skills');
+      const isFlatLegacySkill = parts.length === 1 || parts.at(-2) === 'skills';
+      const isSkillFile = entry.name === 'SKILL.md' || isFlatLegacySkill;
       if (isSkillFile) files.push({ path: candidate, relative, stat });
     }
   }
