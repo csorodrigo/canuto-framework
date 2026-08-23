@@ -4,6 +4,21 @@ from pathlib import Path
 path = Path(__file__).resolve().parent / "apply-cross-platform-release.py"
 text = path.read_text(encoding="utf-8")
 
+old_library_seam = r'''# shellcheck source=/dev/null
+source "$FRAMEWORK_DIR/install.sh"
+
+cleanup() {
+'''
+new_library_seam = r'''# shellcheck source=/dev/null
+source "$FRAMEWORK_DIR/install.sh"
+unset CANUTO_INSTALL_LIBRARY_ONLY
+
+cleanup() {
+'''
+if text.count(old_library_seam) != 1:
+    raise SystemExit(f"library seam expected once, found {text.count(old_library_seam)}")
+text = text.replace(old_library_seam, new_library_seam, 1)
+
 old_locals = r'''assert_consumer_green() {
   local destination="$1" slug="$2" smoke_json="$E2E_ROOT/$slug-smoke.json" check_log="$E2E_ROOT/$slug-check.log"
 '''
@@ -84,5 +99,16 @@ if text.count(old_smoke_tail) != 1:
     raise SystemExit(f"consumer smoke heredoc tail expected once, found {text.count(old_smoke_tail)}")
 text = text.replace(old_smoke_tail, new_smoke_tail, 1)
 
+old_check_tail = r'''  grep -q "All framework files are up to date" "$check_log" || fail "$slug check lacked green receipt"
+'''
+new_check_tail = r'''  if ! grep -q "All framework files are up to date" "$check_log"; then
+    cat "$check_log" >&2 || true
+    fail "$slug check lacked green receipt"
+  fi
+'''
+if text.count(old_check_tail) != 1:
+    raise SystemExit(f"consumer check tail expected once, found {text.count(old_check_tail)}")
+text = text.replace(old_check_tail, new_check_tail, 1)
+
 path.write_text(text, encoding="utf-8")
-print("cross-consumer renders now create project-owned bootstrap files, enforce contract references, permissions, and portable diagnostic smoke output")
+print("cross-consumer E2E now confines library-only mode, creates project bootstrap files, and emits diagnostic failures")
