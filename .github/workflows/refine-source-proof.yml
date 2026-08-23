@@ -26,6 +26,7 @@ jobs:
         run: |
           python3 tools/fix-source-proof-fixture.py
           python3 tools/refine-source-proof.py
+          python3 tools/fix-update-all-receipt-parser.py
 
       - name: Validate focused and complete gates
         run: |
@@ -41,6 +42,7 @@ jobs:
         run: |
           rm -f tools/fix-source-proof-fixture.py
           rm -f tools/refine-source-proof.py
+          rm -f tools/fix-update-all-receipt-parser.py
           rm -f .github/workflows/refine-source-proof.yml
 
       - name: Commit refined result
