@@ -158,7 +158,7 @@ jobs:
 
           git config user.name "canuto-release-bot"
           git config user.email "canuto-release-bot@users.noreply.github.com"
-          git add -A -- install.sh tools/fix-bash32-empty-arrays.py
+          git add -A -- install.sh test-framework.sh tools/fix-bash32-empty-arrays.py
           git diff --cached --quiet && exit 0
           git commit -m "fix(portability): guard empty arrays on macOS Bash 3.2"
           git push origin HEAD:codex/cross-platform-release-1.8.0-20260823
