@@ -43,6 +43,7 @@ jobs:
             brew install jq
           fi
           /bin/bash --version | head -1
+          python3 --version
           node --version
           jq --version
 
@@ -62,26 +63,43 @@ jobs:
 
       - name: Validate skill frontmatter
         run: |
-          errors=0
-          while IFS= read -r skill; do
-            name=$(basename "$skill")
-            [ "$name" = "CLAUDE.md" ] && continue
-            first=$(head -1 "$skill")
-            if echo "$first" | grep -q '^shortDescription:'; then
-              :
-            elif [ "$first" = "---" ] && awk '
-                NR == 1 { next }
-                /^---$/ { closed = 1; exit (found && closed ? 0 : 1) }
-                /^(shortDescription|description|skill):/ { found = 1 }
-                END { exit (found && closed ? 0 : 1) }
-              ' "$skill"; then
-              :
-            else
-              echo "missing frontmatter: $skill"
-              errors=$((errors + 1))
-            fi
-          done < <(find .agents/skills -type f -name '*.md' -not -path '*/_archive/*' | LC_ALL=C sort)
-          [ "$errors" -eq 0 ]
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          # Only skill entrypoints carry skill frontmatter. Files under
+          # references/, examples, glossaries and test fixtures are supporting
+          # documents and must not be misclassified as independent skills.
+          skill_paths = sorted(Path(".agents/skills").glob("*.md"))
+          skill_paths += sorted(Path(".agents/skills").glob("*/SKILL.md"))
+          errors = []
+
+          for path in skill_paths:
+              if path.name == "CLAUDE.md":
+                  continue
+              lines = path.read_text(encoding="utf-8").splitlines()
+              if not lines:
+                  errors.append(f"empty skill entrypoint: {path}")
+                  continue
+              if lines[0].startswith("shortDescription:"):
+                  continue
+              if lines[0] != "---":
+                  errors.append(f"missing frontmatter: {path}")
+                  continue
+              try:
+                  close = lines.index("---", 1)
+              except ValueError:
+                  errors.append(f"unclosed frontmatter: {path}")
+                  continue
+              frontmatter = lines[1:close]
+              if not any(re.match(r"^(shortDescription|description|skill):", line) for line in frontmatter):
+                  errors.append(f"missing skill metadata key: {path}")
+
+          if errors:
+              print("\n".join(errors))
+              raise SystemExit(1)
+          print(f"validated {len(skill_paths)} skill entrypoints")
+          PY
 
       - name: Run focused Node suites
         run: |
