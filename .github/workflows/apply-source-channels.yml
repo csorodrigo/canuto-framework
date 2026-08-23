@@ -23,7 +23,9 @@ jobs:
           fetch-depth: 0
 
       - name: Apply guarded source-channel patch
-        run: python3 tools/apply-source-channels.py
+        run: |
+          python3 tools/fix-source-patcher.py
+          python3 tools/apply-source-channels.py
 
       - name: Validate source-channel implementation
         run: |
@@ -37,6 +39,7 @@ jobs:
 
       - name: Remove one-shot automation
         run: |
+          rm -f tools/fix-source-patcher.py
           rm -f tools/apply-source-channels.py
           rm -f .github/workflows/apply-source-channels.yml
 
