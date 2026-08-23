@@ -2886,7 +2886,14 @@ for SOURCE_CASE in bad-channel bad-version bad-ref selector-conflict custom-conf
     selector-conflict) SOURCE_ARGS=(--dry-run --update --channel edge --version 1.8.0); SOURCE_ENV=() ;;
     custom-conflict) SOURCE_ARGS=(--dry-run --update --channel edge); SOURCE_ENV=(CANUTO_REPO_URL=https://example.invalid/canuto) ;;
   esac
-  (cd "$SOURCE_EMPTY" && env HOME="$SOURCE_HOME" "${SOURCE_ENV[@]}" /bin/bash "$FRAMEWORK_DIR/install.sh" "${SOURCE_ARGS[@]}" >/dev/null 2>&1) || SOURCE_RC=$?
+  # Bash 3.2 + `set -u` rejects expansion of SOURCE_ENV when the
+  # environment list is intentionally empty. Keep the exact same parser cases,
+  # but call env without an empty-array expansion in that branch.
+  if [ "${#SOURCE_ENV[@]}" -gt 0 ]; then
+    (cd "$SOURCE_EMPTY" && env HOME="$SOURCE_HOME" "${SOURCE_ENV[@]}" /bin/bash "$FRAMEWORK_DIR/install.sh" "${SOURCE_ARGS[@]}" >/dev/null 2>&1) || SOURCE_RC=$?
+  else
+    (cd "$SOURCE_EMPTY" && env HOME="$SOURCE_HOME" /bin/bash "$FRAMEWORK_DIR/install.sh" "${SOURCE_ARGS[@]}" >/dev/null 2>&1) || SOURCE_RC=$?
+  fi
   if [ "$SOURCE_RC" -eq 64 ] && [ -z "$(find "$SOURCE_EMPTY" -mindepth 1 -print -quit)" ]; then
     pass "22c parser rejeita $SOURCE_CASE antes de mutar"
   else
