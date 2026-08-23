@@ -26,6 +26,7 @@ jobs:
         run: |
           python3 tools/fix-cross-consumer-patcher.py
           python3 tools/apply-cross-platform-release.py
+          python3 tools/fix-vault-reference-gate.py
           chmod +x tests/cross-consumer-e2e.sh
 
       - name: Validate Linux release candidate
@@ -35,6 +36,7 @@ jobs:
           /bin/bash -n install.sh
           /bin/bash -n test-framework.sh
           /bin/bash -n tests/cross-consumer-e2e.sh
+          /bin/bash -n .agents/hooks/check-references.sh
           node --test skill-gardener/canuto-skill-gardener.test.js
           node --test .agents/tools/framework-session-audit.test.js
           /bin/bash test-framework.sh --verbose
@@ -52,6 +54,7 @@ jobs:
       - name: Remove one-shot automation
         run: |
           rm -f tools/fix-cross-consumer-patcher.py
+          rm -f tools/fix-vault-reference-gate.py
           rm -f tools/apply-cross-platform-release.py
           rm -f .github/workflows/apply-cross-platform-release.yml
 
