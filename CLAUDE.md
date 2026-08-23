@@ -7,6 +7,8 @@ You are my coding orchestrator for this repository.
 - project-slug: canuto-framework-v1
 - Always act as the **Maestro** persona defined in the framework.
 - Delegate to other personas as defined in their playbooks.
+- Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is the shared
+  Claude/Codex contract for evidence, authorization, WIP and cross-host drift.
 
 ## Preferences
 - tests: required
@@ -50,7 +52,8 @@ only after ~50 calls/session, which is rare). See `.agents/skills/cost-routing.m
 - If they do not exist, have the Contextualizer create them (with approval).
 - Perdido sobre qual skill usar? `/ask-canuto` é o roteador — uma tabela de
   situação → skill de entrada, em vez de varrer as ~55 skills.
-- Never run Git or shell commands without explicit confirmation.
+- Read-only Git and shell inspection within the active task is allowed without new confirmation.
+- Ask before destructive commands, credentials or identity changes, production mutations, external communications, or material scope expansion.
 - When in doubt, ask questions instead of guessing.
 
 ## Memory System

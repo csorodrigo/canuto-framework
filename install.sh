@@ -755,6 +755,9 @@ FRAMEWORK_FILES=(
   # Design system normativo (denso/compacto/sem overflow) — NÃO é skill:
   # contrato neutro consultado por Claude E Codex antes de qualquer front.
   ".agents/design/DESIGN-RULES.md"
+  # Contrato operacional comum a Claude/Codex e Mac/SSH. O projeto mantém
+  # SPEC/DESIGN próprios; este arquivo distribui apenas disciplina operacional.
+  ".agents/OPERATING-CONTRACT.md"
   ".agents/tools/canuto-update-all.sh"
   ".agents/personas/maestro.md"
   ".agents/personas/architect.md"
@@ -798,7 +801,6 @@ FRAMEWORK_FILES=(
   ".agents/hooks/worktree-collision-check.sh"
   ".agents/hooks/pre-claim-grep.sh"
   ".agents/config/models.yaml"
-  ".agents/config/gates.env"
   ".agents/skills/continuous-learning/SKILL.md"
   ".agents/skills/continuous-learning/references/instinct-promotion.md"
   ".agents/skills/continuous-learning/references/examples.md"
@@ -903,6 +905,9 @@ FRAMEWORK_FILES=(
 )
 
 INSTALL_ONLY_FILES=(
+  # Configuração pertencente ao projeto: o framework fornece o default apenas
+  # quando ausente e nunca substitui escolhas locais em --update/--check.
+  ".agents/config/gates.env"
   ".agents/heartbeats/weekly-maintenance.md"
   ".agents/heartbeats/usage-audit.md"
   ".agents/vault/_index.md"
@@ -982,20 +987,81 @@ HEADER
     ok "$CLAUDE_MD created (clean template — project-slug defaults to the directory name)"
   else
     log "$CLAUDE_MD already exists — checking for missing sections and rules..."
+    if ! awk '
+      /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced; next }
+      !fenced && /^[[:space:]]*-[[:space:]]+Read `\.agents\/OPERATING-CONTRACT\.md` before non-trivial work;/ { found=1 }
+      END { exit(found ? 0 : 1) }
+    ' "$CLAUDE_MD" 2>/dev/null && awk '
+      /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced }
+      END { exit(fenced ? 0 : 1) }
+    ' "$CLAUDE_MD" 2>/dev/null; then
+      {
+        cat <<'RECOVERY'
+## Framework
+- Location: .agents/
+- Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is the shared
+  Claude/Codex contract for evidence, authorization, WIP and cross-host drift.
+
+## Preferences
+- tests: required
+- handoff-verbosity: explicit
+- session-briefing: true
+
+## Project Rules
+- Before finalizing any plan, always interview the user in detail using AskUserQuestion about implementation choices, UI/UX decisions, trade-offs, and concerns. Never assume — always ask first.
+- Before planning, implementing, or reviewing ANY user-facing UI, read `.agents/design/DESIGN-RULES.md` and obey it. It is the normative design system for every runtime.
+- Read-only Git and shell inspection within the active task is allowed without new confirmation.
+- Ask before destructive commands, credentials or identity changes, production mutations, external communications, or material scope expansion.
+
+## On Session Start
+1. Read project context and present the session briefing.
+
+RECOVERY
+        cat "$CLAUDE_MD"
+      } > "${CLAUDE_MD}.tmp" && mv "${CLAUDE_MD}.tmp" "$CLAUDE_MD"
+      warn "$CLAUDE_MD had an unclosed Markdown fence; active framework rules were preserved in a prefix outside it."
+    fi
   fi
 
   local appended=0
 
   # ── Section: ## Framework ──────────────────────────────────────────────
-  if ! grep -q "^## Framework" "$CLAUDE_MD" 2>/dev/null; then
+  if ! awk '
+    /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced; next }
+    !fenced && /^## Framework[[:space:]]*$/ { found=1 }
+    END { exit(found ? 0 : 1) }
+  ' "$CLAUDE_MD" 2>/dev/null; then
     cat >> "$CLAUDE_MD" << 'SECTION'
 
 ## Framework
 - Location: .agents/
 - Always act as the **Maestro** persona defined in the framework.
 - Delegate to other personas as defined in their playbooks.
+- Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is the shared
+  Claude/Codex contract for evidence, authorization, WIP and cross-host drift.
 SECTION
     ok "  added: ## Framework"
+    appended=1
+  fi
+
+  # ── Rule: shared operating contract ────────────────────────────────────
+  if ! awk '
+    /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced; next }
+    !fenced && /^## Framework[[:space:]]*$/ { section=1; next }
+    !fenced && /^## / { section=0 }
+    section && /^[[:space:]]*-[[:space:]]+Read `\.agents\/OPERATING-CONTRACT\.md` before non-trivial work;/ { found=1 }
+    END { exit(found ? 0 : 1) }
+  ' "$CLAUDE_MD" 2>/dev/null; then
+    awk '
+    /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced }
+    !fenced && !inserted && /^## Framework[[:space:]]*$/ {
+      print
+      print "- Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is the shared"
+      print "  Claude/Codex contract for evidence, authorization, WIP and cross-host drift."
+      inserted=1
+      next
+    }1' "$CLAUDE_MD" > "${CLAUDE_MD}.tmp" && mv "${CLAUDE_MD}.tmp" "$CLAUDE_MD"
+    ok "  patched: shared operating contract added to ## Framework"
     appended=1
   fi
 
@@ -1013,7 +1079,11 @@ SECTION
   fi
 
   # ── Section: ## Project Rules ──────────────────────────────────────────
-  if ! grep -q "^## Project Rules" "$CLAUDE_MD" 2>/dev/null; then
+  if ! awk '
+    /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced; next }
+    !fenced && /^## Project Rules[[:space:]]*$/ { found=1 }
+    END { exit(found ? 0 : 1) }
+  ' "$CLAUDE_MD" 2>/dev/null; then
     # Section missing entirely — add the full block
     cat >> "$CLAUDE_MD" << 'SECTION'
 
@@ -1022,30 +1092,95 @@ SECTION
 - Before planning, implementing, or reviewing ANY user-facing UI, read `.agents/design/DESIGN-RULES.md` and obey it. It is the normative design system (density, spacing, overflow, copy) for every runtime — Claude and Codex alike.
 - Read any .context.md and docs/FEATURE-MAP.md files if they exist.
 - If they do not exist, have the Contextualizer create them (with approval).
-- Never run Git or shell commands without explicit confirmation.
+- Read-only Git and shell inspection within the active task is allowed without new confirmation.
+- Ask before destructive commands, credentials or identity changes, production mutations, external communications, or material scope expansion.
 - When in doubt, ask questions instead of guessing.
 SECTION
     ok "  added: ## Project Rules (full block)"
     appended=1
   else
     # Section exists — patch individual missing rules
-    if ! grep -q "AskUserQuestion" "$CLAUDE_MD" 2>/dev/null; then
+    if ! awk '
+      /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced; next }
+      !fenced && /^## Project Rules[[:space:]]*$/ { section=1; next }
+      !fenced && /^## / { section=0 }
+      section && /AskUserQuestion/ { found=1 }
+      END { exit(found ? 0 : 1) }
+    ' "$CLAUDE_MD" 2>/dev/null; then
       # Insert planning-interview rule as first item under ## Project Rules
-      awk '/^## Project Rules/{
+      awk '
+      /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced }
+      !fenced && !inserted && /^## Project Rules[[:space:]]*$/ {
         print
         print "- Before finalizing any plan, always interview the user in detail using AskUserQuestion about implementation choices, UI/UX decisions, trade-offs, and concerns. Never assume \342\200\224 always ask first."
+        inserted=1
         next
       }1' "$CLAUDE_MD" > "${CLAUDE_MD}.tmp" && mv "${CLAUDE_MD}.tmp" "$CLAUDE_MD"
       ok "  patched: planning-interview rule added to ## Project Rules"
       appended=1
     fi
-    if ! grep -q "DESIGN-RULES" "$CLAUDE_MD" 2>/dev/null; then
-      awk '/^## Project Rules/{
+    if ! awk '
+      /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced; next }
+      !fenced && /^## Project Rules[[:space:]]*$/ { section=1; next }
+      !fenced && /^## / { section=0 }
+      section && /DESIGN-RULES/ { found=1 }
+      END { exit(found ? 0 : 1) }
+    ' "$CLAUDE_MD" 2>/dev/null; then
+      awk '
+      /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced }
+      !fenced && !inserted && /^## Project Rules[[:space:]]*$/ {
         print
         print "- Before planning, implementing, or reviewing ANY user-facing UI, read `.agents/design/DESIGN-RULES.md` and obey it. It is the normative design system (density, spacing, overflow, copy) for every runtime \342\200\224 Claude and Codex alike."
+        inserted=1
         next
       }1' "$CLAUDE_MD" > "${CLAUDE_MD}.tmp" && mv "${CLAUDE_MD}.tmp" "$CLAUDE_MD"
       ok "  patched: design-rules consultation rule added to ## Project Rules"
+      appended=1
+    fi
+
+    # Replace the legacy blanket prohibition only inside the exact Project
+    # Rules section. Read-only inspection has the same authority in Claude and
+    # Codex; destructive/external actions still require confirmation.
+    if awk '
+      /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced; next }
+      !fenced && /^## Project Rules[[:space:]]*$/ { section=1; next }
+      !fenced && /^## / { section=0 }
+      section && $0 == "- Never run Git or shell commands without explicit confirmation." { found=1 }
+      END { exit(found ? 0 : 1) }
+    ' "$CLAUDE_MD" 2>/dev/null; then
+      awk '
+        /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced }
+        !fenced && /^## Project Rules[[:space:]]*$/ { section=1 }
+        !fenced && section && /^## / && !/^## Project Rules[[:space:]]*$/ { section=0 }
+        section && $0 == "- Never run Git or shell commands without explicit confirmation." {
+          print "- Read-only Git and shell inspection within the active task is allowed without new confirmation."
+          print "- Ask before destructive commands, credentials or identity changes, production mutations, external communications, or material scope expansion."
+          next
+        }
+        { print }
+      ' "$CLAUDE_MD" > "${CLAUDE_MD}.tmp" && mv "${CLAUDE_MD}.tmp" "$CLAUDE_MD"
+      ok "  patched: Claude/Codex operational authority aligned"
+      appended=1
+    fi
+
+    if ! awk '
+      /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced; next }
+      !fenced && /^## Project Rules[[:space:]]*$/ { section=1; next }
+      !fenced && /^## / { section=0 }
+      section && /Read-only Git and shell inspection within the active task/ { found=1 }
+      END { exit(found ? 0 : 1) }
+    ' "$CLAUDE_MD" 2>/dev/null; then
+      awk '
+        /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced }
+        !fenced && !inserted && /^## Project Rules[[:space:]]*$/ {
+          print
+          print "- Read-only Git and shell inspection within the active task is allowed without new confirmation."
+          print "- Ask before destructive commands, credentials or identity changes, production mutations, external communications, or material scope expansion."
+          inserted=1
+          next
+        }1
+      ' "$CLAUDE_MD" > "${CLAUDE_MD}.tmp" && mv "${CLAUDE_MD}.tmp" "$CLAUDE_MD"
+      ok "  patched: scoped operational authority added to ## Project Rules"
       appended=1
     fi
   fi
@@ -1152,6 +1287,24 @@ register_project_path() {
   mkdir -p "$regdir" 2>/dev/null || return 0
   printf '%s\n' "$(pwd)" > "$regdir/project-path" 2>/dev/null || true
   ok "Projeto registrado para o update-all: $slug"
+  return 0
+}
+
+update_tree_is_clean() {
+  local status
+  [ "$GIT_AVAILABLE" = true ] || return 0
+  status=$(git status --porcelain --untracked-files=all 2>/dev/null) || return 1
+  [ -z "$status" ]
+}
+
+check_result_code() {
+  local outdated="$1" missing="$2" unknown="$3"
+  if [ "$unknown" -gt 0 ]; then
+    return 2
+  fi
+  if [ "$outdated" -gt 0 ] || [ "$missing" -gt 0 ]; then
+    return 1
+  fi
   return 0
 }
 
@@ -2283,6 +2436,8 @@ merge_agents_md() {
 
 ## Context
 - Framework: Canuto v1.x at .agents/
+- Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is the shared
+  Claude/Codex contract for evidence, authorization, WIP and cross-host drift.
 - Read .context.md files in each directory for local context
 - Read docs/FEATURE-MAP.md for feature status and flows
 - Read .agents/tmp/context-package.md if it exists (pre-loaded context from Architect)
@@ -2352,6 +2507,39 @@ AGENTSEOF
   else
     # Patch missing sections
     local patched=false
+    if ! awk '
+      /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced; next }
+      !fenced && /^[[:space:]]*-[[:space:]]+Read `\.agents\/OPERATING-CONTRACT\.md` before non-trivial work;/ { found=1 }
+      END { exit(found ? 0 : 1) }
+    ' "$agents_md" 2>/dev/null && awk '
+      /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced }
+      END { exit(fenced ? 0 : 1) }
+    ' "$agents_md" 2>/dev/null; then
+      {
+        cat <<'CONTRACTRECOVERY'
+## Shared Operating Contract
+- Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is the shared
+  Claude/Codex contract for evidence, authorization, WIP and cross-host drift.
+
+CONTRACTRECOVERY
+        cat "$agents_md"
+      } > "${agents_md}.tmp" && mv "${agents_md}.tmp" "$agents_md"
+      warn "$agents_md had an unclosed Markdown fence; the active contract was preserved in a prefix outside it."
+      patched=true
+    fi
+    if ! awk '
+      /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced; next }
+      !fenced && /^[[:space:]]*-[[:space:]]+Read `\.agents\/OPERATING-CONTRACT\.md` before non-trivial work;/ { found=1 }
+      END { exit(found ? 0 : 1) }
+    ' "$agents_md" 2>/dev/null; then
+      cat >> "$agents_md" << 'CONTRACTPATCH'
+
+## Shared Operating Contract
+- Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is the shared
+  Claude/Codex contract for evidence, authorization, WIP and cross-host drift.
+CONTRACTPATCH
+      patched=true
+    fi
     if ! grep -q "## MCP Tools Available" "$agents_md" 2>/dev/null; then
       cat >> "$agents_md" << 'MCPPATCH'
 
@@ -2900,6 +3088,23 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 process.stdout.write(crypto.createHash('sha256').update(fs.readFileSync(process.argv[2])).digest('hex'));
 NODE
+}
+
+# Hash helper for bootstrap/check mode. Unlike Skill Gardener verification,
+# this path must work before Node dependencies have been repaired.
+sha256_file() {
+  local file="$1"
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$file" | awk '{print $1}'
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$file" | awk '{print $1}'
+  elif command -v openssl >/dev/null 2>&1; then
+    openssl dgst -sha256 "$file" | awk '{print $NF}'
+  elif command -v node >/dev/null 2>&1; then
+    skill_gardener_sha256_file "$file"
+  else
+    return 1
+  fi
 }
 
 verify_skill_gardener_release() {
@@ -4116,6 +4321,7 @@ if [ "$MODE" = "check" ]; then
   UP_TO_DATE=0
   OUTDATED=0
   MISSING=0
+  UNKNOWN=0
 
   for file in "${FRAMEWORK_FILES[@]}"; do
     if [ ! -f "$file" ]; then
@@ -4130,6 +4336,7 @@ if [ "$MODE" = "check" ]; then
         # Mesmo contrato do bra\u00e7o gen\u00e9rico: sem os DOIS lados (offline, 404),
         # \u00e9 UNKNOWN \u2014 nunca um OUTDATED fantasma.
         echo -e "  ${YELLOW}? UNKNOWN${RESET}    $file (version unavailable)"
+        UNKNOWN=$((UNKNOWN + 1))
       elif [ "$LOCAL_VER" = "$REMOTE_VER" ]; then
         echo -e "  ${GREEN}\u2713 OK${RESET}        $file (v$LOCAL_VER)"
         UP_TO_DATE=$((UP_TO_DATE + 1))
@@ -4137,34 +4344,80 @@ if [ "$MODE" = "check" ]; then
         echo -e "  ${YELLOW}\u26a0 OUTDATED${RESET}   $file (local: v$LOCAL_VER \u2192 remote: v$REMOTE_VER)"
         OUTDATED=$((OUTDATED + 1))
       fi
+    elif [ "$file" = ".agents/OPERATING-CONTRACT.md" ]; then
+      contract_remote=$(mktemp)
+      if fetch_content "$file" > "$contract_remote" 2>/dev/null && [ -s "$contract_remote" ]; then
+        LOCAL_HASH=$(sha256_file "$file" 2>/dev/null || true)
+        REMOTE_HASH=$(sha256_file "$contract_remote" 2>/dev/null || true)
+        if [ -z "$LOCAL_HASH" ] || [ -z "$REMOTE_HASH" ]; then
+          echo -e "  ${YELLOW}? UNKNOWN${RESET}    $file (sha256 unavailable)"
+          UNKNOWN=$((UNKNOWN + 1))
+        elif [ "$LOCAL_HASH" = "$REMOTE_HASH" ]; then
+          echo -e "  ${GREEN}✓ OK${RESET}        $file (sha256: ${LOCAL_HASH:0:12})"
+          UP_TO_DATE=$((UP_TO_DATE + 1))
+        else
+          echo -e "  ${YELLOW}⚠ OUTDATED${RESET}   $file (content hash drift)"
+          OUTDATED=$((OUTDATED + 1))
+        fi
+      else
+        echo -e "  ${YELLOW}? UNKNOWN${RESET}    $file (remote content unavailable)"
+        UNKNOWN=$((UNKNOWN + 1))
+      fi
+      rm -f "$contract_remote"
     else
-      LOCAL_VER=$(grep "^version:" "$file" 2>/dev/null | head -1 | awk '{print $2}' || true)
-      REMOTE_VER=$(fetch_content "$file" | grep "^version:" | head -1 | awk '{print $2}' || true)
-
-      if [ -z "$LOCAL_VER" ] || [ -z "$REMOTE_VER" ]; then
-        echo -e "  ${YELLOW}? UNKNOWN${RESET}    $file (no version field)"
-      elif [ "$LOCAL_VER" = "$REMOTE_VER" ]; then
-        echo -e "  ${GREEN}\u2713 OK${RESET}        $file (v$LOCAL_VER)"
-        UP_TO_DATE=$((UP_TO_DATE + 1))
+      generic_remote=$(mktemp)
+      if fetch_content "$file" > "$generic_remote" 2>/dev/null && [ -s "$generic_remote" ]; then
+        LOCAL_VER=$(grep "^version:" "$file" 2>/dev/null | head -1 | awk '{print $2}' || true)
+        REMOTE_VER=$(grep "^version:" "$generic_remote" 2>/dev/null | head -1 | awk '{print $2}' || true)
+        if [ -n "$LOCAL_VER" ] && [ -n "$REMOTE_VER" ]; then
+          if [ "$LOCAL_VER" = "$REMOTE_VER" ]; then
+            echo -e "  ${GREEN}\u2713 OK${RESET}        $file (v$LOCAL_VER)"
+            UP_TO_DATE=$((UP_TO_DATE + 1))
+          else
+            echo -e "  ${YELLOW}\u26a0 OUTDATED${RESET}   $file (local: v$LOCAL_VER \u2192 remote: v$REMOTE_VER)"
+            OUTDATED=$((OUTDATED + 1))
+          fi
+        elif [ -z "$LOCAL_VER" ] && [ -z "$REMOTE_VER" ]; then
+          LOCAL_HASH=$(sha256_file "$file" 2>/dev/null || true)
+          REMOTE_HASH=$(sha256_file "$generic_remote" 2>/dev/null || true)
+          if [ -z "$LOCAL_HASH" ] || [ -z "$REMOTE_HASH" ]; then
+            echo -e "  ${YELLOW}? UNKNOWN${RESET}    $file (sha256 unavailable)"
+            UNKNOWN=$((UNKNOWN + 1))
+          elif [ "$LOCAL_HASH" = "$REMOTE_HASH" ]; then
+            echo -e "  ${GREEN}\u2713 OK${RESET}        $file (sha256: ${LOCAL_HASH:0:12})"
+            UP_TO_DATE=$((UP_TO_DATE + 1))
+          else
+            echo -e "  ${YELLOW}\u26a0 OUTDATED${RESET}   $file (content hash drift)"
+            OUTDATED=$((OUTDATED + 1))
+          fi
+        else
+          echo -e "  ${YELLOW}? UNKNOWN${RESET}    $file (version metadata differs)"
+          UNKNOWN=$((UNKNOWN + 1))
+        fi
       else
-        echo -e "  ${YELLOW}\u26a0 OUTDATED${RESET}   $file (local: v$LOCAL_VER \u2192 remote: v$REMOTE_VER)"
-        OUTDATED=$((OUTDATED + 1))
+        echo -e "  ${YELLOW}? UNKNOWN${RESET}    $file (remote content unavailable)"
+        UNKNOWN=$((UNKNOWN + 1))
       fi
+      rm -f "$generic_remote"
     fi
   done
 
   echo ""
-  echo -e "  Summary: ${GREEN}${UP_TO_DATE} up-to-date${RESET}  ${YELLOW}${OUTDATED} outdated${RESET}  ${RED}${MISSING} missing${RESET}"
+  echo -e "  Summary: ${GREEN}${UP_TO_DATE} up-to-date${RESET}  ${YELLOW}${OUTDATED} outdated${RESET}  ${RED}${MISSING} missing${RESET}  ${YELLOW}${UNKNOWN} unknown${RESET}"
   echo ""
 
-  if [ "$OUTDATED" -gt 0 ] || [ "$MISSING" -gt 0 ]; then
+  CHECK_RC=0
+  check_result_code "$OUTDATED" "$MISSING" "$UNKNOWN" || CHECK_RC=$?
+  if [ "$CHECK_RC" -eq 2 ]; then
+    warn "Version check is incomplete; UNKNOWN is never a green result."
+  elif [ "$CHECK_RC" -eq 1 ]; then
     log "Run 'bash install.sh --update' to update outdated/missing files."
   else
     ok "All framework files are up to date."
   fi
   echo ""
   rm -rf "$TMP_DIR"
-  exit 0
+  exit "$CHECK_RC"
 fi
 
 # ── SKILL INSTALL ───────────────────────────────────────────────────────────
@@ -4482,6 +4735,9 @@ if [ "$MODE" = "update" ]; then
   echo -e "${CYAN}  Canuto Framework \u2014 Update${RESET}"
   echo -e "${CYAN}\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501${RESET}"
   echo ""
+  if ! update_tree_is_clean; then
+    error "Refusing --update in a dirty worktree. Preserve WIP and retry from a clean isolated worktree."
+  fi
   warn "This will update personas, skills, hooks, and SPEC.md."
   warn "vault/ and plugins/ will NOT be touched."
   echo ""
