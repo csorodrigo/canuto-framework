@@ -427,6 +427,26 @@ else
 fi
 rm -f "$SG_STATUS_BEFORE" "$SG_STATUS_AFTER"
 
+echo "── Test 3d: Resumable Skill Refactor ──"
+
+SKILL_REFACTOR_DIR="$FRAMEWORK_DIR/skill-refactor"
+for refactor_file in canuto-skill-refactor.js canuto-skill-refactor-lib.js canuto-skill-refactor.test.js; do
+  if [ ! -f "$SKILL_REFACTOR_DIR/$refactor_file" ]; then
+    fail "skill refactor file missing: $refactor_file"
+  elif node --check "$SKILL_REFACTOR_DIR/$refactor_file" >/dev/null 2>&1; then
+    pass "skill refactor $refactor_file syntax valid"
+  else
+    fail "skill refactor $refactor_file has syntax errors"
+  fi
+done
+
+if node --test "$SKILL_REFACTOR_DIR/canuto-skill-refactor.test.js" >/tmp/canuto-skill-refactor-test.$$ 2>&1; then
+  pass "canuto-skill-refactor focused tests"
+else
+  fail "canuto-skill-refactor focused tests failed"
+fi
+rm -f /tmp/canuto-skill-refactor-test.$$
+
 SG_CONSUMER="$(mktemp -d)"
 git -C "$SG_CONSUMER" init -q
 if (
