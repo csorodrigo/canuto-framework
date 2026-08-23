@@ -11,8 +11,8 @@ from __future__ import annotations
 import argparse
 import base64
 import contextlib
-import fcntl
 import datetime as dt
+import fcntl
 import hashlib
 import json
 import os
@@ -30,6 +30,7 @@ from typing import Any
 SCHEMA_VERSION = 1
 DEFAULT_MAX_CONTENT_BYTES = 5 * 1024 * 1024
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$")
+ENVELOPE_FILENAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}\.json$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 SSH_HOST_RE = re.compile(r"^[A-Za-z0-9_.@-]+$")
 REMOTE_PATH_RE = re.compile(r"^/[A-Za-z0-9_./-]+$")
@@ -47,7 +48,8 @@ def fsync_enabled() -> bool:
     return os.getenv("CANUTO_VAULT_TEST_NO_FSYNC") != "1"
 
 
-def atomic_write_json(path: Path, value: dict[str, Any]) -> None:
+def atomic_create_json(path: Path, value: dict[str, Any]) -> None:
+    """Publish a new JSON file without ever replacing an existing ID."""
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.canuto-", dir=path.parent)
     tmp_path = Path(tmp_name)
@@ -59,7 +61,7 @@ def atomic_write_json(path: Path, value: dict[str, Any]) -> None:
             if fsync_enabled():
                 os.fsync(handle.fileno())
         os.chmod(tmp_path, 0o600)
-        os.replace(tmp_path, path)
+        os.link(tmp_path, path)
         if fsync_enabled():
             directory_fd = os.open(path.parent, os.O_RDONLY)
             try:
@@ -135,15 +137,22 @@ def submit(args: argparse.Namespace) -> int:
     }
     outbox = args.outbox.expanduser()
     destination = outbox / f"{envelope_id}.json"
-    if destination.exists():
+    try:
+        atomic_create_json(destination, envelope)
+    except FileExistsError:
         print(f"outbox already contains id {envelope_id}", file=sys.stderr)
         return 1
-    atomic_write_json(destination, envelope)
     print(json.dumps({"id": envelope_id, "outbox_path": str(destination)}, sort_keys=True))
     return 0
 
 
+def validate_envelope_filename(final_name: str) -> None:
+    if not ENVELOPE_FILENAME_RE.fullmatch(final_name):
+        raise RuntimeError("outbox filename is not a valid envelope ID")
+
+
 def deliver_local(sending: Path, inbox: Path, final_name: str) -> None:
+    validate_envelope_filename(final_name)
     inbox.mkdir(parents=True, exist_ok=True)
     destination = inbox / final_name
     try:
@@ -172,7 +181,8 @@ def deliver_local(sending: Path, inbox: Path, final_name: str) -> None:
 def deliver_remote(
     sending: Path, host: str, remote_inbox: str, final_name: str, connect_timeout: int
 ) -> None:
-    if not SSH_HOST_RE.fullmatch(host):
+    validate_envelope_filename(final_name)
+    if host.startswith("-") or not SSH_HOST_RE.fullmatch(host):
         raise RuntimeError("SSH host contains unsupported characters")
     pure_remote = PurePosixPath(remote_inbox)
     if (
@@ -199,23 +209,52 @@ def deliver_remote(
         "-o",
         f"ConnectTimeout={connect_timeout}",
     ]
-    subprocess.run([*ssh_base, "mkdir", "-p", "--", remote_inbox], check=True)
+    remote_prepare = (
+        "import os,sys\n"
+        "path=sys.argv[1]\n"
+        "os.makedirs(path, mode=0o700, exist_ok=True)\n"
+    )
     remote_publish = (
-        "import os,sys; src,dst=sys.argv[1:3]; "
-        "same=os.path.exists(dst) and open(src,'rb').read()==open(dst,'rb').read(); "
-        "(os.unlink(src) if same else os.link(src,dst)); "
-        "(None if same else os.unlink(src))"
+        "import os,sys\n"
+        "src,dst=sys.argv[1:3]\n"
+        "if os.path.exists(dst):\n"
+        "    with open(src,'rb') as source, open(dst,'rb') as existing:\n"
+        "        if source.read() != existing.read():\n"
+        "            raise FileExistsError('remote inbox collision')\n"
+        "    os.unlink(src)\n"
+        "else:\n"
+        "    os.link(src,dst)\n"
+        "    os.unlink(src)\n"
+    )
+    remote_cleanup = (
+        "import os,sys\n"
+        "try:\n"
+        "    os.unlink(sys.argv[1])\n"
+        "except FileNotFoundError:\n"
+        "    pass\n"
+    )
+    subprocess.run(
+        [*ssh_base, "python3", "-", remote_inbox],
+        input=remote_prepare,
+        text=True,
+        check=True,
     )
     try:
         subprocess.run([*scp_base, str(sending), f"{host}:{remote_tmp}"], check=True)
         subprocess.run(
-            [*ssh_base, "python3", "-c", remote_publish, remote_tmp, remote_final],
+            [*ssh_base, "python3", "-", remote_tmp, remote_final],
+            input=remote_publish,
+            text=True,
             check=True,
         )
     except subprocess.CalledProcessError:
-        subprocess.run([*ssh_base, "rm", "-f", "--", remote_tmp], check=False)
+        subprocess.run(
+            [*ssh_base, "python3", "-", remote_tmp],
+            input=remote_cleanup,
+            text=True,
+            check=False,
+        )
         raise
-
 
 
 @contextlib.contextmanager
@@ -231,6 +270,7 @@ def outbox_lock(outbox: Path):
             yield
         finally:
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
 
 def flush(args: argparse.Namespace) -> int:
     if bool(args.deliver_to) == bool(args.ssh_host):
