@@ -923,6 +923,40 @@ else
   fail "gates.env voltou a ser sobrescrito/hash-checked como arquivo do framework"
 fi
 
+# 12f0c. CODEX.md contem slug e regras renderizadas do consumidor. Comparar
+# seu hash com o CODEX.md do framework cria drift imediatamente apos update;
+# a fonte gerenciada e o template, enquanto o smoke valida o arquivo gerado.
+if ! printf '%s\n' "$framework_block" | grep -qx '  "CODEX.md"' \
+  && printf '%s\n' "$framework_block" | grep -qx '  ".agents/templates/CODEX.md"' \
+  && grep -q '^render_codex_md() {' "$FRAMEWORK_DIR/install.sh"; then
+  pass "CODEX.md renderizado nao e hash-checked contra outro projeto"
+else
+  fail "CODEX.md renderizado voltou ao inventario de arquivos canonicos"
+fi
+
+codex_render_tmp=$(mktemp -d)
+mkdir -p "$codex_render_tmp/.agents/templates"
+cp "$FRAMEWORK_DIR/.agents/templates/CODEX.md" "$codex_render_tmp/.agents/templates/CODEX.md"
+cat > "$codex_render_tmp/CLAUDE.md" <<'EOF'
+# Consumer
+
+## Project Rules
+
+- Regra exclusiva do consumidor.
+EOF
+if ( cd "$codex_render_tmp" \
+  && export CANUTO_INSTALL_LIBRARY_ONLY=1 \
+  && . "$FRAMEWORK_DIR/install.sh" \
+  && trap 'rm -rf "$TMP_DIR"' EXIT \
+  && render_codex_md >/dev/null \
+  && ! grep -q '{{' CODEX.md \
+  && grep -qF -- '- Regra exclusiva do consumidor.' CODEX.md ); then
+  pass "render_codex_md resolve placeholders e preserva regras do consumidor"
+else
+  fail "render_codex_md nao produziu um CODEX.md valido para o consumidor"
+fi
+rm -rf "$codex_render_tmp"
+
 # 12f1. merge_claude_md executada: headings exatos, referências fora de cerca,
 # autoridade comum e idempotência. Grep estático não prova nenhum desses casos.
 mcm_tmp=$(mktemp -d)
