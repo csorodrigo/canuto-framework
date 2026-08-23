@@ -7,8 +7,8 @@
 
 | Area | Status | Entry Points | Notes |
 |------|--------|--------------|-------|
-| Fresh install | implemented | `install.sh` | Bootstraps `.agents/`, hooks, vault, Codex, and docs |
-| Update flow | implemented | `install.sh --update` | Refreshes installer logic from `main`, persists the updated `install.sh`, then applies framework updates |
+| Fresh install | implemented | `install.sh` | Bootstraps `.agents/`, hooks, vault, Codex, and docs; leaves changes unstaged unless `--commit` is explicit |
+| Update flow | implemented | `install.sh --update` | Refreshes installer logic, applies framework updates, and never treats `--yes` as commit authorization |
 | Runtime repair | implemented | `install.sh --repair` | Provisions strict runtime dependencies, reinstalls hooks, rewires MCP/config, recreates missing bootstrap files |
 | One-command diagnosis | implemented | `install.sh --doctor`, `install.sh --health` | Installs/verifies dependencies, runs repair plus consumer/Codex health validation, and fails if the complete environment is not ready |
 | Consumer smoke test | implemented | `install.sh --test`, `.agents/tools/canuto-consumer-smoke.sh` | Validates project-facing install state |
