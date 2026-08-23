@@ -18,12 +18,12 @@ jobs:
 
       - name: Package working copy
         run: |
-          tar --exclude=.git -czf canuto-framework-working-copy.tar.gz .
+          git archive --format=tar.gz --output="$RUNNER_TEMP/canuto-framework-working-copy.tar.gz" HEAD
 
       - name: Upload working copy
         uses: actions/upload-artifact@v4
         with:
           name: canuto-framework-working-copy
-          path: canuto-framework-working-copy.tar.gz
+          path: ${{ runner.temp }}/canuto-framework-working-copy.tar.gz
           if-no-files-found: error
           retention-days: 1
