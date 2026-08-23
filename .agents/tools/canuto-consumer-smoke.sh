@@ -71,6 +71,7 @@ for file_path in \
   "$ROOT_DIR/CLAUDE.md" \
   "$ROOT_DIR/AGENTS.md" \
   "$ROOT_DIR/CODEX.md" \
+  "$ROOT_DIR/.agents/OPERATING-CONTRACT.md" \
   "$ROOT_DIR/.context.md" \
   "$ROOT_DIR/docs/FEATURE-MAP.md"; do
   if [ -f "$file_path" ]; then
@@ -79,6 +80,28 @@ for file_path in \
     fail "missing file: ${file_path#$ROOT_DIR/}"
   fi
 done
+
+for entrypoint in "$ROOT_DIR/CLAUDE.md" "$ROOT_DIR/AGENTS.md"; do
+  entrypoint_name="${entrypoint#$ROOT_DIR/}"
+  if [ -f "$entrypoint" ] && awk '
+    /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced; next }
+    !fenced && /^[[:space:]]*-[[:space:]]+Read `\.agents\/OPERATING-CONTRACT\.md` before non-trivial work;/ { found=1 }
+    END { exit(found ? 0 : 1) }
+  ' "$entrypoint" 2>/dev/null; then
+    pass "$entrypoint_name loads shared operating contract"
+  else
+    fail "$entrypoint_name does not load shared operating contract"
+  fi
+done
+
+if [ -s "$ROOT_DIR/.agents/OPERATING-CONTRACT.md" ] \
+  && grep -q '^contract: canuto-operating-contract$' "$ROOT_DIR/.agents/OPERATING-CONTRACT.md" \
+  && grep -q '^## Autonomia e autorização$' "$ROOT_DIR/.agents/OPERATING-CONTRACT.md" \
+  && grep -q '^## WIP e concorrência$' "$ROOT_DIR/.agents/OPERATING-CONTRACT.md"; then
+  pass "shared operating contract has canonical identity and required sections"
+else
+  fail "shared operating contract is empty, stale, or structurally invalid"
+fi
 
 for section in "## Framework" "## Preferences" "## On Session Start"; do
   if [ -f "$ROOT_DIR/CLAUDE.md" ] && grep -q "$section" "$ROOT_DIR/CLAUDE.md" 2>/dev/null; then

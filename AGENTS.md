@@ -2,6 +2,8 @@
 
 ## Context
 - Framework: Canuto v1.x at .agents/
+- Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is the shared
+  Claude/Codex contract for evidence, authorization, WIP and cross-host drift.
 - Read .context.md files in each directory for local context
 - Read docs/FEATURE-MAP.md for feature status and flows
 - Read .agents/tmp/context-package.md if it exists (pre-loaded context from Architect)

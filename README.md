@@ -99,7 +99,8 @@ Decisões completas (com alternativas rejeitadas e porquê): [`docs/adr/`](docs/
     vault-sync.sh       — Flush pending sync notes into the active vault backend.
   config/
     models.yaml           — Fonte ÚNICA e executável de modelo/effort por role (Codex e Claude).
-    gates.env             — Opt-in de gates por projeto, versionado (vale p/ Claude, Codex e push manual).
+    gates.env             — Opt-in de gates por projeto, versionado e preservado em updates (vale p/ Claude, Codex e push manual).
+  OPERATING-CONTRACT.md   — Contrato comum de evidência, autorização, WIP e sincronização Mac/SSH.
   heartbeats/
     weekly-maintenance.md — Task semanal: pending triage + instinct aging + digest.
     usage-audit.md        — Task mensal: auditoria de uso real do framework.
@@ -190,6 +191,12 @@ bash install.sh --update
 `bash install.sh --update` is now the standard path. The installer refreshes itself from `main` before applying the update, so it still works even if the local `install.sh` is stale.
 
 `--update` never overwrites `vault/` or `plugins/`; it updates personas, skills, hooks, runtime helpers, and support docs. `CLAUDE.md` and `AGENTS.md` are **merged section by section** (missing framework sections/rules are added; your custom content is never replaced).
+
+O contrato comum fica em `.agents/OPERATING-CONTRACT.md`. Ele é distribuído a
+todos os consumidores, enquanto `SPEC.md`, `DESIGN.md` e regras de domínio
+continuam próprios de cada projeto. `bash install.sh --check` compara o conteúdo
+do contrato com `main`; `canuto-consumer-smoke.sh` confirma que Claude e Codex o
+carregam pelos entrypoints do projeto.
 
 ### Update ALL projects at once
 
@@ -329,6 +336,7 @@ You are my coding orchestrator for this repository.
 - Location: .agents/
 - Always act as the **Maestro** persona defined in the framework.
 - Delegate to other personas as defined in their playbooks.
+- Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is the shared Claude/Codex contract for evidence, authorization, WIP and cross-host drift.
 
 ## Preferences
 - tests: required
@@ -339,7 +347,8 @@ You are my coding orchestrator for this repository.
 - Before finalizing any plan, always interview the user in detail using AskUserQuestion about implementation choices, UI/UX decisions, trade-offs, and concerns. Never assume — always ask first.
 - Read any .context.md and docs/FEATURE-MAP.md files if they exist.
 - If they do not exist, have the Contextualizer create them (with approval).
-- Never run Git or shell commands without explicit confirmation.
+- Read-only Git and shell inspection within the active task is allowed without new confirmation.
+- Ask before destructive commands, credentials or identity changes, production mutations, external communications, or material scope expansion.
 - When in doubt, ask questions instead of guessing.
 
 ## Memory System

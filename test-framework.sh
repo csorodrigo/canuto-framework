@@ -14,6 +14,25 @@ FRAMEWORK_DIR="$(cd "$(dirname "$0")" && pwd)"
 AGENTS_DIR="$FRAMEWORK_DIR/.agents"
 VERBOSE=false
 
+# Git exporta variaveis locais do repositorio para hooks. Sem limpa-las, os
+# repositorios temporarios desta suite continuam apontando para o checkout que
+# disparou o pre-push, mesmo quando os comandos usam `git -C <fixture>`. O
+# framework continua referenciado por caminhos absolutos; fixtures devem
+# descobrir o proprio repositorio.
+if ! git_local_vars=$(git -C "$FRAMEWORK_DIR" rev-parse --local-env-vars 2>/dev/null); then
+  echo "FATAL: nao foi possivel enumerar as variaveis locais do Git; fixtures nao executadas." >&2
+  exit 2
+fi
+if ! grep -qx 'GIT_DIR' <<< "$git_local_vars" \
+  || ! grep -qx 'GIT_WORK_TREE' <<< "$git_local_vars"; then
+  echo "FATAL: lista de variaveis locais do Git incompleta; fixtures nao executadas." >&2
+  exit 2
+fi
+while IFS= read -r git_local_var; do
+  [ -n "$git_local_var" ] && unset "$git_local_var"
+done <<< "$git_local_vars"
+unset git_local_vars git_local_var
+
 [[ "${1:-}" == "--verbose" ]] && VERBOSE=true
 
 # ── Test counters ───────────────────────────────────────────────────────────
@@ -881,6 +900,152 @@ else
   fail "AGENTS.md sem a seção do contrato Codex-side"
 fi
 
+# 12f0. Contrato operacional único: distribuído, carregado pelos dois runtimes
+# e verificado por conteúdo no --check.
+if grep -qF '".agents/OPERATING-CONTRACT.md"' "$FRAMEWORK_DIR/install.sh" \
+  && grep -qF '.agents/OPERATING-CONTRACT.md' "$FRAMEWORK_DIR/AGENTS.md" \
+  && grep -qF '.agents/OPERATING-CONTRACT.md' "$FRAMEWORK_DIR/CLAUDE.md" \
+  && grep -qF '^[[:space:]]{0,3}(```|~~~)' "$AGENTS_DIR/tools/canuto-consumer-smoke.sh" \
+  && grep -qF 'content hash drift' "$FRAMEWORK_DIR/install.sh"; then
+  pass "contrato operacional é distribuído, carregado por Claude/Codex e hash-checked"
+else
+  fail "contrato operacional sem distribuição, entrypoint ou check de conteúdo"
+fi
+
+# 12f0b. gates.env é configuração do consumidor: seed if missing, nunca
+# artefato sobrescrito/hash-checked pelo framework.
+framework_block=$(sed -n '/^FRAMEWORK_FILES=(/,/^)/p' "$FRAMEWORK_DIR/install.sh")
+install_only_block=$(sed -n '/^INSTALL_ONLY_FILES=(/,/^)/p' "$FRAMEWORK_DIR/install.sh")
+if ! printf '%s\n' "$framework_block" | grep -qF '".agents/config/gates.env"' \
+  && printf '%s\n' "$install_only_block" | grep -qF '".agents/config/gates.env"'; then
+  pass "gates.env pertence ao projeto: instalado se ausente e preservado em updates"
+else
+  fail "gates.env voltou a ser sobrescrito/hash-checked como arquivo do framework"
+fi
+
+# 12f1. merge_claude_md executada: headings exatos, referências fora de cerca,
+# autoridade comum e idempotência. Grep estático não prova nenhum desses casos.
+mcm_tmp=$(mktemp -d)
+{
+  echo 'set -euo pipefail'
+  echo 'ok(){ :; }'
+  echo 'warn(){ :; }'
+  sed -n '/^merge_claude_md() {/,/^}/p' "$FRAMEWORK_DIR/install.sh"
+} > "$mcm_tmp/fn.sh"
+mcm_run(){ ( cd "$1" && CLAUDE_MD=CLAUDE.md && . "$mcm_tmp/fn.sh" && merge_claude_md ) >/dev/null 2>&1 || true; }
+mcm_fail=""
+
+mkdir -p "$mcm_tmp/a"
+cat > "$mcm_tmp/a/CLAUDE.md" <<'EOF'
+# X
+
+## Framework Notes
+- `.agents/OPERATING-CONTRACT.md` aparece só numa nota.
+
+```markdown
+## Framework
+- Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is fake.
+```
+
+## Framework
+- Location: .agents/
+- Contract path documented as `.agents/OPERATING-CONTRACT.md`, without loading it.
+
+## Framework
+- seção duplicada legada
+
+## Project Rules
+- Never run Git or shell commands without explicit confirmation.
+EOF
+mcm_run "$mcm_tmp/a" && mcm_run "$mcm_tmp/a"
+[ "$(grep -c 'Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is the shared' "$mcm_tmp/a/CLAUDE.md")" = "1" ] \
+  || mcm_fail="referência ativa ausente ou duplicada"
+[ "$(grep -c 'Read-only Git and shell inspection within the active task' "$mcm_tmp/a/CLAUDE.md")" = "1" ] \
+  || mcm_fail="${mcm_fail:+$mcm_fail; }autoridade read-only ausente ou duplicada"
+[ "$(grep -c '^- Before finalizing any plan, always interview the user' "$mcm_tmp/a/CLAUDE.md")" = "1" ] \
+  || mcm_fail="${mcm_fail:+$mcm_fail; }regra de planejamento inserida em cerca ou duplicada"
+[ "$(grep -c '^- Before planning, implementing, or reviewing ANY user-facing UI' "$mcm_tmp/a/CLAUDE.md")" = "1" ] \
+  || mcm_fail="${mcm_fail:+$mcm_fail; }regra de design inserida em cerca ou duplicada"
+[ "$(grep -c '^- Never run Git or shell commands without explicit confirmation.$' "$mcm_tmp/a/CLAUDE.md")" = "0" ] \
+  || mcm_fail="${mcm_fail:+$mcm_fail; }proibição legada não removida da seção real"
+[ "$(find "$mcm_tmp" -name '*.tmp' | wc -l)" -eq 0 ] \
+  || mcm_fail="${mcm_fail:+$mcm_fail; }temp órfão"
+
+mkdir -p "$mcm_tmp/b"
+cat > "$mcm_tmp/b/CLAUDE.md" <<'EOF'
+# X
+
+```markdown
+## Framework
+- Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is fake.
+## Project Rules
+- Never run Git or shell commands without explicit confirmation.
+```
+EOF
+mcm_run "$mcm_tmp/b" && mcm_run "$mcm_tmp/b"
+[ "$(grep -c '^## Framework$' "$mcm_tmp/b/CLAUDE.md")" = "2" ] \
+  || mcm_fail="${mcm_fail:+$mcm_fail; }heading cercado suprimiu seção real ou duplicou em re-run"
+[ "$(grep -c 'Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is the shared' "$mcm_tmp/b/CLAUDE.md")" = "1" ] \
+  || mcm_fail="${mcm_fail:+$mcm_fail; }referência cercada suprimiu diretiva real"
+
+mkdir -p "$mcm_tmp/c"
+printf '# X\n\n```markdown\ncerca nunca fechada\n' > "$mcm_tmp/c/CLAUDE.md"
+mcm_run "$mcm_tmp/c" && mcm_run "$mcm_tmp/c"
+mcm_active=$(awk '
+  /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced; next }
+  !fenced && /Read `\.agents\/OPERATING-CONTRACT\.md` before non-trivial work;/ { count++ }
+  END { print count+0 }
+' "$mcm_tmp/c/CLAUDE.md")
+[ "$mcm_active" = "1" ] && [ "$(grep -c '^## Framework$' "$mcm_tmp/c/CLAUDE.md")" = "1" ] \
+  || mcm_fail="${mcm_fail:+$mcm_fail; }cerca não fechada deixou contrato inativo ou duplicou recovery"
+
+if [ -z "$mcm_fail" ]; then
+  pass "merge_claude_md executada: heading exato, cerca ignorada, autoridade alinhada e idempotência"
+else
+  fail "merge_claude_md: $mcm_fail"
+fi
+rm -rf "$mcm_tmp"
+
+# 12f1b. Gates mecânicos: update recusa WIP e --check nunca fica verde com
+# drift, missing ou UNKNOWN.
+gate_tmp=$(mktemp -d)
+{
+  sed -n '/^update_tree_is_clean() {/,/^}/p' "$FRAMEWORK_DIR/install.sh"
+  sed -n '/^check_result_code() {/,/^}/p' "$FRAMEWORK_DIR/install.sh"
+} > "$gate_tmp/fn.sh"
+git -C "$gate_tmp" init -q
+git -C "$gate_tmp" add fn.sh
+git -C "$gate_tmp" -c user.name=Canuto -c user.email=canuto@example.invalid commit -qm fixture
+( cd "$gate_tmp" && . "$gate_tmp/fn.sh" && GIT_AVAILABLE=true && update_tree_is_clean ) \
+  || fail "update_tree_is_clean rejeitou worktree limpa"
+printf 'wip\n' > "$gate_tmp/user-wip.txt"
+if ( cd "$gate_tmp" && . "$gate_tmp/fn.sh" && GIT_AVAILABLE=true && update_tree_is_clean ); then
+  fail "update_tree_is_clean aceitou WIP untracked"
+elif ( . "$gate_tmp/fn.sh"; check_result_code 0 0 0 ) \
+  && ! ( . "$gate_tmp/fn.sh"; check_result_code 1 0 0 ) \
+  && [ "$( ( . "$gate_tmp/fn.sh"; check_result_code 0 0 1 ); printf '%s' "$?" )" = "2" ]; then
+  pass "gates de update/check: WIP recusado e estados não verdes retornam não-zero"
+else
+  fail "check_result_code não distingue verde, drift e UNKNOWN"
+fi
+mkdir -p "$gate_tmp/not-a-repo"
+if ( cd "$gate_tmp/not-a-repo" && . "$gate_tmp/fn.sh" && GIT_AVAILABLE=true && update_tree_is_clean ); then
+  fail "update_tree_is_clean ficou verde quando git status falhou"
+else
+  pass "update_tree_is_clean falha fechado quando o estado Git não pode ser lido"
+fi
+rm -rf "$gate_tmp"
+
+check_out=$(mktemp)
+if ( cd "$FRAMEWORK_DIR" && CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" bash install.sh --check ) > "$check_out" 2>&1 \
+  && grep -q '0 unknown' "$check_out" \
+  && grep -q 'All framework files are up to date' "$check_out"; then
+  pass "--check contra fonte idêntica: hashes cobrem arquivos sem version e resultado é verde"
+else
+  fail "--check não reconheceu fonte idêntica como integralmente atualizada"
+fi
+rm -f "$check_out"
+
 # 12f2. Coding Rules: os dois caminhos de merge_agents_md têm de emitir a MESMA
 # seção. Comparação textual do bloco inteiro — checar só as 3 regras novas
 # deixaria passar edição em qualquer um dos outros 6 bullets, e deixaria passar
@@ -928,13 +1093,34 @@ mam_fail=""
 # a) geração do zero + idempotência
 mkdir -p "$mam_tmp/a" && mam_run "$mam_tmp/a" && mam_run "$mam_tmp/a"
 [ "$(mam_count "$mam_tmp/a" "$R_GROW")" = "1" ] || mam_fail="geração/idempotência"
+[ "$(mam_count "$mam_tmp/a" '.agents/OPERATING-CONTRACT.md')" = "1" ] || mam_fail="${mam_fail:+$mam_fail; }contrato ausente/duplicado na geração"
 
 # b) seção existente sem uma regra, 2 runs → exatamente 1 de cada
 mkdir -p "$mam_tmp/b"
 printf '# X\n\n## Coding Rules\n- Follow existing patterns\n\n## Custom\n- preservar isto\n' > "$mam_tmp/b/AGENTS.md"
 mam_run "$mam_tmp/b" && mam_run "$mam_tmp/b"
 [ "$(mam_count "$mam_tmp/b" "$R_GROW")" = "1" ] || mam_fail="${mam_fail:+$mam_fail; }duplicou em 2 runs"
+[ "$(mam_count "$mam_tmp/b" '.agents/OPERATING-CONTRACT.md')" = "1" ] || mam_fail="${mam_fail:+$mam_fail; }contrato ausente/duplicado no patch"
 grep -q "preservar isto" "$mam_tmp/b/AGENTS.md" || mam_fail="${mam_fail:+$mam_fail; }perdeu seção custom"
+
+# b2) menção em prosa ou cerca não satisfaz a diretiva ativa exigida pelo smoke.
+mkdir -p "$mam_tmp/b2"
+cat > "$mam_tmp/b2/AGENTS.md" <<'EOF'
+# X
+
+O arquivo `.agents/OPERATING-CONTRACT.md` existe.
+
+   ```markdown
+- Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is fake.
+   ```
+EOF
+mam_run "$mam_tmp/b2" && mam_run "$mam_tmp/b2"
+active_contract_refs=$(awk '
+  /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced; next }
+  !fenced && /^[[:space:]]*-[[:space:]]+Read `\.agents\/OPERATING-CONTRACT\.md` before non-trivial work;/ { count++ }
+  END { print count+0 }
+' "$mam_tmp/b2/AGENTS.md")
+[ "$active_contract_refs" = "1" ] || mam_fail="${mam_fail:+$mam_fail; }menção/cerca suprimiu ou duplicou contrato ativo"
 
 # c) regra citada dentro de bloco de código não conta como aplicada.
 # O fixture usa o texto INTEGRAL da regra: com o prefixo só, uma regressão para
@@ -959,6 +1145,13 @@ mkdir -p "$mam_tmp/c3"
 printf '# X\n\n```\ncerca aberta e nunca fechada\n\n## Coding Rules\n- Follow existing patterns\n' > "$mam_tmp/c3/AGENTS.md"
 mam_run "$mam_tmp/c3"; mam_run "$mam_tmp/c3"; mam_run "$mam_tmp/c3"
 [ "$(grep -cE '^##+ Coding Rules[[:space:]]*$' "$mam_tmp/c3/AGENTS.md")" = "1" ] || mam_fail="${mam_fail:+$mam_fail; }anexou seção duplicada (cerca não fechada, 3 runs)"
+mam_c3_active=$(awk '
+  /^[[:space:]]{0,3}(```|~~~)/ { fenced=!fenced; next }
+  !fenced && /Read `\.agents\/OPERATING-CONTRACT\.md` before non-trivial work;/ { count++ }
+  END { print count+0 }
+' "$mam_tmp/c3/AGENTS.md")
+[ "$mam_c3_active" = "1" ] && [ "$(grep -c '^## Shared Operating Contract$' "$mam_tmp/c3/AGENTS.md")" = "1" ] \
+  || mam_fail="${mam_fail:+$mam_fail; }cerca não fechada deixou contrato inativo ou duplicou recovery"
 
 # d) falha na publicação não pode danificar o arquivo do usuário
 mkdir -p "$mam_tmp/d"
