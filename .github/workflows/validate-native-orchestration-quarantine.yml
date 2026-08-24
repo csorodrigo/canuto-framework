@@ -1,0 +1,26 @@
+name: Validate Native Orchestration Quarantine
+
+on:
+  pull_request:
+    paths:
+      - ".agents/experiments/native-orchestration/**"
+      - ".github/workflows/validate-native-orchestration-quarantine.yml"
+  push:
+    branches:
+      - "feat/codex-native-orchestration-quarantine"
+    paths:
+      - ".agents/experiments/native-orchestration/**"
+      - ".github/workflows/validate-native-orchestration-quarantine.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate quarantine invariants
+        run: bash .agents/experiments/native-orchestration/validate.sh
