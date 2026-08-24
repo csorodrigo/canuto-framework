@@ -1,90 +1,51 @@
 {
   "schemaVersion": 1,
-  "projects": {
-    "lucrando-ai": {
-      "surfaces": {
-        "mac": {
-          "provider": "codex",
-          "roots": [
-            "/Users/rodrigooliveira/conductor/repos/lucrando-ai"
-          ],
-          "aliases": ["Mac"],
-          "historyRoots": ["~/.codex/sessions", "~/.codex/archived_sessions"]
-        },
-        "ssh-papiro": {
-          "provider": "codex",
-          "remote": true,
-          "roots": [
-            "/srv/dev/worktrees/lucrando-ai/main"
-          ],
-          "aliases": ["Papiro"],
-          "historyRoots": ["~/.codex/sessions", "~/.codex/archived_sessions"]
-        }
-      }
-    },
-    "papiro": {
-      "surfaces": {
-        "mac": {
-          "provider": "codex",
-          "roots": [
-            "/Users/rodrigooliveira/conductor/workspaces/cartorio"
-          ],
-          "aliases": ["Mac"],
-          "historyRoots": ["~/.codex/sessions", "~/.codex/archived_sessions"]
-        },
-        "ssh-papiro": {
-          "provider": "codex",
-          "remote": true,
-          "roots": [
-            "/srv/dev/worktrees/papiro/main"
-          ],
-          "aliases": ["Papiro"],
-          "historyRoots": ["~/.codex/sessions", "~/.codex/archived_sessions"]
-        }
-      }
-    },
-    "mecesa-v1": {
-      "surfaces": {
-        "mac-container": {
-          "provider": "codex",
-          "roots": [
-            "/Users/rodrigooliveira/conductor/workspaces/mecesa",
-            "/Users/rodrigooliveira/conductor/workspaces/mecesa-v1/*",
-            "/Users/rodrigooliveira/conductor/repos/mecesa-v1"
-          ],
-          "aliases": ["Mac"],
-          "historyRoots": ["~/.codex/sessions", "~/.codex/archived_sessions"]
-        },
-        "ssh-papiro": {
-          "provider": "codex",
-          "remote": true,
-          "roots": [
-            "/srv/dev/worktrees/mecesa/main"
-          ],
-          "aliases": ["Papiro"],
-          "historyRoots": ["~/.codex/sessions", "~/.codex/archived_sessions"]
-        }
-      }
-    }
-  },
+  "projects": {},
   "providers": {
     "codex": {
-      "roots": ["~/.codex/skills", "~/.agents/skills"],
-      "pluginRoots": ["~/.codex/plugins"],
-      "systemRoots": ["~/.codex/system/skills"],
-      "historyRoots": ["~/.codex/sessions", "~/.codex/archived_sessions"]
+      "roots": [
+        "~/.codex/skills",
+        "~/.agents/skills"
+      ],
+      "pluginRoots": [
+        "~/.codex/plugins"
+      ],
+      "systemRoots": [
+        "~/.codex/system/skills"
+      ],
+      "historyRoots": [
+        "~/.codex/sessions",
+        "~/.codex/archived_sessions"
+      ]
     },
     "claude": {
-      "roots": ["~/.claude/skills"],
-      "pluginRoots": ["~/.claude/plugins"],
-      "systemRoots": ["~/.claude/system/skills"],
-      "historyRoots": ["~/.claude/projects", "~/.claude/telemetry"]
+      "roots": [
+        "~/.claude/skills"
+      ],
+      "pluginRoots": [
+        "~/.claude/plugins"
+      ],
+      "systemRoots": [
+        "~/.claude/system/skills"
+      ],
+      "historyRoots": [
+        "~/.claude/projects",
+        "~/.claude/telemetry"
+      ]
     },
     "hermes": {
-      "roots": ["~/.hermes/skills"],
-      "pluginRoots": ["~/.hermes/plugins"],
-      "systemRoots": ["~/.hermes/system/skills"],
-      "historyRoots": ["~/.hermes/sessions"]
+      "roots": [
+        "~/.hermes/skills"
+      ],
+      "pluginRoots": [
+        "~/.hermes/plugins"
+      ],
+      "systemRoots": [
+        "~/.hermes/system/skills"
+      ],
+      "historyRoots": [
+        "~/.hermes/sessions"
+      ]
     },
     "opencode": {
       "roots": [],
@@ -96,9 +57,38 @@
   "policy": {
     "detailRetentionDays": 180,
     "fingerprintFamilies": {
-      "tools": ["read", "search", "edit", "test", "git", "shell", "delegate"],
-      "executables": ["node", "npm", "pnpm", "yarn", "bun", "git", "rg", "grep", "sed", "awk", "jq", "bash", "python3"],
-      "results": ["success", "failure", "error", "timeout", "partial", "unknown"]
+      "tools": [
+        "read",
+        "search",
+        "edit",
+        "test",
+        "git",
+        "shell",
+        "delegate"
+      ],
+      "executables": [
+        "node",
+        "npm",
+        "pnpm",
+        "yarn",
+        "bun",
+        "git",
+        "rg",
+        "grep",
+        "sed",
+        "awk",
+        "jq",
+        "bash",
+        "python3"
+      ],
+      "results": [
+        "success",
+        "failure",
+        "error",
+        "timeout",
+        "partial",
+        "unknown"
+      ]
     },
     "evalAdapter": {
       "enabled": false,

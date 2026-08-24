@@ -1904,6 +1904,50 @@ function runInstallerLibrary(home, extra = {}) {
   });
 }
 
+function makeSyntheticLegacyConfig() {
+  const config = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'config', 'skill-gardener.json'), 'utf8'));
+  config.projects = {
+    alpha: {
+      surfaces: {
+        local: {
+          provider: 'codex',
+          roots: ['~/work/alpha'],
+          aliases: ['Local'],
+          historyRoots: ['/custom/history'],
+        },
+        remote: {
+          provider: 'codex',
+          remote: true,
+          roots: ['/opt/canuto-fixtures/alpha/main'],
+          aliases: ['Remote'],
+          historyRoots: ['/opt/canuto-fixtures/alpha/main/.codex/sessions'],
+        },
+      },
+    },
+    beta: {
+      surfaces: {
+        remote: {
+          provider: 'codex',
+          remote: true,
+          roots: ['/opt/canuto-fixtures/beta/main'],
+          aliases: ['Remote'],
+          historyRoots: ['/opt/canuto-fixtures/beta/main/.codex/sessions'],
+        },
+        customRemote: {
+          provider: 'codex',
+          remote: true,
+          roots: ['/opt/canuto-fixtures/beta/main'],
+          aliases: ['Custom'],
+          historyRoots: ['/custom/remote-history'],
+        },
+      },
+    },
+  };
+  config.providers.hermes.historyRoots = ['~/.hermes/sessions', '~/.hermes/history'];
+  config.providers.hermes.pluginRoots = ['/custom/hermes/plugins'];
+  return config;
+}
+
 test('Skill Gardener installer runs through the isolated stock /bin/bash path', () => {
   const root = tempDir();
   const home = path.join(root, 'home');
@@ -1948,12 +1992,7 @@ test('installer keeps exact legacy config and old runtime when activation fails'
   const stable = path.join(home, '.canuto', 'bin', 'canuto-skill-gardener');
   const oldRuntime = fs.realpathSync(stable);
   const configPath = path.join(home, '.canuto', 'config', 'skill-gardener.json');
-  const legacy = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  legacy.projects['lucrando-ai'].surfaces['ssh-papiro'].historyRoots = ['/srv/dev/worktrees/lucrando-ai/main/.codex/sessions'];
-  legacy.projects.papiro.surfaces['ssh-papiro'].historyRoots = ['/srv/dev/worktrees/papiro/main/.codex/sessions'];
-  legacy.projects['mecesa-v1'].surfaces['ssh-papiro'].roots = ['/srv/dev/worktrees/mecesa-v1/main'];
-  legacy.projects['mecesa-v1'].surfaces['ssh-papiro'].historyRoots = ['/srv/dev/worktrees/mecesa-v1/main/.codex/sessions'];
-  legacy.providers.hermes.historyRoots = ['~/.hermes/sessions', '~/.hermes/history'];
+  const legacy = makeSyntheticLegacyConfig();
   writeFile(configPath, `${JSON.stringify(legacy, null, 2)}\n`);
   const originalConfig = fs.readFileSync(configPath);
 
@@ -1999,33 +2038,21 @@ test('installer preserves valid config race winner and rejects invalid winner', 
   assert.equal(fs.readFileSync(invalidConfigPath, 'utf8'), '{broken');
 });
 
-test('installer atomically migrates only the exact legacy Skill Gardener defaults', () => {
+test('installer preserves existing valid machine-owned config byte-for-byte', () => {
   const root = tempDir();
   const home = path.join(root, 'home');
   fs.mkdirSync(home, { recursive: true });
   const first = runInstallerLibrary(home);
   assert.equal(first.status, 0, first.stderr);
   const configPath = path.join(home, '.canuto', 'config', 'skill-gardener.json');
-  const legacy = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  legacy.projects['lucrando-ai'].surfaces['ssh-papiro'].historyRoots = ['/srv/dev/worktrees/lucrando-ai/main/.codex/sessions'];
-  legacy.projects.papiro.surfaces['ssh-papiro'].historyRoots = ['/srv/dev/worktrees/papiro/main/.codex/sessions'];
-  legacy.projects['mecesa-v1'].surfaces['ssh-papiro'].roots = ['/srv/dev/worktrees/mecesa-v1/main'];
-  legacy.projects['mecesa-v1'].surfaces['ssh-papiro'].historyRoots = ['/srv/dev/worktrees/mecesa-v1/main/.codex/sessions'];
-  legacy.providers.hermes.historyRoots = ['~/.hermes/sessions', '~/.hermes/history'];
-  legacy.projects['lucrando-ai'].surfaces.mac.historyRoots = ['/custom/history'];
-  legacy.providers.hermes.pluginRoots = ['/custom/hermes/plugins'];
-  writeFile(configPath, `${JSON.stringify(legacy, null, 2)}\n`);
+  const machineOwned = makeSyntheticLegacyConfig();
+  writeFile(configPath, `${JSON.stringify(machineOwned, null, 2)}\n`);
+  const original = fs.readFileSync(configPath);
 
-  const migrated = runInstallerLibrary(home);
-  assert.equal(migrated.status, 0, migrated.stderr);
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  assert.deepEqual(config.projects['lucrando-ai'].surfaces['ssh-papiro'].historyRoots, ['~/.codex/sessions', '~/.codex/archived_sessions']);
-  assert.deepEqual(config.projects.papiro.surfaces['ssh-papiro'].historyRoots, ['~/.codex/sessions', '~/.codex/archived_sessions']);
-  assert.deepEqual(config.projects['mecesa-v1'].surfaces['ssh-papiro'].roots, ['/srv/dev/worktrees/mecesa/main']);
-  assert.deepEqual(config.projects['mecesa-v1'].surfaces['ssh-papiro'].historyRoots, ['~/.codex/sessions', '~/.codex/archived_sessions']);
-  assert.deepEqual(config.providers.hermes.historyRoots, ['~/.hermes/sessions']);
-  assert.deepEqual(config.projects['lucrando-ai'].surfaces.mac.historyRoots, ['/custom/history']);
-  assert.deepEqual(config.providers.hermes.pluginRoots, ['/custom/hermes/plugins']);
+  const activated = runInstallerLibrary(home);
+  assert.equal(activated.status, 0, activated.stderr);
+  assert.deepEqual(fs.readFileSync(configPath), original);
+  assert.deepEqual(fs.readdirSync(path.dirname(configPath)).filter((name) => name.includes('.tmp-migrate-')), []);
 });
 
 test('installer cleanup refuses a lock nonce mismatch', () => {

@@ -616,9 +616,9 @@ if [ -f "$FRAMEWORK_DIR/install.sh" ]; then
   INSTALL_STATIC_PATTERNS=(
     'install|update|contract|check|skill|migrate|repair|doctor|test|deps)'
     '"install.sh"'
-    '--test)    MODE="test"'
-    '--repair)  MODE="repair"'
-    '--doctor|--health) MODE="doctor"'
+    '--test) set_requested_mode "test"'
+    '--repair) set_requested_mode "repair"'
+    '--doctor|--health) set_requested_mode "doctor"'
     'rtk init -g --auto-patch'
     'rtk init -g --codex'
     '--deps-only|--deps'
@@ -1046,20 +1046,21 @@ contract_hook_before=$(cksum < "$contract_only_tmp/.agents/hooks/product-gate.sh
 
 contract_only_ok=true
 ( cd "$contract_only_tmp" \
-  && CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" bash "$FRAMEWORK_DIR/install.sh" --contract-only --yes >/dev/null 2>&1 ) \
+  && CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" bash "$FRAMEWORK_DIR/install.sh" --contract-only --yes --commit >/dev/null 2>&1 ) \
   || contract_only_ok=false
 contract_first_head=$(git -C "$contract_only_tmp" rev-parse HEAD 2>/dev/null || true)
 ( cd "$contract_only_tmp" \
-  && CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" bash "$FRAMEWORK_DIR/install.sh" --contract-only --yes >/dev/null 2>&1 ) \
+  && CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" bash "$FRAMEWORK_DIR/install.sh" --contract-only --yes --commit >/dev/null 2>&1 ) \
   || contract_only_ok=false
 contract_second_head=$(git -C "$contract_only_tmp" rev-parse HEAD 2>/dev/null || true)
 contract_names=$(git -C "$contract_only_tmp" diff-tree --no-commit-id --name-only -r "$contract_first_head" | sort)
-contract_expected=$(printf '%s\n' .agents/OPERATING-CONTRACT.md AGENTS.md CLAUDE.md | sort)
+contract_expected=$(printf '%s\n' .agents/CONTRACT-RECEIPT.json .agents/OPERATING-CONTRACT.md AGENTS.md CLAUDE.md | sort)
 
 if [ "$contract_only_ok" = true ] \
   && [ "$contract_first_head" = "$contract_second_head" ] \
   && [ "$contract_names" = "$contract_expected" ] \
   && git -C "$contract_only_tmp" ls-files --error-unmatch .agents/OPERATING-CONTRACT.md >/dev/null 2>&1 \
+  && git -C "$contract_only_tmp" ls-files --error-unmatch .agents/CONTRACT-RECEIPT.json >/dev/null 2>&1 \
   && [ "$contract_hook_before" = "$(cksum < "$contract_only_tmp/.agents/hooks/product-gate.sh")" ] \
   && [ "$(grep -c 'Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is the shared' "$contract_only_tmp/AGENTS.md")" = "1" ] \
   && [ "$(grep -c 'Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is the shared' "$contract_only_tmp/CLAUDE.md")" = "1" ] \
@@ -1089,7 +1090,7 @@ git -C "$contract_fail_tmp" commit --no-verify -qm fixture
 contract_fail_head=$(git -C "$contract_fail_tmp" rev-parse HEAD)
 contract_fail_out=$(mktemp)
 if ( cd "$contract_fail_tmp" \
-  && CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" bash "$FRAMEWORK_DIR/install.sh" --contract-only --yes ) >"$contract_fail_out" 2>&1; then
+  && CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" bash "$FRAMEWORK_DIR/install.sh" --contract-only --yes --commit ) >"$contract_fail_out" 2>&1; then
   fail "--contract-only saiu verde quando o pre-commit rejeitou o commit"
 elif [ "$contract_fail_head" = "$(git -C "$contract_fail_tmp" rev-parse HEAD)" ] \
   && grep -q 'Git commit failed' "$contract_fail_out" \
@@ -2645,6 +2646,453 @@ for F2_LIB in brief-compose.sh memory-usage.sh delegation-ledger.sh; do
     fail "19c2 $F2_LIB fora de install_global_fallback_libs — hook em install antigo degrada calado"
   fi
 done
+echo ""
+# ═══════════════════════════════════════════════════════════════════════════
+# TEST 20: Defaults identidade-cegos (ADR-0003)
+# ═══════════════════════════════════════════════════════════════════════════
+echo "── Test 20: Defaults identidade-cegos ──"
+
+SG_DEFAULT="$FRAMEWORK_DIR/config/skill-gardener.json"
+SG_SCHEMA="$FRAMEWORK_DIR/config/skill-gardener.schema.json"
+if [ ! -s "$SG_DEFAULT" ]; then
+  fail "20a config/skill-gardener.json ausente ou vazio"
+elif python3 - "$SG_DEFAULT" "$SG_SCHEMA" <<'PYEOF'
+import json
+import os
+import re
+import sys
+
+config_path, schema_path = sys.argv[1:]
+with open(config_path, encoding="utf-8") as fh:
+    cfg = json.load(fh)
+with open(schema_path, encoding="utf-8") as fh:
+    schema = json.load(fh)
+
+assert cfg.get("schemaVersion") == 1
+assert cfg.get("projects") == {}, "bootstrap default must not enumerate real projects"
+assert isinstance(cfg.get("providers"), dict) and cfg["providers"]
+assert isinstance(cfg.get("policy"), dict)
+assert schema.get("properties", {}).get("schemaVersion", {}).get("const") == 1
+
+identity_path = re.compile(r"^/(Users|home)/[^/]+/|^/srv/dev/(worktrees|repos)/")
+for provider, provider_cfg in cfg["providers"].items():
+    for key in ("roots", "pluginRoots", "systemRoots", "historyRoots"):
+        values = provider_cfg.get(key, [])
+        assert isinstance(values, list), f"{provider}.{key} must be an array"
+        for value in values:
+            assert isinstance(value, str)
+            assert not identity_path.search(value), f"identity-bearing path in {provider}.{key}: {value}"
+            assert value.startswith("~") or not os.path.isabs(value), f"absolute path in bootstrap default: {value}"
+PYEOF
+then
+  pass "20a Skill Gardener bootstrap é neutro, parseável e compatível com o schema"
+else
+  fail "20a Skill Gardener bootstrap contém identidade, path absoluto ou shape inválido"
+fi
+
+if grep -nE '"projects"[[:space:]]*:[[:space:]]*\{[[:space:]]*"' "$SG_DEFAULT" >/dev/null 2>&1; then
+  fail "20b bootstrap default enumera projeto real"
+else
+  pass "20b bootstrap default não enumera projetos"
+fi
+
+if grep -nE '/(Users|home)/[^/[:space:]\"]+|/srv/dev/(worktrees|repos)/[^/[:space:]\"]+' \
+    "$SG_DEFAULT" "$FRAMEWORK_DIR/install.sh" >/dev/null 2>&1; then
+  fail "20c default ou instalador contém identidade/topologia específica de máquina"
+else
+  pass "20c default e instalador não contêm identidade/topologia específica de máquina"
+fi
+
+if grep -qF 'config/skill-gardener.json' "$FRAMEWORK_DIR/install.sh" 2>/dev/null \
+   && grep -qF '$HOME/.canuto/config' "$FRAMEWORK_DIR/install.sh" 2>/dev/null; then
+  pass "20d instalador materializa a config efetiva fora do repositório"
+else
+  fail "20d instalador não mantém a config efetiva em ~/.canuto/config"
+fi
+
+if [ -s "$FRAMEWORK_DIR/docs/SKILL-GARDENER-CONFIG.md" ]; then
+  pass "20e política de configuração local está documentada"
+else
+  fail "20e docs/SKILL-GARDENER-CONFIG.md ausente"
+fi
+
+echo ""
+# ═══════════════════════════════════════════════════════════════════════════
+# TEST 21: Consentimento explícito para commit (ADR-0016)
+# ═══════════════════════════════════════════════════════════════════════════
+echo "── Test 21: Consentimento explícito para commit ──"
+
+CONSENT_ROOT=$(mktemp -d)
+CONSENT_HOME="$CONSENT_ROOT/home"
+mkdir -p "$CONSENT_HOME"
+
+make_contract_consumer() {
+  local repo="$1"
+  mkdir -p "$repo"
+  git -C "$repo" init -q
+  git -C "$repo" config user.name "Canuto Consent Test"
+  git -C "$repo" config user.email "consent@example.invalid"
+  printf '# Consumer Claude\n' > "$repo/CLAUDE.md"
+  printf '# Consumer Agents\n' > "$repo/AGENTS.md"
+  git -C "$repo" add CLAUDE.md AGENTS.md
+  git -C "$repo" commit -q -m "test: initial consumer"
+}
+
+NO_COMMIT_REPO="$CONSENT_ROOT/no-commit"
+make_contract_consumer "$NO_COMMIT_REPO"
+NO_COMMIT_BEFORE=$(git -C "$NO_COMMIT_REPO" rev-parse HEAD)
+if (cd "$NO_COMMIT_REPO" && HOME="$CONSENT_HOME" CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" \
+    /bin/bash "$FRAMEWORK_DIR/install.sh" --contract-only --yes </dev/null >/dev/null 2>&1); then
+  NO_COMMIT_AFTER=$(git -C "$NO_COMMIT_REPO" rev-parse HEAD)
+  if [ "$NO_COMMIT_AFTER" = "$NO_COMMIT_BEFORE" ] \
+     && git -C "$NO_COMMIT_REPO" diff --cached --quiet \
+     && [ -n "$(git -C "$NO_COMMIT_REPO" status --porcelain)" ]; then
+    pass "21a --yes aplica o contrato sem stage nem commit"
+  else
+    fail "21a --yes alterou HEAD/index ou não deixou diff inspecionável"
+  fi
+else
+  fail "21a contract-only sem --commit falhou"
+fi
+
+COMMIT_REPO="$CONSENT_ROOT/explicit-commit"
+make_contract_consumer "$COMMIT_REPO"
+COMMIT_COUNT_BEFORE=$(git -C "$COMMIT_REPO" rev-list --count HEAD)
+if (cd "$COMMIT_REPO" && HOME="$CONSENT_HOME" CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" \
+    /bin/bash "$FRAMEWORK_DIR/install.sh" --contract-only --yes --commit </dev/null >/dev/null 2>&1); then
+  COMMIT_COUNT_AFTER=$(git -C "$COMMIT_REPO" rev-list --count HEAD)
+  COMMIT_PATHS=$(git -C "$COMMIT_REPO" diff-tree --no-commit-id --name-only -r HEAD | LC_ALL=C sort | tr '\n' ' ')
+  if [ "$COMMIT_COUNT_AFTER" -eq $((COMMIT_COUNT_BEFORE + 1)) ] \
+     && [ -z "$(git -C "$COMMIT_REPO" status --porcelain)" ] \
+     && [ "$COMMIT_PATHS" = ".agents/CONTRACT-RECEIPT.json .agents/OPERATING-CONTRACT.md AGENTS.md CLAUDE.md " ]; then
+    pass "21b --commit cria um commit limitado aos paths declarados"
+  else
+    fail "21b commit explícito não convergiu ou incluiu paths indevidos: $COMMIT_PATHS"
+  fi
+else
+  fail "21b contract-only com --commit falhou"
+fi
+
+PRESERVE_REPO="$CONSENT_ROOT/preserve-user-index"
+mkdir -p "$PRESERVE_REPO"
+git -C "$PRESERVE_REPO" init -q
+git -C "$PRESERVE_REPO" config user.name "Canuto Consent Test"
+git -C "$PRESERVE_REPO" config user.email "consent@example.invalid"
+printf 'framework-initial\n' > "$PRESERVE_REPO/framework.txt"
+printf 'user-initial\n' > "$PRESERVE_REPO/user.txt"
+git -C "$PRESERVE_REPO" add framework.txt user.txt
+git -C "$PRESERVE_REPO" commit -q -m "test: initial paths"
+printf 'framework-change\n' > "$PRESERVE_REPO/framework.txt"
+printf 'user-change\n' > "$PRESERVE_REPO/user.txt"
+git -C "$PRESERVE_REPO" add user.txt
+if (
+  cd "$PRESERVE_REPO"
+  export CANUTO_INSTALL_LIBRARY_ONLY=1 HOME="$CONSENT_HOME"
+  source "$FRAMEWORK_DIR/install.sh"
+  GIT_AVAILABLE=true
+  COMMIT_CHANGES=true
+  HELPER_RC=0
+  commit_declared_paths "test: framework-only commit" framework.txt || HELPER_RC=$?
+  rm -rf "$TMP_DIR"
+  exit "$HELPER_RC"
+); then
+  PRESERVE_COMMIT_PATHS=$(git -C "$PRESERVE_REPO" diff-tree --no-commit-id --name-only -r HEAD | LC_ALL=C sort | tr '\n' ' ')
+  PRESERVE_STAGED_PATHS=$(git -C "$PRESERVE_REPO" diff --cached --name-only | LC_ALL=C sort | tr '\n' ' ')
+  if [ "$PRESERVE_COMMIT_PATHS" = "framework.txt " ] \
+     && [ "$PRESERVE_STAGED_PATHS" = "user.txt " ]; then
+    pass "21c commit --only preserva staging não relacionado"
+  else
+    fail "21c commit absorveu ou removeu staging do usuário: commit=$PRESERVE_COMMIT_PATHS staged=$PRESERVE_STAGED_PATHS"
+  fi
+else
+  fail "21c helper de commit por paths falhou"
+fi
+
+if ! grep -Eq 'confirm_yes[[:space:]]+"Commit|read[^\n]*Commit' "$FRAMEWORK_DIR/install.sh" \
+   && [ "$(grep -c 'commit_declared_paths ' "$FRAMEWORK_DIR/install.sh")" -ge 5 ]; then
+  pass "21d nenhum fluxo mantém prompt de commit implícito"
+else
+  fail "21d prompt de commit implícito ou fluxo fora do helper ainda existe"
+fi
+
+PARSER_DIR="$CONSENT_ROOT/parser"
+mkdir -p "$PARSER_DIR"
+if (cd "$PARSER_DIR" && /bin/bash "$FRAMEWORK_DIR/install.sh" --help >/dev/null 2>&1) \
+   && [ -z "$(find "$PARSER_DIR" -mindepth 1 -print -quit)" ]; then
+  pass "21e --help sai 0 sem mutar o diretório"
+else
+  fail "21e --help falhou ou criou artefatos"
+fi
+
+if (cd "$PARSER_DIR" && HOME="$CONSENT_HOME" CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" \
+    /bin/bash "$FRAMEWORK_DIR/install.sh" --dry-run --yes >/dev/null 2>&1) \
+   && [ -z "$(find "$PARSER_DIR" -mindepth 1 -print -quit)" ]; then
+  pass "21f --dry-run resolve o modo sem mutação"
+else
+  fail "21f --dry-run falhou ou criou artefatos"
+fi
+
+for PARSER_CASE in unknown missing-skill missing-api conflicting-mode conflicting-commit commit-readonly dryrun-commit positional; do
+  PARSER_RC=0
+  case "$PARSER_CASE" in
+    unknown) PARSER_ARGS=(--definitely-unknown) ;;
+    missing-skill) PARSER_ARGS=(--skill) ;;
+    missing-api) PARSER_ARGS=(--api-key) ;;
+    conflicting-mode) PARSER_ARGS=(--update --check) ;;
+    conflicting-commit) PARSER_ARGS=(--commit --no-commit) ;;
+    commit-readonly) PARSER_ARGS=(--check --commit) ;;
+    dryrun-commit) PARSER_ARGS=(--dry-run --commit) ;;
+    positional) PARSER_ARGS=(unexpected-positional) ;;
+  esac
+  (cd "$PARSER_DIR" && /bin/bash "$FRAMEWORK_DIR/install.sh" "${PARSER_ARGS[@]}" >/dev/null 2>&1) || PARSER_RC=$?
+  if [ "$PARSER_RC" -eq 64 ] && [ -z "$(find "$PARSER_DIR" -mindepth 1 -print -quit)" ]; then
+    pass "21g parser rejeita $PARSER_CASE antes de mutar"
+  else
+    fail "21g parser $PARSER_CASE retornou $PARSER_RC ou criou artefatos"
+  fi
+done
+
+UPDATE_SOURCE="$CONSENT_ROOT/update-source"
+UPDATE_TMP="$CONSENT_ROOT/update-tmp"
+mkdir -p "$UPDATE_SOURCE/.agents" "$UPDATE_TMP"
+printf '9.9.9\n' > "$UPDATE_SOURCE/.agents/VERSION"
+cat > "$UPDATE_SOURCE/install.sh" <<'STUBEOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > .captured-installer-args
+mkdir -p .agents
+printf '9.9.9\n' > .agents/VERSION
+STUBEOF
+chmod +x "$UPDATE_SOURCE/install.sh"
+
+make_update_consumer() {
+  local repo="$1"
+  mkdir -p "$repo/.agents"
+  git -C "$repo" init -q
+  git -C "$repo" config user.name "Canuto Update Test"
+  git -C "$repo" config user.email "update@example.invalid"
+  printf '1.0.0\n' > "$repo/.agents/VERSION"
+  git -C "$repo" add .agents/VERSION
+  git -C "$repo" commit -q -m "test: old framework"
+}
+
+UPDATE_DEFAULT_REPO="$CONSENT_ROOT/update-default"
+make_update_consumer "$UPDATE_DEFAULT_REPO"
+if CANUTO_SOURCE_DIR="$UPDATE_SOURCE" CANUTO_VAULT_DIR="$CONSENT_ROOT/empty-vault" TMPDIR="$UPDATE_TMP" \
+   /bin/bash "$FRAMEWORK_DIR/.agents/tools/canuto-update-all.sh" "$UPDATE_DEFAULT_REPO" >/dev/null 2>&1 \
+   && ! grep -qx -- '--commit' "$UPDATE_DEFAULT_REPO/.captured-installer-args"; then
+  pass "21h update-all não encaminha --commit por padrão"
+else
+  fail "21h update-all encaminhou commit implícito ou falhou"
+fi
+
+UPDATE_COMMIT_REPO="$CONSENT_ROOT/update-commit"
+make_update_consumer "$UPDATE_COMMIT_REPO"
+if CANUTO_SOURCE_DIR="$UPDATE_SOURCE" CANUTO_VAULT_DIR="$CONSENT_ROOT/empty-vault" TMPDIR="$UPDATE_TMP" \
+   /bin/bash "$FRAMEWORK_DIR/.agents/tools/canuto-update-all.sh" --commit "$UPDATE_COMMIT_REPO" >/dev/null 2>&1 \
+   && grep -qx -- '--commit' "$UPDATE_COMMIT_REPO/.captured-installer-args"; then
+  pass "21i update-all encaminha --commit somente quando explícito"
+else
+  fail "21i update-all não respeitou autorização explícita"
+fi
+
+rm -rf "$CONSENT_ROOT"
+echo ""
+# ═══════════════════════════════════════════════════════════════════════════
+# TEST 22: Stable/edge, pinning e source receipts (ADR-0017)
+# ═══════════════════════════════════════════════════════════════════════════
+echo "── Test 22: Stable/edge e source receipts ──"
+
+SOURCE_ROOT=$(mktemp -d)
+SOURCE_HOME="$SOURCE_ROOT/home"
+SOURCE_EMPTY="$SOURCE_ROOT/empty"
+mkdir -p "$SOURCE_HOME" "$SOURCE_EMPTY"
+
+assert_dry_source() {
+  local expected_kind="$1" expected_ref="$2"
+  shift 2
+  local output rc=0
+  output=$(cd "$SOURCE_EMPTY" && HOME="$SOURCE_HOME" /bin/bash "$FRAMEWORK_DIR/install.sh" --dry-run "$@" 2>&1) || rc=$?
+  if [ "$rc" -eq 0 ] \
+    && grep -q "^source_kind=$expected_kind$" <<< "$output" \
+    && grep -q "^source_ref=$expected_ref$" <<< "$output" \
+    && [ -z "$(find "$SOURCE_EMPTY" -mindepth 1 -print -quit)" ]; then
+    pass "22a source $expected_kind resolve para $expected_ref sem mutação"
+  else
+    fail "22a source $expected_kind não resolveu para $expected_ref (rc=$rc): $output"
+  fi
+}
+
+assert_dry_source stable stable --update
+assert_dry_source edge main --update --channel edge
+assert_dry_source version releases/1.8.0 --update --version 1.8.0
+assert_dry_source ref 0123456789abcdef0123456789abcdef01234567 --update --ref 0123456789abcdef0123456789abcdef01234567
+ROLLBACK_OUT=$(cd "$SOURCE_EMPTY" && HOME="$SOURCE_HOME" /bin/bash "$FRAMEWORK_DIR/install.sh" --dry-run --rollback 1.7.0 2>&1 || true)
+if grep -q '^mode=update$' <<< "$ROLLBACK_OUT" \
+   && grep -q '^source_ref=releases/1.7.0$' <<< "$ROLLBACK_OUT" \
+   && grep -q '^rollback=true$' <<< "$ROLLBACK_OUT"; then
+  pass "22b rollback resolve release fixado e modo update"
+else
+  fail "22b rollback não resolveu release/mode: $ROLLBACK_OUT"
+fi
+
+for SOURCE_CASE in bad-channel bad-version bad-ref selector-conflict custom-conflict; do
+  SOURCE_RC=0
+  case "$SOURCE_CASE" in
+    bad-channel) SOURCE_ARGS=(--dry-run --update --channel beta); SOURCE_ENV=() ;;
+    bad-version) SOURCE_ARGS=(--dry-run --update --version latest); SOURCE_ENV=() ;;
+    bad-ref) SOURCE_ARGS=(--dry-run --update --ref ../main); SOURCE_ENV=() ;;
+    selector-conflict) SOURCE_ARGS=(--dry-run --update --channel edge --version 1.8.0); SOURCE_ENV=() ;;
+    custom-conflict) SOURCE_ARGS=(--dry-run --update --channel edge); SOURCE_ENV=(CANUTO_REPO_URL=https://example.invalid/canuto) ;;
+  esac
+  (cd "$SOURCE_EMPTY" && env HOME="$SOURCE_HOME" "${SOURCE_ENV[@]}" /bin/bash "$FRAMEWORK_DIR/install.sh" "${SOURCE_ARGS[@]}" >/dev/null 2>&1) || SOURCE_RC=$?
+  if [ "$SOURCE_RC" -eq 64 ] && [ -z "$(find "$SOURCE_EMPTY" -mindepth 1 -print -quit)" ]; then
+    pass "22c parser rejeita $SOURCE_CASE antes de mutar"
+  else
+    fail "22c parser $SOURCE_CASE retornou $SOURCE_RC ou criou artefatos"
+  fi
+done
+
+RECEIPT_REPO="$SOURCE_ROOT/receipt"
+mkdir -p "$RECEIPT_REPO/.agents"
+printf '1.8.0\n' > "$RECEIPT_REPO/.agents/VERSION"
+printf 'alpha\n' > "$RECEIPT_REPO/a.txt"
+printf 'beta\n' > "$RECEIPT_REPO/b.txt"
+if (
+  cd "$RECEIPT_REPO"
+  export HOME="$SOURCE_HOME" CANUTO_INSTALL_LIBRARY_ONLY=1
+  source "$FRAMEWORK_DIR/install.sh"
+  FRAMEWORK_FILES=(a.txt b.txt)
+  SOURCE_KIND=edge; SOURCE_REF=main; SOURCE_CHANNEL=edge; SOURCE_VERSION=""; SOURCE_TRANSPORT=local
+  write_source_receipt .agents/SOURCE-RECEIPT.json framework update "${FRAMEWORK_FILES[@]}"
+  FIRST_HASH=$(sha256_file .agents/SOURCE-RECEIPT.json)
+  write_source_receipt .agents/SOURCE-RECEIPT.json framework update "${FRAMEWORK_FILES[@]}"
+  SECOND_HASH=$(sha256_file .agents/SOURCE-RECEIPT.json)
+  [ "$FIRST_HASH" = "$SECOND_HASH" ]
+  rm -rf "$TMP_DIR"
+); then
+  if python3 - "$RECEIPT_REPO/.agents/SOURCE-RECEIPT.json" <<'PYEOF'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as fh:
+    r = json.load(fh)
+assert r["schemaVersion"] == 1
+assert r["scope"] == "framework"
+assert r["sourceKind"] == "edge"
+assert r["sourceRef"] == "main"
+assert r["frameworkVersion"] == "1.8.0"
+assert r["fileCount"] == 2
+assert len(r["manifestSha256"]) == 64
+PYEOF
+  then
+    pass "22d source receipt é atômico, determinístico e estruturalmente válido"
+  else
+    fail "22d source receipt JSON inválido"
+  fi
+else
+  fail "22d source receipt não foi idempotente"
+fi
+
+UPDATE_SOURCE="$SOURCE_ROOT/update-source"
+UPDATE_TMP="$SOURCE_ROOT/update-tmp"
+mkdir -p "$UPDATE_SOURCE/.agents" "$UPDATE_TMP"
+printf '9.9.9\n' > "$UPDATE_SOURCE/.agents/VERSION"
+cat > "$UPDATE_SOURCE/install.sh" <<'STUBEOF'
+#!/usr/bin/env bash
+# SOURCE-RECEIPT.json support marker
+if [ "${1:-}" = "--check" ]; then
+  [ -f .source-check-ok ] && exit 0
+  exit 1
+fi
+printf '%s|%s|%s|%s|%s|%s\n' "${CANUTO_SOURCE_KIND:-}" "${CANUTO_SOURCE_REF:-}" "${CANUTO_SOURCE_CHANNEL:-}" "${CANUTO_SOURCE_VERSION:-}" "${CANUTO_SOURCE_TRANSPORT:-}" "${CANUTO_ROLLBACK_REQUESTED:-}" > .captured-source
+mkdir -p .agents
+printf '9.9.9\n' > .agents/VERSION
+python3 - <<'PYEOF'
+import json, os
+with open('.agents/SOURCE-RECEIPT.json', 'w', encoding='utf-8') as fh:
+    json.dump({'schemaVersion': 1, 'scope': 'framework', 'sourceRef': os.environ.get('CANUTO_SOURCE_REF', '')}, fh)
+    fh.write('\n')
+PYEOF
+STUBEOF
+chmod +x "$UPDATE_SOURCE/install.sh"
+
+make_source_consumer() {
+  local repo="$1" version="$2" receipt_ref_value="$3"
+  mkdir -p "$repo/.agents"
+  git -C "$repo" init -q
+  git -C "$repo" config user.name "Canuto Source Test"
+  git -C "$repo" config user.email "source@example.invalid"
+  printf '%s\n' "$version" > "$repo/.agents/VERSION"
+  if [ -n "$receipt_ref_value" ]; then
+    printf '{"schemaVersion":1,"scope":"framework","sourceRef":"%s"}\n' "$receipt_ref_value" > "$repo/.agents/SOURCE-RECEIPT.json"
+  fi
+  git -C "$repo" add .agents
+  git -C "$repo" commit -q -m "test: source consumer"
+}
+
+EDGE_REPO="$SOURCE_ROOT/edge-consumer"
+make_source_consumer "$EDGE_REPO" 9.9.9 stable
+if CANUTO_SOURCE_DIR="$UPDATE_SOURCE" CANUTO_VAULT_DIR="$SOURCE_ROOT/empty-vault" TMPDIR="$UPDATE_TMP" \
+   /bin/bash "$FRAMEWORK_DIR/.agents/tools/canuto-update-all.sh" --channel edge "$EDGE_REPO" >/dev/null 2>&1 \
+   && [ "$(cat "$EDGE_REPO/.captured-source")" = "edge|main|edge||local|false" ]; then
+  pass "22e update-all troca source mesmo com VERSION igual"
+else
+  fail "22e update-all não propagou edge/main ou pulou por VERSION igual"
+fi
+
+SAME_REF_DRIFT_REPO="$SOURCE_ROOT/same-ref-drift"
+make_source_consumer "$SAME_REF_DRIFT_REPO" 9.9.9 main
+if CANUTO_SOURCE_DIR="$UPDATE_SOURCE" CANUTO_VAULT_DIR="$SOURCE_ROOT/empty-vault" TMPDIR="$UPDATE_TMP" \
+   /bin/bash "$FRAMEWORK_DIR/.agents/tools/canuto-update-all.sh" --channel edge "$SAME_REF_DRIFT_REPO" >/dev/null 2>&1 \
+   && [ -f "$SAME_REF_DRIFT_REPO/.captured-source" ]; then
+  pass "22f update-all atualiza quando VERSION/ref coincidem mas conteúdo não é provado"
+else
+  fail "22f update-all declarou OK sem prova completa de conteúdo"
+fi
+
+SAME_REF_OK_REPO="$SOURCE_ROOT/same-ref-ok"
+make_source_consumer "$SAME_REF_OK_REPO" 9.9.9 main
+touch "$SAME_REF_OK_REPO/.source-check-ok"
+git -C "$SAME_REF_OK_REPO" add .source-check-ok
+git -C "$SAME_REF_OK_REPO" commit -q -m "test: full source check is green"
+SOURCE_OK_RC=0
+SOURCE_OK_OUTPUT=$(CANUTO_SOURCE_DIR="$UPDATE_SOURCE" CANUTO_VAULT_DIR="$SOURCE_ROOT/empty-vault" TMPDIR="$UPDATE_TMP" \
+   /bin/bash "$FRAMEWORK_DIR/.agents/tools/canuto-update-all.sh" --channel edge "$SAME_REF_OK_REPO" 2>&1) || SOURCE_OK_RC=$?
+if [ "$SOURCE_OK_RC" -eq 0 ] && [ ! -e "$SAME_REF_OK_REPO/.captured-source" ]; then
+  pass "22g update-all pula somente após check completo verde"
+else
+  fail "22g update-all ignorou check verde ou executou update desnecessário (rc=$SOURCE_OK_RC): $SOURCE_OK_OUTPUT"
+fi
+
+ROLLBACK_REPO="$SOURCE_ROOT/rollback-consumer"
+make_source_consumer "$ROLLBACK_REPO" 1.0.0 main
+if CANUTO_SOURCE_DIR="$UPDATE_SOURCE" CANUTO_VAULT_DIR="$SOURCE_ROOT/empty-vault" TMPDIR="$UPDATE_TMP" \
+   /bin/bash "$FRAMEWORK_DIR/.agents/tools/canuto-update-all.sh" --rollback 1.7.0 "$ROLLBACK_REPO" >/dev/null 2>&1 \
+   && [ "$(cat "$ROLLBACK_REPO/.captured-source")" = "version|releases/1.7.0||1.7.0|local|true" ]; then
+  pass "22h update-all propaga rollback fixado"
+else
+  fail "22h update-all não propagou rollback fixado"
+fi
+
+BOOTSTRAP_SOURCE="$SOURCE_ROOT/bootstrap-source"
+BOOTSTRAP_WORK="$SOURCE_ROOT/bootstrap-work"
+BOOTSTRAP_CAPTURE="$SOURCE_ROOT/bootstrap-capture"
+mkdir -p "$BOOTSTRAP_SOURCE/releases/1.7.0" "$BOOTSTRAP_WORK"
+cat > "$BOOTSTRAP_SOURCE/releases/1.7.0/install.sh" <<'BOOTEOF'
+#!/usr/bin/env bash
+printf '%s|%s|%s|%s|%s|%s\n' "${CANUTO_SOURCE_KIND:-}" "${CANUTO_SOURCE_REF:-}" "${CANUTO_SOURCE_CHANNEL:-}" "${CANUTO_SOURCE_VERSION:-}" "${CANUTO_SOURCE_TRANSPORT:-}" "${CANUTO_ROLLBACK_REQUESTED:-}" > "$CANUTO_BOOTSTRAP_CAPTURE"
+BOOTEOF
+chmod +x "$BOOTSTRAP_SOURCE/releases/1.7.0/install.sh"
+if (cd "$BOOTSTRAP_WORK" \
+    && HOME="$SOURCE_HOME" \
+       CANUTO_REPO_BASE="file://$BOOTSTRAP_SOURCE" \
+       CANUTO_BOOTSTRAP_CAPTURE="$BOOTSTRAP_CAPTURE" \
+       /bin/bash "$FRAMEWORK_DIR/install.sh" --rollback 1.7.0 --yes </dev/null >/dev/null 2>&1) \
+   && [ "$(cat "$BOOTSTRAP_CAPTURE" 2>/dev/null)" = "version|releases/1.7.0||1.7.0|remote-url|true" ]; then
+  pass "22i bootstrap preserva rollback, ref fixado e transporte no instalador filho"
+else
+  fail "22i bootstrap perdeu rollback/ref/transporte: $(cat "$BOOTSTRAP_CAPTURE" 2>/dev/null || echo ausente)"
+fi
+
+rm -rf "$SOURCE_ROOT"
 echo ""
 # ═══════════════════════════════════════════════════════════════════════════
 # SUMMARY

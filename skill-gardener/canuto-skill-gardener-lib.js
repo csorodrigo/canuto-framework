@@ -2221,7 +2221,13 @@ function getRuntimeOptions(options = {}) {
       storedKey = readFileBounded(hmacKeyPath, 4096).toString('utf8').trim();
     } catch (error) {
       if (error?.code === 'ENOENT') keyFileMissing = true;
-      else throw new Error('hmac-key-read-failed');
+      else if (error?.code === 'file-mutated') {
+        try {
+          storedKey = readFileBounded(hmacKeyPath, 4096).toString('utf8').trim();
+        } catch {
+          throw new Error('hmac-key-read-failed');
+        }
+      } else throw new Error('hmac-key-read-failed');
     }
     if (!keyFileMissing) {
       if (!HMAC_KEY_RE.test(storedKey)) throw new Error('invalid-hmac-key');
