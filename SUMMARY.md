@@ -1,75 +1,55 @@
-# Canuto Framework v1.6 Summary
+# Canuto Framework v1.8 Summary
 
-Canuto is a personal multi-agent framework for AI-assisted software work. It gives a project a stable `.agents/` structure with personas, skills, local memory, and a `CLAUDE.md` operating contract so every session starts with context and ends with reusable learning.
+Canuto is a multi-agent operating framework for AI-assisted software work. It
+shares one operational contract across Claude and Codex, preserves project WIP,
+uses an Obsidian-native two-tier memory, and records lifecycle evidence in an
+append-only event log.
 
-## What This Release Adds
+## Runtime flow
 
-This release keeps the v1.6 Obsidian-native runtime and adds a sharper learning-loop layer:
-
-- Project diagnosis before risky work.
-- Rework detection before repeating failed approaches.
-- Session-end learning for summaries, pending tasks, decisions, metrics, and candidate instincts.
-- Pending triage so backlog memory stays usable.
-- Safe Obsidian/Canuto vault write-back preview before any external memory write.
-- Optional domain QA skills for dashboards, scrapers, routing, spreadsheets, and frontend visual checks.
-
-## Default Flow
-
-1. Maestro reads project setup, memory, and context.
-2. Maestro detects project style: `Canuto`, `foreign-schema`, or `new`.
-3. Architect turns the goal into a plan.
-4. Coder implements the change.
-5. Tester validates behavior and edge cases.
-6. Debugger investigates failures when tests or checks fail.
-7. Reviewer checks quality, risk, tests, and PR description.
-8. Maestro closes the session with learning and memory updates.
-
-## Passive Skills
-
-Passive skills are called by the framework lifecycle or by evidence in the current session. They are not background daemons and they are not silent.
-
-| Skill | Trigger |
-|------|---------|
-| `canuto-project-doctor` | Session start when setup, memory, or context looks suspicious. |
-| `canuto-rework-detector` | Retry loops, repeated review fixes, repeated test failures, stale context, dirty-state, or repeated pending tasks. |
-| `canuto-session-end-learning` | End of session before final handoff. |
-| `canuto-pending-triage` | Duplicated, vague, stale, or oversized pending backlog. |
-| `obsidian-writeback-queue` | Proposed write-back to Obsidian or the Canuto vault. |
-
-## Active Skills
-
-Active skills are selected by domain, installed on demand, or requested directly by the user.
-
-| Skill | Best For |
-|------|----------|
-| `dashboard-regression-guard` | BI, admin, analytics, and reporting dashboards. |
-| `scraper-resilience` | Scrapers, collectors, parsers, and fragile data extraction. |
-| `route-optimizer-qa` | Routing, geocoding, logistics, and delivery sequencing. |
-| `spreadsheet-delivery-check` | XLSX, CSV, exports, and spreadsheet deliverables. |
-| `frontend-visual-qa` | Web apps, landing pages, interactive UIs, and games. |
-
-## Memory Policy
-
-Canonical project memory lives in the Obsidian-native Canuto vault:
-
-- `projects/{project-slug}/sessions/`: session summaries and outcomes.
-- `projects/{project-slug}/pending/`: actionable unfinished tasks.
-- `projects/{project-slug}/decisions/`: decisions future sessions must respect.
-- `projects/{project-slug}/metrics/`: session quality and rework metrics.
-- `projects/{project-slug}/instincts/`: reusable lessons promoted by the learning loop.
-
-`obsidian-writeback-queue` previews the target, action, summary, and risk before non-standard writes or external write-back operations.
-
-## Rollout Rule
-
-After this branch is merged into GitHub `main`, update projects with:
-
-```bash
-bash install.sh --update
+```text
+Maestro → Architect → Coder → Reviewer
+                  ↘ /test or /fix when deeper validation is needed
 ```
 
-For projects without a local installer copy, run:
+The active personas are Maestro, Architect, Coder, Reviewer, Contextualizer, and
+Investigator. Tester and Debugger remain archived; their workflows are covered
+by explicit test/fix paths rather than always-loaded personas.
+
+## v1.8 operational guarantees
+
+- Distributed defaults contain no machine-specific projects, users, hosts, or
+  workspace paths. Effective Skill Gardener configuration belongs only to the
+  local machine and valid local bytes are preserved.
+- `--yes` confirms operational prompts but never authorizes staging or commit.
+  Only `--commit` can create a framework commit, and it uses declared paths
+  without absorbing unrelated staging.
+- `stable` is the default distribution channel; `main` is explicit edge.
+  Version, release-ref, exact-SHA pinning, and rollback are supported.
+- Install/update publish deterministic source receipts. The multi-project updater
+  verifies complete content before reporting a consumer as current.
+- The final release gate runs on Ubuntu and macOS with `/bin/bash`, plus two
+  distinct consumer fixtures including a path with spaces and different rendered
+  `CODEX.md` outputs.
+
+## Memory and evidence
+
+- Hypothesis tier: sessions, metrics, pending tasks, and low-confidence instinct
+  candidates may be written mechanically.
+- Curated tier: decisions and promoted instincts require explicit human approval.
+- `events/log.jsonl` is the session-event source of truth; notes and dashboards
+  are projections.
+- Code, test, commit, push, PR, merge, deploy, and runtime health remain separate
+  states with separate receipts.
+
+## Release usage
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/csorodrigo/canuto-framework/main/install.sh | bash -s -- --update
+bash install.sh --update                    # stable
+bash install.sh --update --channel edge     # main
+bash install.sh --update --version 1.8.0    # pinned release
+bash install.sh --update --ref <commit-sha> # exact pin
+bash install.sh --rollback <version>        # rollback
 ```
+
+Promotion and rollback policy: [`docs/RELEASE-PROMOTION.md`](docs/RELEASE-PROMOTION.md).

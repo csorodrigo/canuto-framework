@@ -222,6 +222,10 @@ build_refresh_args() {
   local skip_next=0
   local arg=""
   REFRESH_ARGS=()
+
+  # Bash 3.2 + `set -u` treats expansion of a declared-but-empty array as an
+  # unbound variable. Guard the expansion explicitly; this path is exercised
+  # when the installer is invoked without arguments by repair-dispatch tests.
   if [ "${#ORIGINAL_ARGS[@]}" -gt 0 ]; then
     for arg in "${ORIGINAL_ARGS[@]}"; do
       if [ "$skip_next" -eq 1 ]; then
@@ -234,10 +238,21 @@ build_refresh_args() {
       esac
     done
   fi
+
   if [ "$ROLLBACK_REQUESTED" = true ]; then
     local has_update=false
-    for arg in "${REFRESH_ARGS[@]}"; do [ "$arg" = "--update" ] && has_update=true; done
-    [ "$has_update" = true ] || REFRESH_ARGS=(--update "${REFRESH_ARGS[@]}")
+    if [ "${#REFRESH_ARGS[@]}" -gt 0 ]; then
+      for arg in "${REFRESH_ARGS[@]}"; do
+        [ "$arg" = "--update" ] && has_update=true
+      done
+    fi
+    if [ "$has_update" != true ]; then
+      if [ "${#REFRESH_ARGS[@]}" -gt 0 ]; then
+        REFRESH_ARGS=(--update "${REFRESH_ARGS[@]}")
+      else
+        REFRESH_ARGS=(--update)
+      fi
+    fi
   fi
 }
 
@@ -981,15 +996,27 @@ refresh_from_remote_installer_if_needed() {
   local remote_installer="$TMP_DIR/install.remote.sh"
   if download "install.sh" "$remote_installer"; then
     chmod +x "$remote_installer"
-    CANUTO_BOOTSTRAPPED=1 \
-      CANUTO_REPO_URL="$REPO_URL" \
-      CANUTO_SOURCE_KIND="$SOURCE_KIND" \
-      CANUTO_SOURCE_REF="$SOURCE_REF" \
-      CANUTO_SOURCE_CHANNEL="$SOURCE_CHANNEL" \
-      CANUTO_SOURCE_VERSION="$SOURCE_VERSION" \
-      CANUTO_SOURCE_TRANSPORT="$SOURCE_TRANSPORT" \
-      CANUTO_ROLLBACK_REQUESTED="$ROLLBACK_REQUESTED" \
-      bash "$remote_installer" "${REFRESH_ARGS[@]}"
+    if [ "${#REFRESH_ARGS[@]}" -gt 0 ]; then
+      CANUTO_BOOTSTRAPPED=1 \
+        CANUTO_REPO_URL="$REPO_URL" \
+        CANUTO_SOURCE_KIND="$SOURCE_KIND" \
+        CANUTO_SOURCE_REF="$SOURCE_REF" \
+        CANUTO_SOURCE_CHANNEL="$SOURCE_CHANNEL" \
+        CANUTO_SOURCE_VERSION="$SOURCE_VERSION" \
+        CANUTO_SOURCE_TRANSPORT="$SOURCE_TRANSPORT" \
+        CANUTO_ROLLBACK_REQUESTED="$ROLLBACK_REQUESTED" \
+        bash "$remote_installer" "${REFRESH_ARGS[@]}"
+    else
+      CANUTO_BOOTSTRAPPED=1 \
+        CANUTO_REPO_URL="$REPO_URL" \
+        CANUTO_SOURCE_KIND="$SOURCE_KIND" \
+        CANUTO_SOURCE_REF="$SOURCE_REF" \
+        CANUTO_SOURCE_CHANNEL="$SOURCE_CHANNEL" \
+        CANUTO_SOURCE_VERSION="$SOURCE_VERSION" \
+        CANUTO_SOURCE_TRANSPORT="$SOURCE_TRANSPORT" \
+        CANUTO_ROLLBACK_REQUESTED="$ROLLBACK_REQUESTED" \
+        bash "$remote_installer"
+    fi
     exit $?
   fi
 
@@ -1205,6 +1232,8 @@ FRAMEWORK_FILES=(
   ".agents/tools/brief-compose.sh"
   ".agents/tools/memory-usage.sh"
   ".agents/tools/delegation-ledger.sh"
+  "distribution/release.json"
+  "docs/RELEASE-PROMOTION.md"
 )
 
 INSTALL_ONLY_FILES=(
