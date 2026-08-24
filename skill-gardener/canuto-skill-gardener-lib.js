@@ -2167,6 +2167,19 @@ function collectSources(config, options = {}) {
   return sources;
 }
 
+function readHmacKeyFile(hmacKeyPath) {
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return readFileBounded(hmacKeyPath, 4096).toString('utf8').trim();
+    } catch (error) {
+      lastError = error;
+      if (error?.code !== 'file-mutated') throw error;
+    }
+  }
+  throw lastError;
+}
+
 function initializeHmacKey(hmacKeyPath) {
   ensureDir(path.dirname(hmacKeyPath));
   const generatedKey = crypto.randomBytes(32).toString('hex');
@@ -2180,14 +2193,18 @@ function initializeHmacKey(hmacKeyPath) {
       if (error?.code !== 'EEXIST') throw error;
       let winner;
       try {
-        winner = readFileBounded(hmacKeyPath, 4096).toString('utf8').trim();
+        // The winning process unlinks its temporary hard-link after publishing
+        // the target. That link-count change can update ctime while a loser is
+        // performing the bounded identity check, so retry only that proven
+        // mutation signal before failing closed.
+        winner = readHmacKeyFile(hmacKeyPath);
       } catch {
         throw new Error('hmac-key-persistence-failed');
       }
       if (!HMAC_KEY_RE.test(winner)) throw new Error('invalid-hmac-key');
       return winner;
     }
-    const persistedKey = readFileBounded(hmacKeyPath, 4096).toString('utf8').trim();
+    const persistedKey = readHmacKeyFile(hmacKeyPath);
     if (!HMAC_KEY_RE.test(persistedKey) || persistedKey !== generatedKey) throw new Error('hmac-key-persistence-failed');
     return persistedKey;
   } finally {
@@ -2218,16 +2235,10 @@ function getRuntimeOptions(options = {}) {
     let keyFileMissing = false;
     let storedKey = '';
     try {
-      storedKey = readFileBounded(hmacKeyPath, 4096).toString('utf8').trim();
+      storedKey = readHmacKeyFile(hmacKeyPath);
     } catch (error) {
       if (error?.code === 'ENOENT') keyFileMissing = true;
-      else if (error?.code === 'file-mutated') {
-        try {
-          storedKey = readFileBounded(hmacKeyPath, 4096).toString('utf8').trim();
-        } catch {
-          throw new Error('hmac-key-read-failed');
-        }
-      } else throw new Error('hmac-key-read-failed');
+      else throw new Error('hmac-key-read-failed');
     }
     if (!keyFileMissing) {
       if (!HMAC_KEY_RE.test(storedKey)) throw new Error('invalid-hmac-key');
