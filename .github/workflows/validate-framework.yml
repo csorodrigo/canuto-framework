@@ -111,6 +111,9 @@ jobs:
       - name: Test vault integrator transport
         run: python3 .agents/tests/vault-integrator-transport-test.py
 
+      - name: Test vault integrator inbox boundary
+        run: python3 .agents/tests/vault-integrator-inbox-test.py
+
       - name: Smoke vault integrator installer
         run: /bin/bash .agents/tests/vault-integrator-setup-test.sh
 

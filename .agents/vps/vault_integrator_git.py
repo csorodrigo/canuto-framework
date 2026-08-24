@@ -7,6 +7,7 @@ import contextlib
 import os
 import re
 import shutil
+import stat
 import subprocess
 import time
 from pathlib import Path
@@ -124,11 +125,20 @@ def files_equal(left: Path, right: Path, chunk_size: int = 1024 * 1024) -> bool:
                 return True
 
 
+def _regular_non_symlink(path: Path) -> bool:
+    try:
+        return stat.S_ISREG(path.lstat().st_mode)
+    except OSError:
+        return False
+
+
 def archive_envelope(source: Path, destination_dir: Path, envelope_hash: str) -> Path:
     destination_dir.mkdir(parents=True, exist_ok=True)
     destination = destination_dir / f"{source.stem}-{envelope_hash[:12]}.json"
-    if destination.exists():
-        if files_equal(destination, source):
+    if destination.exists() or destination.is_symlink():
+        if _regular_non_symlink(destination) and _regular_non_symlink(source) and files_equal(
+            destination, source
+        ):
             source.unlink()
             return destination
         destination = destination_dir / f"{source.stem}-{envelope_hash[:12]}-{time.time_ns()}.json"
@@ -137,6 +147,8 @@ def archive_envelope(source: Path, destination_dir: Path, envelope_hash: str) ->
     except OSError as exc:
         if getattr(exc, "errno", None) != 18:  # EXDEV
             raise
+        if not _regular_non_symlink(source):
+            raise OSError("cannot archive a non-regular envelope across filesystems") from exc
         shutil.copy2(source, destination)
         source.unlink()
     return destination
