@@ -88,7 +88,8 @@ a situação encaixa. Estão aqui só para você saber que existem.
 
 `grilling` · `domain-modeling` · `codebase-design` · `tdd` · `co-review` ·
 `research` · `verification-gates` · `skill-check-protocol` · `continuous-learning` ·
-`security-practices` · `context-maintenance`
+`security-practices` · `context-maintenance` · `canuto-ptbr-editor` ·
+`canuto-orchestrate`
 
 Se uma delas **não** disparou quando deveria, isso é bug de `description` — leve
 para `/skill-creator`, não repita o pedido com outras palavras.

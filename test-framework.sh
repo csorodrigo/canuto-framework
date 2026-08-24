@@ -139,6 +139,77 @@ for skill in "${CORE_SKILLS[@]}"; do
 done
 echo ""
 
+echo "── Test 2b: Passive cross-runtime skills ──"
+
+PASSIVE_SKILLS=(canuto-ptbr-editor canuto-orchestrate)
+PASSIVE_FILES=(
+  "canuto-ptbr-editor/SKILL.md"
+  "canuto-ptbr-editor/references/review-checklist.md"
+  "canuto-ptbr-editor/evals/cases.yaml"
+  "canuto-ptbr-editor/agents/openai.yaml"
+  "canuto-orchestrate/SKILL.md"
+  "canuto-orchestrate/references/contracts.md"
+  "canuto-orchestrate/evals/cases.yaml"
+  "canuto-orchestrate/agents/openai.yaml"
+)
+
+for skill in "${PASSIVE_SKILLS[@]}"; do
+  PFILE="$FRAMEWORK_DIR/global-skills/$skill/SKILL.md"
+  OAI_FILE="$FRAMEWORK_DIR/global-skills/$skill/agents/openai.yaml"
+  if [ -s "$PFILE" ] && grep -q '^  canuto-invocation: "model"$' "$PFILE"; then
+    pass "$skill is a model-invoked global skill"
+  else
+    fail "$skill missing or not model-invoked"
+  fi
+  if grep -q '^  allow_implicit_invocation: true$' "$OAI_FILE" \
+    && ! grep -q '^disable-model-invocation:[[:space:]]*true$' "$PFILE"; then
+    pass "$skill is passive in Codex and Claude"
+  else
+    fail "$skill is not passively invocable in both runtimes"
+  fi
+  if grep -qE 'gpt-[0-9]|claude-(opus|sonnet|haiku)' "$PFILE"; then
+    fail "$skill pins a runtime model instead of using canonical routing"
+  else
+    pass "$skill does not pin a runtime model"
+  fi
+done
+
+PASSIVE_HOME="$(mktemp -d)"
+if (
+  cd "$FRAMEWORK_DIR"
+  export HOME="$PASSIVE_HOME" CANUTO_INSTALL_LIBRARY_ONLY=1 \
+    CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" CANUTO_SOURCE_TRANSPORT=local
+  source "$FRAMEWORK_DIR/install.sh"
+  setup_passive_skills >/dev/null
+  setup_passive_skills >/dev/null
+) 2>/dev/null; then
+  PASSIVE_INSTALL_OK=true
+  for relative in "${PASSIVE_FILES[@]}"; do
+    for root in "$PASSIVE_HOME/.agents/skills" "$PASSIVE_HOME/.claude/skills"; do
+      if ! cmp -s "$FRAMEWORK_DIR/global-skills/$relative" "$root/$relative"; then
+        PASSIVE_INSTALL_OK=false
+      fi
+    done
+  done
+  if [ "$PASSIVE_INSTALL_OK" = true ]; then
+    pass "passive skill bundles install idempotently for Codex and Claude"
+  else
+    fail "passive skill bundle contents diverge across runtime roots"
+  fi
+else
+  fail "setup_passive_skills failed in isolated HOME"
+fi
+rm -rf "$PASSIVE_HOME"
+
+if grep -q 'setup_passive_skills' "$FRAMEWORK_DIR/install.sh" \
+  && grep -q 'canuto-ptbr-editor' "$FRAMEWORK_DIR/.agents/personas/maestro.md" \
+  && grep -q 'canuto-orchestrate' "$FRAMEWORK_DIR/.agents/personas/maestro.md"; then
+  pass "installer and Maestro wire both passive skills"
+else
+  fail "passive skills are present but unreachable from the harness"
+fi
+echo ""
+
 # ═══════════════════════════════════════════════════════════════════════════
 # TEST 3: Hooks Syntax
 # ═══════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,12 @@
+version: 1
+skill: canuto-orchestrate
+
+positive:
+  - prompt: "Investigue logs e código como superfícies independentes antes de escolher a causa."
+  - prompt: "Faça uma revisão independente do risco de replay deste fluxo de pagamento."
+
+negative:
+  - prompt: "Corrija este typo."
+    reason: "Tarefa pequena; coordenação custa mais que o trabalho direto."
+  - prompt: "Crie dois agentes para editar os mesmos arquivos e escolha o melhor diff."
+    reason: "Escritores sobrepostos são proibidos."

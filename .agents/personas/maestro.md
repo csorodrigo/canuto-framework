@@ -118,8 +118,9 @@ See `skill-check-protocol` skill for the full protocol and red flags.
 > router está incompleto e deve ser atualizado (`/skill-creator`, Passo 8).
 >
 > As skills **model-invoked** (`grilling`, `domain-modeling`, `codebase-design`,
-> `tdd`, `co-review`, `research`, `verification-gates`, `context-maintenance`) o
-> agente alcança sozinho — não precisam de varredura. Se uma delas não disparou
+> `tdd`, `co-review`, `research`, `verification-gates`, `context-maintenance`,
+> `canuto-ptbr-editor`, `canuto-orchestrate`) o agente alcança sozinho — não
+> precisam de varredura. Se uma delas não disparou
 > quando devia, isso é bug de `description`, não motivo para reformular o pedido.
 
 **Common rationalizations to ignore:**

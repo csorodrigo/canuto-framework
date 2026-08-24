@@ -1,7 +1,0 @@
-interface:
-  display_name: "Native Orchestration (Quarantine)"
-  short_description: "Run at most two read-only Codex leaves under Canuto Maestro"
-  default_prompt: "Use $native-orchestration only for explicit, read-only evidence gathering or blind review."
-
-policy:
-  allow_implicit_invocation: false
