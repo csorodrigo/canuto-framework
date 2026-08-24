@@ -500,6 +500,35 @@ if CLAUDE_PROJECT_DIR="$FRAMEWORK_DIR" bash "$AGENTS_DIR/tools/vault-sync.sh" >/
 else
   fail "vault-sync.sh no-op path failed"
 fi
+
+echo "── Test 3d: Global skill bundle publisher ──"
+
+for publisher_file in skill-bundle-publisher.js import-matt-pocock-skills.js skill-bundle-publisher.test.js; do
+  if node --check "$AGENTS_DIR/tools/$publisher_file" >/dev/null 2>&1; then
+    pass "global skill publisher $publisher_file syntax valid"
+  else
+    fail "global skill publisher $publisher_file has syntax errors"
+  fi
+done
+
+if node --test "$AGENTS_DIR/tools/skill-bundle-publisher.test.js" >/tmp/canuto-skill-bundle-test.$$ 2>&1; then
+  pass "global skill publisher focused tests"
+else
+  fail "global skill publisher focused tests failed"
+fi
+rm -f /tmp/canuto-skill-bundle-test.$$
+
+MATT_PLAN_HOME="$(mktemp -d)"
+MATT_PLAN_TARGET="$MATT_PLAN_HOME/skills"
+if MATT_PLAN_JSON="$(node "$AGENTS_DIR/tools/skill-bundle-publisher.js" plan \
+    --manifest "$FRAMEWORK_DIR/distribution/matt-pocock-skills.json" \
+    --target "$MATT_PLAN_TARGET" 2>/dev/null)" \
+  && node -e 'const plan=JSON.parse(process.argv[1]); if(plan.conflicts!==0||plan.changes!==36||plan.items.length!==36)process.exit(1)' "$MATT_PLAN_JSON"; then
+  pass "Matt Pocock bundle manifest pins and validates 36 skills"
+else
+  fail "Matt Pocock bundle manifest or source fingerprints are invalid"
+fi
+rm -rf "$MATT_PLAN_HOME"
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════
