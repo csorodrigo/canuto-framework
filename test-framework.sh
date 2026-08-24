@@ -175,6 +175,9 @@ for skill in "${PASSIVE_SKILLS[@]}"; do
 done
 
 PASSIVE_HOME="$(mktemp -d)"
+mkdir -p "$PASSIVE_HOME/.codex" "$PASSIVE_HOME/.claude"
+printf '%s\n' '# Existing Codex instructions' > "$PASSIVE_HOME/.codex/AGENTS.md"
+printf '%s\n' '# Existing Claude instructions' > "$PASSIVE_HOME/.claude/CLAUDE.md"
 if (
   cd "$FRAMEWORK_DIR"
   export HOME="$PASSIVE_HOME" CANUTO_INSTALL_LIBRARY_ONLY=1 \
@@ -191,8 +194,24 @@ if (
       fi
     done
   done
+  if ! grep -q '^# Existing Codex instructions$' "$PASSIVE_HOME/.codex/AGENTS.md" \
+    || ! grep -q '^# Existing Claude instructions$' "$PASSIVE_HOME/.claude/CLAUDE.md"; then
+    PASSIVE_INSTALL_OK=false
+  fi
+  for routing_file in "$PASSIVE_HOME/.codex/AGENTS.md" "$PASSIVE_HOME/.claude/CLAUDE.md"; do
+    if [ "$(grep -Fxc '<!-- CANUTO PASSIVE SKILLS START -->' "$routing_file")" -ne 1 ] \
+      || [ "$(grep -Fxc '<!-- CANUTO PASSIVE SKILLS END -->' "$routing_file")" -ne 1 ] \
+      || ! grep -q 'canuto-ptbr-editor/SKILL.md' "$routing_file" \
+      || ! grep -q 'canuto-orchestrate/SKILL.md' "$routing_file"; then
+      PASSIVE_INSTALL_OK=false
+    fi
+  done
+  if ! grep -q '~/.agents/skills/canuto-ptbr-editor/SKILL.md' "$PASSIVE_HOME/.codex/AGENTS.md" \
+    || ! grep -q '~/.claude/skills/canuto-ptbr-editor/SKILL.md' "$PASSIVE_HOME/.claude/CLAUDE.md"; then
+    PASSIVE_INSTALL_OK=false
+  fi
   if [ "$PASSIVE_INSTALL_OK" = true ]; then
-    pass "passive skill bundles install idempotently for Codex and Claude"
+    pass "passive skill bundles and routing install idempotently for Codex and Claude"
   else
     fail "passive skill bundle contents diverge across runtime roots"
   fi
@@ -200,6 +219,46 @@ else
   fail "setup_passive_skills failed in isolated HOME"
 fi
 rm -rf "$PASSIVE_HOME"
+
+MALFORMED_HOME="$(mktemp -d)"
+mkdir -p "$MALFORMED_HOME/.codex"
+printf '%s\n' '# Keep me' '<!-- CANUTO PASSIVE SKILLS START -->' > "$MALFORMED_HOME/.codex/AGENTS.md"
+MALFORMED_BEFORE="$(cksum "$MALFORMED_HOME/.codex/AGENTS.md")"
+if (
+  cd "$FRAMEWORK_DIR"
+  export HOME="$MALFORMED_HOME" CANUTO_INSTALL_LIBRARY_ONLY=1 \
+    CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" CANUTO_SOURCE_TRANSPORT=local
+  source "$FRAMEWORK_DIR/install.sh"
+  ! ensure_passive_skill_routing "$HOME/.codex/AGENTS.md" '~/.agents/skills' >/dev/null
+) 2>/dev/null \
+  && [ "$MALFORMED_BEFORE" = "$(cksum "$MALFORMED_HOME/.codex/AGENTS.md")" ]; then
+  pass "passive routing fails closed on malformed markers"
+else
+  fail "passive routing modified malformed global instructions"
+fi
+rm -rf "$MALFORMED_HOME"
+
+FAILED_COPY_HOME="$(mktemp -d)"
+if (
+  cd "$FRAMEWORK_DIR"
+  export HOME="$FAILED_COPY_HOME" CANUTO_INSTALL_LIBRARY_ONLY=1 \
+    CANUTO_SOURCE_DIR="$FRAMEWORK_DIR" CANUTO_SOURCE_TRANSPORT=local
+  source "$FRAMEWORK_DIR/install.sh"
+  cp() {
+    case "$1" in
+      global-skills/canuto-ptbr-editor/SKILL.md) return 1 ;;
+      *) command cp "$@" ;;
+    esac
+  }
+  ! setup_passive_skills >/dev/null
+) 2>/dev/null \
+  && [ ! -e "$FAILED_COPY_HOME/.codex/AGENTS.md" ] \
+  && [ ! -e "$FAILED_COPY_HOME/.claude/CLAUDE.md" ]; then
+  pass "passive routing is not activated after a skill copy failure"
+else
+  fail "passive routing points at an incomplete skill installation"
+fi
+rm -rf "$FAILED_COPY_HOME"
 
 if grep -q 'setup_passive_skills' "$FRAMEWORK_DIR/install.sh" \
   && grep -q 'canuto-ptbr-editor' "$FRAMEWORK_DIR/.agents/personas/maestro.md" \
