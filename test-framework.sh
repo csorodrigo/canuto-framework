@@ -427,6 +427,85 @@ else
 fi
 rm -f "$SG_STATUS_BEFORE" "$SG_STATUS_AFTER"
 
+echo "── Test 3d: Resumable Skill Refactor ──"
+
+SKILL_REFACTOR_DIR="$FRAMEWORK_DIR/skill-refactor"
+for refactor_file in canuto-skill-refactor.js canuto-skill-refactor-lib.js canuto-skill-refactor.test.js; do
+  if [ ! -f "$SKILL_REFACTOR_DIR/$refactor_file" ]; then
+    fail "skill refactor file missing: $refactor_file"
+  elif node --check "$SKILL_REFACTOR_DIR/$refactor_file" >/dev/null 2>&1; then
+    pass "skill refactor $refactor_file syntax valid"
+  else
+    fail "skill refactor $refactor_file has syntax errors"
+  fi
+done
+if [ -x "$SKILL_REFACTOR_DIR/canuto-skill-refactor.js" ]; then
+  pass "skill refactor CLI source is executable"
+else
+  fail "skill refactor CLI source is not executable"
+fi
+
+if node --test "$SKILL_REFACTOR_DIR/canuto-skill-refactor.test.js" >/tmp/canuto-skill-refactor-test.$$ 2>&1; then
+  pass "canuto-skill-refactor focused tests"
+else
+  fail "canuto-skill-refactor focused tests failed"
+fi
+rm -f /tmp/canuto-skill-refactor-test.$$
+
+SR_HOME="$(mktemp -d)"
+SR_CRONTAB="$(mktemp)"
+if (
+  cd "$FRAMEWORK_DIR"
+  export HOME="$SR_HOME" CANUTO_INSTALL_LIBRARY_ONLY=1 \
+    CANUTO_SKILL_GARDENER_SOURCE_DIR="$FRAMEWORK_DIR/skill-gardener" \
+    CANUTO_SKILL_GARDENER_CONFIG_SOURCE="$FRAMEWORK_DIR/config/skill-gardener.json" \
+    CANUTO_SKILL_GARDENER_CONFIG="$SR_HOME/.canuto/config/skill-gardener.json" \
+    CANUTO_SKILL_GARDENER_CRONTAB_FILE="$SR_CRONTAB" \
+    CANUTO_SKILL_REFACTOR_SOURCE_DIR="$SKILL_REFACTOR_DIR" \
+    CANUTO_SKILL_REFACTOR_GARDENER_SOURCE_DIR="$FRAMEWORK_DIR/skill-gardener"
+  source "$FRAMEWORK_DIR/install.sh"
+  setup_global_skills
+  setup_skill_gardener
+  setup_skill_refactor
+) >/dev/null 2>&1 \
+  && [ -L "$SR_HOME/.canuto/bin/canuto-skill-refactor" ] \
+  && [ -x "$SR_HOME/.canuto/bin/canuto-skill-refactor" ] \
+  && SR_TARGET="$(node -e 'process.stdout.write(require("node:fs").realpathSync(process.argv[1]))' "$SR_HOME/.canuto/bin/canuto-skill-refactor")" \
+  && printf '%s\n' "$SR_TARGET" | grep -qE '/\.canuto/lib/skill-refactor/releases/[0-9a-f]{64}/skill-refactor/canuto-skill-refactor\.js$' \
+  && [ -f "$(dirname "$SR_TARGET")/canuto-skill-refactor-lib.js" ] \
+  && [ -f "$(dirname "$(dirname "$SR_TARGET")")/skill-gardener/canuto-skill-gardener-lib.js" ] \
+  && [ -f "$SR_HOME/.claude/skills/skill-refactor/SKILL.md" ] \
+  && [ -f "$SR_HOME/.claude/skills/skill-refactor/agents/openai.yaml" ] \
+  && "$SR_HOME/.canuto/bin/canuto-skill-refactor" --help >/dev/null 2>&1 \
+  && grep -qF '"skill-refactor"' "$FRAMEWORK_DIR/install.sh"; then
+  pass "skill refactor immutable runtime and companion skill are installable"
+else
+  fail "skill refactor install is incomplete"
+fi
+rm -rf "$SR_HOME"
+rm -f "$SR_CRONTAB"
+
+SR_FAIL_HOME="$(mktemp -d)"
+mkdir -p "$SR_FAIL_HOME/.claude/skills/skill-refactor"
+: > "$SR_FAIL_HOME/.claude/skills/skill-refactor/agents"
+if (
+  cd "$FRAMEWORK_DIR"
+  export HOME="$SR_FAIL_HOME" CANUTO_INSTALL_LIBRARY_ONLY=1
+  source "$FRAMEWORK_DIR/install.sh"
+  setup_global_skills
+) >/dev/null 2>&1; then
+  fail "skill refactor companion skill failure was silently accepted"
+else
+  pass "skill refactor companion skill failure propagates"
+fi
+rm -rf "$SR_FAIL_HOME"
+if grep -qF 'setup_global_skills || global_skills_rc=50' "$FRAMEWORK_DIR/install.sh" \
+  && grep -qF 'failure_mask=$((failure_mask | 8))' "$FRAMEWORK_DIR/install.sh"; then
+  pass "repair_runtime propagates global skill installation failure"
+else
+  fail "repair_runtime ignores global skill installation failure"
+fi
+
 SG_CONSUMER="$(mktemp -d)"
 git -C "$SG_CONSUMER" init -q
 if (
