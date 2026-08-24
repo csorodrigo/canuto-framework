@@ -1,0 +1,1970 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-08-24T21:00:00-03:00",
+  "repository": "csorodrigo/canuto-framework",
+  "baseSha": "180c74751250de0f57555f6618c912bd341cc9cf",
+  "branch": "codex/hooks-governance-t0",
+  "privacy": {
+    "exportedTopLevelFields": [
+      "hooks"
+    ],
+    "rawCommandsExported": false,
+    "absolutePathsExported": false
+  },
+  "inputHookDigests": {
+    "claude-user": "d9138cc47f218d8976021aa602e92108972ec0d8b3aafebc571b3dc3434fcacb",
+    "codex-user": "9249176541fe1e6042991a56e965cce3b4d24d8634dd390c2797231d646e8665",
+    "plugin-vercel": "9ab0c3b51e2bbe89348fdde5b5163b803133d28eace7ebf91ed0fe4ffdc8bb2d",
+    "plugin-codex-companion": "fdb189f14f91b1c1ceb9665feec4d1b1eebcbce327bd98b9a0580425957a240a"
+  },
+  "records": [
+    {
+      "id": "CU-01",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "Edit|Write",
+      "timeoutSeconds": 30,
+      "handler": "inline-prettier",
+      "commandSha256": "7908f0231ac18ccc37f1de6074a1cc96c2c4d32de22f0adc653f7b54f0693ff6",
+      "artifacts": [],
+      "role": "Automation",
+      "owner": "repository",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-02",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "Edit|Write",
+      "timeoutSeconds": 30,
+      "handler": "posttool-typecheck.sh",
+      "commandSha256": "aa7748af6424d002e58a23b8979071906002f43914b962dc924c73d429fc9670",
+      "artifacts": [
+        {
+          "name": "posttool-typecheck.sh",
+          "sha256": "bac4b6c23058a60270c4332463872de74717845f1e20c16796e9ac07c5831770"
+        }
+      ],
+      "role": "Advisory",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-03",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "Edit|Write",
+      "timeoutSeconds": 3,
+      "handler": "validation-mark.sh",
+      "commandSha256": "680613232692265a921c2124036ece3300086e8e15e2cfe30253637124e17d7f",
+      "artifacts": [
+        {
+          "name": "validation-mark.sh",
+          "sha256": "bdd189a5ad6d8e58abba07cc721bac71d4db62cb9e4b6d9171c16285187f50a9"
+        }
+      ],
+      "role": "Observer",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/settings-snippet.json",
+          ".agents/hooks/validation-mark.sh"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-04",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "",
+      "timeoutSeconds": 20,
+      "handler": "api-reference-guard.sh",
+      "commandSha256": "a504f645c8e891edf6ddf57f2a8245a6a4f476aa6cd0c0cf4a258104f9428960",
+      "artifacts": [
+        {
+          "name": "api-reference-guard.sh",
+          "sha256": "94d11b76513ab4c02c613b88a53584fcd6480d4ea3fdd9f2fef17417c8acb71b"
+        }
+      ],
+      "role": "Automation",
+      "owner": "skill:api-reference",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-05",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "Bash",
+      "timeoutSeconds": 3,
+      "handler": "validation-clear.sh",
+      "commandSha256": "7a0733429c8bc32b1e3fbbcdcc9de4b482163b4c815e9ed88420054b890c7e43",
+      "artifacts": [
+        {
+          "name": "validation-clear.sh",
+          "sha256": "705c0c27c6b397c99fc40faad991c47431769f12bc85b4677ae05797ce488b7e"
+        }
+      ],
+      "role": "Automation",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/settings-snippet.json",
+          ".agents/hooks/validation-clear.sh"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-06",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "Bash",
+      "timeoutSeconds": 3,
+      "handler": "retry-detect.sh",
+      "commandSha256": "b7e1bfcc95c4b8a16e75239039214343cf52e00e227c17a38f29ed29fe63e6a0",
+      "artifacts": [
+        {
+          "name": "retry-detect.sh",
+          "sha256": "6a137b3aea3639c2a21307d69bb99ddeda9e5bc3ad29ab66a21bc13f3606f837"
+        }
+      ],
+      "role": "Observer",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/retry-detect.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-07",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "Bash",
+      "timeoutSeconds": 5,
+      "handler": "git-truth.sh",
+      "commandSha256": "5d534e0cb558dfab5d2000a98e3623c5dc2c9e7fb41d1a3ad0a45b29e794b6ea",
+      "artifacts": [
+        {
+          "name": "git-truth.sh",
+          "sha256": "47205120617cede66466a68688cca0fcddc580d05cd3f32a2b8049e12c9f27f4"
+        }
+      ],
+      "role": "Advisory",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-08",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": ".*",
+      "timeoutSeconds": 3,
+      "handler": "posttooluse-universal.sh",
+      "commandSha256": "98bf57bc02eec75cef8d733c639b866c6ac4683769bbdd6ba672f24f7ce0ec74",
+      "artifacts": [
+        {
+          "name": "posttooluse-universal.sh",
+          "sha256": "19cee2a1af98b114086ac1a1bf84d9838f79edb7bdd8b830a95c3d2dc5fd8b99"
+        }
+      ],
+      "role": "Observer",
+      "owner": "machine-or-plugin:telemetry",
+      "disposition": "replace",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/posttooluse-universal.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-09",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "ExitPlanMode",
+      "timeoutSeconds": 180,
+      "handler": "plan-review.sh",
+      "commandSha256": "4b13d94d925c3b8634f1e3a94fc0d3f64caeb5ef2961089333c74b9ce1e776f8",
+      "artifacts": [
+        {
+          "name": "plan-review.sh",
+          "sha256": "546f59565e4a023bcc00b537275f31609bb07c16bddba32bb90d893db902bbe5"
+        }
+      ],
+      "role": "Automation",
+      "owner": "skill:plan-review",
+      "disposition": "move",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/_retired/plan-review.sh"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-10",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "Bash",
+      "timeoutSeconds": 5,
+      "handler": "postdelegate-verify.sh",
+      "commandSha256": "e9216dba2f3cc9a9eacb6bf1fe9a0b6e420784954f66e9c41ed05287b55a219b",
+      "artifacts": [
+        {
+          "name": "postdelegate-verify.sh",
+          "sha256": "063337b0c665e7c4c5034b3b2d0a81c808cfa56414fd5772812d918f472702e6"
+        }
+      ],
+      "role": "Advisory",
+      "owner": "orchestrator",
+      "disposition": "move",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/postdelegate-verify.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-11",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "(AskUserQuestion|mcp__.*__AskUserQuestion)",
+      "timeoutSeconds": 5,
+      "handler": "question-log-hook",
+      "commandSha256": "cd5c9d2a2d35f02cc37d7505e1f01ee66e84b194b46d0fdd1465344ac39230f4",
+      "artifacts": [
+        {
+          "name": "question-log-hook",
+          "sha256": "a8dae5b30d44cf599e893eb052784a9d78681359f9b0635ca4f5bf823d6b23e2"
+        }
+      ],
+      "role": "Observer",
+      "owner": "plugin:gstack",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-12",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "(AskUserQuestion|mcp__.*__AskUserQuestion)",
+      "timeoutSeconds": 5,
+      "handler": "auq-error-fallback-hook",
+      "commandSha256": "44fbb4a87afe8ee71ece932cd372b8f03034f03372f0527d936a4131395fbec1",
+      "artifacts": [
+        {
+          "name": "auq-error-fallback-hook",
+          "sha256": "fce153204a040294b4f9877a04a187b626ff625ae12737f8c07888f68473e727"
+        }
+      ],
+      "role": "Advisory",
+      "owner": "plugin:gstack",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-13",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeoutSeconds": 5,
+      "handler": "host-pressure-gate.sh",
+      "commandSha256": "3567f6881dd0eec40d9cf522147399ea2212b816103aa7ba4ababf37b972fe4b",
+      "artifacts": [
+        {
+          "name": "host-pressure-gate.sh",
+          "sha256": "a2c53d43b2d37714e4101b1e63eab476618d0e2cc59382129931854af7e22731"
+        }
+      ],
+      "role": "Gate",
+      "owner": "machine",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-14",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeoutSeconds": 5,
+      "handler": "worktree-deps-check.sh",
+      "commandSha256": "ef93ed584055a8f1e7d316638e879918b7a612c2cbe3bf8438ecaeb7c82392bc",
+      "artifacts": [
+        {
+          "name": "worktree-deps-check.sh",
+          "sha256": "dc34943e3eba05e1ff72190f991d15b9813ccdbcf2e58fd77206b0eaac5fce4e"
+        }
+      ],
+      "role": "Gate",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-15",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeoutSeconds": 5,
+      "handler": "local-build-guard.sh",
+      "commandSha256": "32a19cb3ab5877288104ec8208f0acd5699d51629c3d595985aa4f8493bed459",
+      "artifacts": [
+        {
+          "name": "local-build-guard.sh",
+          "sha256": "da843751f60d63494b3018234b483e2aa683859b13e3af2fed77c46131092310"
+        }
+      ],
+      "role": "Gate",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-16",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeoutSeconds": 5,
+      "handler": "secret-hygiene.sh",
+      "commandSha256": "383207401c64a0d4d638623723cda1ec7a3f7ba6c8f5c6fac2615c76073bfe21",
+      "artifacts": [
+        {
+          "name": "secret-hygiene.sh",
+          "sha256": "39c3fb36705336d5239cb2354565b7f1f1e8dc984ce68d73313291629c6301eb"
+        }
+      ],
+      "role": "Gate",
+      "owner": "machine",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-17",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeoutSeconds": null,
+      "handler": "ps-self-match-guard.sh",
+      "commandSha256": "11b2a008fc915ecf38b068deb1bad546e65ead05c9d43a16d9f043a3ca1f087f",
+      "artifacts": [
+        {
+          "name": "ps-self-match-guard.sh",
+          "sha256": "7761ffdf6e55d571acfeac1e6c6918af42ad76ba29c18eecebbed036984114dd"
+        }
+      ],
+      "role": "Gate",
+      "owner": "machine",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-18",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeoutSeconds": 5,
+      "handler": "claim-guard.sh",
+      "commandSha256": "84720c59b1b5ca5b0a968e128201980f0a3808c08428e2fb2dabbf8e9133f1e3",
+      "artifacts": [
+        {
+          "name": "claim-guard.sh",
+          "sha256": "236ec1d860edad90a5d0fce2dbe10207e190836ec077c2c2a1a69e656b1c7fde"
+        }
+      ],
+      "role": "Gate",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-19",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeoutSeconds": 30,
+      "handler": "inline-rm-rf-gate",
+      "commandSha256": "588b2f598cdd1e5256e240ec9e5b25f74af9634e9c50ac6c2b7283602d7b1884",
+      "artifacts": [],
+      "role": "Gate",
+      "owner": "machine",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-20",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeoutSeconds": null,
+      "handler": "log-commands.sh",
+      "commandSha256": "f919359d51cd285fefd0ca24a5191831b545b198bb0a08f319abc04bbdd49f1d",
+      "artifacts": [
+        {
+          "name": "log-commands.sh",
+          "sha256": "3d72bb5f47e493180daa2d79bf593199ff5e090324eb187c1edcbf1dffedf6f7"
+        }
+      ],
+      "role": "Observer",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-21",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeoutSeconds": null,
+      "handler": "rtk-rewrite-guard.sh",
+      "commandSha256": "8b7929b25e2ded67f2cf1503977ea6c822d79041cea45882e5f8d2f4de9581b2",
+      "artifacts": [
+        {
+          "name": "rtk-rewrite-guard.sh",
+          "sha256": "d5273b4406a7a18cf6ffe99edb58833caac50d5dc01de8b48c9d4f6023f821b6"
+        }
+      ],
+      "role": "Automation",
+      "owner": "runtime:rtk",
+      "disposition": "consolidate",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-22",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeoutSeconds": 3,
+      "handler": "pre-commit-branch-check.sh",
+      "commandSha256": "9d6a9fc04db9f02f963b927b68b930b8cb68380d1853ca02b247d0c15de5b97b",
+      "artifacts": [
+        {
+          "name": "pre-commit-branch-check.sh",
+          "sha256": "4272bf3d1c8b68573c7445132986e9ea44ecb37c2c7f30c969785aff563a66f5"
+        }
+      ],
+      "role": "Gate",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/pre-commit-branch-check.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-23",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeoutSeconds": null,
+      "handler": "dobra-compose-writer-guard.sh",
+      "commandSha256": "bb2c3d670ece0900f8f8209c9577708bf06033a468a33d4b57d383596efdec95",
+      "artifacts": [
+        {
+          "name": "dobra-compose-writer-guard.sh",
+          "sha256": "3128aa7186176ba03e962a18960a755dd8aa5c66aad049bc34c5c97eb744b5ad"
+        }
+      ],
+      "role": "Gate",
+      "owner": "repository:Dobra",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-24",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeoutSeconds": 3,
+      "handler": "protect-env-read.sh",
+      "commandSha256": "62dc9e964463255aee8e99e2fe339eeebf86eb77e4f9775f28934447695baf9e",
+      "artifacts": [
+        {
+          "name": "protect-env-read.sh",
+          "sha256": "0c1b5af25568b223fc3473e9d38f0b7c71762a74fac7acbc1cbf4309b72832a3"
+        }
+      ],
+      "role": "Gate",
+      "owner": "machine",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-25",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeoutSeconds": 5,
+      "handler": "assert-deploy-target.sh",
+      "commandSha256": "a3c14af981b3e93e4c6e016e214d7dc58b291ae897fb3f8259861faaafa05c15",
+      "artifacts": [
+        {
+          "name": "assert-deploy-target.sh",
+          "sha256": "545883080d726a640fcb722fd0f9a1ecfcb96dee572cd5e6fb978b8ac55c8384"
+        }
+      ],
+      "role": "Gate",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-26",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeoutSeconds": 240,
+      "handler": "codex-pretool-guard.sh",
+      "commandSha256": "d8cbb6d14fc1d5b0fc250ab88f1665e0dfe6cd2062f9de7abc045911e01f0bf8",
+      "artifacts": [
+        {
+          "name": "codex-pretool-guard.sh",
+          "sha256": "f21fabf5c76f7266f9daf11ee208c4ead82f887cd0b54f3bd6b5037e6e3dbc08"
+        }
+      ],
+      "role": "Gate",
+      "owner": "repository-and-skill:review",
+      "disposition": "replace",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/codex-pretool-guard.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-27",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Edit|Write",
+      "timeoutSeconds": null,
+      "handler": "protect-files.sh",
+      "commandSha256": "d22b03527e31f2c3880e5aa2269280db3e6e033f62d040f54b4e7f2aad1daf43",
+      "artifacts": [
+        {
+          "name": "protect-files.sh",
+          "sha256": "734ced3ce8fa86aef1aa7f194bd96825f1aca8d1d63bbd3a3ef8e6510fd854fd"
+        }
+      ],
+      "role": "Gate",
+      "owner": "machine-and-repository",
+      "disposition": "split",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/protect-files.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-28",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Edit|Write",
+      "timeoutSeconds": 3,
+      "handler": "fingerprint-gate.sh",
+      "commandSha256": "9fa9711b227a2c95c9e5533081fdc1afda310d25dd5c3a4ac84d84d24ff5b0c1",
+      "artifacts": [
+        {
+          "name": "fingerprint-gate.sh",
+          "sha256": "c03c10dd3833cb75a80dd013d70bbb1c45b14438e9156067f0e4e58067db18b5"
+        }
+      ],
+      "role": "Gate",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/fingerprint-gate.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-29",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "mcp__github__create_pull_request",
+      "timeoutSeconds": 120,
+      "handler": "require-tests-for-pr.sh",
+      "commandSha256": "6176375b2137e956657e5f4b3c4c53ad496b64d1404355dbf97bd9a1b879bdc1",
+      "artifacts": [
+        {
+          "name": "require-tests-for-pr.sh",
+          "sha256": "d458d1fab8f8bf810be245f21b91d8f32ad0a50d344d0a0339bf8659b4b88370"
+        }
+      ],
+      "role": "Gate",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "diverged-or-partial",
+        "refs": [
+          ".agents/hooks/require-tests-for-pr.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-30",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Write",
+      "timeoutSeconds": 3,
+      "handler": "pre-claim-grep.sh",
+      "commandSha256": "2a1ed70d8c8564c9cd128f26eaece4c9e089519165614f2fdf54d7a9fe3ddcfb",
+      "artifacts": [
+        {
+          "name": "pre-claim-grep.sh",
+          "sha256": "bff6d712937e049b25833979656d6d53324e584f34e5e6fca8cda1316d8f88cf"
+        }
+      ],
+      "role": "Advisory",
+      "owner": "repository-or-skill:claims",
+      "disposition": "replace",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/pre-claim-grep.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-31",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Write",
+      "timeoutSeconds": 3,
+      "handler": "tmp-deliverable-guard.sh",
+      "commandSha256": "8fa7da45f815c4ba9e6a9ace282acbcdb25bd2b3c3e23ea90645d9fce98c6238",
+      "artifacts": [
+        {
+          "name": "tmp-deliverable-guard.sh",
+          "sha256": "3375156af4785c72247f5c180b3c84ed01fb2285e1334e4afe26466130ddb3a1"
+        }
+      ],
+      "role": "Advisory",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-32",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "mcp__playwright__browser_take_screenshot|mcp__claude-in-chrome__computer",
+      "timeoutSeconds": 3,
+      "handler": "screenshot-guard.sh",
+      "commandSha256": "b29c09e7fb6babf861291bc9c724b0115af038bf26a1ecfdb1f341d13aaf0b07",
+      "artifacts": [
+        {
+          "name": "screenshot-guard.sh",
+          "sha256": "54dd740876e8c5e34aa5a4d2703dc8629c4849e5f0567d347142e82e8517343c"
+        }
+      ],
+      "role": "Gate",
+      "owner": "plugin:qa-browser",
+      "disposition": "move",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/screenshot-guard.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-33",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeoutSeconds": 300,
+      "handler": "pre-pr-bash-gate.sh",
+      "commandSha256": "7af9da1eda6236c8b5498db746945dd58d673f2ce6ef3e5d0e1c989fd13a8e9f",
+      "artifacts": [
+        {
+          "name": "pre-pr-bash-gate.sh",
+          "sha256": "5f87940541f1017dc59b5dfdbc99f934f34043a3c0ea99aeced568d1ef63d362"
+        }
+      ],
+      "role": "Gate",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "diverged-or-partial",
+        "refs": [
+          ".agents/hooks/pre-pr-bash-gate.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-34",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeoutSeconds": null,
+      "handler": "rtk-hook-claude",
+      "commandSha256": "3127028ecb4bdcc32f13306c030844b116fc7cf87972aee66b17d8a7718aaa5a",
+      "artifacts": [],
+      "role": "Automation",
+      "owner": "runtime:rtk",
+      "disposition": "consolidate",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-35",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "(AskUserQuestion|mcp__.*__AskUserQuestion)",
+      "timeoutSeconds": 5,
+      "handler": "question-preference-hook",
+      "commandSha256": "4f615a8f34d06b12eda60ddf4ddba04a869ea641f1795b41713cddf5c1a8c363",
+      "artifacts": [
+        {
+          "name": "question-preference-hook",
+          "sha256": "608d228537f83074eb9ef7a9d64052cd43fd01623d08c04450b9815f2b4bbd75"
+        }
+      ],
+      "role": "Automation",
+      "owner": "plugin:gstack",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-36",
+      "surface": "claude-user",
+      "event": "Stop",
+      "matcher": "",
+      "timeoutSeconds": 3,
+      "handler": "session-budget-warn.sh",
+      "commandSha256": "b38fc6565dd97835128aca547e0dac5c67ecb27ccf91b17083175a372231566d",
+      "artifacts": [
+        {
+          "name": "session-budget-warn.sh",
+          "sha256": "3ae1bb7b463ae58a71c27fa7a34fb96a0e09f74327de810274f9349f76b112cb"
+        }
+      ],
+      "role": "Advisory",
+      "owner": "machine",
+      "disposition": "correct",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-37",
+      "surface": "claude-user",
+      "event": "Stop",
+      "matcher": "",
+      "timeoutSeconds": 5,
+      "handler": "pre-finalize.sh",
+      "commandSha256": "69a29925057b76c84e7ec112d9dbb287270c4821218b413649c4a31ed3e9a97c",
+      "artifacts": [
+        {
+          "name": "pre-finalize.sh",
+          "sha256": "0ba163d138e981cf2e333043f678b6a9e99521acb87e5e4397ae2fa03a7345f1"
+        }
+      ],
+      "role": "Advisory",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/pre-finalize.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-38",
+      "surface": "claude-user",
+      "event": "Stop",
+      "matcher": "",
+      "timeoutSeconds": 30,
+      "handler": "session-save.sh",
+      "commandSha256": "4ae34b3d72649a837ac57d95b61013b68848117154cce0ac261b0f468b0f0105",
+      "artifacts": [
+        {
+          "name": "session-save.sh",
+          "sha256": "923cbe310e0c7065c5eb594172baf1553b3494dff39034ad150cbb88586702e8"
+        }
+      ],
+      "role": "Automation",
+      "owner": "plugin:Canuto",
+      "disposition": "move",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/session-save.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-39",
+      "surface": "claude-user",
+      "event": "Stop",
+      "matcher": "",
+      "timeoutSeconds": 20,
+      "handler": "api-reference-guard.sh",
+      "commandSha256": "6f96916462b1d205244acc03b9cb6d698216c955a42dcd876dd3fa6bc09ada51",
+      "artifacts": [
+        {
+          "name": "api-reference-guard.sh",
+          "sha256": "94d11b76513ab4c02c613b88a53584fcd6480d4ea3fdd9f2fef17417c8acb71b"
+        }
+      ],
+      "role": "Advisory",
+      "owner": "skill:api-reference",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-40",
+      "surface": "claude-user",
+      "event": "Stop",
+      "matcher": "",
+      "timeoutSeconds": 5,
+      "handler": "ccgram.main",
+      "commandSha256": "900019effd4ab48fd5a7144dd8ecaeb728a8eeb40f07775643ce510c57c3de00",
+      "artifacts": [],
+      "role": "Observer",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-41",
+      "surface": "claude-user",
+      "event": "Stop",
+      "matcher": "",
+      "timeoutSeconds": null,
+      "handler": "delivery-proof-gate.sh",
+      "commandSha256": "24f392739535df1232af0a32b6bc5d0f3b962c8457abc73b7d1021cb31f7fc7b",
+      "artifacts": [
+        {
+          "name": "delivery-proof-gate.sh",
+          "sha256": "c6895ad611da7e3f6c691572c15f79b86f6bd06611fab4a17c2bd46f5c370746"
+        }
+      ],
+      "role": "Advisory",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-42",
+      "surface": "claude-user",
+      "event": "Stop",
+      "matcher": "",
+      "timeoutSeconds": 5,
+      "handler": "timeline-stop-hook",
+      "commandSha256": "58c40c77f895fd2c17d019d0e30cbc5bb0ab0fbd4000b5b1257817a987870079",
+      "artifacts": [
+        {
+          "name": "timeline-stop-hook",
+          "sha256": "e306e885103339920b364e365d2382b0882c065860245a6b82cd784c92fda359"
+        }
+      ],
+      "role": "Automation",
+      "owner": "plugin:gstack",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-43",
+      "surface": "claude-user",
+      "event": "Notification",
+      "matcher": "",
+      "timeoutSeconds": 15,
+      "handler": "pre-compact-save.sh",
+      "commandSha256": "13ce4a71e01a525e61e6ec1f4649a58cf21a040579d63d3ac8f43c2bbc6fad79",
+      "artifacts": [
+        {
+          "name": "pre-compact-save.sh",
+          "sha256": "f5105ce3e393035a1e71228590413c0008edd93305b462160dbc346bce1cc28a"
+        }
+      ],
+      "role": "Automation",
+      "owner": "plugin:Canuto",
+      "disposition": "move",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/pre-compact-save.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-44",
+      "surface": "claude-user",
+      "event": "Notification",
+      "matcher": "",
+      "timeoutSeconds": 5,
+      "handler": "ccgram.main",
+      "commandSha256": "900019effd4ab48fd5a7144dd8ecaeb728a8eeb40f07775643ce510c57c3de00",
+      "artifacts": [],
+      "role": "Observer",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-45",
+      "surface": "claude-user",
+      "event": "SessionStart",
+      "matcher": "",
+      "timeoutSeconds": 5,
+      "handler": "session-start.sh",
+      "commandSha256": "cb63f093eed11ca06bdf65007f5dd9654a56dd4b1810ff47633912bdaac4c3f4",
+      "artifacts": [
+        {
+          "name": "session-start.sh",
+          "sha256": "4f497e23f14dcec755f9cb416ab12db29ac2a8072a31d761301b29a4bb798e97"
+        }
+      ],
+      "role": "Automation",
+      "owner": "plugin:Canuto",
+      "disposition": "move",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/session-start.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-46",
+      "surface": "claude-user",
+      "event": "SessionStart",
+      "matcher": "",
+      "timeoutSeconds": 5,
+      "handler": "ccgram.main",
+      "commandSha256": "900019effd4ab48fd5a7144dd8ecaeb728a8eeb40f07775643ce510c57c3de00",
+      "artifacts": [],
+      "role": "Observer",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-47",
+      "surface": "claude-user",
+      "event": "SessionStart",
+      "matcher": "",
+      "timeoutSeconds": 3,
+      "handler": "worktree-collision-check.sh",
+      "commandSha256": "2ac0ea59a264998c632f6b19ec52a600113d915d2cae771d996ba5d21b301d66",
+      "artifacts": [
+        {
+          "name": "worktree-collision-check.sh",
+          "sha256": "32e89e72c4cc83616d3659fc49df605a6d9148a31fdca75d79faf2012c8b3225"
+        }
+      ],
+      "role": "Advisory",
+      "owner": "machine",
+      "disposition": "correct",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/settings-snippet.json",
+          ".agents/hooks/worktree-collision-check.sh"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-48",
+      "surface": "claude-user",
+      "event": "SessionStart",
+      "matcher": "startup|resume|clear|compact",
+      "timeoutSeconds": 10,
+      "handler": "obsidian_mcp_cleanup.sh",
+      "commandSha256": "5dda1b01e34430abdc19f6d4dc29c7cc26c0e38de1c006c791bd35ebbbbb7df6",
+      "artifacts": [
+        {
+          "name": "obsidian_mcp_cleanup.sh",
+          "sha256": "e65a35409b3c0fb8ed719c97de04925b704edb80bf8f659846a09b25a46cc3ba"
+        }
+      ],
+      "role": "Automation",
+      "owner": "plugin:Obsidian",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-49",
+      "surface": "claude-user",
+      "event": "SessionStart",
+      "matcher": "compact",
+      "timeoutSeconds": 8,
+      "handler": "post-compact-reread.sh",
+      "commandSha256": "d52369506108144076dbb506d1be17723d7f77f3b9f20ab6cc63c5b5b374ee19",
+      "artifacts": [
+        {
+          "name": "post-compact-reread.sh",
+          "sha256": "4f5d49b58fe42dcbac2ff648e687d01f17b26dfa7e57e7213c5a66ea044b62c3"
+        }
+      ],
+      "role": "Advisory",
+      "owner": "plugin:Canuto",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-50",
+      "surface": "claude-user",
+      "event": "SessionStart",
+      "matcher": "*",
+      "timeoutSeconds": 10,
+      "handler": "herdr-agent-state.sh",
+      "commandSha256": "f7c7392eb64d66bebe45b73280f3d5a840bc037106d64de73d88655256a34ea2",
+      "artifacts": [
+        {
+          "name": "herdr-agent-state.sh",
+          "sha256": "4deaaa7b12399358d9506db6e6ee3fe9b6ef06abde94922f919056854511d9ba"
+        }
+      ],
+      "role": "Observer",
+      "owner": "plugin:Herdr",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-51",
+      "surface": "claude-user",
+      "event": "StopFailure",
+      "matcher": "",
+      "timeoutSeconds": 5,
+      "handler": "ccgram.main",
+      "commandSha256": "900019effd4ab48fd5a7144dd8ecaeb728a8eeb40f07775643ce510c57c3de00",
+      "artifacts": [],
+      "role": "Observer",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-52",
+      "surface": "claude-user",
+      "event": "SessionEnd",
+      "matcher": "",
+      "timeoutSeconds": 5,
+      "handler": "ccgram.main",
+      "commandSha256": "900019effd4ab48fd5a7144dd8ecaeb728a8eeb40f07775643ce510c57c3de00",
+      "artifacts": [],
+      "role": "Observer",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-53",
+      "surface": "claude-user",
+      "event": "SubagentStart",
+      "matcher": "",
+      "timeoutSeconds": 5,
+      "handler": "ccgram.main",
+      "commandSha256": "900019effd4ab48fd5a7144dd8ecaeb728a8eeb40f07775643ce510c57c3de00",
+      "artifacts": [],
+      "role": "Observer",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-54",
+      "surface": "claude-user",
+      "event": "SubagentStop",
+      "matcher": "",
+      "timeoutSeconds": 5,
+      "handler": "ccgram.main",
+      "commandSha256": "900019effd4ab48fd5a7144dd8ecaeb728a8eeb40f07775643ce510c57c3de00",
+      "artifacts": [],
+      "role": "Observer",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-55",
+      "surface": "claude-user",
+      "event": "TeammateIdle",
+      "matcher": "",
+      "timeoutSeconds": 5,
+      "handler": "ccgram.main",
+      "commandSha256": "900019effd4ab48fd5a7144dd8ecaeb728a8eeb40f07775643ce510c57c3de00",
+      "artifacts": [],
+      "role": "Observer",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-56",
+      "surface": "claude-user",
+      "event": "TaskCompleted",
+      "matcher": "",
+      "timeoutSeconds": 5,
+      "handler": "ccgram.main",
+      "commandSha256": "900019effd4ab48fd5a7144dd8ecaeb728a8eeb40f07775643ce510c57c3de00",
+      "artifacts": [],
+      "role": "Observer",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-57",
+      "surface": "claude-user",
+      "event": "UserPromptSubmit",
+      "matcher": "",
+      "timeoutSeconds": 5,
+      "handler": "secret-hygiene.sh",
+      "commandSha256": "383207401c64a0d4d638623723cda1ec7a3f7ba6c8f5c6fac2615c76073bfe21",
+      "artifacts": [
+        {
+          "name": "secret-hygiene.sh",
+          "sha256": "39c3fb36705336d5239cb2354565b7f1f1e8dc984ce68d73313291629c6301eb"
+        }
+      ],
+      "role": "Advisory",
+      "owner": "machine",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-01",
+      "surface": "codex-user",
+      "event": "PostToolUse",
+      "matcher": "^Bash$",
+      "timeoutSeconds": 10,
+      "handler": "canuto_hook.mjs",
+      "commandSha256": "3fb2d93917426364884861436ae19e255a4621b91901d1378a8abea34ea567df",
+      "artifacts": [
+        {
+          "name": "canuto_hook.mjs",
+          "sha256": "5b785de3ba81a9a04fead85e3835bc3e1002f90fca747ec6e81675babe8f072d"
+        }
+      ],
+      "role": "Observer",
+      "owner": "plugin:Canuto",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-02",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "timeoutSeconds": 10,
+      "handler": "codex-adapt.sh -> probe-canuto-chain.sh",
+      "commandSha256": "848b2574c94e09fa560e2456e3aa6d607fe06aa5c15f49cb1f1de8a7c741749d",
+      "artifacts": [
+        {
+          "name": "codex-adapt.sh",
+          "sha256": "fc1c470ee776ca04774438f4c7b03ea81b28d39d2920d6777888217eab2a59ba"
+        },
+        {
+          "name": "probe-canuto-chain.sh",
+          "sha256": "181831dafd9e074181c316e9c74bb958832bbcc17b7c9837d28edcd665ab8247"
+        }
+      ],
+      "role": "Probe",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CX-03",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "timeoutSeconds": 10,
+      "handler": "canuto_hook.mjs",
+      "commandSha256": "898e4613dac1a025ff4928909bab0d279fabe4c910119fbf8707eeb18f2439c3",
+      "artifacts": [
+        {
+          "name": "canuto_hook.mjs",
+          "sha256": "5b785de3ba81a9a04fead85e3835bc3e1002f90fca747ec6e81675babe8f072d"
+        }
+      ],
+      "role": "Automation",
+      "owner": "plugin:Canuto",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-04",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "timeoutSeconds": 10,
+      "handler": "python3 -> pre_bash_guard.py",
+      "commandSha256": "9c6669493c2d0cd87f61d679455b92bc7b697afe36feab2e571414bed39442b4",
+      "artifacts": [
+        {
+          "name": "python3",
+          "sha256": "179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818"
+        },
+        {
+          "name": "pre_bash_guard.py",
+          "sha256": "746881df7f2b34a42b8d75df756bc41d81a28fa25213529fa0424440cf6cfec5"
+        }
+      ],
+      "role": "Gate",
+      "owner": "machine-and-repository",
+      "disposition": "split",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-05",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "timeoutSeconds": 10,
+      "handler": "ps-self-match-guard.sh",
+      "commandSha256": "3af476354c3d5572a9fd55abf20b3f62c14d69ad93668db0fc4fdee2665249ad",
+      "artifacts": [
+        {
+          "name": "ps-self-match-guard.sh",
+          "sha256": "7761ffdf6e55d571acfeac1e6c6918af42ad76ba29c18eecebbed036984114dd"
+        }
+      ],
+      "role": "Gate",
+      "owner": "machine",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-06",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "timeoutSeconds": 20,
+      "handler": "codex-adapt.sh -> protect-env-read.sh",
+      "commandSha256": "21ee10a75e21bebe1afb6ff34cdf85239edf70f07c2a8083f574e2c3ba889cda",
+      "artifacts": [
+        {
+          "name": "codex-adapt.sh",
+          "sha256": "fc1c470ee776ca04774438f4c7b03ea81b28d39d2920d6777888217eab2a59ba"
+        },
+        {
+          "name": "protect-env-read.sh",
+          "sha256": "0c1b5af25568b223fc3473e9d38f0b7c71762a74fac7acbc1cbf4309b72832a3"
+        }
+      ],
+      "role": "Gate",
+      "owner": "machine",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-07",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "timeoutSeconds": 20,
+      "handler": "codex-adapt.sh -> secret-hygiene.sh",
+      "commandSha256": "1881cec790921dcc8f0db820f3158028f051147687e2fcb51d966a8183720795",
+      "artifacts": [
+        {
+          "name": "codex-adapt.sh",
+          "sha256": "fc1c470ee776ca04774438f4c7b03ea81b28d39d2920d6777888217eab2a59ba"
+        },
+        {
+          "name": "secret-hygiene.sh",
+          "sha256": "39c3fb36705336d5239cb2354565b7f1f1e8dc984ce68d73313291629c6301eb"
+        }
+      ],
+      "role": "Gate",
+      "owner": "machine",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-08",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "timeoutSeconds": 15,
+      "handler": "codex-adapt.sh -> host-pressure-gate.sh",
+      "commandSha256": "749008449776c2efcc580372584c8b0b3c3f7a64ca72501eb7a9372921a8ff0a",
+      "artifacts": [
+        {
+          "name": "codex-adapt.sh",
+          "sha256": "fc1c470ee776ca04774438f4c7b03ea81b28d39d2920d6777888217eab2a59ba"
+        },
+        {
+          "name": "host-pressure-gate.sh",
+          "sha256": "a2c53d43b2d37714e4101b1e63eab476618d0e2cc59382129931854af7e22731"
+        }
+      ],
+      "role": "Gate",
+      "owner": "machine",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-09",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "timeoutSeconds": 15,
+      "handler": "codex-adapt.sh -> worktree-deps-check.sh",
+      "commandSha256": "f250a38f5598d1293e5db0a67242e5781a2206db56c63542954d1e0e303ea5ae",
+      "artifacts": [
+        {
+          "name": "codex-adapt.sh",
+          "sha256": "fc1c470ee776ca04774438f4c7b03ea81b28d39d2920d6777888217eab2a59ba"
+        },
+        {
+          "name": "worktree-deps-check.sh",
+          "sha256": "dc34943e3eba05e1ff72190f991d15b9813ccdbcf2e58fd77206b0eaac5fce4e"
+        }
+      ],
+      "role": "Gate",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-10",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "timeoutSeconds": 20,
+      "handler": "codex-adapt.sh -> pre-commit-branch-check.sh",
+      "commandSha256": "1dcd96bcd2fc35cad1503e17fbea139a4b863cc29c6ce3c86f130634659432dc",
+      "artifacts": [
+        {
+          "name": "codex-adapt.sh",
+          "sha256": "fc1c470ee776ca04774438f4c7b03ea81b28d39d2920d6777888217eab2a59ba"
+        },
+        {
+          "name": "pre-commit-branch-check.sh",
+          "sha256": "4272bf3d1c8b68573c7445132986e9ea44ecb37c2c7f30c969785aff563a66f5"
+        }
+      ],
+      "role": "Gate",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "diverged-or-partial",
+        "refs": [
+          ".agents/hooks/pre-commit-branch-check.sh"
+        ]
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-11",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "timeoutSeconds": 30,
+      "handler": "codex-adapt.sh -> assert-deploy-target.sh",
+      "commandSha256": "9425522e9f617835228c59ea4fb257f4cd0f812cefe4c65746fbfd70bb046079",
+      "artifacts": [
+        {
+          "name": "codex-adapt.sh",
+          "sha256": "fc1c470ee776ca04774438f4c7b03ea81b28d39d2920d6777888217eab2a59ba"
+        },
+        {
+          "name": "assert-deploy-target.sh",
+          "sha256": "545883080d726a640fcb722fd0f9a1ecfcb96dee572cd5e6fb978b8ac55c8384"
+        }
+      ],
+      "role": "Gate",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-12",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "timeoutSeconds": 20,
+      "handler": "codex-adapt.sh -> claim-guard.sh",
+      "commandSha256": "4a73f8aa2b41c0262d290e16af4c8f97b7ae0e30c56b68b23737d30d0f113dc7",
+      "artifacts": [
+        {
+          "name": "codex-adapt.sh",
+          "sha256": "fc1c470ee776ca04774438f4c7b03ea81b28d39d2920d6777888217eab2a59ba"
+        },
+        {
+          "name": "claim-guard.sh",
+          "sha256": "236ec1d860edad90a5d0fce2dbe10207e190836ec077c2c2a1a69e656b1c7fde"
+        }
+      ],
+      "role": "Gate",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-13",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "timeoutSeconds": 180,
+      "handler": "codex-adapt.sh -> pre-pr-bash-gate.sh",
+      "commandSha256": "c304f2af5d19f84da98f5a47c4bb083cbd059ec5e4b012ab836933e205a6274e",
+      "artifacts": [
+        {
+          "name": "codex-adapt.sh",
+          "sha256": "fc1c470ee776ca04774438f4c7b03ea81b28d39d2920d6777888217eab2a59ba"
+        },
+        {
+          "name": "pre-pr-bash-gate.sh",
+          "sha256": "5f87940541f1017dc59b5dfdbc99f934f34043a3c0ea99aeced568d1ef63d362"
+        }
+      ],
+      "role": "Gate",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "diverged-or-partial",
+        "refs": [
+          ".agents/hooks/pre-pr-bash-gate.sh"
+        ]
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-14",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "timeoutSeconds": 300,
+      "handler": "codex-adapt.sh -> codex-pretool-guard.sh",
+      "commandSha256": "b8218a44caa69393922e8db5d267a838d61d819cfc41685a6c46a373a12b6a39",
+      "artifacts": [
+        {
+          "name": "codex-adapt.sh",
+          "sha256": "fc1c470ee776ca04774438f4c7b03ea81b28d39d2920d6777888217eab2a59ba"
+        },
+        {
+          "name": "codex-pretool-guard.sh",
+          "sha256": "f21fabf5c76f7266f9daf11ee208c4ead82f887cd0b54f3bd6b5037e6e3dbc08"
+        }
+      ],
+      "role": "Gate",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "diverged-or-partial",
+        "refs": [
+          ".agents/hooks/codex-pretool-guard.sh"
+        ]
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-15",
+      "surface": "codex-user",
+      "event": "SessionEnd",
+      "matcher": "",
+      "timeoutSeconds": 3,
+      "handler": "canuto_hook.mjs",
+      "commandSha256": "a4d04d82eddd4a2c5af44b9aa3a13d19b6eaf57a916c4e879d989c3269456c12",
+      "artifacts": [
+        {
+          "name": "canuto_hook.mjs",
+          "sha256": "5b785de3ba81a9a04fead85e3835bc3e1002f90fca747ec6e81675babe8f072d"
+        }
+      ],
+      "role": "Observer",
+      "owner": "plugin:Canuto",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-16",
+      "surface": "codex-user",
+      "event": "SessionEnd",
+      "matcher": "",
+      "timeoutSeconds": 3,
+      "handler": "obsidian_mcp_cleanup.sh",
+      "commandSha256": "5dda1b01e34430abdc19f6d4dc29c7cc26c0e38de1c006c791bd35ebbbbb7df6",
+      "artifacts": [
+        {
+          "name": "obsidian_mcp_cleanup.sh",
+          "sha256": "e65a35409b3c0fb8ed719c97de04925b704edb80bf8f659846a09b25a46cc3ba"
+        }
+      ],
+      "role": "Automation",
+      "owner": "plugin:Obsidian",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-17",
+      "surface": "codex-user",
+      "event": "SessionStart",
+      "matcher": "startup|resume|clear|compact",
+      "timeoutSeconds": 30,
+      "handler": "canuto_hook.mjs",
+      "commandSha256": "a13f537bac8bb385efdfa267d0f612e649193eb7959ccb9fc73e7d9416cd5afa",
+      "artifacts": [
+        {
+          "name": "canuto_hook.mjs",
+          "sha256": "5b785de3ba81a9a04fead85e3835bc3e1002f90fca747ec6e81675babe8f072d"
+        }
+      ],
+      "role": "Automation",
+      "owner": "plugin:Canuto",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "PV-01",
+      "surface": "plugin-vercel",
+      "event": "SessionStart",
+      "matcher": "startup|resume|clear|compact",
+      "timeoutSeconds": null,
+      "handler": "session-start-seen-skills.mjs",
+      "commandSha256": "0ce127c754315a5016daac772ae4f4a98e844e51529d43aadd999ab89d52d479",
+      "artifacts": [
+        {
+          "name": "session-start-seen-skills.mjs",
+          "sha256": "02f75d69ac4b7c1055688862c65b1223123e44c6fb5bde5db372ca602a3e668e",
+          "pluginRelativePath": "hooks/session-start-seen-skills.mjs"
+        }
+      ],
+      "role": "Automation",
+      "owner": "plugin:Vercel",
+      "disposition": "keep",
+      "source": {
+        "state": "versioned-plugin",
+        "refs": [
+          "https://github.com/vercel/vercel-plugin.git#ccfbc7c584f15c0fc925957c86bafaca9444d24a:."
+        ],
+        "hookConfigSha256": "09d335208258ab6b8593976732869272755b6c7fae30afd906d010234a30aed5",
+        "commitSha": "ccfbc7c584f15c0fc925957c86bafaca9444d24a",
+        "receiptSha256": "181ccda87d7d5d19410075cbc0c0db733bf6c97650c7ed6c78953b0c8e7d1aac"
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "PV-02",
+      "surface": "plugin-vercel",
+      "event": "SessionStart",
+      "matcher": "startup|resume|clear|compact",
+      "timeoutSeconds": null,
+      "handler": "session-start-profiler.mjs",
+      "commandSha256": "501bd3194d4a02282a275f9c331a3293d5f8dd34532beeaea1f6dd83e9777536",
+      "artifacts": [
+        {
+          "name": "session-start-profiler.mjs",
+          "sha256": "215e6502c4e8fc6edf683e13939ecdee096b1d4e27be29b12599e059693d9416",
+          "pluginRelativePath": "hooks/session-start-profiler.mjs"
+        }
+      ],
+      "role": "Observer",
+      "owner": "plugin:Vercel",
+      "disposition": "keep",
+      "source": {
+        "state": "diverged-or-partial",
+        "refs": [
+          "https://github.com/vercel/vercel-plugin.git#ccfbc7c584f15c0fc925957c86bafaca9444d24a:."
+        ]
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "PV-03",
+      "surface": "plugin-vercel",
+      "event": "SessionStart",
+      "matcher": "startup|resume|clear|compact",
+      "timeoutSeconds": null,
+      "handler": "inject-claude-md.mjs",
+      "commandSha256": "59100546720b4baad88e00b31a1ec3288b7886775412c74ae538ab81bd6dd807",
+      "artifacts": [
+        {
+          "name": "inject-claude-md.mjs",
+          "sha256": "bbda85ac5cb781560d8f9318e27ddaccdc6172e8bb9010ab86b6e297bd0b432c",
+          "pluginRelativePath": "hooks/inject-claude-md.mjs"
+        }
+      ],
+      "role": "Advisory",
+      "owner": "plugin:Vercel",
+      "disposition": "keep",
+      "source": {
+        "state": "versioned-plugin",
+        "refs": [
+          "https://github.com/vercel/vercel-plugin.git#ccfbc7c584f15c0fc925957c86bafaca9444d24a:."
+        ],
+        "hookConfigSha256": "09d335208258ab6b8593976732869272755b6c7fae30afd906d010234a30aed5",
+        "commitSha": "ccfbc7c584f15c0fc925957c86bafaca9444d24a",
+        "receiptSha256": "181ccda87d7d5d19410075cbc0c0db733bf6c97650c7ed6c78953b0c8e7d1aac"
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "PV-04",
+      "surface": "plugin-vercel",
+      "event": "SessionEnd",
+      "matcher": "",
+      "timeoutSeconds": null,
+      "handler": "session-end-cleanup.mjs",
+      "commandSha256": "7483ecfba37125bd5f5d771192678368b3b039cf4688440e7c5967d4f65a0f27",
+      "artifacts": [
+        {
+          "name": "session-end-cleanup.mjs",
+          "sha256": "1db52d969130cbcb954cad129eb06dbe4a89ed636b51bad6ba6b33a22ec80a0a",
+          "pluginRelativePath": "hooks/session-end-cleanup.mjs"
+        }
+      ],
+      "role": "Automation",
+      "owner": "plugin:Vercel",
+      "disposition": "keep",
+      "source": {
+        "state": "versioned-plugin",
+        "refs": [
+          "https://github.com/vercel/vercel-plugin.git#ccfbc7c584f15c0fc925957c86bafaca9444d24a:."
+        ],
+        "hookConfigSha256": "09d335208258ab6b8593976732869272755b6c7fae30afd906d010234a30aed5",
+        "commitSha": "ccfbc7c584f15c0fc925957c86bafaca9444d24a",
+        "receiptSha256": "181ccda87d7d5d19410075cbc0c0db733bf6c97650c7ed6c78953b0c8e7d1aac"
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "PC-01",
+      "surface": "plugin-codex-companion",
+      "event": "SessionStart",
+      "matcher": "",
+      "timeoutSeconds": 5,
+      "handler": "session-lifecycle-hook.mjs",
+      "commandSha256": "639cf350cfb4d50a8586cb14eea666503f34599e1a7cb990da8da99fc63797ab",
+      "artifacts": [
+        {
+          "name": "session-lifecycle-hook.mjs",
+          "sha256": "cb8781e6a12bddcde94776e82c743f79e5e11c81bd4e4e9571dbb7002108292a",
+          "pluginRelativePath": "scripts/session-lifecycle-hook.mjs"
+        }
+      ],
+      "role": "Automation",
+      "owner": "plugin:Codex-Companion",
+      "disposition": "keep",
+      "source": {
+        "state": "versioned-plugin",
+        "refs": [
+          "https://github.com/openai/codex-plugin-cc.git#80c31f99570876c3ef40327838b0a2ca1ae2cd9c:plugins/codex"
+        ],
+        "hookConfigSha256": "6ba33b3f6a75ba4271a76160b0465e7050a607a02e1ec212a7c0f3b9cd3cb35a",
+        "commitSha": "80c31f99570876c3ef40327838b0a2ca1ae2cd9c",
+        "receiptSha256": "bfd66d6ec5c2704b698d65ec73256984a487e87243c818cc166bcc94abb24c28"
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "PC-02",
+      "surface": "plugin-codex-companion",
+      "event": "SessionEnd",
+      "matcher": "",
+      "timeoutSeconds": 5,
+      "handler": "session-lifecycle-hook.mjs",
+      "commandSha256": "e27134a9c2dc313b2d07c4c5a2a8d6dfa6c486875452f52ca479731acf1052ee",
+      "artifacts": [
+        {
+          "name": "session-lifecycle-hook.mjs",
+          "sha256": "cb8781e6a12bddcde94776e82c743f79e5e11c81bd4e4e9571dbb7002108292a",
+          "pluginRelativePath": "scripts/session-lifecycle-hook.mjs"
+        }
+      ],
+      "role": "Automation",
+      "owner": "plugin:Codex-Companion",
+      "disposition": "keep",
+      "source": {
+        "state": "versioned-plugin",
+        "refs": [
+          "https://github.com/openai/codex-plugin-cc.git#80c31f99570876c3ef40327838b0a2ca1ae2cd9c:plugins/codex"
+        ],
+        "hookConfigSha256": "6ba33b3f6a75ba4271a76160b0465e7050a607a02e1ec212a7c0f3b9cd3cb35a",
+        "commitSha": "80c31f99570876c3ef40327838b0a2ca1ae2cd9c",
+        "receiptSha256": "bfd66d6ec5c2704b698d65ec73256984a487e87243c818cc166bcc94abb24c28"
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "PC-03",
+      "surface": "plugin-codex-companion",
+      "event": "Stop",
+      "matcher": "",
+      "timeoutSeconds": 900,
+      "handler": "stop-review-gate-hook.mjs",
+      "commandSha256": "508787f2276ea252fd9e8dd93e0d23bc182725f508cc0eded06289fb897fbe28",
+      "artifacts": [
+        {
+          "name": "stop-review-gate-hook.mjs",
+          "sha256": "caf98d78d995f98df5da3903690c20ab701b56240b6ca8b9fd10ef38bc9119fc",
+          "pluginRelativePath": "scripts/stop-review-gate-hook.mjs"
+        }
+      ],
+      "role": "Gate",
+      "owner": "plugin:Codex-Companion",
+      "disposition": "keep",
+      "source": {
+        "state": "versioned-plugin",
+        "refs": [
+          "https://github.com/openai/codex-plugin-cc.git#80c31f99570876c3ef40327838b0a2ca1ae2cd9c:plugins/codex"
+        ],
+        "hookConfigSha256": "6ba33b3f6a75ba4271a76160b0465e7050a607a02e1ec212a7c0f3b9cd3cb35a",
+        "commitSha": "80c31f99570876c3ef40327838b0a2ca1ae2cd9c",
+        "receiptSha256": "bfd66d6ec5c2704b698d65ec73256984a487e87243c818cc166bcc94abb24c28"
+      },
+      "batchStatus": "eligible-for-later-plan"
+    }
+  ]
+}
