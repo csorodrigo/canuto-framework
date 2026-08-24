@@ -126,9 +126,9 @@ def read_bytes_limited(path: Path, max_bytes: int, label: str) -> bytes:
     try:
         opened = os.fstat(descriptor)
         if not stat.S_ISREG(opened.st_mode):
-            raise EnvelopeError(""{label} must be a regular file")
+            raise EnvelopeError(f"{label} must be a regular file")
         if (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino):
-            raise EnvelopeError(""{label} changed while it was being opened")
+            raise EnvelopeError(f"{label} changed while it was being opened")
 
         chunks: list[bytes] = []
         remaining = max_bytes + 1
@@ -143,7 +143,7 @@ def read_bytes_limited(path: Path, max_bytes: int, label: str) -> bytes:
         os.close(descriptor)
 
     if len(payload) > max_bytes:
-        raise EnvelopeError(""{label} exceeds {max_bytes} bytes")
+        raise EnvelopeError(f"{label} exceeds {max_bytes} bytes")
     return payload
 
 
@@ -154,7 +154,7 @@ def load_json_limited(path: Path) -> dict[str, Any]:
     except EnvelopeError:
         raise
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise EnvelopeError(""invalid JSON: {exc}") from exc
+        raise EnvelopeError(f"invalid JSON: {exc}") from exc
     if not isinstance(value, dict):
         raise EnvelopeError("envelope root must be an object")
     return value
@@ -162,7 +162,7 @@ def load_json_limited(path: Path) -> dict[str, Any]:
 
 def require_nonempty_string(value: Any, field: str, max_len: int = 512) -> str:
     if not isinstance(value, str) or not value.strip():
-        raise EnvelopeError(""{lfield} must be a non-empty string")
+        raise EnvelopeError(f"{field} must be a non-empty string")
     if len(value) > max_len:
         raise EnvelopeError(f"{field} exceeds {max_len} characters")
     if any(ord(ch) < 32 for ch in value):
@@ -225,7 +225,7 @@ def validate_envelope(
     }
     missing = sorted(required - envelope.keys())
     if missing:
-        raise EnvelopeError(&"missing required fields: {', '.join(missing)}")
+        raise EnvelopeError(f"missing required fields: {', '.join(missing)}")
     unknown = sorted(envelope.keys() - required)
     if unknown:
         raise EnvelopeError(f"unknown fields: {', '.join(unknown)}")
