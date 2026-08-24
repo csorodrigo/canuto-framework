@@ -15,240 +15,35 @@ HOOKS_DIR="$HOME/.claude/hooks"
 SETTINGS_FILE="$HOME/.claude/settings.json"
 SCRIPTS_DIR="$HOME/.claude/scripts"
 
-# ── Merge idempotente + self-heal do settings.json (auditoria 2026-08-01) ────
-# CAUSA-RAIZ da duplicação de hooks corrigida aqui: o merge jq antigo
-# identificava grupos por (matcher + conjunto ordenado dos comandos do grupo).
-# Bastava o grupo local ter UM hook a mais (git-truth, ccgram,
-# session-budget-warn...) para a chave nunca bater — e o grupo do snippet era
-# appendado INTEIRO de novo a cada install. A dedup por hook só rodava DENTRO
-# de um grupo casado, nunca entre grupos do mesmo evento: 12 hooks chegaram a
-# rodar 2x por evento na máquina de referência.
-#
-# Regras novas:
-#   1. Presença por (evento + command): se o comando já está registrado no
-#      evento — em QUALQUER grupo/matcher — skip. Cobre (evento+matcher+
-#      command) e também respeita consolidação manual do usuário (ex.:
-#      codex-pretool-guard movido do matcher "" para "Bash").
-#   2. Self-heal: duplicatas exatas (evento+matcher+command) PRÉ-EXISTENTES de
-#      hooks canuto são removidas (1ª ocorrência preservada), incluindo o caso
-#      nominal cross-matcher do codex-pretool-guard ("" duplica "Bash" porque
-#      matcher vazio casa todo tool). Hooks não-canuto nunca são tocados.
-#   3. Só reescreve o arquivo quando houve mudança real (escrita atômica).
-canuto_settings_merge() {
-  local settings="$1" snippet="$2"
-  if [ ! -f "$snippet" ]; then
-    echo "   ⚠️  snippet não encontrado: $snippet — merge de hooks pulado."
-    return 0
-  fi
-  if [ ! -f "$settings" ]; then
-    mkdir -p "$(dirname "$settings")"
-    cp "$snippet" "$settings"
-    echo "   ✅ settings.json criado com hooks e MCP servers"
-    return 0
-  fi
-  if ! command -v python3 >/dev/null 2>&1; then
-    echo "   ⚠️  python3 indisponível — merge de hooks pulado (settings.json intacto; instale python3 e re-rode)."
-    return 0
-  fi
-
-  # Hooks canuto = exatamente os .sh que este diretório distribui.
-  local canuto_list="" f
-  for f in "$SCRIPT_DIR"/*.sh; do
-    [ -f "$f" ] || continue
-    canuto_list="$canuto_list$(basename "$f"),"
-  done
-
-  if python3 - "$settings" "$snippet" "$canuto_list" <<'PYMERGE'
-import json, os, sys
-
-settings_path, snippet_path = sys.argv[1], sys.argv[2]
-canuto_names = set(n for n in sys.argv[3].split(",") if n)
-HOME = os.path.expanduser("~")
-
-def norm(cmd):
-    # "~/.claude/hooks/x.sh" e "/Users/me/.claude/hooks/x.sh" são o mesmo hook.
-    if isinstance(cmd, str) and cmd.startswith("~"):
-        return HOME + cmd[1:]
-    return cmd
-
-def script_name(cmd):
-    # basename do executável, ignorando argumentos ("api-reference-guard.sh stop")
-    # e pulando interpretador ("bash ~/.claude/hooks/x.sh" -> "x.sh" — sem isso,
-    # toda regra por nome falhava em silêncio na forma bash-prefixada).
-    if not isinstance(cmd, str) or not cmd.strip():
-        return ""
-    toks = cmd.split()
-    tok = toks[0]
-    if tok.rsplit("/", 1)[-1] in ("bash", "sh", "zsh") and len(toks) > 1:
-        tok = toks[1]
-    return tok.rsplit("/", 1)[-1]
-
-with open(settings_path) as fh:
-    data = json.load(fh)
-with open(snippet_path) as fh:
-    snip = json.load(fh)
-
-changes = []
-hooks = data.setdefault("hooks", {})
-
-# ── Migração matcher ""->"Bash" do codex-pretool-guard ──────────────────────
-# Ressalva do review cego 2026-08-01: "preservar a 1ª ocorrência" deixava o
-# guard sob matcher "" vencer quando esse grupo vinha primeiro — e matcher
-# vazio dispara o guard para TODO tool. Migra PRESERVANDO metadata do usuário
-# (cwd/timeout/env — garantia testada no test-framework): grupo "" só com o
-# guard tem o matcher convertido em-lugar; grupo misto tem só o hook-objeto do
-# guard movido para o grupo "Bash". Roda ANTES do self-heal: duplicatas que a
-# migração criar (guard já existente sob "Bash") caem na dedup logo abaixo.
-for event, groups in list(hooks.items()):
-    if not isinstance(groups, list):
-        continue
-    for group in groups:
-        if not isinstance(group, dict) or group.get("matcher", "") != "":
-            continue
-        ghooks = group.get("hooks", [])
-        guard_hooks = [h for h in ghooks if isinstance(h, dict)
-                       and script_name(h.get("command", "")) == "codex-pretool-guard.sh"]
-        if not guard_hooks:
-            continue
-        others = [h for h in ghooks if h not in guard_hooks]
-        if not others:
-            group["matcher"] = "Bash"
-            changes.append('migração: grupo do codex-pretool-guard convertido de '
-                           'matcher "" para "Bash" (metadata preservada) [%s]' % event)
-        else:
-            target = None
-            for g in groups:
-                if isinstance(g, dict) and g.get("matcher", "") == "Bash":
-                    target = g
-                    break
-            if target is None:
-                target = {"matcher": "Bash", "hooks": []}
-                groups.append(target)
-            target.setdefault("hooks", []).extend(guard_hooks)
-            group["hooks"] = others
-            changes.append('migração: codex-pretool-guard movido do matcher "" '
-                           'para "Bash" (hook-metadata preservada) [%s]' % event)
-
-# ── Self-heal: remove duplicatas pré-existentes de hooks canuto ─────────────
-for event, groups in list(hooks.items()):
-    if not isinstance(groups, list):
-        continue
-    seen_exact = set()   # (matcher, command normalizado)
-    seen_cmd = {}        # command normalizado -> primeiro matcher
-    new_groups = []
-    for group in groups:
-        if not isinstance(group, dict):
-            new_groups.append(group)
-            continue
-        matcher = group.get("matcher", "")
-        kept = []
-        for h in group.get("hooks", []):
-            if not isinstance(h, dict):
-                kept.append(h)
-                continue
-            cmd = norm(h.get("command", ""))
-            name = script_name(cmd)
-            key = (matcher, cmd)
-            if key in seen_exact and name in canuto_names:
-                changes.append("self-heal: duplicata exata removida [%s] matcher=%r %s"
-                               % (event, matcher, h.get("command", "")))
-                continue
-            if (name == "codex-pretool-guard.sh" and cmd in seen_cmd
-                    and seen_cmd[cmd] != matcher):
-                changes.append("self-heal: duplicata cross-matcher removida [%s] matcher=%r %s"
-                               % (event, matcher, h.get("command", "")))
-                continue
-            seen_exact.add(key)
-            seen_cmd.setdefault(cmd, matcher)
-            kept.append(h)
-        if kept:
-            g2 = dict(group)
-            g2["hooks"] = kept
-            new_groups.append(g2)
-        else:
-            changes.append("self-heal: grupo vazio removido [%s] matcher=%r"
-                           % (event, group.get("matcher", "")))
-    hooks[event] = new_groups
-
-# ── Merge: registra hooks do snippet ausentes (presença por evento+command) ─
-for event, sgroups in (snip.get("hooks") or {}).items():
-    if not isinstance(sgroups, list):
-        continue
-    groups = hooks.setdefault(event, [])
-    present = set()
-    for g in groups:
-        if isinstance(g, dict):
-            for h in g.get("hooks", []):
-                if isinstance(h, dict):
-                    present.add(norm(h.get("command", "")))
-    for sgroup in sgroups:
-        if not isinstance(sgroup, dict):
-            continue
-        matcher = sgroup.get("matcher", "")
-        for h in sgroup.get("hooks", []):
-            if not isinstance(h, dict):
-                continue
-            cmd = norm(h.get("command", ""))
-            if not cmd or cmd in present:
-                continue
-            target = None
-            for g in groups:
-                if isinstance(g, dict) and g.get("matcher", "") == matcher:
-                    target = g
-                    break
-            if target is None:
-                target = {"matcher": matcher, "hooks": []}
-                groups.append(target)
-            target.setdefault("hooks", []).append(h)
-            present.add(cmd)
-            changes.append("registrado [%s] matcher=%r %s"
-                           % (event, matcher, h.get("command", "")))
-
-# ── mcpServers: deep-merge (preserva chaves extras locais, ex. env custom) ──
-def deep_merge(base, over):
-    out = dict(base)
-    for k, v in over.items():
-        if isinstance(v, dict) and isinstance(out.get(k), dict):
-            out[k] = deep_merge(out[k], v)
-        else:
-            out[k] = v
-    return out
-
-snip_mcp = snip.get("mcpServers") or {}
-if snip_mcp:
-    current = data.get("mcpServers") or {}
-    merged = deep_merge(current, snip_mcp)
-    if merged != current:
-        changes.append("mcpServers atualizados a partir do snippet")
-        data["mcpServers"] = merged
-
-if changes:
-    tmp = settings_path + ".canuto-merge.tmp"
-    with open(tmp, "w") as fh:
-        json.dump(data, fh, indent=2, ensure_ascii=False)
-        fh.write("\n")
-    os.replace(tmp, settings_path)
-    for c in changes:
-        print("   • " + c)
-    print("   ✅ settings.json: %d mudança(s) aplicada(s)" % len(changes))
-else:
-    print("   ✅ settings.json já em dia (0 mudanças)")
-PYMERGE
-  then
-    :
-  else
-    echo "   ⚠️  merge de settings falhou — settings.json NÃO foi modificado."
-  fi
+canuto_managed_hooks() {
+  node "$SCRIPT_DIR/reconcile-hooks.mjs" "$@" \
+    --manifest "$SCRIPT_DIR/managed-hooks.json"
 }
 
-# Modo restrito (usado pelos testes e pelo track de validação): roda SÓ o
-# merge/self-heal do settings, sem copiar hooks nem tocar em mais nada.
-#   bash .agents/hooks/install.sh --merge-settings-only <settings.json> [snippet.json]
-if [ "${1:-}" = "--merge-settings-only" ]; then
-  [ -n "${2:-}" ] || { echo "uso: install.sh --merge-settings-only <settings.json> [snippet.json]" >&2; exit 64; }
-  canuto_settings_merge "$2" "${3:-$SCRIPT_DIR/settings-snippet.json}"
-  exit $?
-fi
+# Modos restritos: nunca copiam hooks nem usam a configuração real por padrão.
+# `apply` exige o fingerprint emitido por uma execução anterior de `plan`.
+case "${1:-}" in
+  --plan-managed-hooks)
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] || { echo "uso: install.sh --plan-managed-hooks <settings.json> <hooks-dir>" >&2; exit 64; }
+    canuto_managed_hooks plan --config "$2" --hooks-dir "$3"
+    exit $?
+    ;;
+  --apply-managed-hooks)
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] && [ -n "${4:-}" ] && [ -n "${5:-}" ] || { echo "uso: install.sh --apply-managed-hooks <fingerprint> <settings.json> <hooks-dir> <state-dir>" >&2; exit 64; }
+    canuto_managed_hooks apply --fingerprint "$2" --config "$3" --hooks-dir "$4" --state-dir "$5"
+    exit $?
+    ;;
+  --verify-managed-hooks)
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] || { echo "uso: install.sh --verify-managed-hooks <settings.json> <hooks-dir>" >&2; exit 64; }
+    canuto_managed_hooks verify --config "$2" --hooks-dir "$3"
+    exit $?
+    ;;
+  --rollback-managed-hooks)
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] || { echo "uso: install.sh --rollback-managed-hooks <batch-id> <state-dir>" >&2; exit 64; }
+    node "$SCRIPT_DIR/reconcile-hooks.mjs" rollback --batch-id "$2" --state-dir "$3"
+    exit $?
+    ;;
+esac
 
 echo "🔍 Verificando pré-requisitos..."
 
@@ -256,64 +51,6 @@ if ! command -v jq &> /dev/null; then
   echo "⚠️  jq não encontrado. Instale com: brew install jq"
   echo "Abortando — jq é necessário para hooks e MCP."
   exit 1
-fi
-
-# ── Hooks ───────────────────────────────────────────────────────────────────
-echo ""
-echo "📁 Instalando hooks em ~/.claude/hooks/..."
-mkdir -p "$HOOKS_DIR"
-
-# plan-review.sh retired 2026-06-11 (0 firings in the 200-session audit) — see _retired/.
-for hook in codex-pretool-guard.sh session-save.sh pre-compact-save.sh protect-files.sh require-tests-for-pr.sh log-commands.sh session-start.sh validation-mark.sh validation-clear.sh retry-detect.sh fingerprint-gate.sh pre-finalize.sh posttooluse-universal.sh pre-commit-branch-check.sh worktree-collision-check.sh pre-claim-grep.sh screenshot-guard.sh pre-pr-bash-gate.sh postdelegate-verify.sh; do
-  if [ -f "$SCRIPT_DIR/$hook" ]; then
-    # Guarda a versão anterior antes de sobrescrever: se a nova cópia não
-    # parsear, dá para voltar.
-    prev=""
-    if [ -f "$HOOKS_DIR/$hook" ]; then
-      prev="$HOOKS_DIR/$hook.prev.$$"
-      cp "$HOOKS_DIR/$hook" "$prev" 2>/dev/null || prev=""
-    fi
-
-    cp "$SCRIPT_DIR/$hook" "$HOOKS_DIR/$hook"
-    chmod +x "$HOOKS_DIR/$hook"
-
-    # Verifica o DESTINO. Hook que não parseia dispara erro a cada invocação —
-    # e posttooluse-universal.sh tem matcher ".*", ou seja, todo comando da
-    # sessão. Visto em campo com o arquivo do repo íntegro: a cópia chegou
-    # corrompida. A causa exata não importa aqui; o que importa é não deixar
-    # em pé.
-    if bash -n "$HOOKS_DIR/$hook" 2>/dev/null; then
-      echo "   ✅ $hook"
-      rm -f "$prev" 2>/dev/null || true
-    else
-      echo "   ❌ $hook: a cópia instalada não parseia (bash -n falhou)"
-      bash -n "$HOOKS_DIR/$hook" 2>&1 | head -3 | sed 's/^/         /'
-      if [ -n "$prev" ] && bash -n "$prev" 2>/dev/null; then
-        mv "$prev" "$HOOKS_DIR/$hook"; chmod +x "$HOOKS_DIR/$hook"
-        echo "      versão anterior íntegra restaurada"
-      else
-        rm -f "$HOOKS_DIR/$hook"
-        echo "      removido — melhor sem hook que com hook quebrado em todo comando"
-      fi
-      rm -f "$prev" 2>/dev/null || true
-    fi
-  fi
-done
-
-# Rede de segurança: hooks instalados em rodadas ANTERIORES podem ter corrompido
-# depois. Varre tudo que está em ~/.claude/hooks/, não só o que acabou de ser
-# copiado — foi exatamente assim que o posttooluse-universal.sh quebrado passou
-# despercebido, disparando em toda a sessão sem ninguém reinstalar.
-BROKEN_HOOKS=""
-for installed in "$HOOKS_DIR"/*.sh; do
-  [ -f "$installed" ] || continue
-  bash -n "$installed" 2>/dev/null || BROKEN_HOOKS="$BROKEN_HOOKS $(basename "$installed")"
-done
-if [ -n "$BROKEN_HOOKS" ]; then
-  echo ""
-  echo "   ⚠️  hooks já instalados que NÃO parseiam:$BROKEN_HOOKS"
-  echo "      Cada um deles falha a cada invocação. Se vieram do framework, o"
-  echo "      passo acima já os substituiu; se persistirem, são locais."
 fi
 
 echo ""
@@ -417,41 +154,21 @@ if [ -n "$CANUTO_LIB_OK" ]; then
   echo "   ✅ VERSION marker atualizado"
 fi
 
-# ── MCP Servers + registro de hooks no settings.json ────────────────────────
-# O merge/self-heal mora em canuto_settings_merge() (topo deste arquivo) — o
-# merge jq antigo, que causava a duplicação de hooks, foi removido em
-# 2026-08-01 (ver comentário da função para a causa-raiz).
+# ── Prévia do estado desejado dos hooks ─────────────────────────────────────
+# O instalador comum não aplica mudanças de wiring implicitamente. O mesmo
+# fingerprint revisado precisa ser fornecido a --apply-managed-hooks.
 echo ""
-echo "🔌 Configurando hooks e MCP servers em settings.json..."
+echo "🔌 Planejando estado desejado dos hooks em settings.json..."
 
-SNIPPET="$SCRIPT_DIR/settings-snippet.json"
-canuto_settings_merge "$SETTINGS_FILE" "$SNIPPET"
-
-# Cleanup: remove MCP entries que não pertencem ao settings.json do Claude.
-# - codex-* (retired 2026-04-29): Maestro invoca Codex via `codex exec` direto.
-# - claude-architect / claude-reviewer (2026-07-27): wrappers de back-delegation
-#   Codex→Claude — só fazem sentido registrados NO CODEX. Numa sessão Claude
-#   eram dois servidores MCP mortos subindo a cada startup.
-# - openbrand / context-hub (2026-07-27): únicos consumidores são skills em
-#   _archive/. Re-adicione com `claude mcp add` se voltar a usar.
-if [ -f "$SETTINGS_FILE" ]; then
-  CLEANED=$(jq '
-    if .mcpServers then
-      .mcpServers |= (
-        del(.["codex-coder"])
-        | del(.["codex-reviewer"])
-        | del(.["codex-maestro"])
-        | del(.["claude-architect"])
-        | del(.["claude-reviewer"])
-        | del(.["openbrand"])
-        | del(.["context-hub"])
-      )
-    else . end
-  ' "$SETTINGS_FILE")
-  if [ -n "$CLEANED" ] && ! cmp -s <(echo "$CLEANED") "$SETTINGS_FILE"; then
-    echo "$CLEANED" > "$SETTINGS_FILE"
-    echo "   ✅ settings.json enxugado: removidos MCPs Codex-only e sem consumidor"
-  fi
+MANAGED_PLAN=$(canuto_managed_hooks plan --config "$SETTINGS_FILE" --hooks-dir "$HOOKS_DIR")
+MANAGED_CHANGED=$(printf '%s' "$MANAGED_PLAN" | jq -r '.changed')
+MANAGED_FINGERPRINT=$(printf '%s' "$MANAGED_PLAN" | jq -r '.fingerprint')
+if [ "$MANAGED_CHANGED" = "true" ]; then
+  echo "   ⚠️  wiring pendente; nenhuma configuração foi escrita."
+  echo "      fingerprint: $MANAGED_FINGERPRINT"
+  echo "      revise com: bash .agents/hooks/install.sh --plan-managed-hooks \"$SETTINGS_FILE\" \"$HOOKS_DIR\""
+else
+  echo "   ✅ wiring já converge para o manifesto ($MANAGED_FINGERPRINT)"
 fi
 
 # ── Claude MCPs ──────────────────────────────────────────────────────────────

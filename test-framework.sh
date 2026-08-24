@@ -401,13 +401,12 @@ cat > "$HOOKS_HOME/.claude/settings.json" <<'EOF'
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "",
-        "cwd": "/tmp/preserve-me",
+        "matcher": "External",
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/codex-pretool-guard.sh",
-            "timeout": 240,
+            "command": "/opt/external/hook",
+            "timeout": 12,
             "env": {
               "KEEP_ME": "1"
             }
@@ -418,17 +417,20 @@ cat > "$HOOKS_HOME/.claude/settings.json" <<'EOF'
   }
 }
 EOF
-if HOME="$HOOKS_HOME" bash "$AGENTS_DIR/hooks/install.sh" >/dev/null 2>&1; then
-  PRESERVED_CWD=$(jq -r '.hooks.PreToolUse[] | select(.hooks[]?.command == "~/.claude/hooks/codex-pretool-guard.sh") | .cwd // empty' "$HOOKS_HOME/.claude/settings.json" | head -1)
-  PRESERVED_ENV=$(jq -r '.hooks.PreToolUse[] | select(.hooks[]?.command == "~/.claude/hooks/codex-pretool-guard.sh") | .hooks[] | select(.command == "~/.claude/hooks/codex-pretool-guard.sh") | .env.KEEP_ME // empty' "$HOOKS_HOME/.claude/settings.json" | head -1)
+HOOK_PLAN=$(HOME="$HOOKS_HOME" bash "$AGENTS_DIR/hooks/install.sh" --plan-managed-hooks "$HOOKS_HOME/.claude/settings.json" "$HOOKS_HOME/.claude/hooks" 2>/dev/null || true)
+HOOK_FINGERPRINT=$(printf '%s' "$HOOK_PLAN" | jq -r '.fingerprint // empty' 2>/dev/null || true)
+if [ -n "$HOOK_FINGERPRINT" ] \
+  && HOME="$HOOKS_HOME" bash "$AGENTS_DIR/hooks/install.sh" --apply-managed-hooks "$HOOK_FINGERPRINT" "$HOOKS_HOME/.claude/settings.json" "$HOOKS_HOME/.claude/hooks" "$HOOKS_HOME/.canuto/reconcile-state" >/dev/null 2>&1 \
+  && HOME="$HOOKS_HOME" bash "$AGENTS_DIR/hooks/install.sh" --verify-managed-hooks "$HOOKS_HOME/.claude/settings.json" "$HOOKS_HOME/.claude/hooks" >/dev/null 2>&1; then
+  PRESERVED_ENV=$(jq -r '.hooks.PreToolUse[] | .hooks[] | select(.command == "/opt/external/hook") | .env.KEEP_ME // empty' "$HOOKS_HOME/.claude/settings.json")
   HOOK_COUNT=$(jq '[.hooks.PreToolUse[] | .hooks[] | select(.command == "~/.claude/hooks/codex-pretool-guard.sh")] | length' "$HOOKS_HOME/.claude/settings.json")
-  if [ "$PRESERVED_CWD" = "/tmp/preserve-me" ] && [ "$PRESERVED_ENV" = "1" ] && [ "$HOOK_COUNT" -eq 1 ]; then
-    pass "hook installer preserves existing hook metadata while deduping"
+  if [ "$PRESERVED_ENV" = "1" ] && [ "$HOOK_COUNT" -eq 1 ]; then
+    pass "managed hook reconciler applies reviewed plan and preserves external entries"
   else
-    fail "hook installer lost hook metadata or duplicated entries"
+    fail "managed hook reconciler changed external entries or duplicated managed hooks"
   fi
 else
-  fail ".agents/hooks/install.sh merge regression test failed"
+  fail ".agents/hooks/install.sh managed reconciliation regression test failed"
 fi
 rm -rf "$HOOKS_HOME"
 
