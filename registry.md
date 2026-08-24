@@ -133,6 +133,34 @@ These skills are slash commands invokable directly in Claude Code. Installed aut
 | `/overdrive` | Technically ambitious interfaces: View Transitions, scroll-driven animations, WebGL, virtual scrolling, Web Audio. | design, advanced |
 | `/clarify` | Microcopy and interface text improvement — every word earns its place. Error messages, empty states, button copy. | design, copy |
 
+### Governed third-party bundle: Matt Pocock
+
+The 36 upstream skills under `global-skills/` are pinned by
+`distribution/matt-pocock-skills.json`. They are not installed by Skill
+Gardener and are not mixed into the legacy `install.sh` copy loop. Publish one
+provider root at a time with an explicit receipt:
+
+```bash
+node .agents/tools/skill-bundle-publisher.js plan --manifest distribution/matt-pocock-skills.json --target ~/.codex/skills
+node .agents/tools/skill-bundle-publisher.js apply --manifest distribution/matt-pocock-skills.json --target ~/.codex/skills
+node .agents/tools/skill-bundle-publisher.js verify --manifest distribution/matt-pocock-skills.json --target ~/.codex/skills
+node .agents/tools/skill-bundle-publisher.js rollback --receipt <apply-receipt>
+```
+
+`apply` accepts an absent directory, adopts byte-identical content, and updates
+only content already recorded as managed. Any different unmanaged directory is
+a conflict and blocks the whole target before mutation. Backups and receipts
+live under `<target>/.canuto-skill-publisher/`.
+
+To update the canonical bundle, first obtain a clean checkout of
+`mattpocock/skills` at an exact commit, then run:
+
+```bash
+node .agents/tools/import-matt-pocock-skills.js --source <checkout> --ref <40-character-sha>
+```
+
+Review the imported diff and rerun the framework suite before publishing.
+
 ---
 
 ## Installing an Optional Skill

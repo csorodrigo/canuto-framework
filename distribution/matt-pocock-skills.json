@@ -1,0 +1,192 @@
+{
+  "schemaVersion": 1,
+  "bundleId": "matt-pocock-skills",
+  "source": {
+    "repository": "https://github.com/mattpocock/skills",
+    "ref": "5b15a47f2d7150f545fbcacbfe381787fc0230dc",
+    "license": "MIT",
+    "licenseFile": "distribution/licenses/matt-pocock-skills.LICENSE"
+  },
+  "skills": [
+    {
+      "name": "ask-matt",
+      "upstreamPath": "skills/engineering/ask-matt",
+      "sha256": "39bacf6e6b4c20286b2145cd2b61fbe2c41886abce42f27999385b07fdd243e8"
+    },
+    {
+      "name": "claude-handoff",
+      "upstreamPath": "skills/in-progress/claude-handoff",
+      "sha256": "7eff7609589c38fd0bcf09d0908d56301c7f881bf1d56c920d46812da9d19497"
+    },
+    {
+      "name": "code-review",
+      "upstreamPath": "skills/engineering/code-review",
+      "sha256": "a20ec5c460423fce0bc5794a2b6bb0386b429eefea26078895a6515793abfae7"
+    },
+    {
+      "name": "codebase-design",
+      "upstreamPath": "skills/engineering/codebase-design",
+      "sha256": "9f4a46133d18eb0a6d269ea78a1e0c61cccbe1cb97b1081389f933e43f9fc5e0"
+    },
+    {
+      "name": "diagnosing-bugs",
+      "upstreamPath": "skills/engineering/diagnosing-bugs",
+      "sha256": "18b9eb4fb2aa1abc7fba807942ebd2d9ff556c30092fed4fe566bb3efe8a2eb1"
+    },
+    {
+      "name": "domain-modeling",
+      "upstreamPath": "skills/engineering/domain-modeling",
+      "sha256": "2dfa1e9ab76bfb134080e4c5457b0e1e87863afb673e441ef6b49418c74f40f6"
+    },
+    {
+      "name": "git-guardrails-claude-code",
+      "upstreamPath": "skills/misc/git-guardrails-claude-code",
+      "sha256": "0cf78cef7bbdef0d425aa5a2e8273ba23b20e2a2f979693251c6b312d7aef8ce"
+    },
+    {
+      "name": "grill-me",
+      "upstreamPath": "skills/productivity/grill-me",
+      "sha256": "bfd8bd2075bdfb5691dba03ddf479f04f43afb2aadd7ddad18c6e27bca9321f5"
+    },
+    {
+      "name": "grill-with-docs",
+      "upstreamPath": "skills/engineering/grill-with-docs",
+      "sha256": "a62f86963efa2b18482b2eaeb8ef82c335d78120b1ab533d5883e6ee8bc115a9"
+    },
+    {
+      "name": "grilling",
+      "upstreamPath": "skills/productivity/grilling",
+      "sha256": "6499aead87b3a2d905cbcd68eaf7012e612dc8e50b6e973692b657fd666c5dc4"
+    },
+    {
+      "name": "handoff",
+      "upstreamPath": "skills/productivity/handoff",
+      "sha256": "1d9ee83b279b233046cc6250362c0fda217a3aadfa0051fc6c634d389896ead0"
+    },
+    {
+      "name": "implement",
+      "upstreamPath": "skills/engineering/implement",
+      "sha256": "6a8c9afb037e25a04dc9c7c4282bb2dd3cd1eee004be79ea3b1042f043dc9f0c"
+    },
+    {
+      "name": "implement-spec",
+      "upstreamPath": "skills/in-progress/implement-spec",
+      "sha256": "f9c52ea8872865118933ae8bd7dd75f73daa803d7ce4058976b353b9bdd853c5"
+    },
+    {
+      "name": "improve-codebase-architecture",
+      "upstreamPath": "skills/engineering/improve-codebase-architecture",
+      "sha256": "2f4e58e905c55c7ed026134f9e8cfcf424f652b766fa1ad8f78a572a09a2949e"
+    },
+    {
+      "name": "loop-me",
+      "upstreamPath": "skills/in-progress/loop-me",
+      "sha256": "de7366e4c61a730de9a5d0c83a3e170340d2d7a5759b63c3afebb36543a3b79f"
+    },
+    {
+      "name": "migrate-to-shoehorn",
+      "upstreamPath": "skills/misc/migrate-to-shoehorn",
+      "sha256": "b735220c9bcbdfc3a8d4370d01a75fcb49ce88d84f4a38bab106e6b7f44847b7"
+    },
+    {
+      "name": "prototype",
+      "upstreamPath": "skills/engineering/prototype",
+      "sha256": "db4f7cb25ff434c8a8ff9f8d31d591dbdac2e4899289379da335b18b82bd578e"
+    },
+    {
+      "name": "research",
+      "upstreamPath": "skills/engineering/research",
+      "sha256": "4c59d05438369c582eb30bab26198929df48fea505cc76e73f63580279f04725"
+    },
+    {
+      "name": "resolving-merge-conflicts",
+      "upstreamPath": "skills/engineering/resolving-merge-conflicts",
+      "sha256": "a771c765347e496121e8fcb5f707c4b4fdeb67737d578ed1cd08b1ec0e081c24"
+    },
+    {
+      "name": "scaffold-exercises",
+      "upstreamPath": "skills/misc/scaffold-exercises",
+      "sha256": "e21c9d7ebc1b933df463b897235597ab1423f721d2a41b4c4f3f5a2d73100d27"
+    },
+    {
+      "name": "setup-matt-pocock-skills",
+      "upstreamPath": "skills/engineering/setup-matt-pocock-skills",
+      "sha256": "aeb23917ab1c4fa9cee8e7397bd92fb1720285cc6192d7d59168658f21fe6a60"
+    },
+    {
+      "name": "setup-pre-commit",
+      "upstreamPath": "skills/misc/setup-pre-commit",
+      "sha256": "25ceaab42d1a333b2b57bab67c2b080809c1e7f2ed96d53429b43109c06f17fa"
+    },
+    {
+      "name": "setup-ts-deep-modules",
+      "upstreamPath": "skills/in-progress/setup-ts-deep-modules",
+      "sha256": "75ca1e59608567dc57b477d91b39f5c557f7d7b101bf8ccd597f90028082505c"
+    },
+    {
+      "name": "tdd",
+      "upstreamPath": "skills/engineering/tdd",
+      "sha256": "df1b0c4465824bc9cc632165253bf6fe5030d0fd9b55edb48a7092fba5dd2a63"
+    },
+    {
+      "name": "teach",
+      "upstreamPath": "skills/productivity/teach",
+      "sha256": "eded8fe19a6598db0dc924eb1fd81595b214292978c90923c5dd4a783f8f7624"
+    },
+    {
+      "name": "to-questionnaire",
+      "upstreamPath": "skills/productivity/to-questionnaire",
+      "sha256": "cb239f24e711a28e1906936e296f7b4488b134305f4c7ab3c02cec1e5bc129cf"
+    },
+    {
+      "name": "to-spec",
+      "upstreamPath": "skills/engineering/to-spec",
+      "sha256": "2a73fc25b49b05667845a013cda5e5c4c7e1e4e870d5755454a6cbbcc6383c3a"
+    },
+    {
+      "name": "to-tickets",
+      "upstreamPath": "skills/engineering/to-tickets",
+      "sha256": "ba65caae84132fe983d03dd34e2226aac2a26793f6774caebb2851f9d1c3cc24"
+    },
+    {
+      "name": "triage",
+      "upstreamPath": "skills/engineering/triage",
+      "sha256": "3f81e8f192081e8b9125ab474f416dbd5cd4f376400c90ad1b8140d7e9457463"
+    },
+    {
+      "name": "wait-what",
+      "upstreamPath": "skills/productivity/wait-what",
+      "sha256": "ef8ab15e74eff843e88e8126283ccfd247547dd29b64506ba4d234a446974312"
+    },
+    {
+      "name": "wayfinder",
+      "upstreamPath": "skills/engineering/wayfinder",
+      "sha256": "6e3e7be11d271f0599630868c25a461c84f08217a2e6bb4581706a8740faa1bb"
+    },
+    {
+      "name": "wizard",
+      "upstreamPath": "skills/engineering/wizard",
+      "sha256": "c92b734dc58fb5fdb84f017124fd325661c0101f434c1c4d96bee1a84d013a21"
+    },
+    {
+      "name": "writing-beats",
+      "upstreamPath": "skills/in-progress/writing-beats",
+      "sha256": "a68eb9f842924a8a72103f7d22a31b15c98c146bd690f5ddc42e36fac28888fe"
+    },
+    {
+      "name": "writing-for-agents",
+      "upstreamPath": "skills/productivity/writing-for-agents",
+      "sha256": "239cf8db2600498114df5194bfe86114d01d7e3a6915d39d028290d2b79de841"
+    },
+    {
+      "name": "writing-fragments",
+      "upstreamPath": "skills/in-progress/writing-fragments",
+      "sha256": "827d2329c22ad93ebe50e37c7f204f4cc62326e8a1f84ed5d6ca3d8ffa3bbf7d"
+    },
+    {
+      "name": "writing-shape",
+      "upstreamPath": "skills/in-progress/writing-shape",
+      "sha256": "24a93b52a61d11f0979529356cc97022c0806931807be199889677e7b59baa99"
+    }
+  ]
+}
