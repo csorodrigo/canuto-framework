@@ -28,6 +28,7 @@ CURATED_AREAS = HYPOTHESIS_AREAS | frozenset(
     {"decisions", "instincts", "design", "digests"}
 )
 
+
 class EnvelopeError(ValueError):
     """Envelope is invalid or cannot be safely applied."""
 
@@ -106,15 +107,24 @@ def atomic_write_bytes(path: Path, payload: bytes, mode: int = 0o644) -> None:
 
 
 def atomic_write_json(path: Path, value: dict[str, Any]) -> None:
-    atomic_write_bytes(path, json.dumps(value, ensure_ascii=True, indent=2, sort_keys=True).encode("utf-8") + b"\n")
+    atomic_write_bytes(
+        path,
+        json.dumps(value, ensure_ascii=True, indent=2, sort_keys=True).encode("utf-8") + b"\n",
+    )
+
+
+def read_bytes_limited(path: Path, max_bytes: int, label: str) -> bytes:
+    with path.open("rb") as handle:
+        payload = handle.read(max_bytes + 1)
+    if len(payload) > max_bytes:
+        raise EnvelopeError(f"{label} exceeds {max_bytes} bytes")
+    return payload
 
 
 def load_json_limited(path: Path) -> dict[str, Any]:
     try:
-        size = path.stat().st_size
-        if size > MAX_ENVELOPE_BYTES:
-            raise EnvelopeError(f"envelope exceeds {MAX_ENVELOPE_BYTES} bytes")
-        value = json.loads(path.read_text(encoding="utf-8"))
+        payload = read_bytes_limited(path, MAX_ENVELOPE_BYTES, "envelope")
+        value = json.loads(payload.decode("utf-8"))
     except EnvelopeError:
         raise
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -296,4 +306,3 @@ def resolve_target(vault: Path, relative_target: str) -> Path:
     except ValueError as exc:
         raise EnvelopeError("target resolves outside the vault") from exc
     return candidate
-

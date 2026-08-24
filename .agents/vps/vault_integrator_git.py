@@ -18,6 +18,7 @@ from vault_integrator_common import (
     utc_now,
 )
 
+
 def run_git(vault: Path, args: Iterable[str], check: bool = True) -> subprocess.CompletedProcess[str]:
     command = ["git", "-C", str(vault), *args]
     return subprocess.run(
@@ -109,11 +110,22 @@ def receipt_filename(envelope_id: str) -> str:
     return f"{safe}.json"
 
 
+def files_equal(left: Path, right: Path, chunk_size: int = 1024 * 1024) -> bool:
+    with left.open("rb") as left_handle, right.open("rb") as right_handle:
+        while True:
+            left_chunk = left_handle.read(chunk_size)
+            right_chunk = right_handle.read(chunk_size)
+            if left_chunk != right_chunk:
+                return False
+            if not left_chunk:
+                return True
+
+
 def archive_envelope(source: Path, destination_dir: Path, envelope_hash: str) -> Path:
     destination_dir.mkdir(parents=True, exist_ok=True)
     destination = destination_dir / f"{source.stem}-{envelope_hash[:12]}.json"
     if destination.exists():
-        if destination.read_bytes() == source.read_bytes():
+        if files_equal(destination, source):
             source.unlink()
             return destination
         destination = destination_dir / f"{source.stem}-{envelope_hash[:12]}-{time.time_ns()}.json"
@@ -145,4 +157,3 @@ def base_receipt(
     if reason:
         receipt["reason"] = reason
     return receipt
-

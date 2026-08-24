@@ -29,6 +29,7 @@ from typing import Any
 
 SCHEMA_VERSION = 1
 DEFAULT_MAX_CONTENT_BYTES = 5 * 1024 * 1024
+MAX_ENVELOPE_BYTES = 8 * 1024 * 1024
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$")
 ENVELOPE_FILENAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}\.json$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -81,12 +82,13 @@ def generated_id() -> str:
 
 
 def load_content(path: Path, max_bytes: int) -> bytes:
-    if not path.is_file():
-        raise ValueError(f"content file does not exist: {path}")
-    size = path.stat().st_size
-    if size > max_bytes:
+    if path.is_symlink() or not path.is_file():
+        raise ValueError(f"content file does not exist or is not a regular file: {path}")
+    with path.open("rb") as handle:
+        content = handle.read(max_bytes + 1)
+    if len(content) > max_bytes:
         raise ValueError(f"content exceeds {max_bytes} bytes")
-    return path.read_bytes()
+    return content
 
 
 def submit(args: argparse.Namespace) -> int:
@@ -146,19 +148,35 @@ def submit(args: argparse.Namespace) -> int:
     return 0
 
 
-def validate_envelope_filename(final_name: str) -> None:
+def files_equal(left: Path, right: Path, chunk_size: int = 1024 * 1024) -> bool:
+    with left.open("rb") as left_handle, right.open("rb") as right_handle:
+        while True:
+            left_chunk = left_handle.read(chunk_size)
+            right_chunk = right_handle.read(chunk_size)
+            if left_chunk != right_chunk:
+                return False
+            if not left_chunk:
+                return True
+
+
+def validate_envelope_file(sending: Path, final_name: str) -> None:
     if not ENVELOPE_FILENAME_RE.fullmatch(final_name):
         raise RuntimeError("outbox filename is not a valid envelope ID")
+    if sending.is_symlink() or not sending.is_file():
+        raise RuntimeError("outbox entry must be a regular file, not a symlink")
+    size = sending.stat().st_size
+    if size > MAX_ENVELOPE_BYTES:
+        raise RuntimeError(f"outbox envelope exceeds {MAX_ENVELOPE_BYTES} bytes")
 
 
 def deliver_local(sending: Path, inbox: Path, final_name: str) -> None:
-    validate_envelope_filename(final_name)
+    validate_envelope_file(sending, final_name)
     inbox.mkdir(parents=True, exist_ok=True)
     destination = inbox / final_name
     try:
         os.link(sending, destination)
     except FileExistsError:
-        if destination.read_bytes() != sending.read_bytes():
+        if not files_equal(destination, sending):
             raise RuntimeError(f"inbox collision for {final_name}")
     except OSError:
         tmp = inbox / f".{final_name}.delivery-{os.getpid()}-{time.time_ns()}"
@@ -169,7 +187,7 @@ def deliver_local(sending: Path, inbox: Path, final_name: str) -> None:
         try:
             os.link(tmp, destination)
         except FileExistsError:
-            if destination.read_bytes() != sending.read_bytes():
+            if not files_equal(destination, sending):
                 raise RuntimeError(f"inbox collision for {final_name}")
         finally:
             try:
@@ -181,7 +199,7 @@ def deliver_local(sending: Path, inbox: Path, final_name: str) -> None:
 def deliver_remote(
     sending: Path, host: str, remote_inbox: str, final_name: str, connect_timeout: int
 ) -> None:
-    validate_envelope_filename(final_name)
+    validate_envelope_file(sending, final_name)
     if host.startswith("-") or not SSH_HOST_RE.fullmatch(host):
         raise RuntimeError("SSH host contains unsupported characters")
     pure_remote = PurePosixPath(remote_inbox)
@@ -213,14 +231,24 @@ def deliver_remote(
         "import os,sys\n"
         "path=sys.argv[1]\n"
         "os.makedirs(path, mode=0o700, exist_ok=True)\n"
+        "os.chmod(path, 0o700)\n"
     )
     remote_publish = (
-        "import os,sys\n"
+        "import os,stat,sys\n"
         "src,dst=sys.argv[1:3]\n"
-        "if os.path.exists(dst):\n"
-        "    with open(src,'rb') as source, open(dst,'rb') as existing:\n"
-        "        if source.read() != existing.read():\n"
-        "            raise FileExistsError('remote inbox collision')\n"
+        "def regular(path):\n"
+        "    return stat.S_ISREG(os.stat(path, follow_symlinks=False).st_mode)\n"
+        "def same(left,right):\n"
+        "    with open(left,'rb') as a, open(right,'rb') as b:\n"
+        "        while True:\n"
+        "            ac=a.read(1048576); bc=b.read(1048576)\n"
+        "            if ac != bc: return False\n"
+        "            if not ac: return True\n"
+        "if not regular(src):\n"
+        "    raise RuntimeError('remote delivery temp is not a regular file')\n"
+        "if os.path.lexists(dst):\n"
+        "    if not regular(dst) or not same(src,dst):\n"
+        "        raise FileExistsError('remote inbox collision')\n"
         "    os.unlink(src)\n"
         "else:\n"
         "    os.link(src,dst)\n"
@@ -240,7 +268,7 @@ def deliver_remote(
         check=True,
     )
     try:
-        subprocess.run([*scp_base, str(sending), f"{host}:{remote_tmp}"], check=True)
+        subprocess.run([*scp_base, str(sending.resolve(strict=True)), f"{host}:{remote_tmp}"], check=True)
         subprocess.run(
             [*ssh_base, "python3", "-", remote_tmp, remote_final],
             input=remote_publish,

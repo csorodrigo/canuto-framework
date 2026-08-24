@@ -18,6 +18,7 @@ from vault_integrator_common import (
     atomic_write_json,
     canonical_json_bytes,
     load_json_limited,
+    read_bytes_limited,
     resolve_target,
     sha256_bytes,
     utc_now,
@@ -33,6 +34,7 @@ from vault_integrator_git import (
     rollback_target,
     run_git,
 )
+
 
 def apply_one(
     envelope_path: Path,
@@ -54,9 +56,6 @@ def apply_one(
     previous_mode = 0o644
 
     try:
-        raw_bytes = envelope_path.read_bytes()
-        envelope_hash = sha256_bytes(raw_bytes)
-        envelope_id = f"invalid-{envelope_hash[:16]}"
         raw = load_json_limited(envelope_path)
         if isinstance(raw.get("id"), str) and ID_RE.fullmatch(raw["id"]):
             envelope_id = raw["id"]
@@ -128,7 +127,7 @@ def apply_one(
         else:
             if not target.exists() or not target.is_file() or target.is_symlink():
                 raise EnvelopeError("replace target must be an existing regular file")
-            previous = target.read_bytes()
+            previous = read_bytes_limited(target, max_content_bytes, "replace target")
             previous_mode = stat.S_IMODE(target.stat().st_mode)
             before_sha = sha256_bytes(previous)
             if before_sha != normalized["expected_sha256"]:
@@ -154,7 +153,9 @@ def apply_one(
             atomic_create_bytes(target, content, previous_mode)
         else:
             assert previous is not None
-            current_immediately_before_publish = target.read_bytes()
+            current_immediately_before_publish = read_bytes_limited(
+                target, max_content_bytes, "replace target"
+            )
             if sha256_bytes(current_immediately_before_publish) != normalized["expected_sha256"]:
                 raise EnvelopeError("compare-and-swap precondition changed before publication")
             atomic_write_bytes(target, content, previous_mode)
@@ -343,5 +344,3 @@ def publish(vault: Path, state: Path) -> bool:
     update_publish_receipts(reachable, "pushed", result.stdout.strip())
     print(f"PUSHED {len(reachable)} receipt(s)")
     return not unreachable
-
-
