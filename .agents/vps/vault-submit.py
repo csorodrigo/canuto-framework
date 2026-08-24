@@ -343,7 +343,12 @@ def list_outbox(args: argparse.Namespace) -> int:
     values = []
     for path in sorted(outbox.glob("*.json")) if outbox.exists() else []:
         try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
+            validate_envelope_file(path, path.name)
+            with path.open("rb") as handle:
+                raw = handle.read(MAX_ENVELOPE_BYTES + 1)
+            if len(raw) > MAX_ENVELOPE_BYTES:
+                raise RuntimeError(f"outbox envelope exceeds {MAX_ENVELOPE_BYTES} bytes")
+            payload = json.loads(raw.decode("utf-8"))
             values.append(
                 {
                     "id": payload.get("id"),
@@ -352,7 +357,7 @@ def list_outbox(args: argparse.Namespace) -> int:
                     "path": str(path),
                 }
             )
-        except (OSError, json.JSONDecodeError):
+        except (OSError, RuntimeError, UnicodeDecodeError, json.JSONDecodeError):
             values.append({"id": None, "path": str(path), "invalid": True})
     print(json.dumps(values, ensure_ascii=True, sort_keys=True))
     return 0

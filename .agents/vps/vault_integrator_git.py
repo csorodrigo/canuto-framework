@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import contextlib
 import os
 import re
@@ -106,8 +107,10 @@ def commit_target(vault: Path, target_rel: str, envelope_id: str) -> str:
 
 
 def receipt_filename(envelope_id: str) -> str:
-    safe = re.sub(r"[^A-Za-z0-9._-]", "_", envelope_id)
-    return f"{safe}.json"
+    if re.fullmatch(r"[A-Za-z0-9._-]+", envelope_id):
+        return f"{envelope_id}.json"
+    encoded = base64.urlsafe_b64encode(envelope_id.encode("ascii")).decode("ascii").rstrip("=")
+    return f"%{encoded}.json"
 
 
 def files_equal(left: Path, right: Path, chunk_size: int = 1024 * 1024) -> bool:

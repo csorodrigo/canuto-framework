@@ -44,6 +44,21 @@ def load_engine_module():
         sys.path.pop(0)
 
 
+def load_git_module():
+    sys.path.insert(0, str(VPS))
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "canuto_vault_integrator_git", VPS / "vault_integrator_git.py"
+        )
+        if spec is None or spec.loader is None:
+            raise RuntimeError("could not load vault integrator Git helpers")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    finally:
+        sys.path.pop(0)
+
+
 class VaultTransportTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory(prefix="canuto-vault-transport-")
@@ -305,6 +320,30 @@ cp "$source_path" "$remote_path"
         self.assertIn("regular file, not a symlink", flushed.stderr)
         self.assertTrue(symlink.is_symlink())
         self.assertFalse((local_inbox / symlink.name).exists())
+
+    def test_receipt_filename_keeps_colon_and_underscore_ids_distinct(self) -> None:
+        module = load_git_module()
+        colon = module.receipt_filename("we:receipt-0001")
+        underscore = module.receipt_filename("we_receipt-0001")
+        self.assertNotEqual(colon, underscore)
+        self.assertTrue(colon.startswith("%"))
+        self.assertEqual(underscore, "we_receipt-0001.json")
+
+    def test_list_outbox_marks_oversized_and_symlink_entries_invalid(self) -> None:
+        self.outbox.mkdir()
+        oversized = self.outbox / "we-list-oversized-0001.json"
+        oversized.write_bytes(b"x" * (8 * 1024 * 1024 + 1))
+        payload = self.root / "payload.json"
+        payload.write_text("{}\n", encoding="utf-8")
+        symlink = self.outbox / "we-list-symlink-0001.json"
+        symlink.symlink_to(payload)
+
+        listed = self.run_submit("list", "--outbox", str(self.outbox))
+
+        self.assertEqual(listed.returncode, 0, listed.stderr)
+        values = json.loads(listed.stdout)
+        self.assertEqual(len(values), 2)
+        self.assertTrue(all(value.get("invalid") is True for value in values))
 
     def test_remote_host_cannot_be_parsed_as_an_ssh_option(self) -> None:
         module = load_submit_module()
