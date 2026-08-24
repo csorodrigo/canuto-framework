@@ -141,6 +141,22 @@ for file_path in \
   fi
 done
 
+if [ -f "$ROOT_DIR/.agents/SOURCE-RECEIPT.json" ] \
+  && python3 - "$ROOT_DIR/.agents/SOURCE-RECEIPT.json" <<'PYEOF' >/dev/null 2>&1
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as fh:
+    receipt = json.load(fh)
+assert receipt.get("schemaVersion") == 1
+assert receipt.get("scope") == "framework"
+assert receipt.get("sourceRef")
+assert receipt.get("manifestSha256")
+PYEOF
+then
+  pass "framework source receipt is structurally valid"
+else
+  warn "framework source receipt missing or invalid (legacy consumer)"
+fi
+
 if [ -d "$ROOT_DIR/.agents/tmp" ]; then
   pass ".agents/tmp present"
 else

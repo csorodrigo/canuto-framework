@@ -109,12 +109,21 @@ while IFS= read -r file; do
     target_base="${target%%#*}"
     [ -z "$target_base" ] && continue
 
+    # Obsidian templates intentionally contain unresolved {{date:...}} links.
+    # They are valid only inside the template directory; the same placeholder
+    # in a normal note must still fail closed.
+    if [[ "$file" == "$VAULT_DIR/.obsidian/templates/"* \
+      && "$target_base" == *"{{"* \
+      && "$target_base" == *"}}"* ]]; then
+      continue
+    fi
+
     if ! note_index_contains "$target_base" && \
        ! note_index_contains "$target_base.md" && \
-       [ ! -f "$file_dir/$target_base" ] && \
-       [ ! -f "$file_dir/$target_base.md" ] && \
-       [ ! -f "$VAULT_DIR/$target_base" ] && \
-       [ ! -f "$VAULT_DIR/$target_base.md" ]; then
+       [ ! -e "$file_dir/$target_base" ] && \
+       [ ! -e "$file_dir/$target_base.md" ] && \
+       [ ! -e "$VAULT_DIR/$target_base" ] && \
+       [ ! -e "$VAULT_DIR/$target_base.md" ]; then
       echo "  BROKEN wikilink in $(basename "$file"): [[$target]]"
       BROKEN_COUNT=$((BROKEN_COUNT + 1))
     fi
@@ -133,16 +142,16 @@ while IFS= read -r file; do
     [ -z "$link_path_base" ] && continue
 
     if [[ "$link_path_base" == /* ]]; then
-      if [ ! -f "$link_path_base" ]; then
+      if [ ! -e "$link_path_base" ]; then
         echo "  BROKEN link in $(basename "$file"): ($link_path)"
         BROKEN_COUNT=$((BROKEN_COUNT + 1))
       fi
       continue
     fi
 
-    if [ ! -f "$file_dir/$link_path_base" ] && \
-       [ ! -f "$ROOT_DIR/$link_path_base" ] && \
-       [ ! -f "$VAULT_DIR/$link_path_base" ]; then
+    if [ ! -e "$file_dir/$link_path_base" ] && \
+       [ ! -e "$ROOT_DIR/$link_path_base" ] && \
+       [ ! -e "$VAULT_DIR/$link_path_base" ]; then
       echo "  BROKEN link in $(basename "$file"): ($link_path)"
       BROKEN_COUNT=$((BROKEN_COUNT + 1))
     fi

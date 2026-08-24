@@ -3,81 +3,127 @@ name: Validate Framework
 on:
   pull_request:
     branches: [main]
+  push:
+    branches:
+      - main
+      - stable
+      - 'releases/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    name: validate (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-14
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: /bin/bash --noprofile --norc -e -o pipefail {0}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install dependencies
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq jq
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq jq
+          elif ! command -v jq >/dev/null 2>&1; then
+            brew install jq
+          fi
+          /bin/bash --version | head -1
+          python3 --version
+          node --version
+          jq --version
 
       - name: Syntax check all shell scripts
         run: |
-          echo "── Checking shell script syntax ──"
-          ERRORS=0
+          echo "── Checking shell script syntax with /bin/bash ──"
+          errors=0
           while IFS= read -r script; do
-            if bash -n "$script" 2>/dev/null; then
+            if /bin/bash -n "$script"; then
               echo "  ✓ $script"
             else
               echo "  ✗ $script"
-              ERRORS=$((ERRORS + 1))
+              errors=$((errors + 1))
             fi
-          done < <(find . -name "*.sh" -type f)
-          if [ $ERRORS -gt 0 ]; then
-            echo "Found $ERRORS script(s) with syntax errors"
-            exit 1
-          fi
-          echo "All scripts pass syntax check"
+          done < <(find . -name "*.sh" -type f -not -path './.git/*' | LC_ALL=C sort)
+          [ "$errors" -eq 0 ]
 
       - name: Validate skill frontmatter
         run: |
-          echo "── Checking skill frontmatter ──"
-          ERRORS=0
-          for skill in .agents/skills/*.md; do
-            [ -f "$skill" ] || continue
-            name=$(basename "$skill")
-            # Skip non-skill artifacts that may live under .agents/skills/
-            if [ "$name" = "CLAUDE.md" ]; then
-              echo "  - $name skipped (skill directory instructions)"
-              continue
-            fi
-            first=$(head -1 "$skill")
-            if echo "$first" | grep -q "^shortDescription:"; then
-              echo "  ✓ $name (legacy frontmatter)"
-            elif [ "$first" = "---" ] && awk '
-                NR == 1 { next }
-                /^---$/ { closed = 1; exit (found && closed ? 0 : 1) }
-                /^(shortDescription|description|skill):/ { found = 1 }
-                END { exit (found && closed ? 0 : 1) }
-              ' "$skill"; then
-              echo "  ✓ $name (yaml frontmatter)"
-            else
-              echo "  ✗ $name missing shortDescription/description/skill"
-              ERRORS=$((ERRORS + 1))
-            fi
-          done
-          if [ $ERRORS -gt 0 ]; then
-            echo "Found $ERRORS skill(s) with missing frontmatter"
-            exit 1
-          fi
-          echo "All skills have valid frontmatter"
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
 
-      - name: Run test framework
-        run: bash test-framework.sh --verbose
+          # Only skill entrypoints carry skill frontmatter. Supporting files in
+          # references/, examples, glossaries and fixtures remain normal docs.
+          skill_paths = sorted(Path(".agents/skills").glob("*.md"))
+          skill_paths += sorted(Path(".agents/skills").glob("*/SKILL.md"))
+          errors = []
 
-      - name: Install check
-        run: CANUTO_SOURCE_DIR="$PWD" bash install.sh --check
+          for path in skill_paths:
+              if path.name == "CLAUDE.md":
+                  continue
+              lines = path.read_text(encoding="utf-8").splitlines()
+              if not lines:
+                  errors.append(f"empty skill entrypoint: {path}")
+                  continue
+              if lines[0].startswith("shortDescription:"):
+                  continue
+              if lines[0] != "---":
+                  errors.append(f"missing frontmatter: {path}")
+                  continue
+              try:
+                  close = lines.index("---", 1)
+              except ValueError:
+                  errors.append(f"unclosed frontmatter: {path}")
+                  continue
+              frontmatter = lines[1:close]
+              if not any(re.match(r"^(shortDescription|description|skill):", line) for line in frontmatter):
+                  errors.append(f"missing skill metadata key: {path}")
+
+          if errors:
+              print("\n".join(errors))
+              raise SystemExit(1)
+          print(f"validated {len(skill_paths)} skill entrypoints")
+          PY
+
+      - name: Run focused Node suites
+        run: |
+          node --test skill-gardener/canuto-skill-gardener.test.js
+          node --test .agents/tools/framework-session-audit.test.js
+
+      - name: Run complete framework gate
+        run: /bin/bash test-framework.sh --verbose
+
+      - name: Run two-consumer E2E
+        env:
+          CANUTO_E2E_SOURCE_SHA: ${{ github.sha }}
+        run: /bin/bash tests/cross-consumer-e2e.sh
+
+      - name: Pinned source check
+        env:
+          CANUTO_SOURCE_DIR: ${{ github.workspace }}
+          CANUTO_SOURCE_KIND: ref
+          CANUTO_SOURCE_REF: ${{ github.sha }}
+          CANUTO_SOURCE_TRANSPORT: local
+          CANUTO_BOOTSTRAPPED: '1'
+        run: /bin/bash install.sh --check
 
       - name: Check vault references
-        continue-on-error: true
-        run: bash .agents/hooks/check-references.sh
+        run: /bin/bash .agents/hooks/check-references.sh
 
       - name: Check vault orphans
-        continue-on-error: true
-        run: bash .agents/hooks/check-orphans.sh
+        run: /bin/bash .agents/hooks/check-orphans.sh
