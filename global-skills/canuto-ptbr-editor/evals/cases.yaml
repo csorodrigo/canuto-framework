@@ -1,0 +1,12 @@
+version: 1
+skill: canuto-ptbr-editor
+
+positive:
+  - prompt: "Reescreva este handoff em PT-BR sem alterar comandos, caminhos ou o que ainda está pendente."
+  - prompt: "Crie uma mensagem de erro curta que informe o problema conhecido e a recuperação disponível."
+
+negative:
+  - prompt: "Responda em português: qual arquivo devo abrir?"
+    reason: "Conversa comum, não um artefato editorial."
+  - prompt: "Transcreva literalmente este áudio."
+    reason: "Transcrição literal não admite edição."

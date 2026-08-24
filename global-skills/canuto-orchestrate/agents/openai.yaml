@@ -1,0 +1,7 @@
+interface:
+  display_name: "Canuto Orchestrate"
+  short_description: "Decide quando usar folhas independentes"
+  default_prompt: "Use $canuto-orchestrate para avaliar uma delegação segura desta tarefa."
+
+policy:
+  allow_implicit_invocation: true

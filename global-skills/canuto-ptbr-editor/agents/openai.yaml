@@ -1,0 +1,7 @@
+interface:
+  display_name: "Canuto PT-BR Editor"
+  short_description: "Revisa artefatos em PT-BR sem mudar o sentido"
+  default_prompt: "Use $canuto-ptbr-editor para revisar este artefato em português brasileiro."
+
+policy:
+  allow_implicit_invocation: true

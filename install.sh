@@ -3364,6 +3364,7 @@ repair_runtime() {
   setup_codex_mcps
   setup_gstack
   setup_global_skills || global_skills_rc=50
+  setup_passive_skills || global_skills_rc=50
   setup_skill_gardener || gardener_rc=20
   setup_skill_refactor || refactor_rc=40
 
@@ -3473,6 +3474,62 @@ setup_global_skills() {
         download "$metadata_remote" "$metadata_dst" || { warn "Could not download $metadata_remote"; failures=1; }
       fi
     fi
+  done
+  return "$failures"
+}
+
+# ── setup_passive_skills ────────────────────────────────────────────────────
+# Installs the same model-invoked bundles for both runtimes. ~/.agents/skills is
+# the shared Agent Skills root used by Codex; Claude discovers ~/.claude/skills.
+passive_skill_files() {
+  case "$1" in
+    canuto-ptbr-editor)
+      printf '%s\n' \
+        "SKILL.md" \
+        "references/review-checklist.md" \
+        "evals/cases.yaml" \
+        "agents/openai.yaml"
+      ;;
+    canuto-orchestrate)
+      printf '%s\n' \
+        "SKILL.md" \
+        "references/contracts.md" \
+        "evals/cases.yaml" \
+        "agents/openai.yaml"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+setup_passive_skills() {
+  local skill runtime_root relative remote dst
+  local failures=0
+  local -a passive_skills=("canuto-ptbr-editor" "canuto-orchestrate")
+  local -a runtime_roots=("$HOME/.agents/skills" "$HOME/.claude/skills")
+
+  log "Installing passive Canuto skills for Codex and Claude..."
+
+  for skill in "${passive_skills[@]}"; do
+    for runtime_root in "${runtime_roots[@]}"; do
+      while IFS= read -r relative; do
+        [ -n "$relative" ] || continue
+        remote="global-skills/${skill}/${relative}"
+        dst="${runtime_root}/${skill}/${relative}"
+        mkdir -p "$(dirname "$dst")"
+        if [ -f "$remote" ]; then
+          cp "$remote" "$dst" \
+            || { warn "Could not copy passive skill file $remote"; failures=1; }
+        else
+          download "$remote" "$dst" \
+            || { warn "Could not download passive skill file $remote"; failures=1; }
+        fi
+      done < <(passive_skill_files "$skill")
+      if [ -f "${runtime_root}/${skill}/SKILL.md" ]; then
+        ok "passive skill: ${runtime_root}/${skill}"
+      fi
+    done
   done
   return "$failures"
 }
