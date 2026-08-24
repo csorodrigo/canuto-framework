@@ -3503,6 +3503,76 @@ passive_skill_files() {
   esac
 }
 
+ensure_passive_skill_routing() {
+  local target="$1"
+  local runtime_root="$2"
+  local start_marker='<!-- CANUTO PASSIVE SKILLS START -->'
+  local end_marker='<!-- CANUTO PASSIVE SKILLS END -->'
+  local target_dir start_count end_count start_line end_line staged rendered
+
+  target_dir="$(dirname "$target")"
+  mkdir -p "$target_dir" || { warn "Could not create passive routing directory $target_dir"; return 1; }
+
+  start_count=0
+  end_count=0
+  start_line=0
+  end_line=0
+  if [ -f "$target" ]; then
+    start_count="$(grep -Fxc "$start_marker" "$target" 2>/dev/null || true)"
+    end_count="$(grep -Fxc "$end_marker" "$target" 2>/dev/null || true)"
+    if [ "$start_count" -eq 1 ] && [ "$end_count" -eq 1 ]; then
+      start_line="$(awk -v marker="$start_marker" '$0 == marker { print NR; exit }' "$target")"
+      end_line="$(awk -v marker="$end_marker" '$0 == marker { print NR; exit }' "$target")"
+    fi
+  fi
+
+  if { [ "$start_count" -ne 0 ] || [ "$end_count" -ne 0 ]; } \
+    && { [ "$start_count" -ne 1 ] || [ "$end_count" -ne 1 ] || [ "$start_line" -ge "$end_line" ]; }; then
+    warn "Refusing to update malformed passive routing block in $target"
+    return 1
+  fi
+
+  staged="$(mktemp "${target}.tmp.XXXXXX")" \
+    || { warn "Could not stage passive routing update for $target"; return 1; }
+  rendered="$(mktemp "${target}.content.XXXXXX")" \
+    || { rm -f "$staged"; warn "Could not render passive routing update for $target"; return 1; }
+
+  if [ -f "$target" ]; then
+    cp -p "$target" "$staged" \
+      || { rm -f "$staged" "$rendered"; warn "Could not preserve $target metadata"; return 1; }
+    awk -v start="$start_marker" -v end="$end_marker" '
+      $0 == start { skipping=1; next }
+      $0 == end && skipping { skipping=0; next }
+      !skipping { kept[++count]=$0 }
+      END {
+        while (count > 0 && kept[count] ~ /^[[:space:]]*$/) count--
+        for (line=1; line<=count; line++) print kept[line]
+      }
+    ' "$target" > "$rendered" \
+      || { rm -f "$staged" "$rendered"; warn "Could not preserve existing instructions in $target"; return 1; }
+  else
+    chmod 0644 "$staged"
+    : > "$rendered"
+  fi
+
+  if [ -s "$rendered" ]; then
+    printf '\n' >> "$rendered"
+  fi
+  printf '%s\n' \
+    "$start_marker" \
+    '## Canuto Passive Skills' \
+    "- Quando a solicitação pedir um artefato editorial, revisão ou tradução em PT-BR, use a ferramenta de skill quando disponível e carregue ${runtime_root}/canuto-ptbr-editor/SKILL.md por completo antes de agir. Não ative apenas porque a conversa está em português; preserve literais e incerteza." \
+    "- Quando um trabalho substancial tiver ao menos duas perguntas independentes e verificáveis, coleta somente leitura lenta ou revisão independente de risco material, use a ferramenta de skill quando disponível e carregue ${runtime_root}/canuto-orchestrate/SKILL.md antes de delegar. Não use em trabalho pequeno, sequencial ou com escritores sobrepostos." \
+    "$end_marker" >> "$rendered" \
+    || { rm -f "$staged" "$rendered"; warn "Could not render passive routing block for $target"; return 1; }
+
+  cp "$rendered" "$staged" \
+    && mv "$staged" "$target" \
+    || { rm -f "$staged" "$rendered"; warn "Could not install passive routing block in $target"; return 1; }
+  rm -f "$rendered"
+  ok "passive routing: $target"
+}
+
 setup_passive_skills() {
   local skill runtime_root relative remote dst
   local failures=0
@@ -3531,6 +3601,12 @@ setup_passive_skills() {
       fi
     done
   done
+  if [ "$failures" -eq 0 ]; then
+    ensure_passive_skill_routing "$HOME/.codex/AGENTS.md" '~/.agents/skills' || failures=1
+    ensure_passive_skill_routing "$HOME/.claude/CLAUDE.md" '~/.claude/skills' || failures=1
+  else
+    warn "Skipping passive routing because one or more skill files failed to install"
+  fi
   return "$failures"
 }
 
