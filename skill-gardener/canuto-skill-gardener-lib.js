@@ -43,6 +43,10 @@ const CRON_SCHEDULE = '0 3 * * 0';
 const MAX_LINE_BYTES = 64 * 1024 * 1024;
 const MAX_REMOTE_STDOUT_BYTES = 128 * 1024 * 1024;
 const MAX_REMOTE_STDERR_BYTES = 1 * 1024 * 1024;
+const MAX_JSON_BYTES = 32 * 1024 * 1024;
+const MAX_CONFIG_BYTES = 4 * 1024 * 1024;
+const MAX_SKILL_BYTES = 4 * 1024 * 1024;
+const MAX_HISTORY_FILE_BYTES = MAX_REMOTE_STDOUT_BYTES;
 const REMOTE_CONNECT_TIMEOUT_MS = 10 * 1000;
 const REMOTE_EXECUTION_TIMEOUT_MS = 20 * 60 * 1000;
 const DETAIL_RETENTION_DAYS = 180;
@@ -136,9 +140,50 @@ function ensureDir(directory) {
   fs.mkdirSync(directory, { recursive: true });
 }
 
+function sameFileIdentity(left, right) {
+  for (const key of ['dev', 'ino', 'size', 'mtimeMs', 'ctimeMs']) {
+    if (left?.[key] !== undefined && right?.[key] !== undefined && left[key] !== right[key]) return false;
+  }
+  return true;
+}
+
+function readFileBounded(filePath, limit) {
+  const target = path.resolve(filePath);
+  let fd;
+  try {
+    const pathBefore = fs.lstatSync(target);
+    if (!pathBefore.isFile() || pathBefore.isSymbolicLink()) throw Object.assign(new Error('file-read-failed'), { code: 'file-read-failed' });
+    fd = fs.openSync(target, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+    const before = fs.fstatSync(fd);
+    if (!before.isFile()) throw Object.assign(new Error('file-read-failed'), { code: 'file-read-failed' });
+    if (before.size > limit) throw Object.assign(new Error('file-too-large'), { code: 'file-too-large' });
+    if (!sameFileIdentity(pathBefore, before)) throw Object.assign(new Error('file-mutated'), { code: 'file-mutated' });
+    const buffer = Buffer.alloc(before.size);
+    let offset = 0;
+    while (offset < buffer.length) {
+      const bytes = fs.readSync(fd, buffer, offset, buffer.length - offset, offset);
+      if (!bytes) throw Object.assign(new Error('file-mutated'), { code: 'file-mutated' });
+      offset += bytes;
+    }
+    const after = fs.fstatSync(fd);
+    const pathAfter = fs.lstatSync(target);
+    if (!pathAfter.isFile() || pathAfter.isSymbolicLink() || !sameFileIdentity(before, after) || !sameFileIdentity(after, pathAfter)) {
+      throw Object.assign(new Error('file-mutated'), { code: 'file-mutated' });
+    }
+    return buffer;
+  } catch (error) {
+    if (error?.code) throw error;
+    throw Object.assign(new Error('file-read-failed'), { code: 'file-read-failed' });
+  } finally {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch { /* best effort */ }
+    }
+  }
+}
+
 function readJson(filePath, fallback = null) {
   try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    return JSON.parse(readFileBounded(filePath, MAX_JSON_BYTES).toString('utf8'));
   } catch {
     return fallback;
   }
@@ -213,7 +258,7 @@ function defaultConfig() {
     projects: {},
     providers: {
       codex: {
-        roots: ['~/.codex/skills'],
+        roots: ['~/.codex/skills', '~/.agents/skills'],
         pluginRoots: ['~/.codex/plugins'],
         systemRoots: ['~/.codex/system/skills'],
         historyRoots: ['~/.codex/sessions', '~/.codex/archived_sessions'],
@@ -405,7 +450,7 @@ function loadConfig(configPath, sourceConfig) {
   }
   let raw;
   try {
-    raw = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    raw = JSON.parse(readFileBounded(configPath, MAX_CONFIG_BYTES).toString('utf8'));
   } catch (error) {
     if (error?.code === 'ENOENT') throw new Error('config-missing');
     if (error instanceof SyntaxError) throw new Error('config-invalid');
@@ -570,6 +615,13 @@ function listEntries(directory) {
   }
 }
 
+function isInternalTestFixtureDirectory(directory, allowlistedRoot) {
+  const parts = path.relative(allowlistedRoot, directory).split(path.sep).filter(Boolean);
+  const fixtureIndex = parts.findIndex((part) => ['fixtures', '__fixtures__'].includes(part.toLowerCase()));
+  if (fixtureIndex <= 0) return false;
+  return parts.slice(0, fixtureIndex).some((part) => ['test', 'tests'].includes(part.toLowerCase()));
+}
+
 function scanSkillFiles(rootPath) {
   if (!rootPath || !fileExists(rootPath)) return [];
   let allowlistedRoot = '';
@@ -591,6 +643,8 @@ function scanSkillFiles(rootPath) {
     if (!isWithin(real, allowlistedRoot) || visited.has(real)) return;
     visited.add(real);
     for (const entry of listEntries(real)) {
+      if (entry.isDirectory() && ['node_modules', '.git', '.next'].includes(entry.name)) continue;
+      if (entry.isDirectory() && ['fixtures', '__fixtures__'].includes(entry.name.toLowerCase()) && isInternalTestFixtureDirectory(path.join(real, entry.name), allowlistedRoot)) continue;
       const candidate = path.join(real, entry.name);
       let stat;
       try {
@@ -612,7 +666,8 @@ function scanSkillFiles(rootPath) {
       if (!stat.isFile() || !entry.name.endsWith('.md')) continue;
       const relative = path.relative(allowlistedRoot, candidate);
       const parts = relative.split(path.sep);
-      const isSkillFile = entry.name === 'SKILL.md' || parts.length === 1 || parts.includes('skills');
+      const isFlatLegacySkill = parts.length === 1 || parts.at(-2) === 'skills';
+      const isSkillFile = entry.name === 'SKILL.md' || isFlatLegacySkill;
       if (isSkillFile) files.push({ path: candidate, relative, stat });
     }
   }
@@ -675,6 +730,32 @@ function extractCapabilityTokens(name, content, fingerprintFamilies = DEFAULT_FI
   return allowed.filter((token) => padded.includes(`-${token}-`));
 }
 
+function blockedInstallation(file, descriptor, hmacKey, reason) {
+  const name = inferSkillName(file.path, '');
+  const identity = {
+    name: normalizeName(name),
+    contentHash: '',
+    skillKey: hmac(`blocked:${normalizeName(name)}:${reason}`, hmacKey),
+    provider: normalizeProvider(descriptor.provider) || 'unknown',
+    installationKind: inferInstallationKind(descriptor),
+  };
+  let installedAt = '';
+  try { installedAt = new Date(file.stat.mtimeMs).toISOString(); } catch { installedAt = ''; }
+  return {
+    ...identity,
+    logicalProjectId: descriptor.logicalProjectId || 'UNMAPPED',
+    surfaceId: descriptor.surfaceId,
+    sourceAlias: descriptor.sourceAlias,
+    installedAt,
+    metadataClass: 'CODE_METADATA',
+    metadataId: hmac(`metadata:${descriptor.provider || 'framework'}:${descriptor.surfaceId}:${file.relative}`, hmacKey),
+    status: 'BLOCKED',
+    reason,
+    _sourcePath: file.path,
+    _capabilityTokens: [],
+  };
+}
+
 function collectInventory(config, options = {}) {
   const home = options.home || os.homedir();
   const hmacKey = options.hmacKey || 'canuto-skill-gardener-unconfigured';
@@ -709,11 +790,26 @@ function collectInventory(config, options = {}) {
   }));
 
   const installations = [];
+  const inventoryIssues = [];
   const byPath = new Map();
   for (const descriptor of descriptors) {
     for (const file of scanSkillFiles(descriptor.path)) {
       let content;
-      try { content = fs.readFileSync(file.path, 'utf8'); } catch { continue; }
+      if (file.stat?.size > MAX_SKILL_BYTES) {
+        const blocked = blockedInstallation(file, descriptor, hmacKey, 'skill-file-too-large');
+        installations.push(blocked);
+        inventoryIssues.push({ name: blocked.name, reason: blocked.reason });
+        byPath.set(path.resolve(file.path), blocked);
+        continue;
+      }
+      try { content = readFileBounded(file.path, MAX_SKILL_BYTES).toString('utf8'); } catch (error) {
+        const reason = error.code === 'file-too-large' ? 'skill-file-too-large' : 'skill-file-unreadable';
+        const blocked = blockedInstallation(file, descriptor, hmacKey, reason);
+        installations.push(blocked);
+        inventoryIssues.push({ name: blocked.name, reason: blocked.reason });
+        byPath.set(path.resolve(file.path), blocked);
+        continue;
+      }
       const identity = makeSkillIdentity({
         name: inferSkillName(file.path, content),
         content,
@@ -777,6 +873,8 @@ function collectInventory(config, options = {}) {
     _installations: installations,
     _byPath: byPath,
     _byName: byName,
+    inventoryStatus: inventoryIssues.length ? 'PARTIAL' : 'COMPLETE',
+    inventoryIssues: [...new Map(inventoryIssues.map((item) => [`${item.name}\u0000${item.reason}`, item])).values()],
   };
 }
 
@@ -1402,9 +1500,10 @@ const parsedInput = (payload) => { if (payload.input && typeof payload.input ===
 const sessionHints = (record) => { const payload = record && record.payload && typeof record.payload === 'object' ? record.payload : record || {}; return { cwd: payload.cwd || payload.working_directory || payload.workingDirectory || record.cwd || record.working_directory || record.workingDirectory || '' }; };
 const mapSession = (record) => { const cwdHint = sessionHints(record).cwd; if (!cwdHint || !Array.isArray(cfg.projectMappings) || cfg.projectMappings.length === 0) return null; const cwd = path.resolve(expandHome(cwdHint)); const candidates = []; for (const mapping of cfg.projectMappings) for (const root of mapping.roots || []) { const resolvedRoot = path.resolve(expandHome(root)); if (within(cwd, resolvedRoot)) candidates.push({ mapping, length: resolvedRoot.length }); } if (candidates.length === 0) return null; const maxLength = Math.max(...candidates.map((item) => item.length)); const best = candidates.filter((item) => item.length === maxLength); const identities = new Set(best.map((item) => item.mapping.logicalProjectId + '\\u0000' + item.mapping.surfaceId)); return identities.size === 1 ? best[0].mapping : null; };
 const mappingValues = (state) => { if (Array.isArray(cfg.projectMappings) && cfg.projectMappings.length > 0) { if (!state.mapping) return null; return { logicalProjectId: state.mapping.logicalProjectId || 'UNMAPPED', surfaceAlias: state.mapping.surfaceAlias || 'UNMAPPED' }; } return { logicalProjectId: cfg.logicalProjectId || 'UNMAPPED', surfaceAlias: cfg.surfaceAlias || 'UNMAPPED' }; };
-const skillVariants = cfg.skillVariants || {};
-const maxSkillBytes = 4 * 1024 * 1024;
-const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
+  const skillVariants = cfg.skillVariants || {};
+  const maxSkillBytes = 4 * 1024 * 1024;
+  const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
+  const readBounded = (file, limit) => { let fd; try { const pathBefore = fs.lstatSync(file); if (!pathBefore.isFile() || pathBefore.isSymbolicLink()) throw new Error('file-read-failed'); fd = fs.openSync(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0)); const before = fs.fstatSync(fd); if (!before.isFile()) throw new Error('file-read-failed'); if (before.size > limit) throw new Error('file-too-large'); const buffer = Buffer.alloc(before.size); let offset = 0; while (offset < buffer.length) { const bytes = fs.readSync(fd, buffer, offset, buffer.length - offset, offset); if (!bytes) throw new Error('file-mutated'); offset += bytes; } const after = fs.fstatSync(fd); const pathAfter = fs.lstatSync(file); if (!pathAfter.isFile() || pathAfter.isSymbolicLink() || before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size || after.dev !== pathAfter.dev || after.ino !== pathAfter.ino || after.size !== pathAfter.size) throw new Error('file-mutated'); return buffer; } finally { if (fd !== undefined) try { fs.closeSync(fd); } catch {} } };
 const skillFromPath = (value) => { const parts = String(value || '').split('/'); const marker = parts.findIndex((part) => ['.agents', '.codex', '.claude', '.hermes'].includes(part.toLowerCase())); if (marker < 0) return ''; const skills = parts.findIndex((part, index) => index > marker && part.toLowerCase() === 'skills'); const name = skills >= 0 ? parts[skills + 1] : ''; const last = parts[parts.length - 1] || ''; return name && /\\.md$/i.test(last) ? normalize(name) : ''; };
 const skillPathInfo = (value, record) => { const raw = String(value || ''); if (!raw) return null; const expanded = expandHome(raw); const cwd = sessionHints(record || {}).cwd || process.cwd(); const absolute = path.resolve(path.isAbsolute(expanded) ? expanded : path.join(expandHome(cwd), expanded)); const parts = absolute.split(path.sep); const markerIndex = parts.findIndex((part) => ['.agents', '.codex', '.claude', '.hermes'].includes(part.toLowerCase())); if (markerIndex < 0) return null; const marker = parts[markerIndex].toLowerCase(); const skillsIndex = parts.findIndex((part, index) => index > markerIndex && part.toLowerCase() === 'skills'); const name = skillsIndex >= 0 ? normalize(parts[skillsIndex + 1]) : ''; const last = parts[parts.length - 1] || ''; if (!name || !/\\.md$/i.test(last)) return null; const allowedRoots = []; if (['.codex', '.claude', '.hermes'].includes(marker)) allowedRoots.push(path.join(os.homedir(), marker)); if (marker === '.agents') for (const mapping of cfg.projectMappings || []) for (const root of mapping.roots || []) allowedRoots.push(path.join(path.resolve(expandHome(root)), '.agents')); for (const allowedRoot of allowedRoots) { if (!within(absolute, path.resolve(allowedRoot))) continue; try { const realRoot = fs.realpathSync(allowedRoot); const realFile = fs.realpathSync(absolute); const stat = fs.statSync(realFile); if (!stat.isFile() || !within(realFile, realRoot) || stat.size > maxSkillBytes) continue; return { name, file: realFile }; } catch {} } return null; };
 const readSkillHash = (file) => { let fd; try { fd = fs.openSync(file, 'r'); const initial = fs.fstatSync(fd); if (!initial.isFile() || initial.size > maxSkillBytes) return ''; const buffer = Buffer.allocUnsafe(Math.min(maxSkillBytes + 1, Math.max(1, initial.size + 1))); const bytes = fs.readSync(fd, buffer, 0, buffer.length, 0); const final = fs.fstatSync(fd); if (!final.isFile() || final.size > maxSkillBytes || final.size !== bytes) return ''; return sha256(buffer.subarray(0, bytes)); } catch { return ''; } finally { if (fd !== undefined) try { fs.closeSync(fd); } catch {} } };
@@ -1419,9 +1518,9 @@ const recordsFor = (record) => { if (cfg.provider === 'codex' && record.type ===
 const processRecord = (record, position, state) => { const hints = sessionHints(record); if (hints.cwd) state.mapping = mapSession(record); if (record.session_id || record.sessionId || record.payload?.session_id || record.payload?.sessionId) state.sessionId = String(record.session_id || record.sessionId || record.payload.session_id || record.payload.sessionId); for (const payload of recordsFor(record)) { const mapped = mappingValues(state); if (!mapped) continue; const input = parsedInput(payload); const type = normalize(payload.type || record.type); const name = normalize(payload.name || record.name); const skill = skillName(payload, record); const nativeId = String(payload.eventId || payload.event_id || payload.id || payload.call_id || record.eventId || record.event_id || ''); const resultId = String(payload.call_id || payload.tool_use_id || payload.toolUseId || record.call_id || record.tool_use_id || ''); const session = String(payload.sessionId || payload.session_id || record.sessionId || record.session_id || state.sessionId || 'remote'); const timestamp = iso(payload.timestamp || payload.ts || record.timestamp); const provider = cfg.provider; const keyFor = (nameValue) => cfg.skillKeys[nameValue] || h('name:' + nameValue); const isResult = ['function-call-output', 'tool-result', 'read-result', 'exec-command-end'].includes(type); if (isResult && resultId) { const pending = state.pendingReads.get(resultId); state.pendingReads.delete(resultId); const status = normalize(payload.status || payload.result_family || ''); const failed = payload.is_error === true || ['error', 'failure', 'failed', 'timeout'].includes(status) || (payload.exit_code !== undefined && Number(payload.exit_code) !== 0); const hasResult = Object.prototype.hasOwnProperty.call(payload, 'output') || Object.prototype.hasOwnProperty.call(payload, 'content') || Object.prototype.hasOwnProperty.call(payload, 'result') || (type === 'exec-command-end' && (Object.prototype.hasOwnProperty.call(payload, 'exit_code') || Object.prototype.hasOwnProperty.call(payload, 'exitCode') || Object.prototype.hasOwnProperty.call(payload, 'status') || Object.prototype.hasOwnProperty.call(payload, 'aggregated_output'))); if (pending && hasResult && !failed) for (const pendingKey of pending.skillKeys) emit({ schemaVersion: 1, kind: 'verified_usage', eventKey: h('native:' + provider + ':' + resultId + ':confirmed-read:' + pendingKey), skillKey: pendingKey, timestamp, provider, surfaceAlias: mapped.surfaceAlias, logicalProjectId: mapped.logicalProjectId, verification: 'confirmed_skill_file_read' }); continue; } const isSkill = type === 'skill' || type === 'skill-usage' || type === 'skill-used' || name === 'skill' || record.event === 'Skill'; if (isSkill && skill) { const key = keyFor(skill); emit({ schemaVersion: 1, kind: 'verified_usage', eventKey: nativeId ? h('native:' + provider + ':' + nativeId) : h('fallback:' + provider + ':' + session + ':' + position + ':' + key), skillKey: key, timestamp, provider, surfaceAlias: mapped.surfaceAlias, logicalProjectId: mapped.logicalProjectId, verification: 'native_skill_event' }); continue; } if ((type === 'skill-missing' || record.event === 'skill-missing' || input.missing === true) && skill) { emit({ schemaVersion: 1, kind: 'candidate_signal', eventKey: nativeId ? h('native:' + provider + ':' + nativeId) : h('fallback:' + provider + ':' + session + ':' + position + ':' + skill), signalKey: h('missing:' + skill), timestamp, provider, surfaceAlias: mapped.surfaceAlias, logicalProjectId: mapped.logicalProjectId, fingerprint: 'skill-missing', count: 1 }); continue; } const directRead = ['read', 'read-file', 'file-read'].includes(name) && ['tool-use', 'function-call', 'read'].includes(type) && skill && nativeId; const shellRead = shellToolNames.has(name) || type === 'shell'; const shellSkillNames = shellRead ? [...new Set(shellSkills(payload))] : []; const requestedSkills = directRead ? [skill] : shellSkillNames; if (requestedSkills.length > 0 && nativeId) state.pendingReads.set(nativeId, { skillKeys: [...new Set(requestedSkills.map(keyFor))] }); } };
 const ignorableMalformedRecord = (line) => { const text = String(line || ''); if (/^[\\0\\s]*$/.test(text)) return true; return /"type"\\s*:\\s*"response_item"[\\s\\S]{0,4096}"payload"\\s*:\\s*\\{[\\s\\S]{0,2048}"type"\\s*:\\s*"reasoning"/.test(text); };
 const parseRemoteRecord = (line) => { try { return JSON.parse(line); } catch { if (ignorableMalformedRecord(line)) return null; throw new Error('schema-invalid'); } };
-const readLines = async function* (file) { const stream = fs.createReadStream(file, { encoding: 'utf8' }); let pending = ''; for await (const chunk of stream) { const lines = (pending + chunk).split(/\\r?\\n/); pending = lines.pop() || ''; if (Buffer.byteLength(pending) > MAX_LINE + 2) throw new Error('line-overflow'); for (const line of lines) { if (Buffer.byteLength(line) > MAX_LINE) throw new Error('line-overflow'); yield line; } } if (pending) { if (Buffer.byteLength(pending) > MAX_LINE) throw new Error('line-overflow'); yield pending; } };
+  const readLines = async function* (file) { const stat = fs.statSync(file); if (!stat.isFile() || stat.size > MAX_STDOUT) throw new Error('file-overflow'); const stream = fs.createReadStream(file, { encoding: 'utf8' }); let pending = ''; for await (const chunk of stream) { const lines = (pending + chunk).split(/\\r?\\n/); pending = lines.pop() || ''; if (Buffer.byteLength(pending) > MAX_LINE + 2) throw new Error('line-overflow'); for (const line of lines) { if (Buffer.byteLength(line) > MAX_LINE) throw new Error('line-overflow'); yield line; } } if (pending) { if (Buffer.byteLength(pending) > MAX_LINE) throw new Error('line-overflow'); yield pending; } };
 const collectFiles = (root, depth, allowlistedRoot, files) => { if (depth > 8) return; const entries = fs.readdirSync(root, { withFileTypes: true }); for (const entry of entries) { const file = path.join(root, entry.name); const linkStat = fs.lstatSync(file); let real = file; if (linkStat.isSymbolicLink()) { real = fs.realpathSync(file); if (!within(real, allowlistedRoot)) continue; } if (linkStat.isDirectory() || (linkStat.isSymbolicLink() && fs.statSync(file).isDirectory())) collectFiles(file, depth + 1, allowlistedRoot, files); else if ((linkStat.isFile() || (linkStat.isSymbolicLink() && fs.statSync(file).isFile())) && (file.endsWith('.jsonl') || (cfg.provider === 'hermes' && file.endsWith('.json')))) files.push(file); } };
-const hermesDocumentRecords = (file) => { const text = fs.readFileSync(file, 'utf8'); if (Buffer.byteLength(text) > MAX_STDOUT) throw new Error('document-overflow'); let document; try { document = JSON.parse(text); } catch { throw new Error('schema-invalid'); } if (!document || typeof document !== 'object' || Array.isArray(document)) throw new Error('schema-invalid'); if (!Object.prototype.hasOwnProperty.call(document, 'messages')) return [document]; if (!Array.isArray(document.messages)) throw new Error('schema-invalid'); const sessionId = document.session_id || document.sessionId || document.id || ''; const timestamp = document.session_start || document.sessionStart || document.started_at || document.timestamp || document.created_at || document.createdAt || document.last_updated || document.lastUpdated || ''; const cwd = document.cwd || document.working_directory || document.workingDirectory || ''; return document.messages.map((message) => { if (!message || typeof message !== 'object' || Array.isArray(message)) throw new Error('schema-invalid'); return { ...message, session_id: message.session_id || message.sessionId || sessionId, sessionId: message.sessionId || message.session_id || sessionId, timestamp: message.timestamp || message.created_at || message.createdAt || timestamp, cwd: message.cwd || message.working_directory || message.workingDirectory || cwd }; }); };
+  const hermesDocumentRecords = (file) => { const text = readBounded(file, MAX_STDOUT).toString('utf8'); let document; try { document = JSON.parse(text); } catch { throw new Error('schema-invalid'); } if (!document || typeof document !== 'object' || Array.isArray(document)) throw new Error('schema-invalid'); if (!Object.prototype.hasOwnProperty.call(document, 'messages')) return [document]; if (!Array.isArray(document.messages)) throw new Error('schema-invalid'); const sessionId = document.session_id || document.sessionId || document.id || ''; const timestamp = document.session_start || document.sessionStart || document.started_at || document.timestamp || document.created_at || document.createdAt || document.last_updated || document.lastUpdated || ''; const cwd = document.cwd || document.working_directory || document.workingDirectory || ''; return document.messages.map((message) => { if (!message || typeof message !== 'object' || Array.isArray(message)) throw new Error('schema-invalid'); return { ...message, session_id: message.session_id || message.sessionId || sessionId, sessionId: message.sessionId || message.session_id || sessionId, timestamp: message.timestamp || message.created_at || message.createdAt || timestamp, cwd: message.cwd || message.working_directory || message.workingDirectory || cwd }; }); };
 const main = async () => { if (cfg.provider === 'opencode') throw new Error('not-implemented'); const files = []; for (const configuredRoot of (cfg.historyRoots || [])) { if (typeof configuredRoot !== 'string' || !configuredRoot) continue; const resolvedRoot = path.resolve(expandHome(configuredRoot)); const rootStat = fs.lstatSync(resolvedRoot); const allowlistedRoot = fs.realpathSync(resolvedRoot); if (!rootStat.isDirectory() && !fs.statSync(resolvedRoot).isDirectory()) throw new Error('root-invalid'); collectFiles(allowlistedRoot, 0, allowlistedRoot, files); } for (const file of [...new Set(files)].sort()) { const state = { mapping: null, sessionId: '', pendingReads: new Map() }; if (cfg.provider === 'hermes' && file.endsWith('.json')) { for (const [position, record] of hermesDocumentRecords(file).entries()) processRecord(record, position, state); continue; } let position = 0; for await (const line of readLines(file)) { if (!line.trim()) continue; const record = parseRemoteRecord(line); if (!record) continue; if (typeof record !== 'object' || Array.isArray(record)) throw new Error('schema-invalid'); processRecord(record, position, state); position += 1; } } };
 main().catch(() => { process.stderr.write('remote-collector-failed\\n'); process.exitCode = 1; });
 `;
@@ -1548,7 +1647,7 @@ function sourceHistoryFiles(sourcePath, provider = '') {
 function prefixHash(filePath, bytes = 4096, content = null) {
   try {
     const length = Math.max(0, Math.min(Number(bytes) || 0, 4096));
-    const buffer = Buffer.isBuffer(content) ? content : fs.readFileSync(filePath);
+    const buffer = Buffer.isBuffer(content) ? content : readFileBounded(filePath, MAX_HISTORY_FILE_BYTES);
     return sha256(buffer.subarray(0, length));
   } catch { return ''; }
 }
@@ -1598,7 +1697,11 @@ function readLocalSource({ source, cursor = {}, context, full = false }) {
       ? Math.min(Math.max(0, parseNumber(previous.size, 0)), 4096)
       : Math.min(Math.max(0, parseNumber(previous.prefixLength, 0)), 4096);
     let buffer;
-    try { buffer = fs.readFileSync(file); } catch { partial = true; reason = 'source-read'; continue; }
+    try { buffer = readFileBounded(file, MAX_HISTORY_FILE_BYTES); } catch (error) {
+      partial = true;
+      reason = error.code === 'file-too-large' ? 'source-file-too-large' : 'source-read';
+      continue;
+    }
     const prefixLengthToCompare = previous.size === undefined ? Math.min(stat.size, 4096) : previousPrefixLength;
     const prefix = prefixHash(file, prefixLengthToCompare, buffer);
     const rewritten = previous.size !== undefined && (
@@ -2077,14 +2180,14 @@ function initializeHmacKey(hmacKeyPath) {
       if (error?.code !== 'EEXIST') throw error;
       let winner;
       try {
-        winner = fs.readFileSync(hmacKeyPath, 'utf8').trim();
+        winner = readFileBounded(hmacKeyPath, 4096).toString('utf8').trim();
       } catch {
         throw new Error('hmac-key-persistence-failed');
       }
       if (!HMAC_KEY_RE.test(winner)) throw new Error('invalid-hmac-key');
       return winner;
     }
-    const persistedKey = fs.readFileSync(hmacKeyPath, 'utf8').trim();
+    const persistedKey = readFileBounded(hmacKeyPath, 4096).toString('utf8').trim();
     if (!HMAC_KEY_RE.test(persistedKey) || persistedKey !== generatedKey) throw new Error('hmac-key-persistence-failed');
     return persistedKey;
   } finally {
@@ -2115,10 +2218,16 @@ function getRuntimeOptions(options = {}) {
     let keyFileMissing = false;
     let storedKey = '';
     try {
-      storedKey = fs.readFileSync(hmacKeyPath, 'utf8').trim();
+      storedKey = readFileBounded(hmacKeyPath, 4096).toString('utf8').trim();
     } catch (error) {
       if (error?.code === 'ENOENT') keyFileMissing = true;
-      else throw new Error('hmac-key-read-failed');
+      else if (error?.code === 'file-mutated') {
+        try {
+          storedKey = readFileBounded(hmacKeyPath, 4096).toString('utf8').trim();
+        } catch {
+          throw new Error('hmac-key-read-failed');
+        }
+      } else throw new Error('hmac-key-read-failed');
     }
     if (!keyFileMissing) {
       if (!HMAC_KEY_RE.test(storedKey)) throw new Error('invalid-hmac-key');
@@ -2270,7 +2379,7 @@ function normalizeState(raw) {
 function loadState(statePath) {
   let raw;
   try {
-    raw = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    raw = JSON.parse(readFileBounded(statePath, MAX_JSON_BYTES).toString('utf8'));
   } catch (error) {
     if (error?.code === 'ENOENT') return emptyState();
     if (error instanceof SyntaxError) throw new Error('state-invalid');
@@ -2472,7 +2581,7 @@ function countBy(items, key) {
   return output;
 }
 
-function buildReport({ runId, mode, status, sources, catalog, retainedRunEvents = [], retainedDetailedEvents = [], coverageIntervals, config, fingerprints, postGate, cursorsPromoted, now, nonGitReceipts, hmacKey, lifetimeUsage = {} }) {
+function buildReport({ runId, mode, status, sources, catalog, retainedRunEvents = [], retainedDetailedEvents = [], coverageIntervals, config, fingerprints, postGate, cursorsPromoted, now, nonGitReceipts, hmacKey, lifetimeUsage = {}, inventoryIssues = [] }) {
   const allDetailed = retainedDetailedEvents;
   const classifications = [];
   for (const variant of catalog.variants) {
@@ -2534,6 +2643,10 @@ function buildReport({ runId, mode, status, sources, catalog, retainedRunEvents 
     }))),
     logicalProjects: projects,
     installations: catalog.installations,
+    inventory: {
+      status: inventoryIssues.length > 0 ? 'PARTIAL' : 'COMPLETE',
+      issues: inventoryIssues.map((issue) => ({ name: issue.name, reason: issue.reason })),
+    },
     variants: catalog.variants,
     divergence: catalog.divergence,
     dedupCandidates: catalog.dedupCandidates,
@@ -2687,7 +2800,7 @@ function mergeEventKeyLedger(existingLedger = {}, events = []) {
 function readAuthenticatedPendingState(stageDir, commit) {
   let raw;
   try {
-    raw = fs.readFileSync(path.join(stageDir, 'pending-state.json'));
+    raw = readFileBounded(path.join(stageDir, 'pending-state.json'), MAX_JSON_BYTES);
   } catch {
     throw new Error('pending-state-read-failed');
   }
@@ -2992,7 +3105,7 @@ async function runGardener(mode, options = {}) {
     for (const [sourceId, intervals] of Object.entries(stagedCoverage)) nextState.coverage[sourceId] = mergeIntervals([...(state.coverage?.[sourceId] || []), ...intervals]);
     nextState.coverage = retainCoverage(nextState.coverage, runtime.now, config.policy.detailRetentionDays);
     const coverageBySkill = buildCoverageBySkill({ catalog, state: nextState, sources: sourceReports, now: runtime.now });
-    const status = sourceReports.some((source) => ['PARTIAL', 'NOT_IMPLEMENTED'].includes(source.status)) ? 'partial' : 'complete';
+    const status = sourceReports.some((source) => ['PARTIAL', 'NOT_IMPLEMENTED'].includes(source.status)) || (catalog.inventoryIssues || []).length > 0 ? 'partial' : 'complete';
     ensureDir(stageDir);
     const reportData = buildReport({
       runId,
@@ -3012,6 +3125,7 @@ async function runGardener(mode, options = {}) {
       nonGitReceipts,
       hmacKey: runtime.hmacKey,
       lifetimeUsage: nextState.lifetimeUsage,
+      inventoryIssues: catalog.inventoryIssues,
     });
     const cleanReport = finalizeReport(reportData);
     atomicWriteJson(path.join(stageDir, 'report.json'), cleanReport);
@@ -3062,7 +3176,7 @@ async function runGardener(mode, options = {}) {
     nextState.runs = appendRunIndex(state, runId, finalReport.status);
     nextState = normalizeState(nextState);
     atomicWriteJson(path.join(stageDir, 'pending-state.json'), nextState);
-    const pendingStateRaw = fs.readFileSync(path.join(stageDir, 'pending-state.json'));
+    const pendingStateRaw = readFileBounded(path.join(stageDir, 'pending-state.json'), MAX_JSON_BYTES);
     atomicWriteJson(path.join(stageDir, 'commit.json'), { schemaVersion: SCHEMA_VERSION, tool: 'canuto-skill-gardener', runId, status: finalReport.status, reportHash: sha256(JSON.stringify(finalReport)), receiptHash: sha256(JSON.stringify(finalReceipt)), pendingStateHash: sha256(pendingStateRaw) });
     if (options.failAfterCommit || options.crashAt === 'commit') throw new Error('injected-crash-after-commit');
     if (options.failBeforePromotion) throw new Error('injected-crash-before-cursor-promotion');
@@ -3112,7 +3226,7 @@ function readCrontabText(options = {}) {
   const file = options.file || process.env.CANUTO_SKILL_GARDENER_CRONTAB_FILE;
   if (file) {
     try {
-      return { ok: true, text: fs.readFileSync(file, 'utf8'), reason: '' };
+      return { ok: true, text: readFileBounded(file, 1 * 1024 * 1024).toString('utf8'), reason: '' };
     } catch (error) {
       if (error?.code === 'ENOENT') return { ok: true, text: '', reason: '' };
       return { ok: false, text: '', reason: 'crontab-read-failed' };
@@ -3292,6 +3406,7 @@ module.exports = {
   CRON_SCHEDULE,
   DETAIL_RETENTION_DAYS,
   MAX_LINE_BYTES,
+  MAX_SKILL_BYTES,
   MAX_REMOTE_STDERR_BYTES,
   MAX_REMOTE_STDOUT_BYTES,
   NEGATIVE_WINDOW_DAYS,
@@ -3330,6 +3445,7 @@ module.exports = {
   parseFrontmatter,
   recordCanaryReceipt,
   readCrontabText,
+  readFileBounded,
   readJson,
   reportForRun,
   runEvalAdapter,

@@ -106,16 +106,16 @@ const releasePath = process.argv[4];
 const libraryPath = process.argv[5];
 const home = process.argv[6];
 const stateDir = process.argv[7];
-const originalReadFileSync = fs.readFileSync;
+const originalOpenSync = fs.openSync;
 let gated = false;
-fs.readFileSync = function readFileSync(file, ...args) {
+fs.openSync = function openSync(file, ...args) {
   if (!gated && typeof file === 'string' && path.resolve(file) === keyPath) {
     gated = true;
     fs.writeFileSync(path.join(readyDir, 'ready-' + process.pid), 'ready', { flag: 'wx' });
     const cell = new Int32Array(new SharedArrayBuffer(4));
     while (!fs.existsSync(releasePath)) Atomics.wait(cell, 0, 0, 10);
   }
-  return originalReadFileSync.call(fs, file, ...args);
+  return originalOpenSync.call(fs, file, ...args);
 };
 const gardener = require(libraryPath);
 const runtime = gardener.getRuntimeOptions({ home, stateDir, hmacKeyPath: keyPath });
@@ -361,18 +361,18 @@ test('each local history file is consumed once without the shared audit full-fil
   writeFile(historyFile, `${JSON.stringify({ event: 'Skill', skill: 'audit', event_id: 'single-read', timestamp: '2026-08-20T00:01:00.000Z' })}\n`);
   writeFile(eventLog, '#!/bin/sh\nexit 0\n', 0o755);
   const config = { projects: {}, providers: { ...emptyProviderConfig(), codex: { roots: [skills], pluginRoots: [], historyRoots: [history] } } };
-  const originalReadFileSync = fs.readFileSync;
+  const originalOpenSync = fs.openSync;
   const realHistoryFile = fs.realpathSync(historyFile);
   let historyReads = 0;
-  fs.readFileSync = function countedRead(file, ...args) {
+  fs.openSync = function countedOpen(file, ...args) {
     if (path.resolve(String(file)) === realHistoryFile) historyReads += 1;
-    return originalReadFileSync.call(fs, file, ...args);
+    return originalOpenSync.call(fs, file, ...args);
   };
   let result;
   try {
     result = await gardener.runGardener('backfill', { home, config, vaultRoot: path.join(root, 'vault'), eventLogPath: eventLog, frameworkRoot: path.join(root, 'missing-framework'), now: '2026-08-21T00:00:00.000Z', hmacKey: 'single-read-key', runId: '20260821060003-5555555555' });
   } finally {
-    fs.readFileSync = originalReadFileSync;
+    fs.openSync = originalOpenSync;
   }
   assert.equal(result.exitCode, 0);
   assert.equal(historyReads, 1);
@@ -595,6 +595,13 @@ test('inventory accepts SKILL.md, legacy markdown, plugins and safe symlinks wit
   writeFile(path.join(globalSkills, 'audit', 'SKILL.md'), '# Audit\nproject\n');
   writeFile(path.join(pluginSkills, 'audit', 'SKILL.md'), '# Audit\nplugin\n');
   writeFile(path.join(pluginSkills, 'alias.md'), '# Audit\nproject\n');
+  writeFile(path.join(pluginSkills, 'audit', 'references', 'provider.md'), '# Provider reference\n');
+  writeFile(path.join(globalSkills, 'gstack', 'test', 'fixtures', 'synthetic', 'SKILL.md'), '# Synthetic fixture\n');
+  writeFile(path.join(globalSkills, 'build', 'legit-build', 'SKILL.md'), '# Legit build skill\n');
+  writeFile(path.join(globalSkills, 'dist', 'legit-dist', 'SKILL.md'), '# Legit dist skill\n');
+  writeFile(path.join(globalSkills, 'coverage', 'legit-coverage', 'SKILL.md'), '# Legit coverage skill\n');
+  writeFile(path.join(globalSkills, 'fixtures', 'legit-fixtures', 'SKILL.md'), '# Legit fixture-named skill\n');
+  writeFile(path.join(projectSkills, 'audit', 'README.md'), '# Audit documentation\n');
   fs.symlinkSync(path.join(projectSkills, 'audit'), path.join(projectSkills, 'cycle'), 'dir');
   const config = gardener.normalizeConfig({
     projects: { demo: { surfaces: { mac: { roots: [path.join(root, 'project')], aliases: ['Mac'], historyRoots: [] } } } },
@@ -604,12 +611,38 @@ test('inventory accepts SKILL.md, legacy markdown, plugins and safe symlinks wit
     },
   });
   const inventory = gardener.collectInventory(config, { home: root, hmacKey: 'inventory-key', frameworkRoot: path.join(root, 'missing-framework') });
-  assert.equal(inventory.installations.length, 5);
+  assert.equal(inventory.installations.length, 9);
   assert.equal(inventory.divergence.some((item) => item.name === 'audit'), true);
   assert.equal(inventory.dedupCandidates.length >= 1, true);
   assert.equal(inventory.installations.some((item) => item.name === 'legacy'), true);
   assert.equal(inventory.installations.some((item) => item.name === 'alias'), true);
+  assert.equal(inventory.installations.some((item) => item.name === 'provider'), false);
+  assert.equal(inventory.installations.some((item) => item.name === 'readme'), false);
+  assert.equal(inventory.installations.some((item) => item.name === 'synthetic'), false);
+  assert.equal(inventory.installations.some((item) => item.name === 'legit-build'), true);
+  assert.equal(inventory.installations.some((item) => item.name === 'legit-dist'), true);
+  assert.equal(inventory.installations.some((item) => item.name === 'legit-coverage'), true);
+  assert.equal(inventory.installations.some((item) => item.name === 'legit-fixtures'), true);
   assert.equal(inventory.installations.some((item) => JSON.stringify(item).includes(root)), false);
+});
+
+test('oversized inventory files become partial blocked evidence without being read into memory', () => {
+  const root = tempDir();
+  const globalSkills = path.join(root, 'codex', 'skills');
+  writeFile(path.join(globalSkills, 'build', 'legit', 'SKILL.md'), '# Legit\n');
+  writeFile(path.join(globalSkills, 'oversized', 'SKILL.md'), Buffer.alloc(gardener.MAX_SKILL_BYTES + 1, 'x'));
+  const config = gardener.normalizeConfig({
+    projects: {},
+    providers: { ...emptyProviderConfig(), codex: { roots: [globalSkills], pluginRoots: [], historyRoots: [] } },
+  });
+  const inventory = gardener.collectInventory(config, { home: root, hmacKey: 'inventory-size-key', frameworkRoot: path.join(root, 'missing-framework') });
+  const blocked = inventory.installations.find((item) => item.name === 'oversized');
+  assert.equal(inventory.inventoryStatus, 'PARTIAL');
+  assert.ok(inventory.inventoryIssues.some((issue) => issue.name === 'oversized' && issue.reason === 'skill-file-too-large'));
+  assert.equal(blocked.status, 'BLOCKED');
+  assert.equal(blocked.reason, 'skill-file-too-large');
+  assert.equal(inventory.installations.some((item) => item.name === 'legit'), true);
+  assert.doesNotMatch(JSON.stringify(inventory.installations), new RegExp(root.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 });
 
 test('Git worktrees are admitted only when they share the configured common dir and aliases do not merge projects', () => {
@@ -1401,6 +1434,10 @@ test('loadConfig and loadState fail closed without artifacts', async () => {
     assert.throws(() => gardener.loadConfig(storedPath), { message: 'config-invalid' }, JSON.stringify(value));
   }
   assert.equal(gardener.loadConfig(path.join(__dirname, '..', 'config', 'skill-gardener.json')).schemaVersion, 1);
+  assert.deepEqual(
+    gardener.loadConfig(path.join(__dirname, '..', 'config', 'skill-gardener.json')).providers.codex.roots.map((root) => root.path),
+    ['~/.codex/skills', '~/.agents/skills'],
+  );
   const loop = path.join(root, 'config-loop');
   fs.symlinkSync('config-loop', loop);
   assert.throws(() => gardener.loadConfig(loop), { message: 'config-read-failed' });

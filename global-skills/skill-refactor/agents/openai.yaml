@@ -1,0 +1,7 @@
+interface:
+  display_name: "Skill Refactor"
+  short_description: "Stage isolated skill refactor candidates"
+  default_prompt: "Use $skill-refactor to compile a resumable, reviewable skill estate staging workspace."
+
+policy:
+  allow_implicit_invocation: true

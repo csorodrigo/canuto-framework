@@ -4,7 +4,8 @@
   "providers": {
     "codex": {
       "roots": [
-        "~/.codex/skills"
+        "~/.codex/skills",
+        "~/.agents/skills"
       ],
       "pluginRoots": [
         "~/.codex/plugins"
