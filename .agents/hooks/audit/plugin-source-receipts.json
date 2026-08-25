@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "plugins": {
+    "vercel@0.45.1": {
+      "remote": "https://github.com/vercel/vercel-plugin.git",
+      "commitSha": "ccfbc7c584f15c0fc925957c86bafaca9444d24a",
+      "sourceRoot": ".",
+      "hookConfig": {
+        "path": "hooks/hooks.json",
+        "sha256": "09d335208258ab6b8593976732869272755b6c7fae30afd906d010234a30aed5"
+      },
+      "artifacts": {
+        "hooks/session-start-seen-skills.mjs": "02f75d69ac4b7c1055688862c65b1223123e44c6fb5bde5db372ca602a3e668e",
+        "hooks/session-start-profiler.mjs": "1537565338358a9f6fb7a0022a5840e44264288cd3397fa3db7fd5ada5813bd7",
+        "hooks/inject-claude-md.mjs": "bbda85ac5cb781560d8f9318e27ddaccdc6172e8bb9010ab86b6e297bd0b432c",
+        "hooks/session-end-cleanup.mjs": "1db52d969130cbcb954cad129eb06dbe4a89ed636b51bad6ba6b33a22ec80a0a"
+      }
+    },
+    "codex-companion@1.0.5": {
+      "remote": "https://github.com/openai/codex-plugin-cc.git",
+      "commitSha": "80c31f99570876c3ef40327838b0a2ca1ae2cd9c",
+      "sourceRoot": "plugins/codex",
+      "hookConfig": {
+        "path": "hooks/hooks.json",
+        "sha256": "6ba33b3f6a75ba4271a76160b0465e7050a607a02e1ec212a7c0f3b9cd3cb35a"
+      },
+      "artifacts": {
+        "scripts/session-lifecycle-hook.mjs": "cb8781e6a12bddcde94776e82c743f79e5e11c81bd4e4e9571dbb7002108292a",
+        "scripts/stop-review-gate-hook.mjs": "caf98d78d995f98df5da3903690c20ab701b56240b6ca8b9fd10ef38bc9119fc"
+      }
+    }
+  }
+}

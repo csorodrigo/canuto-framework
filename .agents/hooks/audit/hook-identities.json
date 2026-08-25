@@ -1,0 +1,572 @@
+{
+  "schemaVersion": 1,
+  "records": [
+    {
+      "id": "CU-01",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "Edit|Write",
+      "handler": "inline-prettier"
+    },
+    {
+      "id": "CU-02",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "Edit|Write",
+      "handler": "posttool-typecheck.sh"
+    },
+    {
+      "id": "CU-03",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "Edit|Write",
+      "handler": "validation-mark.sh"
+    },
+    {
+      "id": "CU-04",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "",
+      "handler": "api-reference-guard.sh"
+    },
+    {
+      "id": "CU-05",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "Bash",
+      "handler": "validation-clear.sh"
+    },
+    {
+      "id": "CU-06",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "Bash",
+      "handler": "retry-detect.sh"
+    },
+    {
+      "id": "CU-07",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "Bash",
+      "handler": "git-truth.sh"
+    },
+    {
+      "id": "CU-08",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": ".*",
+      "handler": "posttooluse-universal.sh"
+    },
+    {
+      "id": "CU-09",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "ExitPlanMode",
+      "handler": "plan-review.sh"
+    },
+    {
+      "id": "CU-10",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "Bash",
+      "handler": "postdelegate-verify.sh"
+    },
+    {
+      "id": "CU-11",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "(AskUserQuestion|mcp__.*__AskUserQuestion)",
+      "handler": "question-log-hook"
+    },
+    {
+      "id": "CU-12",
+      "surface": "claude-user",
+      "event": "PostToolUse",
+      "matcher": "(AskUserQuestion|mcp__.*__AskUserQuestion)",
+      "handler": "auq-error-fallback-hook"
+    },
+    {
+      "id": "CU-13",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "handler": "host-pressure-gate.sh"
+    },
+    {
+      "id": "CU-14",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "handler": "worktree-deps-check.sh"
+    },
+    {
+      "id": "CU-15",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "handler": "local-build-guard.sh"
+    },
+    {
+      "id": "CU-16",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "handler": "secret-hygiene.sh"
+    },
+    {
+      "id": "CU-17",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "handler": "ps-self-match-guard.sh"
+    },
+    {
+      "id": "CU-18",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "handler": "claim-guard.sh"
+    },
+    {
+      "id": "CU-19",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "handler": "inline-rm-rf-gate"
+    },
+    {
+      "id": "CU-20",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "handler": "log-commands.sh"
+    },
+    {
+      "id": "CU-21",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "handler": "rtk-rewrite-guard.sh"
+    },
+    {
+      "id": "CU-22",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "handler": "pre-commit-branch-check.sh"
+    },
+    {
+      "id": "CU-23",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "handler": "dobra-compose-writer-guard.sh"
+    },
+    {
+      "id": "CU-24",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "handler": "protect-env-read.sh"
+    },
+    {
+      "id": "CU-25",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "handler": "assert-deploy-target.sh"
+    },
+    {
+      "id": "CU-26",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "handler": "codex-pretool-guard.sh"
+    },
+    {
+      "id": "CU-27",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Edit|Write",
+      "handler": "protect-files.sh"
+    },
+    {
+      "id": "CU-28",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Edit|Write",
+      "handler": "fingerprint-gate.sh"
+    },
+    {
+      "id": "CU-29",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "mcp__github__create_pull_request",
+      "handler": "require-tests-for-pr.sh"
+    },
+    {
+      "id": "CU-30",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Write",
+      "handler": "pre-claim-grep.sh"
+    },
+    {
+      "id": "CU-31",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Write",
+      "handler": "tmp-deliverable-guard.sh"
+    },
+    {
+      "id": "CU-32",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "mcp__playwright__browser_take_screenshot|mcp__claude-in-chrome__computer",
+      "handler": "screenshot-guard.sh"
+    },
+    {
+      "id": "CU-33",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "handler": "pre-pr-bash-gate.sh"
+    },
+    {
+      "id": "CU-34",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "handler": "rtk-hook-claude"
+    },
+    {
+      "id": "CU-35",
+      "surface": "claude-user",
+      "event": "PreToolUse",
+      "matcher": "(AskUserQuestion|mcp__.*__AskUserQuestion)",
+      "handler": "question-preference-hook"
+    },
+    {
+      "id": "CU-36",
+      "surface": "claude-user",
+      "event": "Stop",
+      "matcher": "",
+      "handler": "session-budget-warn.sh"
+    },
+    {
+      "id": "CU-37",
+      "surface": "claude-user",
+      "event": "Stop",
+      "matcher": "",
+      "handler": "pre-finalize.sh"
+    },
+    {
+      "id": "CU-38",
+      "surface": "claude-user",
+      "event": "Stop",
+      "matcher": "",
+      "handler": "session-save.sh"
+    },
+    {
+      "id": "CU-39",
+      "surface": "claude-user",
+      "event": "Stop",
+      "matcher": "",
+      "handler": "api-reference-guard.sh"
+    },
+    {
+      "id": "CU-40",
+      "surface": "claude-user",
+      "event": "Stop",
+      "matcher": "",
+      "handler": "ccgram.main"
+    },
+    {
+      "id": "CU-41",
+      "surface": "claude-user",
+      "event": "Stop",
+      "matcher": "",
+      "handler": "delivery-proof-gate.sh"
+    },
+    {
+      "id": "CU-42",
+      "surface": "claude-user",
+      "event": "Stop",
+      "matcher": "",
+      "handler": "timeline-stop-hook"
+    },
+    {
+      "id": "CU-43",
+      "surface": "claude-user",
+      "event": "Notification",
+      "matcher": "",
+      "handler": "pre-compact-save.sh"
+    },
+    {
+      "id": "CU-44",
+      "surface": "claude-user",
+      "event": "Notification",
+      "matcher": "",
+      "handler": "ccgram.main"
+    },
+    {
+      "id": "CU-45",
+      "surface": "claude-user",
+      "event": "SessionStart",
+      "matcher": "",
+      "handler": "session-start.sh"
+    },
+    {
+      "id": "CU-46",
+      "surface": "claude-user",
+      "event": "SessionStart",
+      "matcher": "",
+      "handler": "ccgram.main"
+    },
+    {
+      "id": "CU-47",
+      "surface": "claude-user",
+      "event": "SessionStart",
+      "matcher": "",
+      "handler": "worktree-collision-check.sh"
+    },
+    {
+      "id": "CU-48",
+      "surface": "claude-user",
+      "event": "SessionStart",
+      "matcher": "startup|resume|clear|compact",
+      "handler": "obsidian_mcp_cleanup.sh"
+    },
+    {
+      "id": "CU-49",
+      "surface": "claude-user",
+      "event": "SessionStart",
+      "matcher": "compact",
+      "handler": "post-compact-reread.sh"
+    },
+    {
+      "id": "CU-50",
+      "surface": "claude-user",
+      "event": "SessionStart",
+      "matcher": "*",
+      "handler": "herdr-agent-state.sh"
+    },
+    {
+      "id": "CU-51",
+      "surface": "claude-user",
+      "event": "StopFailure",
+      "matcher": "",
+      "handler": "ccgram.main"
+    },
+    {
+      "id": "CU-52",
+      "surface": "claude-user",
+      "event": "SessionEnd",
+      "matcher": "",
+      "handler": "ccgram.main"
+    },
+    {
+      "id": "CU-53",
+      "surface": "claude-user",
+      "event": "SubagentStart",
+      "matcher": "",
+      "handler": "ccgram.main"
+    },
+    {
+      "id": "CU-54",
+      "surface": "claude-user",
+      "event": "SubagentStop",
+      "matcher": "",
+      "handler": "ccgram.main"
+    },
+    {
+      "id": "CU-55",
+      "surface": "claude-user",
+      "event": "TeammateIdle",
+      "matcher": "",
+      "handler": "ccgram.main"
+    },
+    {
+      "id": "CU-56",
+      "surface": "claude-user",
+      "event": "TaskCompleted",
+      "matcher": "",
+      "handler": "ccgram.main"
+    },
+    {
+      "id": "CU-57",
+      "surface": "claude-user",
+      "event": "UserPromptSubmit",
+      "matcher": "",
+      "handler": "secret-hygiene.sh"
+    },
+    {
+      "id": "CX-01",
+      "surface": "codex-user",
+      "event": "PostToolUse",
+      "matcher": "^Bash$",
+      "handler": "canuto_hook.mjs"
+    },
+    {
+      "id": "CX-02",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "handler": "codex-adapt.sh -> probe-canuto-chain.sh"
+    },
+    {
+      "id": "CX-03",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "handler": "canuto_hook.mjs"
+    },
+    {
+      "id": "CX-04",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "handler": "python3 -> pre_bash_guard.py"
+    },
+    {
+      "id": "CX-05",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "handler": "ps-self-match-guard.sh"
+    },
+    {
+      "id": "CX-06",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "handler": "codex-adapt.sh -> protect-env-read.sh"
+    },
+    {
+      "id": "CX-07",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "handler": "codex-adapt.sh -> secret-hygiene.sh"
+    },
+    {
+      "id": "CX-08",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "handler": "codex-adapt.sh -> host-pressure-gate.sh"
+    },
+    {
+      "id": "CX-09",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "handler": "codex-adapt.sh -> worktree-deps-check.sh"
+    },
+    {
+      "id": "CX-10",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "handler": "codex-adapt.sh -> pre-commit-branch-check.sh"
+    },
+    {
+      "id": "CX-11",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "handler": "codex-adapt.sh -> assert-deploy-target.sh"
+    },
+    {
+      "id": "CX-12",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "handler": "codex-adapt.sh -> claim-guard.sh"
+    },
+    {
+      "id": "CX-13",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "handler": "codex-adapt.sh -> pre-pr-bash-gate.sh"
+    },
+    {
+      "id": "CX-14",
+      "surface": "codex-user",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "handler": "codex-adapt.sh -> codex-pretool-guard.sh"
+    },
+    {
+      "id": "CX-15",
+      "surface": "codex-user",
+      "event": "SessionEnd",
+      "matcher": "",
+      "handler": "canuto_hook.mjs"
+    },
+    {
+      "id": "CX-16",
+      "surface": "codex-user",
+      "event": "SessionEnd",
+      "matcher": "",
+      "handler": "obsidian_mcp_cleanup.sh"
+    },
+    {
+      "id": "CX-17",
+      "surface": "codex-user",
+      "event": "SessionStart",
+      "matcher": "startup|resume|clear|compact",
+      "handler": "canuto_hook.mjs"
+    },
+    {
+      "id": "PV-01",
+      "surface": "plugin-vercel",
+      "event": "SessionStart",
+      "matcher": "startup|resume|clear|compact",
+      "handler": "session-start-seen-skills.mjs"
+    },
+    {
+      "id": "PV-02",
+      "surface": "plugin-vercel",
+      "event": "SessionStart",
+      "matcher": "startup|resume|clear|compact",
+      "handler": "session-start-profiler.mjs"
+    },
+    {
+      "id": "PV-03",
+      "surface": "plugin-vercel",
+      "event": "SessionStart",
+      "matcher": "startup|resume|clear|compact",
+      "handler": "inject-claude-md.mjs"
+    },
+    {
+      "id": "PV-04",
+      "surface": "plugin-vercel",
+      "event": "SessionEnd",
+      "matcher": "",
+      "handler": "session-end-cleanup.mjs"
+    },
+    {
+      "id": "PC-01",
+      "surface": "plugin-codex-companion",
+      "event": "SessionStart",
+      "matcher": "",
+      "handler": "session-lifecycle-hook.mjs"
+    },
+    {
+      "id": "PC-02",
+      "surface": "plugin-codex-companion",
+      "event": "SessionEnd",
+      "matcher": "",
+      "handler": "session-lifecycle-hook.mjs"
+    },
+    {
+      "id": "PC-03",
+      "surface": "plugin-codex-companion",
+      "event": "Stop",
+      "matcher": "",
+      "handler": "stop-review-gate-hook.mjs"
+    }
+  ]
+}

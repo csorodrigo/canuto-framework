@@ -23,6 +23,7 @@
 | JSON health output | implemented | `install.sh --test --json`, `.agents/tools/codex-health-check.sh --json` | Machine-readable diagnostics for CI and dashboards |
 | Context bootstrap | implemented | `.context.md`, `docs/FEATURE-MAP.md`, `.agents/vault/digests/00-bootstrap-digest.md` | Created automatically when missing |
 | Passive hooks | implemented | `.agents/hooks/` | Session save, pre-compact save, Codex pretool guard, event log, gates de PR/delegação (plan-review aposentado 2026-06-11: 0 firings) |
+| Hook governance baseline | implemented | `.agents/hooks/audit/capture-hooks-baseline.mjs`, `.agents/hooks/audit/provenance-manifest.json` | Read-only, sanitized 81/81 inventory; installed-only or divergent sources remain blocked and are never imported automatically |
 | CLAUDE examples | implemented | `docs/CLAUDE-EXAMPLES.md` | Reference setups for common project types |
 | Native Codex MCP auto-registration | partial | `install.sh`, `setup_codex_mcps` | Works when Codex CLI + required creds/tools are available |
 | Obsidian vault integration | partial | `setup_obsidian_mcp`, `setup_codex_mcps` | Fully automatic if API key is already available; otherwise degrades gracefully |

@@ -1,0 +1,912 @@
+{
+  "schemaVersion": 1,
+  "inventoryFixture": ".agents/hooks/audit/fixtures/active-hooks-2026-08-24.json",
+  "inventorySha256": "a3d0e39003d01e13f09bc34a7063fe45a54bf3d424d739628a56c3021ed2ac8b",
+  "recordCount": 81,
+  "records": [
+    {
+      "id": "CU-01",
+      "owner": "repository",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-02",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-03",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/settings-snippet.json",
+          ".agents/hooks/validation-mark.sh"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-04",
+      "owner": "skill:api-reference",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-05",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/settings-snippet.json",
+          ".agents/hooks/validation-clear.sh"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-06",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/retry-detect.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-07",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-08",
+      "owner": "machine-or-plugin:telemetry",
+      "disposition": "replace",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/posttooluse-universal.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-09",
+      "owner": "skill:plan-review",
+      "disposition": "move",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/_retired/plan-review.sh"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-10",
+      "owner": "orchestrator",
+      "disposition": "move",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/postdelegate-verify.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-11",
+      "owner": "plugin:gstack",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-12",
+      "owner": "plugin:gstack",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-13",
+      "owner": "machine",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-14",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-15",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-16",
+      "owner": "machine",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-17",
+      "owner": "machine",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-18",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-19",
+      "owner": "machine",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-20",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-21",
+      "owner": "runtime:rtk",
+      "disposition": "consolidate",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-22",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/pre-commit-branch-check.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-23",
+      "owner": "repository:Dobra",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-24",
+      "owner": "machine",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-25",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-26",
+      "owner": "repository-and-skill:review",
+      "disposition": "replace",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/codex-pretool-guard.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-27",
+      "owner": "machine-and-repository",
+      "disposition": "split",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/protect-files.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-28",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/fingerprint-gate.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-29",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "diverged-or-partial",
+        "refs": [
+          ".agents/hooks/require-tests-for-pr.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-30",
+      "owner": "repository-or-skill:claims",
+      "disposition": "replace",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/pre-claim-grep.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-31",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-32",
+      "owner": "plugin:qa-browser",
+      "disposition": "move",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/screenshot-guard.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-33",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "diverged-or-partial",
+        "refs": [
+          ".agents/hooks/pre-pr-bash-gate.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-34",
+      "owner": "runtime:rtk",
+      "disposition": "consolidate",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-35",
+      "owner": "plugin:gstack",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-36",
+      "owner": "machine",
+      "disposition": "correct",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-37",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/pre-finalize.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-38",
+      "owner": "plugin:Canuto",
+      "disposition": "move",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/session-save.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-39",
+      "owner": "skill:api-reference",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-40",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-41",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-42",
+      "owner": "plugin:gstack",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-43",
+      "owner": "plugin:Canuto",
+      "disposition": "move",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/pre-compact-save.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-44",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-45",
+      "owner": "plugin:Canuto",
+      "disposition": "move",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/session-start.sh",
+          ".agents/hooks/settings-snippet.json"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-46",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-47",
+      "owner": "machine",
+      "disposition": "correct",
+      "source": {
+        "state": "exact",
+        "refs": [
+          ".agents/hooks/settings-snippet.json",
+          ".agents/hooks/worktree-collision-check.sh"
+        ]
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-48",
+      "owner": "plugin:Obsidian",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-49",
+      "owner": "plugin:Canuto",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-50",
+      "owner": "plugin:Herdr",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CU-51",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-52",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-53",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-54",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-55",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-56",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CU-57",
+      "owner": "machine",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-01",
+      "owner": "plugin:Canuto",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-02",
+      "owner": "none",
+      "disposition": "remove",
+      "source": {
+        "state": "removal-approved",
+        "refs": []
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "CX-03",
+      "owner": "plugin:Canuto",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-04",
+      "owner": "machine-and-repository",
+      "disposition": "split",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-05",
+      "owner": "machine",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-06",
+      "owner": "machine",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-07",
+      "owner": "machine",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-08",
+      "owner": "machine",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-09",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-10",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "diverged-or-partial",
+        "refs": [
+          ".agents/hooks/pre-commit-branch-check.sh"
+        ]
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-11",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-12",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-13",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "diverged-or-partial",
+        "refs": [
+          ".agents/hooks/pre-pr-bash-gate.sh"
+        ]
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-14",
+      "owner": "repository",
+      "disposition": "replace",
+      "source": {
+        "state": "diverged-or-partial",
+        "refs": [
+          ".agents/hooks/codex-pretool-guard.sh"
+        ]
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-15",
+      "owner": "plugin:Canuto",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-16",
+      "owner": "plugin:Obsidian",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "CX-17",
+      "owner": "plugin:Canuto",
+      "disposition": "move",
+      "source": {
+        "state": "missing",
+        "refs": []
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "PV-01",
+      "owner": "plugin:Vercel",
+      "disposition": "keep",
+      "source": {
+        "state": "versioned-plugin",
+        "refs": [
+          "https://github.com/vercel/vercel-plugin.git#ccfbc7c584f15c0fc925957c86bafaca9444d24a:."
+        ],
+        "hookConfigSha256": "09d335208258ab6b8593976732869272755b6c7fae30afd906d010234a30aed5",
+        "commitSha": "ccfbc7c584f15c0fc925957c86bafaca9444d24a",
+        "receiptSha256": "181ccda87d7d5d19410075cbc0c0db733bf6c97650c7ed6c78953b0c8e7d1aac"
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "PV-02",
+      "owner": "plugin:Vercel",
+      "disposition": "keep",
+      "source": {
+        "state": "diverged-or-partial",
+        "refs": [
+          "https://github.com/vercel/vercel-plugin.git#ccfbc7c584f15c0fc925957c86bafaca9444d24a:."
+        ]
+      },
+      "batchStatus": "blocked-source-provenance"
+    },
+    {
+      "id": "PV-03",
+      "owner": "plugin:Vercel",
+      "disposition": "keep",
+      "source": {
+        "state": "versioned-plugin",
+        "refs": [
+          "https://github.com/vercel/vercel-plugin.git#ccfbc7c584f15c0fc925957c86bafaca9444d24a:."
+        ],
+        "hookConfigSha256": "09d335208258ab6b8593976732869272755b6c7fae30afd906d010234a30aed5",
+        "commitSha": "ccfbc7c584f15c0fc925957c86bafaca9444d24a",
+        "receiptSha256": "181ccda87d7d5d19410075cbc0c0db733bf6c97650c7ed6c78953b0c8e7d1aac"
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "PV-04",
+      "owner": "plugin:Vercel",
+      "disposition": "keep",
+      "source": {
+        "state": "versioned-plugin",
+        "refs": [
+          "https://github.com/vercel/vercel-plugin.git#ccfbc7c584f15c0fc925957c86bafaca9444d24a:."
+        ],
+        "hookConfigSha256": "09d335208258ab6b8593976732869272755b6c7fae30afd906d010234a30aed5",
+        "commitSha": "ccfbc7c584f15c0fc925957c86bafaca9444d24a",
+        "receiptSha256": "181ccda87d7d5d19410075cbc0c0db733bf6c97650c7ed6c78953b0c8e7d1aac"
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "PC-01",
+      "owner": "plugin:Codex-Companion",
+      "disposition": "keep",
+      "source": {
+        "state": "versioned-plugin",
+        "refs": [
+          "https://github.com/openai/codex-plugin-cc.git#80c31f99570876c3ef40327838b0a2ca1ae2cd9c:plugins/codex"
+        ],
+        "hookConfigSha256": "6ba33b3f6a75ba4271a76160b0465e7050a607a02e1ec212a7c0f3b9cd3cb35a",
+        "commitSha": "80c31f99570876c3ef40327838b0a2ca1ae2cd9c",
+        "receiptSha256": "bfd66d6ec5c2704b698d65ec73256984a487e87243c818cc166bcc94abb24c28"
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "PC-02",
+      "owner": "plugin:Codex-Companion",
+      "disposition": "keep",
+      "source": {
+        "state": "versioned-plugin",
+        "refs": [
+          "https://github.com/openai/codex-plugin-cc.git#80c31f99570876c3ef40327838b0a2ca1ae2cd9c:plugins/codex"
+        ],
+        "hookConfigSha256": "6ba33b3f6a75ba4271a76160b0465e7050a607a02e1ec212a7c0f3b9cd3cb35a",
+        "commitSha": "80c31f99570876c3ef40327838b0a2ca1ae2cd9c",
+        "receiptSha256": "bfd66d6ec5c2704b698d65ec73256984a487e87243c818cc166bcc94abb24c28"
+      },
+      "batchStatus": "eligible-for-later-plan"
+    },
+    {
+      "id": "PC-03",
+      "owner": "plugin:Codex-Companion",
+      "disposition": "keep",
+      "source": {
+        "state": "versioned-plugin",
+        "refs": [
+          "https://github.com/openai/codex-plugin-cc.git#80c31f99570876c3ef40327838b0a2ca1ae2cd9c:plugins/codex"
+        ],
+        "hookConfigSha256": "6ba33b3f6a75ba4271a76160b0465e7050a607a02e1ec212a7c0f3b9cd3cb35a",
+        "commitSha": "80c31f99570876c3ef40327838b0a2ca1ae2cd9c",
+        "receiptSha256": "bfd66d6ec5c2704b698d65ec73256984a487e87243c818cc166bcc94abb24c28"
+      },
+      "batchStatus": "eligible-for-later-plan"
+    }
+  ]
+}

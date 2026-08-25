@@ -298,6 +298,24 @@ for hook in "${HOOKS[@]}"; do
 done
 echo ""
 
+HOOK_AUDIT_DIR="$AGENTS_DIR/hooks/audit"
+HOOK_AUDIT_FIXTURE="$HOOK_AUDIT_DIR/fixtures/active-hooks-2026-08-24.json"
+HOOK_AUDIT_PROVENANCE="$HOOK_AUDIT_DIR/provenance-manifest.json"
+if node --check "$HOOK_AUDIT_DIR/capture-hooks-baseline.mjs" >/dev/null 2>&1 \
+  && node "$HOOK_AUDIT_DIR/capture-hooks-baseline.mjs" validate "$HOOK_AUDIT_FIXTURE" >/dev/null 2>&1 \
+  && node "$HOOK_AUDIT_DIR/capture-hooks-baseline.mjs" validate-provenance "$HOOK_AUDIT_PROVENANCE" "$HOOK_AUDIT_FIXTURE" >/dev/null 2>&1; then
+  pass "hook governance baseline reconciles 81/81 records"
+else
+  fail "hook governance baseline is invalid or incomplete"
+fi
+
+if node --test "$HOOK_AUDIT_DIR/capture-hooks-baseline.test.mjs" >/tmp/canuto-hook-audit-test.$$ 2>&1; then
+  pass "hook governance capture tests"
+else
+  fail "hook governance capture tests failed"
+fi
+rm -f /tmp/canuto-hook-audit-test.$$
+
 echo "── Test 3b: Tooling ──"
 
 CODEX_TOOLS=(canuto-memory codex-common codex-diff-context codex-context-package codex-health-check canuto-consumer-smoke codex-maestro vault-sync otel-emit)
