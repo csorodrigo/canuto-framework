@@ -1,0 +1,44 @@
+filters:
+  and:
+    - or:
+        - 'file.folder.split("/").slice(-1)[0] == "instincts"'
+        - 'file.folder.split("/").slice(-1)[0] == "global-instincts"'
+    - 'file.ext == "md"'
+    - 'confidence != "low"'
+
+formulas:
+  project: 'file.folder.split("/").slice(-2)[0]'
+  age_days: '(today() - file.ctime).days'
+
+properties:
+  formula.project:
+    displayName: "Project"
+  formula.age_days:
+    displayName: "Age (days)"
+
+views:
+  - type: table
+    name: "Patterns by Category"
+    order:
+      - file.name
+      - category
+      - confidence
+      - formula.project
+      - applied
+      - formula.age_days
+    groupBy:
+      property: category
+      direction: ASC
+    summaries:
+      applied: Sum
+
+  - type: cards
+    name: "High Confidence Patterns"
+    filters:
+      and:
+        - 'confidence == "high"'
+    order:
+      - file.name
+      - category
+      - formula.project
+      - applied

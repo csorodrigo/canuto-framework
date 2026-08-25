@@ -1,0 +1,152 @@
+{
+  "nodes": [
+    {
+      "id": "a1b2c3d4e5f60001",
+      "type": "group",
+      "x": -50,
+      "y": -80,
+      "width": 1550,
+      "height": 350,
+      "label": "Standard Flow",
+      "color": "5"
+    },
+    {
+      "id": "a1b2c3d4e5f60010",
+      "type": "text",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 120,
+      "text": "# Maestro\n\nOrchestrator\nTask sizing\nSession lifecycle",
+      "color": "6"
+    },
+    {
+      "id": "a1b2c3d4e5f60020",
+      "type": "text",
+      "x": 280,
+      "y": 0,
+      "width": 200,
+      "height": 120,
+      "text": "# Architect\n\nPlans features\nDesign interview\nAbbreviated for S tasks",
+      "color": "5"
+    },
+    {
+      "id": "a1b2c3d4e5f60030",
+      "type": "text",
+      "x": 560,
+      "y": 0,
+      "width": 200,
+      "height": 120,
+      "text": "# Coder\n\nImplements code\nWrites basic tests\nReads design profile",
+      "color": "4"
+    },
+    {
+      "id": "a1b2c3d4e5f60040",
+      "type": "text",
+      "x": 840,
+      "y": 0,
+      "width": 200,
+      "height": 120,
+      "text": "# Tester\n\nEdge cases\nError scenarios\nCoverage gaps",
+      "color": "3"
+    },
+    {
+      "id": "a1b2c3d4e5f60050",
+      "type": "text",
+      "x": 1120,
+      "y": 0,
+      "width": 200,
+      "height": 120,
+      "text": "# Reviewer\n\nAnalysis + checklist\nMUST/SHOULD/NICE\nAPPROVE or REQUEST",
+      "color": "2"
+    },
+    {
+      "id": "a1b2c3d4e5f60060",
+      "type": "text",
+      "x": 840,
+      "y": 350,
+      "width": 200,
+      "height": 120,
+      "text": "# Debugger\n\nRoot cause analysis\nTriggered by test failure\nNot in happy path",
+      "color": "1"
+    },
+    {
+      "id": "a1b2c3d4e5f60070",
+      "type": "text",
+      "x": 0,
+      "y": 350,
+      "width": 200,
+      "height": 120,
+      "text": "# Contextualizer\n\nScans codebase\n.context.md files\nFEATURE-MAP.md",
+      "color": "6"
+    }
+  ],
+  "edges": [
+    {
+      "id": "b1b2c3d4e5f60001",
+      "fromNode": "a1b2c3d4e5f60010",
+      "fromSide": "right",
+      "toNode": "a1b2c3d4e5f60020",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "plan"
+    },
+    {
+      "id": "b1b2c3d4e5f60002",
+      "fromNode": "a1b2c3d4e5f60020",
+      "fromSide": "right",
+      "toNode": "a1b2c3d4e5f60030",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "implement"
+    },
+    {
+      "id": "b1b2c3d4e5f60003",
+      "fromNode": "a1b2c3d4e5f60030",
+      "fromSide": "right",
+      "toNode": "a1b2c3d4e5f60040",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "test"
+    },
+    {
+      "id": "b1b2c3d4e5f60004",
+      "fromNode": "a1b2c3d4e5f60040",
+      "fromSide": "right",
+      "toNode": "a1b2c3d4e5f60050",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "review"
+    },
+    {
+      "id": "b1b2c3d4e5f60005",
+      "fromNode": "a1b2c3d4e5f60040",
+      "fromSide": "bottom",
+      "toNode": "a1b2c3d4e5f60060",
+      "toSide": "top",
+      "toEnd": "arrow",
+      "label": "tests fail",
+      "color": "1"
+    },
+    {
+      "id": "b1b2c3d4e5f60006",
+      "fromNode": "a1b2c3d4e5f60060",
+      "fromSide": "left",
+      "toNode": "a1b2c3d4e5f60030",
+      "toSide": "bottom",
+      "toEnd": "arrow",
+      "label": "fix",
+      "color": "1"
+    },
+    {
+      "id": "b1b2c3d4e5f60007",
+      "fromNode": "a1b2c3d4e5f60010",
+      "fromSide": "bottom",
+      "toNode": "a1b2c3d4e5f60070",
+      "toSide": "top",
+      "toEnd": "arrow",
+      "label": "bootstrap / stale check",
+      "color": "6"
+    }
+  ]
+}
