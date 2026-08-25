@@ -316,6 +316,17 @@ else
 fi
 rm -f /tmp/canuto-hook-audit-test.$$
 
+if node --check "$AGENTS_DIR/hooks/reconcile-hooks.mjs" >/dev/null 2>&1 \
+  && node --test \
+    "$AGENTS_DIR/hooks/reconcile-hooks.test.mjs" \
+    "$AGENTS_DIR/hooks/retirement-canary.test.mjs" \
+    >/tmp/canuto-hook-reconcile-test.$$ 2>&1; then
+  pass "managed hook reconciliation and T5a retirement canary"
+else
+  fail "managed hook reconciliation or T5a retirement canary failed"
+fi
+rm -f /tmp/canuto-hook-reconcile-test.$$
+
 HOOK_CONTRACT_DIR="$AGENTS_DIR/hooks/contracts"
 if node --check "$HOOK_CONTRACT_DIR/contract-harness.mjs" >/dev/null 2>&1 \
   && node --test "$HOOK_CONTRACT_DIR/contract-harness.test.mjs" >/tmp/canuto-hook-contract-test.$$ 2>&1; then

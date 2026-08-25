@@ -16,6 +16,7 @@ import { pathToFileURL } from "node:url";
 const HASH_RE = /^[a-f0-9]{64}$/;
 const ROLES = new Set(["gate", "advisory", "observer", "automation"]);
 const STATUSES = new Set(["active", "retired"]);
+const FILE_OWNERSHIP_FIELDS = ["origin", "expectedHash", "mode"];
 
 function fail(message) {
   throw new Error(message);
@@ -82,6 +83,17 @@ function validateJsonSchema(value, schema, at = "$", errors = []) {
   return errors;
 }
 
+function fileOwnershipKind(entry) {
+  const present = FILE_OWNERSHIP_FIELDS.filter((key) => Object.hasOwn(entry, key)).length;
+  if (present === 0) return "none";
+  if (present === FILE_OWNERSHIP_FIELDS.length) return "complete";
+  return "partial";
+}
+
+function isRegistrationOnlyRetirement(entry) {
+  return entry.status === "retired" && fileOwnershipKind(entry) === "none";
+}
+
 export function validateManifest(manifest) {
   const errors = [];
   if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) return ["manifest must be an object"];
@@ -90,7 +102,8 @@ export function validateManifest(manifest) {
   if (!Array.isArray(manifest.entries)) return [...errors, "manifest entries must be an array"];
 
   const ids = new Set();
-  const commands = new Set();
+  const executableCommands = new Set();
+  const selectors = new Set();
   for (const [index, entry] of manifest.entries.entries()) {
     const at = `entries[${index}]`;
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
@@ -104,18 +117,33 @@ export function validateManifest(manifest) {
     else ids.add(entry.id);
     if (!Number.isInteger(entry.version) || entry.version < 1) errors.push(`${at}.version must be a positive integer`);
     if (!STATUSES.has(entry.status)) errors.push(`${at}.status must be active or retired`);
-    if (typeof entry.origin !== "string" || !entry.origin) errors.push(`${at}.origin is required`);
+    const ownershipKind = fileOwnershipKind(entry);
+    const hasFileMetadata = ownershipKind !== "none";
+    if (entry.status === "active" && ownershipKind !== "complete") {
+      errors.push(`${at} active entry requires origin, expectedHash, and mode`);
+    } else if (ownershipKind === "partial") {
+      errors.push(`${at} file ownership requires origin, expectedHash, and mode together`);
+    }
+    if (hasFileMetadata && (typeof entry.origin !== "string" || !entry.origin)) errors.push(`${at}.origin is required`);
+    const registrationOnly = isRegistrationOnlyRetirement(entry);
     if (typeof entry.event !== "string" || !entry.event) errors.push(`${at}.event is required`);
     if (typeof entry.matcher !== "string") errors.push(`${at}.matcher must be a string`);
     if (entry.timeout !== null && (!Number.isInteger(entry.timeout) || entry.timeout < 1)) errors.push(`${at}.timeout must be null or a positive integer`);
-    if (!ROLES.has(entry.role)) errors.push(`${at}.role is invalid`);
-    if (typeof entry.command !== "string" || !/^~\/[A-Za-z0-9._/-]+$/.test(entry.command) || entry.command.split("/").includes("..")) {
+    if (!ROLES.has(entry.role) && !(registrationOnly && entry.role === "probe")) errors.push(`${at}.role is invalid`);
+    if (!registrationOnly && (typeof entry.command !== "string" || !/^~\/[A-Za-z0-9._/-]+$/.test(entry.command) || entry.command.split("/").includes(".."))) {
       errors.push(`${at}.command must be one tilde-relative executable path without arguments`);
+    } else if (registrationOnly && (typeof entry.command !== "string" || !/^~\/[^\r\n\0]+$/.test(entry.command))) {
+      errors.push(`${at}.command must be a tilde-relative command without control characters`);
     }
-    if (typeof entry.expectedHash !== "string" || !HASH_RE.test(entry.expectedHash)) errors.push(`${at}.expectedHash must be sha256`);
-    if (entry.mode !== "0755") errors.push(`${at}.mode must be 0755`);
-    if (commands.has(entry.command)) errors.push(`duplicate managed command ${entry.command}`);
-    else commands.add(entry.command);
+    if (hasFileMetadata && (typeof entry.expectedHash !== "string" || !HASH_RE.test(entry.expectedHash))) errors.push(`${at}.expectedHash must be sha256`);
+    if (hasFileMetadata && entry.mode !== "0755") errors.push(`${at}.mode must be 0755`);
+    if (!registrationOnly) {
+      if (executableCommands.has(entry.command)) errors.push(`duplicate managed command ${entry.command}`);
+      else executableCommands.add(entry.command);
+    }
+    const selector = `${entry.event}\0${entry.matcher}\0${entry.command}`;
+    if (selectors.has(selector)) errors.push(`duplicate managed selector for ${entry.event}/${entry.matcher}/${entry.command}`);
+    else selectors.add(selector);
   }
   return errors;
 }
@@ -160,6 +188,14 @@ function flattenHooks(config) {
   return occurrences;
 }
 
+function matchingOccurrences(entry, occurrences, homeDir) {
+  return occurrences.filter((item) => {
+    if (normalizeCommand(item.hook.command, homeDir) !== entry.command) return false;
+    if (!isRegistrationOnlyRetirement(entry)) return true;
+    return item.event === entry.event && item.matcher === entry.matcher;
+  });
+}
+
 function renderNextConfig(config, entries, actions, occurrences, homeDir) {
   const next = structuredClone(config);
   next.hooks ??= {};
@@ -170,7 +206,7 @@ function renderNextConfig(config, entries, actions, occurrences, homeDir) {
 
   for (const entry of entries) {
     const action = actionById.get(entry.id);
-    const matching = occurrences.filter((item) => normalizeCommand(item.hook.command, homeDir) === entry.command);
+    const matching = matchingOccurrences(entry, occurrences, homeDir);
     let replacedInPlace = false;
     if (action === "update" && matching.length === 1 && matching[0].event === entry.event && matching[0].matcher === entry.matcher) {
       const item = matching[0];
@@ -227,20 +263,12 @@ async function loadInputs({ manifestPath, configPath, hooksDir, homeDir = proces
   const config = configState.exists ? parseJson(configState.bytes, "configuration") : {};
   if (!config || typeof config !== "object" || Array.isArray(config)) fail("configuration must be a JSON object");
   const occurrences = flattenHooks(config);
-  const byCommand = new Map();
-  for (const occurrence of occurrences) {
-    const command = normalizeCommand(occurrence.hook.command, homeDir);
-    if (typeof command !== "string") continue;
-    const list = byCommand.get(command) ?? [];
-    list.push(occurrence);
-    byCommand.set(command, list);
-  }
-
   const sourceStates = new Map();
   const targetStates = new Map();
   for (const entry of manifest.entries) {
-    const matches = byCommand.get(entry.command) ?? [];
+    const matches = matchingOccurrences(entry, occurrences, homeDir);
     if (matches.length > 1) fail(`duplicate Canuto entry ${entry.id} (${entry.command})`);
+    if (isRegistrationOnlyRetirement(entry)) continue;
     const sourcePath = resolve(manifestDir, entry.origin);
     const sourceRelative = relative(manifestDir, sourcePath);
     if (!sourceRelative || sourceRelative === ".." || sourceRelative.startsWith(`..${sep}`) || isAbsolute(sourceRelative)) {
@@ -263,7 +291,7 @@ async function loadInputs({ manifestPath, configPath, hooksDir, homeDir = proces
       targetStates.set(targetPath, target);
     }
   }
-  return { manifest, manifestState, config, configState, occurrences, byCommand, sourceStates, targetStates, homeDir };
+  return { manifest, manifestState, config, configState, occurrences, sourceStates, targetStates, homeDir };
 }
 
 export async function buildPlan(options) {
@@ -274,7 +302,7 @@ export async function buildPlan(options) {
   };
   const inputs = await loadInputs({ ...paths, homeDir: options.homeDir });
   const actions = inputs.manifest.entries.map((entry) => {
-    const matches = inputs.byCommand.get(entry.command) ?? [];
+    const matches = matchingOccurrences(entry, inputs.occurrences, inputs.homeDir);
     if (entry.status === "retired") return { id: entry.id, action: matches.length ? "remove" : "preserve" };
     if (matches.length === 0) return { id: entry.id, action: "add" };
     return { id: entry.id, action: hookMatches(entry, matches[0], inputs.homeDir) ? "preserve" : "update" };
@@ -284,6 +312,7 @@ export async function buildPlan(options) {
   const retiredTargets = new Map();
   const ownedTargets = new Map();
   for (const entry of inputs.manifest.entries) {
+    if (isRegistrationOnlyRetirement(entry)) continue;
     const target = join(paths.hooksDir, basename(entry.command.trim().split(/\s+/)[0]));
     const owner = ownedTargets.get(target);
     if (owner && (owner.expectedHash !== entry.expectedHash || owner.origin !== entry.origin)) fail(`conflicting file ownership for ${target}`);
@@ -308,9 +337,8 @@ export async function buildPlan(options) {
   }
 
   const nextConfig = renderNextConfig(inputs.config, inputs.manifest.entries, actions, inputs.occurrences, inputs.homeDir);
-  const externalCommands = new Set(inputs.manifest.entries.map((entry) => entry.command));
   const externalEntries = inputs.occurrences
-    .filter((item) => !externalCommands.has(normalizeCommand(item.hook.command, inputs.homeDir)))
+    .filter((item) => !inputs.manifest.entries.some((entry) => matchingOccurrences(entry, [item], inputs.homeDir).length === 1))
     .map((item) => canonical(item.hook));
   const fingerprintInput = {
     schemaVersion: 1,
@@ -353,7 +381,8 @@ async function atomicWrite(path, bytes, mode) {
   }
 }
 
-async function writeReceipt(path, receipt) {
+async function writeReceipt(path, receipt, { simulateFailure = false } = {}) {
+  if (simulateFailure) fail("simulated receipt write failure");
   await atomicWrite(path, Buffer.from(`${JSON.stringify(receipt, null, 2)}\n`), 0o600);
 }
 
@@ -423,6 +452,7 @@ export async function applyPlan(options) {
     fingerprint: plan.fingerprint,
     status: "prepared",
     createdAt: new Date().toISOString(),
+    entries: plan.entries,
     config: {
       path: plan.config.path,
       beforeExists: configBefore.exists,
@@ -466,15 +496,17 @@ export async function applyPlan(options) {
     receipt.status = "applied";
     receipt.appliedAt = new Date().toISOString();
     await writeReceipt(receiptPath, receipt);
+    const verified = await verifyState(options);
+    if (!verified.ok) fail(`post-apply verification failed: ${verified.errors.join("; ")}`);
+    receipt.verification = {
+      ok: true,
+      stateFingerprint: verified.fingerprint,
+      verifiedAt: new Date().toISOString(),
+    };
+    await writeReceipt(receiptPath, receipt, { simulateFailure: options.failVerificationReceiptWrite });
   } catch (error) {
     await restoreBatch(receipt, receiptPath, { automatic: true });
     throw error;
-  }
-
-  const verified = await verifyState(options);
-  if (!verified.ok) {
-    await restoreBatch(receipt, receiptPath, { automatic: true });
-    fail(`post-apply verification failed: ${verified.errors.join("; ")}`);
   }
   return { applied: true, batchId, fingerprint: plan.fingerprint, receiptPath };
 }
