@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-FRAMEWORK_DIR="$(cd "$(dirname "$0")" && pwd)"
+FRAMEWORK_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 AGENTS_DIR="$FRAMEWORK_DIR/.agents"
 VERBOSE=false
 
