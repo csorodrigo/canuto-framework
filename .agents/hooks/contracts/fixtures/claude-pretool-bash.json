@@ -1,0 +1,20 @@
+{
+  "platform": "claude",
+  "event": "PreToolUse",
+  "expectedOutcome": "pending",
+  "env": {
+    "CLAUDE_PROJECT_DIR": "/workspace/main"
+  },
+  "payload": {
+    "session_id": "session-claude-fixture",
+    "transcript_path": "/state/claude/transcript.jsonl",
+    "cwd": "/workspace/feature-a",
+    "permission_mode": "default",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "npm test"
+    },
+    "tool_use_id": "tool-claude-pre-1"
+  }
+}

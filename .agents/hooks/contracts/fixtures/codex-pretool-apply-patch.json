@@ -1,0 +1,19 @@
+{
+  "platform": "codex",
+  "event": "PreToolUse",
+  "expectedOutcome": "pending",
+  "payload": {
+    "session_id": "session-codex-fixture",
+    "turn_id": "turn-codex-1",
+    "transcript_path": null,
+    "cwd": "/workspace/feature-b",
+    "model": "fixture-model",
+    "permission_mode": "default",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "apply_patch",
+    "tool_input": {
+      "patch": "*** Begin Patch\n*** End Patch"
+    },
+    "tool_use_id": "tool-codex-pre-2"
+  }
+}

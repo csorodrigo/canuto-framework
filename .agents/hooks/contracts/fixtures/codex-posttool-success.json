@@ -1,0 +1,23 @@
+{
+  "platform": "codex",
+  "event": "PostToolUse",
+  "expectedOutcome": "success",
+  "payload": {
+    "session_id": "session-codex-fixture",
+    "turn_id": "turn-codex-1",
+    "transcript_path": null,
+    "cwd": "/workspace/feature-b",
+    "model": "fixture-model",
+    "permission_mode": "default",
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "npm test"
+    },
+    "tool_response": {
+      "stdout": "tests passed",
+      "stderr": ""
+    },
+    "tool_use_id": "tool-codex-post-1"
+  }
+}

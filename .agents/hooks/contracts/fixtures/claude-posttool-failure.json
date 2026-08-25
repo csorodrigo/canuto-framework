@@ -1,0 +1,20 @@
+{
+  "platform": "claude",
+  "event": "PostToolUseFailure",
+  "expectedOutcome": "failure",
+  "payload": {
+    "session_id": "session-claude-fixture",
+    "transcript_path": "/state/claude/transcript.jsonl",
+    "cwd": "/workspace/feature-a",
+    "permission_mode": "default",
+    "hook_event_name": "PostToolUseFailure",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "npm test"
+    },
+    "tool_use_id": "tool-claude-post-2",
+    "error": "Exit code 1\nfixture failure",
+    "is_interrupt": false,
+    "duration_ms": 8
+  }
+}
