@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-FRAMEWORK_DIR="$(cd "$(dirname "$0")" && pwd)"
+FRAMEWORK_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 AGENTS_DIR="$FRAMEWORK_DIR/.agents"
 VERBOSE=false
 
@@ -414,7 +414,9 @@ else
 fi
 rm -rf "$HOOKS_HOME"
 
-if bash -c "cd '$FRAMEWORK_DIR/docs' && source '$AGENTS_DIR/tools/canuto-memory.sh' && [ \"\$(canuto_project_dir)\" = '$FRAMEWORK_DIR' ] && [ \"\$(canuto_project_slug)\" = 'canuto-framework-v1' ]" >/dev/null 2>&1; then
+MEMORY_ROOT_TEST_VAULT="$(mktemp -d)"
+if CANUTO_VAULT_DIR="$MEMORY_ROOT_TEST_VAULT" CANUTO_SLUG_NO_CACHE=1 \
+  bash -c "cd '$FRAMEWORK_DIR/docs' && source '$AGENTS_DIR/tools/canuto-memory.sh' && [ \"\$(canuto_project_dir)\" = '$FRAMEWORK_DIR' ] && [ \"\$(canuto_project_slug)\" = 'canuto-framework-v1' ]" >/dev/null 2>&1; then
   pass "canuto-memory root resolution works from subdirectories"
 else
   fail "canuto-memory root resolution failed from subdirectories"

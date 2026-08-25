@@ -1,0 +1,28 @@
+filters:
+  and:
+    - 'file.folder.split("/").slice(-1)[0] == "audit"'
+    - 'file.ext == "md"'
+    - '!!thread_id'
+
+properties:
+  thread_id:
+    displayName: "Thread ID"
+  task_id:
+    displayName: "Task ID"
+  related-pending:
+    displayName: "Pending Links"
+
+views:
+  - type: table
+    name: "Thread Timeline"
+    order:
+      - date
+      - thread_id
+      - event
+      - provider
+      - actor
+      - task_id
+      - session
+    groupBy:
+      property: thread_id
+      direction: ASC

@@ -1,0 +1,40 @@
+filters:
+  and:
+    - 'file.folder.split("/").slice(-1)[0] == "metrics"'
+    - 'file.ext == "md"'
+    - '!!maestro-provider || !!reviewer-provider || !!coder-provider'
+
+formulas:
+  maestro_runtime: 'if(maestro-provider, maestro-provider + " / " + maestro-model, "unknown")'
+  review_load: 'must-fix-count + rework-cycles + test-failures'
+
+properties:
+  formula.maestro_runtime:
+    displayName: "Maestro Runtime"
+  formula.review_load:
+    displayName: "Review Load"
+
+views:
+  - type: table
+    name: "By Session"
+    order:
+      - date
+      - formula.maestro_runtime
+      - reviewer-provider
+      - quality-verdict
+      - formula.review_load
+      - must-fix-count
+      - rework-cycles
+      - tasks-completed
+    groupBy:
+      property: maestro-provider
+      direction: ASC
+
+  - type: table
+    name: "Reviewer Reliability"
+    order:
+      - reviewer-provider
+      - quality-verdict
+      - must-fix-count
+      - rework-cycles
+      - test-failures

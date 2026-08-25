@@ -1,0 +1,40 @@
+filters:
+  and:
+    - 'file.folder.split("/").slice(-1)[0] == "metrics"'
+    - 'file.ext == "md"'
+
+formulas:
+  verdict_icon: 'if(quality-verdict == "APPROVE", "✅", "❌")'
+
+properties:
+  formula.verdict_icon:
+    displayName: ""
+  quality-verdict:
+    displayName: "Verdict"
+  must-fix-count:
+    displayName: "MUST FIX"
+  tasks-completed:
+    displayName: "Tasks"
+  rework-cycles:
+    displayName: "Rework"
+
+views:
+  - type: table
+    name: "All Sessions"
+    order:
+      - date
+      - formula.verdict_icon
+      - tasks-completed
+      - must-fix-count
+      - test-failures
+      - rework-cycles
+      - persona-transitions
+      - escalations
+      - format-compliance
+      - scope-violations
+    summaries:
+      tasks-completed: Sum
+      must-fix-count: Average
+      test-failures: Sum
+      rework-cycles: Average
+      format-compliance: Average

@@ -123,7 +123,9 @@ fi
 echo ""
 echo "## Runtime Portability"
 
-if bash -c "cd '$ROOT_DIR/docs' && source '$ROOT_DIR/.agents/tools/canuto-memory.sh' && [ \"\$(canuto_project_dir)\" = '$ROOT_DIR' ] && [ \"\$(canuto_project_slug)\" = 'canuto-framework-v1' ]" >/dev/null 2>&1; then
+MEMORY_ROOT_TEST_VAULT="$(mktemp -d)"
+if CANUTO_VAULT_DIR="$MEMORY_ROOT_TEST_VAULT" CANUTO_SLUG_NO_CACHE=1 \
+  bash -c "cd '$ROOT_DIR/docs' && source '$ROOT_DIR/.agents/tools/canuto-memory.sh' && [ \"\$(canuto_project_dir)\" = '$ROOT_DIR' ] && [ \"\$(canuto_project_slug)\" = 'canuto-framework-v1' ]" >/dev/null 2>&1; then
   pass "canuto-memory.sh resolves project root from subdirectories"
 else
   fail "canuto-memory.sh is cwd-sensitive from subdirectories"

@@ -47,5 +47,3 @@ build/
 .agents/vault/events/
 .agents/.cache/
 .agents/vault/handoffs/*-smoke-test.md
-.agents/vault/
-.agents/memory/
