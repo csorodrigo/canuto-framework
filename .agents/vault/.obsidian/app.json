@@ -1,0 +1,11 @@
+{
+  "newFileLocation": "folder",
+  "newFileFolderPath": "",
+  "attachmentFolderPath": "attachments",
+  "alwaysUpdateLinks": true,
+  "showFrontmatter": true,
+  "defaultViewMode": "source",
+  "strictLineBreaks": false,
+  "useMarkdownLinks": false,
+  "showLineNumber": true
+}
