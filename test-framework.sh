@@ -325,6 +325,16 @@ else
 fi
 rm -f /tmp/canuto-hook-contract-test.$$
 
+MACHINE_POLICY_DIR="$AGENTS_DIR/hooks/policies/machine"
+if node --check "$AGENTS_DIR/hooks/core/policy-result.mjs" >/dev/null 2>&1 \
+  && node --check "$AGENTS_DIR/hooks/runners/machine-policy-runner.mjs" >/dev/null 2>&1 \
+  && node --test "$MACHINE_POLICY_DIR/machine-layer.test.mjs" >/tmp/canuto-machine-policy-test.$$ 2>&1; then
+  pass "machine invariant policy layer"
+else
+  fail "machine invariant policy layer failed"
+fi
+rm -f /tmp/canuto-machine-policy-test.$$
+
 echo "── Test 3b: Tooling ──"
 
 CODEX_TOOLS=(canuto-memory codex-common codex-diff-context codex-context-package codex-health-check canuto-consumer-smoke codex-maestro vault-sync otel-emit)
