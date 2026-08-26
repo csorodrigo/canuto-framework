@@ -1,0 +1,8 @@
+{
+  "$schema": "./managed-hooks.schema.json",
+  "schemaVersion": 1,
+  "surface": "codex-user",
+  "entries": [
+    { "id": "CX-02", "version": 1, "status": "retired", "event": "PreToolUse", "matcher": "^Bash$", "timeout": 10, "role": "probe", "command": "~/.claude/hooks/lib/codex-adapt.sh ~/.claude/hooks/probe-canuto-chain.sh" }
+  ]
+}

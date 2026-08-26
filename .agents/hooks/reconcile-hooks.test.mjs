@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   statSync,
@@ -317,6 +318,24 @@ test("failure after a partial write restores prior configuration and files", asy
   assert.equal(existsSync(join(value.hooksDir, "example.sh")), false);
 });
 
+test("failure before the verified receipt is durable restores prior configuration and files", async () => {
+  const value = fixture({ config: { hooks: {}, marker: "unchanged" } });
+  const configBefore = readFileSync(value.configPath);
+  const plan = await buildPlan(options(value));
+  await assert.rejects(
+    applyPlan({ ...options(value), fingerprint: plan.fingerprint, failVerificationReceiptWrite: true }),
+    /simulated receipt write failure/,
+  );
+  assert.equal(digest(readFileSync(value.configPath)), digest(configBefore));
+  assert.equal(existsSync(join(value.hooksDir, "example.sh")), false);
+
+  const [batchId] = readdirSync(join(value.stateDir, "batches"));
+  const receipt = JSON.parse(readFileSync(join(value.stateDir, "batches", batchId, "receipt.json"), "utf8"));
+  assert.equal(receipt.status, "restored-after-failure");
+  assert.equal(receipt.verification.ok, true);
+  assert.deepEqual(receipt.entries, plan.entries);
+});
+
 test("explicit rollback recovers a mixed prepared batch after interruption", async () => {
   const value = fixture();
   const plan = await buildPlan(options(value));
@@ -325,6 +344,7 @@ test("explicit rollback recovers a mixed prepared batch after interruption", asy
   const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
   receipt.status = "prepared";
   delete receipt.appliedAt;
+  delete receipt.verification;
   writeJson(receiptPath, receipt);
   rmSync(value.configPath);
 

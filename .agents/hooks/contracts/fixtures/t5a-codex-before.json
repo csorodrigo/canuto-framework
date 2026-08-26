@@ -1,0 +1,39 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.codex/hooks/external-before.sh",
+            "timeout": 4,
+            "metadata": {
+              "preserve": "byte-for-byte"
+            }
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/lib/codex-adapt.sh ~/.claude/hooks/probe-canuto-chain.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "~/.codex/hooks/external-after.sh",
+            "timeout": 4
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [],
+        "metadata": {
+          "owner": "external"
+        }
+      }
+    ]
+  },
+  "version": 1
+}

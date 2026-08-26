@@ -14,19 +14,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "id",
-          "version",
-          "status",
-          "origin",
-          "event",
-          "matcher",
-          "timeout",
-          "role",
-          "command",
-          "expectedHash",
-          "mode"
-        ],
+        "required": ["id", "version", "status", "event", "matcher", "timeout", "role", "command"],
         "properties": {
           "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9-]+$" },
           "version": { "type": "integer", "minimum": 1 },
@@ -35,11 +23,41 @@
           "event": { "type": "string", "minLength": 1 },
           "matcher": { "type": "string" },
           "timeout": { "type": ["integer", "null"], "minimum": 1 },
-          "role": { "enum": ["gate", "advisory", "observer", "automation"] },
-          "command": { "type": "string", "pattern": "^~/(?!.*\\.\\.(?:/|$))[A-Za-z0-9._/-]+$" },
+          "role": { "enum": ["gate", "advisory", "observer", "automation", "probe"] },
+          "command": { "type": "string", "minLength": 1, "pattern": "^~/[^\\r\\n\\u0000]+$" },
           "expectedHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
           "mode": { "const": "0755" }
-        }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "status": { "const": "active" } }, "required": ["status"] },
+            "then": {
+              "required": ["origin", "expectedHash", "mode"],
+              "properties": {
+                "role": { "enum": ["gate", "advisory", "observer", "automation"] },
+                "command": { "pattern": "^~/(?!.*\\.\\.(?:/|$))[A-Za-z0-9._/-]+$" }
+              }
+            }
+          },
+          {
+            "if": { "required": ["origin"] },
+            "then": {
+              "required": ["expectedHash", "mode"],
+              "properties": {
+                "role": { "enum": ["gate", "advisory", "observer", "automation"] },
+                "command": { "pattern": "^~/(?!.*\\.\\.(?:/|$))[A-Za-z0-9._/-]+$" }
+              }
+            }
+          },
+          {
+            "if": { "required": ["expectedHash"] },
+            "then": { "required": ["origin", "mode"] }
+          },
+          {
+            "if": { "required": ["mode"] },
+            "then": { "required": ["origin", "expectedHash"] }
+          }
+        ]
       }
     }
   }

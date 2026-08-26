@@ -1,0 +1,146 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook",
+            "timeout": 5,
+            "async": true
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/delivery-proof-gate.sh"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "resume",
+        "hooks": [],
+        "metadata": {
+          "owner": "external"
+        }
+      }
+    ],
+    "StopFailure": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "TeammateIdle": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/log-commands.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "preserve": true
+  }
+}
