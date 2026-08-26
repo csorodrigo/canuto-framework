@@ -316,6 +316,15 @@ else
 fi
 rm -f /tmp/canuto-hook-audit-test.$$
 
+HOOK_CONTRACT_DIR="$AGENTS_DIR/hooks/contracts"
+if node --check "$HOOK_CONTRACT_DIR/contract-harness.mjs" >/dev/null 2>&1 \
+  && node --test "$HOOK_CONTRACT_DIR/contract-harness.test.mjs" >/tmp/canuto-hook-contract-test.$$ 2>&1; then
+  pass "Claude/Codex hook contract harness"
+else
+  fail "Claude/Codex hook contract harness failed"
+fi
+rm -f /tmp/canuto-hook-contract-test.$$
+
 echo "── Test 3b: Tooling ──"
 
 CODEX_TOOLS=(canuto-memory codex-common codex-diff-context codex-context-package codex-health-check canuto-consumer-smoke codex-maestro vault-sync otel-emit)

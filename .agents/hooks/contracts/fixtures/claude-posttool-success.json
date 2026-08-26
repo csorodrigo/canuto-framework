@@ -1,0 +1,23 @@
+{
+  "platform": "claude",
+  "event": "PostToolUse",
+  "expectedOutcome": "success",
+  "payload": {
+    "session_id": "session-claude-fixture",
+    "transcript_path": "/state/claude/transcript.jsonl",
+    "cwd": "/workspace/feature-a",
+    "permission_mode": "default",
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "npm test"
+    },
+    "tool_response": {
+      "stdout": "tests passed",
+      "stderr": "",
+      "interrupted": false
+    },
+    "tool_use_id": "tool-claude-post-1",
+    "duration_ms": 12
+  }
+}
