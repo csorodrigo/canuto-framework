@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process";
 
+import { composePolicyResults } from "../core/policy-result.mjs";
+
 const PLATFORMS = new Set(["claude", "codex"]);
 const EVENTS = new Set(["PreToolUse", "PostToolUse", "PostToolUseFailure"]);
 const ROLES = new Set(["gate", "advisory"]);
@@ -110,33 +112,7 @@ export function normalizeFixture(value) {
 }
 
 export function composeDecisions(decisions) {
-  if (!Array.isArray(decisions) || decisions.length === 0) {
-    throw new Error("at least one policy decision is required");
-  }
-  const gates = [];
-  const advisories = [];
-  for (const value of decisions) {
-    const decision = requireObject(value, "decision");
-    requireString(decision.id, "decision.id");
-    if (!ROLES.has(decision.role)) throw new Error(`unsupported role ${decision.role}`);
-    requireString(decision.reason, "decision.reason");
-    if (decision.role === "gate") {
-      if (!new Set(["allow", "block"]).has(decision.verdict)) {
-        throw new Error(`unsupported gate verdict ${decision.verdict}`);
-      }
-      gates.push(decision);
-    } else {
-      if (decision.verdict !== "observe") throw new Error("Advisory verdict must be observe");
-      advisories.push({ id: decision.id, message: decision.reason });
-    }
-  }
-  const blockers = gates.filter((decision) => decision.verdict === "block");
-  return {
-    verdict: blockers.length === 0 ? "allow" : "block",
-    reason: blockers.map((decision) => decision.reason).join("; "),
-    gateIds: gates.map((decision) => decision.id),
-    advisories,
-  };
+  return composePolicyResults(decisions);
 }
 
 export async function composeConcurrentGates(gates) {
