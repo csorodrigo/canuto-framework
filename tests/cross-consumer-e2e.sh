@@ -106,6 +106,17 @@ assert_consumer_green() {
   local slug="$2"
   local smoke_json="$E2E_ROOT/$slug-smoke.json"
   local check_log="$E2E_ROOT/$slug-check.log"
+  local governance_file=""
+
+  for governance_file in \
+    ".agents/hooks/audit/t7-consumer-migration-receipt.json" \
+    ".agents/hooks/audit/t7-repo-policy-consumer-inventory.json" \
+    ".agents/hooks/managed-hooks-retirement-t7-cu23.claude.json" \
+    ".agents/hooks/audit/t7-papiro-dobra-owner-receipt.json"; do
+    [ -f "$destination/$governance_file" ] || fail "$slug missing distributed $governance_file"
+    cmp -s "$FRAMEWORK_DIR/$governance_file" "$destination/$governance_file" \
+      || fail "$slug distributed drift for $governance_file"
+  done
 
   local smoke_rc=0
   local smoke_parse_rc=0

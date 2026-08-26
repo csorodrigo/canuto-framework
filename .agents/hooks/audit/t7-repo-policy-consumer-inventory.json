@@ -6,14 +6,20 @@
       "id": "canuto-framework",
       "repository": "csorodrigo/canuto-framework",
       "manifest": ".agents/hooks/manifest.json",
+      "manifestSha256": "3d31b97781f55ed73d528022da8050ee15f9df31c33246540db2e733f3f57971",
       "manifestStatus": "versioned-contract-tested"
     },
     {
       "id": "papiro-dobra",
       "repository": "csorodrigo/papiro",
-      "candidateHeadSha": "74f1462b021535aea9a7bfee8f27b6a924e47e43",
+      "candidateHeadSha": "09a444de0668ac913300c1d484521e925cbe924e",
+      "candidateTreeSha": "a8a6e1bbe95ffd33a5492283fd6e9afe71b110a2",
+      "mergeCommitSha": "676a3124429546cd9e7780dded9ff32e496547f5",
+      "mergeTreeSha": "a8a6e1bbe95ffd33a5492283fd6e9afe71b110a2",
       "manifest": ".agents/hooks/manifest.json",
-      "manifestStatus": "missing-pending-owner-change"
+      "manifestSha256": "80b66071997182fd710755f321d39afee6845417a12194782669ea24331bfd47",
+      "manifestStatus": "merged-versioned-contract-tested",
+      "gateReceipt": "~/.canuto/gate-receipts/cartorio.jsonl:252"
     }
   ],
   "policies": [
@@ -35,7 +41,7 @@
         },
         {
           "repository": "csorodrigo/papiro",
-          "disposition": "pending-versioned-manifest",
+          "disposition": "versioned-contract-tested",
           "applicability": "required",
           "expectedOptions": { "commands": ["npm run typecheck:codex"] },
           "evidence": "package.json scripts.typecheck:codex at candidate head"
@@ -67,7 +73,7 @@
         },
         {
           "repository": "csorodrigo/papiro",
-          "disposition": "pending-versioned-manifest",
+          "disposition": "versioned-contract-tested",
           "applicability": "required",
           "expectedOptions": {
             "targets": [
@@ -93,7 +99,7 @@
         },
         {
           "repository": "csorodrigo/papiro",
-          "disposition": "pending-versioned-manifest",
+          "disposition": "versioned-contract-tested",
           "applicability": "required",
           "expectedOptions": {
             "enabled": true,
@@ -102,7 +108,7 @@
               ".agents/hooks/dobra-compose-writer-guard.manifest.json",
               ".agents/hooks/dobra-compose-writer-guard-manager.mjs",
               ".claude/settings.json",
-              "tests/dobra-compose-writer-guard.test.ts"
+              "docs/operations/dobra-compose-writer-guard.md"
             ],
             "allowedArgv": [["npm", "run", "test", "--", "tests/dobra-compose-writer-guard.test.ts"]]
           },
@@ -114,7 +120,7 @@
       "id": "commit",
       "consumers": [
         { "repository": "csorodrigo/canuto-framework", "disposition": "versioned-contract-tested", "applicability": "required" },
-        { "repository": "csorodrigo/papiro", "disposition": "pending-versioned-manifest", "applicability": "required" }
+        { "repository": "csorodrigo/papiro", "disposition": "versioned-contract-tested", "applicability": "required" }
       ]
     },
     {
@@ -128,7 +134,7 @@
         },
         {
           "repository": "csorodrigo/papiro",
-          "disposition": "pending-versioned-manifest",
+          "disposition": "versioned-contract-tested",
           "applicability": "required",
           "remoteProof": "required",
           "expectedRequiredFiles": [
@@ -136,7 +142,7 @@
             ".agents/hooks/dobra-compose-writer-guard.manifest.json",
             ".agents/hooks/dobra-compose-writer-guard-manager.mjs",
             ".claude/settings.json",
-            "tests/dobra-compose-writer-guard.test.ts"
+            "docs/operations/dobra-compose-writer-guard.md"
           ]
         }
       ]

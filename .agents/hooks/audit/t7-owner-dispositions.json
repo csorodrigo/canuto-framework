@@ -2,17 +2,17 @@
   "schemaVersion": 1,
   "batch": "T7",
   "entries": [
-    { "id": "CU-01", "owner": "repository", "replacement": "build-typecheck", "status": "retirement-blocked-consumer-receipt" },
-    { "id": "CU-02", "owner": "repository", "replacement": "build-typecheck", "status": "retirement-blocked-consumer-receipt" },
-    { "id": "CU-03", "owner": "repository", "replacement": "validation-receipt", "status": "retirement-blocked-consumer-receipt" },
-    { "id": "CU-05", "owner": "repository", "replacement": "validation-receipt", "status": "retirement-blocked-consumer-receipt" },
-    { "id": "CU-06", "owner": "repository", "replacement": "validation-receipt", "status": "retirement-blocked-consumer-receipt" },
-    { "id": "CU-23", "owner": "repository:Papiro/Dobra", "replacement": ".agents/hooks/dobra-compose-writer-guard.manifest.json", "status": "blocked-owner-main-containment", "receipt": "audit/t7-papiro-dobra-owner-receipt.json" },
-    { "id": "CU-25", "owner": "repository", "replacement": "deploy-target", "status": "retirement-blocked-consumer-receipt" },
-    { "id": "CU-28", "owner": "repository", "replacement": "validation-receipt", "status": "retirement-blocked-consumer-receipt" },
-    { "id": "CU-33", "owner": "repository", "replacement": "pull-request", "status": "retirement-blocked-consumer-receipt" },
-    { "id": "CU-37", "owner": "repository", "replacement": "validation-finalize", "status": "retirement-blocked-consumer-receipt" },
-    { "id": "CX-11", "owner": "repository", "replacement": "deploy-target", "status": "retirement-blocked-consumer-receipt" },
-    { "id": "CX-13", "owner": "repository", "replacement": "pull-request", "status": "retirement-blocked-consumer-receipt" }
+    { "id": "CU-01", "owner": "repository", "replacement": "build-typecheck", "status": "consumer-ready-retirement-eligible" },
+    { "id": "CU-02", "owner": "repository", "replacement": "build-typecheck", "status": "consumer-ready-retirement-eligible" },
+    { "id": "CU-03", "owner": "repository", "replacement": "validation-receipt", "status": "consumer-ready-retirement-eligible" },
+    { "id": "CU-05", "owner": "repository", "replacement": "validation-receipt", "status": "consumer-ready-retirement-eligible" },
+    { "id": "CU-06", "owner": "repository", "replacement": "validation-receipt", "status": "consumer-ready-retirement-eligible" },
+    { "id": "CU-23", "owner": "repository:Papiro/Dobra", "replacement": ".agents/hooks/dobra-compose-writer-guard.manifest.json", "status": "owner-ready-retirement-eligible", "receipt": "audit/t7-papiro-dobra-owner-receipt.json", "retirementManifest": "managed-hooks-retirement-t7-cu23.claude.json" },
+    { "id": "CU-25", "owner": "repository", "replacement": "deploy-target", "status": "consumer-ready-retirement-eligible" },
+    { "id": "CU-28", "owner": "repository", "replacement": "validation-receipt", "status": "consumer-ready-retirement-eligible" },
+    { "id": "CU-33", "owner": "repository", "replacement": "pull-request", "status": "consumer-ready-retirement-eligible" },
+    { "id": "CU-37", "owner": "repository", "replacement": "validation-finalize", "status": "consumer-ready-retirement-eligible" },
+    { "id": "CX-11", "owner": "repository", "replacement": "deploy-target", "status": "consumer-ready-retirement-eligible" },
+    { "id": "CX-13", "owner": "repository", "replacement": "pull-request", "status": "consumer-ready-retirement-eligible" }
   ]
 }

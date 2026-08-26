@@ -1,0 +1,30 @@
+{
+  "$schema": "./managed-hooks.schema.json",
+  "schemaVersion": 1,
+  "surface": "claude-user",
+  "preconditions": [
+    {
+      "id": "papiro-dobra-owner",
+      "receipt": "audit/t7-papiro-dobra-owner-receipt.json",
+      "expectedHash": "81438658b5423be2f2e86fc211982ab39dc8b1d55da965eb96217d075481a84b",
+      "requiredStatus": "ready",
+      "receiptContract": "merged-owner-artifact-v1",
+      "expectedArtifactId": "CU-23",
+      "expectedRepository": "csorodrigo/papiro",
+      "expectedOwner": "repository:Papiro/Dobra",
+      "expectedPackage": "dobra"
+    }
+  ],
+  "entries": [
+    {
+      "id": "CU-23",
+      "version": 1,
+      "status": "retired",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeout": null,
+      "role": "gate",
+      "command": "~/.claude/hooks/dobra-compose-writer-guard.sh"
+    }
+  ]
+}

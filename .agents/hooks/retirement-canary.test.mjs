@@ -185,7 +185,7 @@ test("registration-only retirement is exact and cannot become an executable mana
   assert.ok(validateManifest(manifest).some((error) => error.includes("duplicate managed selector")));
 });
 
-test("registration-only retirement preserves the same command outside its exact event and rejects an in-event duplicate", async (t) => {
+test("registration-only retirement removes only exact registrations and preserves variants", async (t) => {
   const scenario = makeScenario("managed-hooks-retirements.codex.json", "t5a-codex-before.json");
   t.after(() => rmSync(scenario.root, { recursive: true, force: true }));
   const config = JSON.parse(readFileSync(scenario.configPath, "utf8"));
@@ -196,7 +196,16 @@ test("registration-only retirement preserves the same command outside its exact 
   assert.equal(findCommands(plan.nextConfig, PROBE_COMMAND).length, 1);
   assert.equal(plan.nextConfig.hooks.PostToolUse[0].hooks[0].command, PROBE_COMMAND);
 
-  config.hooks.PreToolUse[0].hooks.push({ type: "command", command: PROBE_COMMAND, timeout: 20 });
+  config.hooks.PreToolUse[0].hooks.push(
+    { type: "command", command: PROBE_COMMAND, timeout: 20 },
+    { type: "command", command: PROBE_COMMAND, timeout: 10, env: { KEEP: "external" } },
+  );
   writeFileSync(scenario.configPath, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
-  await assert.rejects(buildPlan(options(scenario)), /duplicate Canuto entry CX-02/);
+  const exactPlan = await buildPlan(options(scenario));
+  assert.equal(exactPlan.entries[0].action, "remove");
+  assert.deepEqual(findCommands(exactPlan.nextConfig, PROBE_COMMAND), [
+    { type: "command", command: PROBE_COMMAND, timeout: 20 },
+    { type: "command", command: PROBE_COMMAND, timeout: 10, env: { KEEP: "external" } },
+    { type: "command", command: PROBE_COMMAND, timeout: 10 },
+  ]);
 });

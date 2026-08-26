@@ -3,14 +3,14 @@
   "schemaVersion": 1,
   "surface": "claude-user",
   "entries": [
-    { "id": "CU-40", "version": 1, "status": "retired", "event": "Stop", "matcher": "", "timeout": 5, "role": "observer", "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook" },
-    { "id": "CU-44", "version": 1, "status": "retired", "event": "Notification", "matcher": "", "timeout": 5, "role": "observer", "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook" },
-    { "id": "CU-46", "version": 1, "status": "retired", "event": "SessionStart", "matcher": "", "timeout": 5, "role": "observer", "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook" },
-    { "id": "CU-51", "version": 1, "status": "retired", "event": "StopFailure", "matcher": "", "timeout": 5, "role": "observer", "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook" },
-    { "id": "CU-52", "version": 1, "status": "retired", "event": "SessionEnd", "matcher": "", "timeout": 5, "role": "observer", "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook" },
-    { "id": "CU-53", "version": 1, "status": "retired", "event": "SubagentStart", "matcher": "", "timeout": 5, "role": "observer", "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook" },
-    { "id": "CU-54", "version": 1, "status": "retired", "event": "SubagentStop", "matcher": "", "timeout": 5, "role": "observer", "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook" },
-    { "id": "CU-55", "version": 1, "status": "retired", "event": "TeammateIdle", "matcher": "", "timeout": 5, "role": "observer", "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook" },
-    { "id": "CU-56", "version": 1, "status": "retired", "event": "TaskCompleted", "matcher": "", "timeout": 5, "role": "observer", "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook" }
+    { "id": "CU-40", "version": 1, "status": "retired", "event": "Stop", "matcher": "", "timeout": 5, "async": true, "role": "observer", "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook" },
+    { "id": "CU-44", "version": 1, "status": "retired", "event": "Notification", "matcher": "", "timeout": 5, "async": true, "role": "observer", "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook" },
+    { "id": "CU-46", "version": 1, "status": "retired", "event": "SessionStart", "matcher": "", "timeout": 5, "async": true, "role": "observer", "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook" },
+    { "id": "CU-51", "version": 1, "status": "retired", "event": "StopFailure", "matcher": "", "timeout": 5, "async": true, "role": "observer", "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook" },
+    { "id": "CU-52", "version": 1, "status": "retired", "event": "SessionEnd", "matcher": "", "timeout": 5, "async": true, "role": "observer", "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook" },
+    { "id": "CU-53", "version": 1, "status": "retired", "event": "SubagentStart", "matcher": "", "timeout": 5, "async": true, "role": "observer", "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook" },
+    { "id": "CU-54", "version": 1, "status": "retired", "event": "SubagentStop", "matcher": "", "timeout": 5, "async": true, "role": "observer", "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook" },
+    { "id": "CU-55", "version": 1, "status": "retired", "event": "TeammateIdle", "matcher": "", "timeout": 5, "async": true, "role": "observer", "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook" },
+    { "id": "CU-56", "version": 1, "status": "retired", "event": "TaskCompleted", "matcher": "", "timeout": 5, "async": true, "role": "observer", "command": "~/.local/share/uv/tools/ccgram/bin/python -m ccgram.main hook" }
   ]
 }
