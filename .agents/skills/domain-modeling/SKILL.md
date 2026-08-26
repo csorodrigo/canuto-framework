@@ -189,6 +189,40 @@ quê**, não em preencher seções.
 
 ---
 
+## O gate — glossário que ninguém checa é decoração
+
+Um `CONTEXT.md` sem gate depende de agente e humano lerem o arquivo. A ferramenta
+`.agents/tools/glossary-gate.mjs` fecha isso: falha quando **código novo**
+introduz um termo marcado `_Evitar_`.
+
+```bash
+node .agents/tools/glossary-gate.mjs --base origin/main   # gate (só o diff)
+node .agents/tools/glossary-gate.mjs --all                # auditoria da dívida
+```
+
+O desenho é **estreito de propósito**, seguindo a ADR-0012: gate que dispara em
+coisa legítima vira ruído, e ruído vira override (92 no mecesa, 246 no
+lucrando-ai). Ele abre mão de recall para não ter falso positivo:
+
+1. **Só linhas adicionadas.** Código existente é dívida conhecida, não violação.
+   Falhar sobre ela tornaria o gate inútil no dia 1.
+2. **Só identificadores.** String, comentário e texto de JSX ficam de fora —
+   `"Loja"` num label é correto, `storeName` numa variável não é. É o que torna a
+   ressalva "(só como tradução de UI)" do glossário executável.
+3. **`.glossaryignore`** (globs) para termo com outro sentido legítimo no arquivo.
+
+**O que ele não pega, conscientemente:** termo evitado dentro de string, de
+comentário, de nome de arquivo, ou vindo de código gerado.
+
+Escape declarado: `CANUTO_ALLOW_GLOSSARY=1 CANUTO_ALLOW_REASON="<motivo>"` — vira
+evento `GATE` no event log. Usar é legítimo; usar em silêncio, não.
+
+> Quando o gate acusar um termo que está **certo**, o bug é do glossário — abra
+> esta skill e corrija a entrada. Contornar o gate para manter um glossário errado
+> é o caminho que produz os 246 overrides.
+
+---
+
 ## Guardrails
 
 - `CONTEXT.md` guarda glossário; detalhe de implementação vai para `.context.md`,

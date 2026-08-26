@@ -428,6 +428,37 @@ for js_tool in framework-session-audit framework-session-audit-lib framework-ses
   fi
 done
 
+# glossary-gate: sintaxe, texto-para-o-git (regressão do sentinela NUL) e a
+# suíte de regressão completa via node --test.
+GG="$AGENTS_DIR/tools/glossary-gate.mjs"
+if [ -f "$GG" ]; then
+  if node --check "$GG" >/dev/null 2>&1; then
+    pass "glossary-gate.mjs syntax valid"
+  else
+    fail "glossary-gate.mjs has syntax errors"
+  fi
+  if grep -qP '\x00' "$GG" 2>/dev/null; then
+    fail "glossary-gate.mjs contém byte NUL — binário para o git (regressão)"
+  else
+    pass "glossary-gate.mjs é texto para o git (sem NUL)"
+  fi
+  GG_TEST="$AGENTS_DIR/tools/__tests__/glossary-gate.test.mjs"
+  if [ -f "$GG_TEST" ]; then
+    GG_OUT=$(node --test "$GG_TEST" 2>&1)
+    GG_PASS=$(printf '%s\n' "$GG_OUT" | grep -c '^ok ' || true)
+    GG_FAIL=$(printf '%s\n' "$GG_OUT" | grep -c '^not ok ' || true)
+    if [ "$GG_FAIL" -eq 0 ] && [ "$GG_PASS" -gt 0 ]; then
+      pass "glossary-gate regression suite ($GG_PASS tests)"
+    else
+      fail "glossary-gate regression suite: $GG_FAIL failing / $GG_PASS passing"
+    fi
+  else
+    fail "glossary-gate.test.mjs missing"
+  fi
+else
+  fail "glossary-gate.mjs missing"
+fi
+
 mkdir -p "$AGENTS_DIR/tmp"
 CONTEXT_SMOKE="$AGENTS_DIR/tmp/context-package-smoke.md"
 if bash "$AGENTS_DIR/tools/codex-context-package.sh" --task "Smoke Test" --output "$CONTEXT_SMOKE" --file "CLAUDE.md" >/dev/null 2>&1; then

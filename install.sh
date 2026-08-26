@@ -1057,6 +1057,8 @@ skill_remote_files() {
       printf '%s\n' \
         ".agents/skills/domain-modeling/SKILL.md" \
         ".agents/skills/domain-modeling/CONTEXT-FORMAT.md"
+  ".agents/tools/glossary-gate.mjs"
+  ".agents/tools/__tests__/glossary-gate.test.mjs"
       ;;
     tdd)
       printf '%s\n' \
@@ -1283,6 +1285,7 @@ FRAMEWORK_FILES=(
   ".agents/skills/codebase-design/TESTABILIDADE.md"
   ".agents/skills/domain-modeling/SKILL.md"
   ".agents/skills/domain-modeling/CONTEXT-FORMAT.md"
+  ".agents/tools/glossary-gate.mjs"
   ".agents/skills/tdd/SKILL.md"
   ".agents/skills/tdd/tests.md"
   ".agents/skills/trace-analysis/SKILL.md"
