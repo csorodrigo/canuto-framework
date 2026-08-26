@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "owner": "plugin:Codex-Companion",
+  "sourceReceiptRef": "../../hooks/audit/plugin-source-receipts.json#/plugins/codex-companion@1.0.5",
+  "reconcileFlow": {
+    "kind": "external-owner-retirement-only",
+    "managedManifest": "../managed-hooks.claude.json",
+    "disabledManifest": "../managed-hooks.claude.disabled.json",
+    "ownerHookConfigSha256": "6ba33b3f6a75ba4271a76160b0465e7050a607a02e1ec212a7c0f3b9cd3cb35a"
+  },
+  "defaultConfig": {
+    "stopReviewGate": false
+  },
+  "hooks": [
+    { "id": "PC-01", "event": "SessionStart", "matcher": "", "timeout": 5, "handler": "scripts/session-lifecycle-hook.mjs", "stateScope": "companion/workspace/session" },
+    { "id": "PC-02", "event": "SessionEnd", "matcher": "", "timeout": 5, "handler": "scripts/session-lifecycle-hook.mjs", "stateScope": "companion/workspace/session" },
+    { "id": "PC-03", "event": "Stop", "matcher": "", "timeout": 900, "handler": "scripts/stop-review-gate-hook.mjs", "stateScope": "companion/workspace/session" }
+  ],
+  "stopReviewGate": {
+    "default": false,
+    "enabledBehavior": "blocks unless the companion review returns an ALLOW response",
+    "errorBehavior": "blocks on timeout, invalid output, or review failure when enabled",
+    "cleanup": "SessionEnd cleans jobs, broker state, and process tree for the same workspace/session only"
+  }
+}

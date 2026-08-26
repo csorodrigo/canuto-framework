@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "owner": "plugin:Herdr",
+  "registration": {
+    "id": "CU-50",
+    "event": "SessionStart",
+    "matcher": "*",
+    "timeout": 10,
+    "role": "observer",
+    "ownerProfile": "~/.config/herdr/agent-routes/profiles/claude/settings.json",
+    "ownerProfileSha256": "78188468602c3e6d0de6f650d7f6e3a9f7108535c2323716b91e24fd2d507975",
+    "ownerCommand": "bash '~/.config/herdr/agent-routes/profiles/claude/hooks/herdr-agent-state.sh' session",
+    "legacyGlobalCommand": "~/.claude/hooks/herdr-agent-state.sh session"
+  },
+  "activation": {
+    "requiredEnv": ["HERDR_ENV=1", "HERDR_SOCKET_PATH", "HERDR_PANE_ID"],
+    "ignoredEvents": ["SubagentStop"],
+    "ignoredWhenAgentIdPresent": true
+  },
+  "payload": {
+    "method": "pane.report_agent_session",
+    "declaredFields": ["pane_id", "source", "agent", "seq", "agent_session_id", "agent_session_path", "session_start_source"],
+    "network": "unix-socket-only"
+  },
+  "retirementState": "global-retirement-only-owner-profile-ready"
+}

@@ -2,7 +2,18 @@
   "schemaVersion": 1,
   "id": "canuto",
   "defaultEnabled": false,
-  "surface": "codex-user",
-  "managedManifest": "managed-hooks.codex.json",
-  "disabledManifest": "managed-hooks.codex.disabled.json"
+  "surfaces": {
+    "codex-user": {
+      "managedManifest": "managed-hooks.codex.json",
+      "disabledManifest": "managed-hooks.codex.disabled.json"
+    },
+    "claude-user": {
+      "managedManifest": "managed-hooks.claude.json",
+      "disabledManifest": "managed-hooks.claude.disabled.json"
+    }
+  },
+  "source": {
+    "type": "canuto-framework",
+    "dispositionIds": ["CU-38", "CU-43", "CU-45", "CU-49", "CX-01", "CX-03", "CX-15", "CX-17"]
+  }
 }

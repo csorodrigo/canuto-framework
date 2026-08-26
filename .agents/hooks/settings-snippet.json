@@ -7,11 +7,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/session-start.sh",
-            "timeout": 5
-          },
-          {
-            "type": "command",
             "command": "~/.claude/hooks/worktree-collision-check.sh",
             "timeout": 3
           }
@@ -76,16 +71,6 @@
             "timeout": 120
           }
         ]
-      },
-      {
-        "matcher": "mcp__playwright__browser_take_screenshot|mcp__claude-in-chrome__computer",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/screenshot-guard.sh",
-            "timeout": 3
-          }
-        ]
       }
     ],
     "PostToolUse": [
@@ -118,23 +103,6 @@
             "type": "command",
             "command": "~/.claude/hooks/validation-finalize-hook.mjs",
             "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/session-save.sh",
-            "timeout": 30
-          }
-        ]
-      }
-    ],
-    "Notification": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/pre-compact-save.sh",
-            "timeout": 15
           }
         ]
       }

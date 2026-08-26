@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "herdr",
+  "defaultEnabled": false,
+  "surface": "claude-user",
+  "contract": "contracts/herdr-agent-state.contract.json",
+  "managedManifest": "managed-hooks.claude.json",
+  "disabledManifest": "managed-hooks.claude.disabled.json",
+  "source": {
+    "type": "external-herdr-installation",
+    "profileSettings": "~/.config/herdr/agent-routes/profiles/claude/settings.json",
+    "profileSettingsSha256": "78188468602c3e6d0de6f650d7f6e3a9f7108535c2323716b91e24fd2d507975",
+    "profileHook": "~/.config/herdr/agent-routes/profiles/claude/hooks/herdr-agent-state.sh",
+    "profileHookSha256": "4deaaa7b12399358d9506db6e6ee3fe9b6ef06abde94922f919056854511d9ba",
+    "legacyGlobalHook": "~/.claude/hooks/herdr-agent-state.sh",
+    "sha256": "4deaaa7b12399358d9506db6e6ee3fe9b6ef06abde94922f919056854511d9ba",
+    "dispositionIds": ["CU-50"]
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "./managed-hooks.schema.json",
+  "schemaVersion": 1,
+  "surface": "claude-user-browser-qa-plugin",
+  "entries": [
+    {
+      "id": "CU-BROWSER-QA-SCREENSHOT-GUARD",
+      "version": 1,
+      "status": "retired",
+      "origin": "hooks/screenshot-guard.sh",
+      "event": "PreToolUse",
+      "matcher": "mcp__playwright__browser_take_screenshot|mcp__claude-in-chrome__computer",
+      "timeout": 3,
+      "role": "gate",
+      "command": "~/.claude/hooks/browser-qa-screenshot-guard.sh",
+      "expectedHash": "0ab7be93a00986f9b7268f3405bf5f0bdbc4e2ce3ddcd5d102e2919737e8bfd9",
+      "mode": "0755"
+    },
+    {
+      "id": "CU-32",
+      "version": 1,
+      "status": "retired",
+      "event": "PreToolUse",
+      "matcher": "mcp__playwright__browser_take_screenshot|mcp__claude-in-chrome__computer",
+      "timeout": 3,
+      "role": "gate",
+      "command": "~/.claude/hooks/screenshot-guard.sh"
+    }
+  ]
+}

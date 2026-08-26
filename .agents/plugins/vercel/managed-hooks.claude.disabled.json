@@ -1,0 +1,47 @@
+{
+  "$schema": "./managed-hooks.schema.json",
+  "schemaVersion": 1,
+  "surface": "claude-user-vercel-plugin-retirement",
+  "entries": [
+    {
+      "id": "PV-01",
+      "version": 1,
+      "status": "retired",
+      "event": "SessionStart",
+      "matcher": "startup|resume|clear|compact",
+      "timeout": null,
+      "role": "automation",
+      "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start-seen-skills.mjs\""
+    },
+    {
+      "id": "PV-02",
+      "version": 1,
+      "status": "retired",
+      "event": "SessionStart",
+      "matcher": "startup|resume|clear|compact",
+      "timeout": null,
+      "role": "observer",
+      "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start-profiler.mjs\""
+    },
+    {
+      "id": "PV-03",
+      "version": 1,
+      "status": "retired",
+      "event": "SessionStart",
+      "matcher": "startup|resume|clear|compact",
+      "timeout": null,
+      "role": "advisory",
+      "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-claude-md.mjs\""
+    },
+    {
+      "id": "PV-04",
+      "version": 1,
+      "status": "retired",
+      "event": "SessionEnd",
+      "matcher": "",
+      "timeout": null,
+      "role": "automation",
+      "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-end-cleanup.mjs\""
+    }
+  ]
+}

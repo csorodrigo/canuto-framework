@@ -1,0 +1,30 @@
+{
+  "$schema": "./managed-hooks.schema.json",
+  "schemaVersion": 1,
+  "surface": "claude-user-obsidian-plugin",
+  "entries": [
+    {
+      "id": "CU-OBSIDIAN-MCP-CLEANUP",
+      "version": 1,
+      "status": "active",
+      "origin": "hooks/obsidian-mcp-cleanup.sh",
+      "event": "SessionStart",
+      "matcher": "startup|resume|clear|compact",
+      "timeout": 10,
+      "role": "automation",
+      "command": "~/.claude/hooks/obsidian-mcp-cleanup.sh",
+      "expectedHash": "3fd9b29b9fb9369987e5ac6c4a655e0b3e5b7b44d49df51a55887229b0ca00bf",
+      "mode": "0755"
+    },
+    {
+      "id": "CU-48",
+      "version": 1,
+      "status": "retired",
+      "event": "SessionStart",
+      "matcher": "startup|resume|clear|compact",
+      "timeout": 10,
+      "role": "automation",
+      "command": "~/.codex/hooks/obsidian_mcp_cleanup.sh"
+    }
+  ]
+}

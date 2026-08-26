@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "vercel",
+  "version": "0.45.1",
+  "defaultEnabled": false,
+  "surface": "plugin-vercel",
+  "contract": "contracts/vercel-hooks.contract.json",
+  "managedManifest": "managed-hooks.claude.json",
+  "disabledManifest": "managed-hooks.claude.disabled.json",
+  "sourceReceiptRef": "../../hooks/audit/plugin-source-receipts.json#/plugins/vercel@0.45.1"
+}

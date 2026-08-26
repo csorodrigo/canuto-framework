@@ -1,0 +1,37 @@
+{
+  "$schema": "./managed-hooks.schema.json",
+  "schemaVersion": 1,
+  "surface": "claude-user-codex-companion-plugin-retirement",
+  "entries": [
+    {
+      "id": "PC-01",
+      "version": 1,
+      "status": "external",
+      "event": "SessionStart",
+      "matcher": "",
+      "timeout": 5,
+      "role": "automation",
+      "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/session-lifecycle-hook.mjs\" SessionStart"
+    },
+    {
+      "id": "PC-02",
+      "version": 1,
+      "status": "external",
+      "event": "SessionEnd",
+      "matcher": "",
+      "timeout": 5,
+      "role": "automation",
+      "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/session-lifecycle-hook.mjs\" SessionEnd"
+    },
+    {
+      "id": "PC-03",
+      "version": 1,
+      "status": "external",
+      "event": "Stop",
+      "matcher": "",
+      "timeout": 900,
+      "role": "gate",
+      "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/stop-review-gate-hook.mjs\""
+    }
+  ]
+}

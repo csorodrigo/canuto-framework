@@ -1121,7 +1121,45 @@ FRAMEWORK_FILES=(
   ".agents/plugins/canuto/managed-hooks.schema.json"
   ".agents/plugins/canuto/managed-hooks.codex.json"
   ".agents/plugins/canuto/managed-hooks.codex.disabled.json"
+  ".agents/plugins/canuto/managed-hooks.claude.json"
+  ".agents/plugins/canuto/managed-hooks.claude.disabled.json"
   ".agents/plugins/canuto/hooks/canuto-hook.mjs"
+  ".agents/plugins/canuto/hooks/session-save.sh"
+  ".agents/plugins/canuto/hooks/pre-compact-save.sh"
+  ".agents/plugins/canuto/hooks/session-start.sh"
+  ".agents/plugins/canuto/hooks/post-compact-reread.sh"
+  ".agents/plugins/browser-qa/plugin.json"
+  ".agents/plugins/browser-qa/managed-hooks.schema.json"
+  ".agents/plugins/browser-qa/managed-hooks.claude.json"
+  ".agents/plugins/browser-qa/managed-hooks.claude.disabled.json"
+  ".agents/plugins/browser-qa/hooks/screenshot-guard.sh"
+  ".agents/plugins/obsidian/plugin.json"
+  ".agents/plugins/obsidian/managed-hooks.schema.json"
+  ".agents/plugins/obsidian/managed-hooks.claude.json"
+  ".agents/plugins/obsidian/managed-hooks.claude.disabled.json"
+  ".agents/plugins/obsidian/managed-hooks.codex.json"
+  ".agents/plugins/obsidian/managed-hooks.codex.disabled.json"
+  ".agents/plugins/obsidian/hooks/obsidian-mcp-cleanup.sh"
+  ".agents/plugins/gstack/plugin.json"
+  ".agents/plugins/gstack/contracts/gstack-hooks.contract.json"
+  ".agents/plugins/herdr/plugin.json"
+  ".agents/plugins/herdr/managed-hooks.schema.json"
+  ".agents/plugins/herdr/managed-hooks.claude.json"
+  ".agents/plugins/herdr/managed-hooks.claude.disabled.json"
+  ".agents/plugins/herdr/contracts/herdr-agent-state.contract.json"
+  ".agents/plugins/herdr/fixtures/legacy-global-settings.json"
+  ".agents/plugins/vercel/plugin.json"
+  ".agents/plugins/vercel/managed-hooks.schema.json"
+  ".agents/plugins/vercel/managed-hooks.claude.json"
+  ".agents/plugins/vercel/managed-hooks.claude.disabled.json"
+  ".agents/plugins/vercel/contracts/vercel-hooks.contract.json"
+  ".agents/plugins/vercel/fixtures/plugin-hooks-settings.json"
+  ".agents/plugins/codex-companion/plugin.json"
+  ".agents/plugins/codex-companion/managed-hooks.schema.json"
+  ".agents/plugins/codex-companion/managed-hooks.claude.json"
+  ".agents/plugins/codex-companion/managed-hooks.claude.disabled.json"
+  ".agents/plugins/codex-companion/contracts/codex-companion-hooks.contract.json"
+  ".agents/plugins/codex-companion/fixtures/plugin-hooks-settings.json"
   ".agents/hooks/settings-snippet.json"
   ".agents/hooks/managed-hooks.schema.json"
   ".agents/hooks/managed-hooks.json"
@@ -1157,10 +1195,6 @@ FRAMEWORK_FILES=(
   ".agents/hooks/log-commands.sh"
   ".agents/hooks/protect-files.sh"
   ".agents/hooks/require-tests-for-pr.sh"
-  ".agents/hooks/screenshot-guard.sh"
-  ".agents/hooks/session-save.sh"
-    ".agents/hooks/pre-compact-save.sh"
-  ".agents/hooks/session-start.sh"
   ".agents/hooks/validation-mark.sh"
   ".agents/hooks/validation-clear.sh"
   ".agents/hooks/retry-detect.sh"
@@ -1743,7 +1777,7 @@ dedup_canuto_hook_dupes() {
   done
   # Fallback (instalação remota antes do download dos hooks): lista distribuída.
   if [ -z "$canuto_list" ]; then
-    canuto_list="codex-pretool-guard.sh,log-commands.sh,protect-files.sh,require-tests-for-pr.sh,screenshot-guard.sh,session-save.sh,pre-compact-save.sh,session-start.sh,validation-mark.sh,validation-clear.sh,retry-detect.sh,fingerprint-gate.sh,posttooluse-universal.sh,pre-finalize.sh,pre-commit-branch-check.sh,worktree-collision-check.sh,pre-claim-grep.sh,pre-pr-bash-gate.sh,postdelegate-verify.sh,"
+    canuto_list="codex-pretool-guard.sh,log-commands.sh,protect-files.sh,require-tests-for-pr.sh,validation-mark.sh,validation-clear.sh,retry-detect.sh,fingerprint-gate.sh,posttooluse-universal.sh,pre-finalize.sh,pre-commit-branch-check.sh,worktree-collision-check.sh,pre-claim-grep.sh,pre-pr-bash-gate.sh,postdelegate-verify.sh,"
   fi
   python3 - "$settings" "$canuto_list" <<'PYDEDUP' || warn "self-heal de hooks duplicados falhou — settings.json intacto."
 import json, os, sys
@@ -1927,11 +1961,7 @@ setup_hooks() {
 
   # ── Install all hooks ──────────────────────────────────────────────────
   install_hook ".agents/hooks/codex-pretool-guard.sh" "PreToolUse"  240
-  install_hook ".agents/hooks/screenshot-guard.sh"  "PreToolUse"    3  "mcp__playwright__browser_take_screenshot|mcp__claude-in-chrome__computer"
-  install_hook ".agents/hooks/session-save.sh"      "Stop"          30
-  install_hook ".agents/hooks/pre-compact-save.sh"  "Notification"  15
   # Observability + enforcement gate hooks (v1.9)
-  install_hook ".agents/hooks/session-start.sh"     "SessionStart"  5
   install_hook ".agents/hooks/validation-mark.sh"   "PostToolUse"   3  "Edit|Write"
   install_hook ".agents/hooks/validation-clear.sh"  "PostToolUse"   3  "Bash"
   install_hook ".agents/hooks/retry-detect.sh"      "PostToolUse"   3  "Bash"
