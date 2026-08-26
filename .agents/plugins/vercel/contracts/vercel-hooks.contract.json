@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "owner": "plugin:Vercel",
+  "sourceReceiptRef": "../../hooks/audit/plugin-source-receipts.json#/plugins/vercel@0.45.1",
+  "reconcileFlow": {
+    "kind": "external-owner-retirement-only",
+    "managedManifest": "../managed-hooks.claude.json",
+    "disabledManifest": "../managed-hooks.claude.disabled.json",
+    "ownerHookConfigSha256": "09d335208258ab6b8593976732869272755b6c7fae30afd906d010234a30aed5"
+  },
+  "observedOwnerReceipt": {
+    "capturedAt": "2026-08-26",
+    "hookConfigSha256": "09d335208258ab6b8593976732869272755b6c7fae30afd906d010234a30aed5",
+    "artifacts": {
+      "hooks/session-start-seen-skills.mjs": "02f75d69ac4b7c1055688862c65b1223123e44c6fb5bde5db372ca602a3e668e",
+      "hooks/session-start-profiler.mjs": "215e6502c4e8fc6edf683e13939ecdee096b1d4e27be29b12599e059693d9416",
+      "hooks/inject-claude-md.mjs": "bbda85ac5cb781560d8f9318e27ddaccdc6172e8bb9010ab86b6e297bd0b432c",
+      "hooks/session-end-cleanup.mjs": "1db52d969130cbcb954cad129eb06dbe4a89ed636b51bad6ba6b33a22ec80a0a"
+    }
+  },
+  "hooks": [
+    { "id": "PV-01", "event": "SessionStart", "matcher": "startup|resume|clear|compact", "handler": "hooks/session-start-seen-skills.mjs", "stateScope": "plugin-session" },
+    { "id": "PV-02", "event": "SessionStart", "matcher": "startup|resume|clear|compact", "handler": "hooks/session-start-profiler.mjs", "stateScope": "plugin-session" },
+    { "id": "PV-03", "event": "SessionStart", "matcher": "startup|resume|clear|compact", "handler": "hooks/inject-claude-md.mjs", "stateScope": "plugin-session" },
+    { "id": "PV-04", "event": "SessionEnd", "matcher": "", "handler": "hooks/session-end-cleanup.mjs", "stateScope": "plugin-session" }
+  ],
+  "network": {
+    "allowed": true,
+    "declaredUses": ["telemetry.vercel.com", "vercel --version", "npm view vercel version"],
+    "timeoutBudget": "hook-runtime-default; profiler must not block session startup indefinitely"
+  },
+  "telemetry": {
+    "default": "enabled unless VERCEL_PLUGIN_TELEMETRY=off",
+    "endpoint": "https://telemetry.vercel.com/api/vercel-plugin/v1/events",
+    "payloadExclusions": ["prompt text", "file paths", "project names", "account ids", "tool-call contents", "skill-injection details"]
+  },
+  "retention": {
+    "activeSession": "session-scoped marker with expiry timestamp",
+    "stamps": "written only after successful telemetry bridge response",
+    "cleanup": "PV-04 removes session-scoped temporary files"
+  }
+}

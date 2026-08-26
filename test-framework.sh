@@ -338,6 +338,13 @@ else
 fi
 rm -f /tmp/canuto-plugin-test.$$
 
+if node --test "$AGENTS_DIR/plugins/integration-governance.test.mjs" >/tmp/canuto-t8-plugins-test.$$ 2>&1; then
+  pass "T8 plugin extraction governance"
+else
+  fail "T8 plugin extraction governance failed"
+fi
+rm -f /tmp/canuto-t8-plugins-test.$$
+
 HOOK_CONTRACT_DIR="$AGENTS_DIR/hooks/contracts"
 if node --check "$HOOK_CONTRACT_DIR/contract-harness.mjs" >/dev/null 2>&1 \
   && node --test "$HOOK_CONTRACT_DIR/contract-harness.test.mjs" >/tmp/canuto-hook-contract-test.$$ 2>&1; then

@@ -15,7 +15,7 @@ import { pathToFileURL } from "node:url";
 
 const HASH_RE = /^[a-f0-9]{64}$/;
 const ROLES = new Set(["gate", "advisory", "observer", "automation"]);
-const STATUSES = new Set(["active", "retired"]);
+const STATUSES = new Set(["active", "retired", "external"]);
 const FILE_OWNERSHIP_FIELDS = ["origin", "expectedHash", "mode"];
 
 function fail(message) {
@@ -94,6 +94,20 @@ function isRegistrationOnlyRetirement(entry) {
   return entry.status === "retired" && fileOwnershipKind(entry) === "none";
 }
 
+function isRegistrationOnlyExternal(entry) {
+  return entry.status === "external" && fileOwnershipKind(entry) === "none";
+}
+
+function isRegistrationOnly(entry) {
+  return isRegistrationOnlyRetirement(entry) || isRegistrationOnlyExternal(entry);
+}
+
+function isSafeRegistrationOnlyCommand(command) {
+  if (typeof command !== "string" || /[\r\n\0]/.test(command)) return false;
+  if (/^~\/[^\r\n\0]+$/.test(command)) return true;
+  return /^node "\$\{CLAUDE_PLUGIN_ROOT\}\/[A-Za-z0-9._/-]+\.mjs"(?: [A-Za-z0-9._:-]+)?$/.test(command);
+}
+
 export function validateManifest(manifest) {
   const errors = [];
   if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) return ["manifest must be an object"];
@@ -137,24 +151,29 @@ export function validateManifest(manifest) {
     else if (ids.has(entry.id)) errors.push(`duplicate managed id ${entry.id}`);
     else ids.add(entry.id);
     if (!Number.isInteger(entry.version) || entry.version < 1) errors.push(`${at}.version must be a positive integer`);
-    if (!STATUSES.has(entry.status)) errors.push(`${at}.status must be active or retired`);
+    if (!STATUSES.has(entry.status)) errors.push(`${at}.status must be active, retired, or external`);
     const ownershipKind = fileOwnershipKind(entry);
     const hasFileMetadata = ownershipKind !== "none";
     if (entry.status === "active" && ownershipKind !== "complete") {
       errors.push(`${at} active entry requires origin, expectedHash, and mode`);
+    } else if (entry.status === "external" && ownershipKind !== "none") {
+      errors.push(`${at} external entry must not declare file ownership`);
     } else if (ownershipKind === "partial") {
       errors.push(`${at} file ownership requires origin, expectedHash, and mode together`);
     }
     if (hasFileMetadata && (typeof entry.origin !== "string" || !entry.origin)) errors.push(`${at}.origin is required`);
-    const registrationOnly = isRegistrationOnlyRetirement(entry);
+    const registrationOnly = isRegistrationOnly(entry);
     if (typeof entry.event !== "string" || !entry.event) errors.push(`${at}.event is required`);
     if (typeof entry.matcher !== "string") errors.push(`${at}.matcher must be a string`);
     if (entry.timeout !== null && (!Number.isInteger(entry.timeout) || entry.timeout < 1)) errors.push(`${at}.timeout must be null or a positive integer`);
     if (!ROLES.has(entry.role) && !(registrationOnly && entry.role === "probe")) errors.push(`${at}.role is invalid`);
     if (!registrationOnly && (typeof entry.command !== "string" || !/^~\/[A-Za-z0-9._/-]+$/.test(entry.command) || entry.command.split("/").includes(".."))) {
       errors.push(`${at}.command must be one tilde-relative executable path without arguments`);
-    } else if (registrationOnly && (typeof entry.command !== "string" || !entry.command || /[\r\n\0]/.test(entry.command))) {
-      errors.push(`${at}.command must be an exact command without control characters`);
+    } else if (isRegistrationOnlyRetirement(entry)
+      && (typeof entry.command !== "string" || !entry.command || /[\r\n\0]/.test(entry.command))) {
+      errors.push(`${at}.command must be an exact retirement command without control characters`);
+    } else if (isRegistrationOnlyExternal(entry) && !isSafeRegistrationOnlyCommand(entry.command)) {
+      errors.push(`${at}.command must be a safe external command without control characters`);
     }
     if (hasFileMetadata && (typeof entry.expectedHash !== "string" || !HASH_RE.test(entry.expectedHash))) errors.push(`${at}.expectedHash must be sha256`);
     if (hasFileMetadata && entry.mode !== "0755") errors.push(`${at}.mode must be 0755`);
@@ -171,6 +190,12 @@ export function validateManifest(manifest) {
 
 function normalizeCommand(command, homeDir) {
   if (typeof command !== "string") return command;
+  const shellWrapper = command.match(/^bash\s+(?:"([^"]+)"|'([^']+)'|(\S+))(\s+.*)?$/);
+  if (shellWrapper) {
+    const executable = shellWrapper[1] || shellWrapper[2] || shellWrapper[3];
+    const args = shellWrapper[4] || "";
+    return normalizeCommand(`${executable}${args}`, homeDir);
+  }
   if (homeDir && command.startsWith(`${homeDir}/`)) return `~/${command.slice(homeDir.length + 1)}`;
   return command;
 }
@@ -212,7 +237,7 @@ function flattenHooks(config) {
 function matchingOccurrences(entry, occurrences, homeDir) {
   return occurrences.filter((item) => {
     if (normalizeCommand(item.hook.command, homeDir) !== entry.command) return false;
-    if (!isRegistrationOnlyRetirement(entry)) return true;
+    if (!isRegistrationOnly(entry)) return true;
     return item.event === entry.event && item.matcher === entry.matcher;
   });
 }
@@ -304,7 +329,7 @@ async function loadInputs({ manifestPath, configPath, hooksDir, homeDir = proces
   for (const entry of manifest.entries) {
     const matches = matchingOccurrences(entry, occurrences, homeDir);
     if (matches.length > 1) fail(`duplicate Canuto entry ${entry.id} (${entry.command})`);
-    if (isRegistrationOnlyRetirement(entry)) continue;
+    if (isRegistrationOnly(entry)) continue;
     const sourcePath = resolve(manifestDir, entry.origin);
     const sourceRelative = relative(manifestDir, sourcePath);
     if (!sourceRelative || sourceRelative === ".." || sourceRelative.startsWith(`..${sep}`) || isAbsolute(sourceRelative)) {
@@ -340,6 +365,7 @@ export async function buildPlan(options) {
   const actions = inputs.manifest.entries.map((entry) => {
     const matches = matchingOccurrences(entry, inputs.occurrences, inputs.homeDir);
     if (entry.status === "retired") return { id: entry.id, action: matches.length ? "remove" : "preserve" };
+    if (entry.status === "external") return { id: entry.id, action: matches.length && hookMatches(entry, matches[0], inputs.homeDir) ? "preserve" : "missing" };
     if (matches.length === 0) return { id: entry.id, action: "add" };
     return { id: entry.id, action: hookMatches(entry, matches[0], inputs.homeDir) ? "preserve" : "update" };
   });
@@ -348,7 +374,7 @@ export async function buildPlan(options) {
   const retiredTargets = new Map();
   const ownedTargets = new Map();
   for (const entry of inputs.manifest.entries) {
-    if (isRegistrationOnlyRetirement(entry)) continue;
+    if (isRegistrationOnly(entry)) continue;
     const target = join(paths.hooksDir, basename(entry.command.trim().split(/\s+/)[0]));
     const owner = ownedTargets.get(target);
     if (owner && (owner.expectedHash !== entry.expectedHash || owner.origin !== entry.origin)) fail(`conflicting file ownership for ${target}`);

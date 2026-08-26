@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "codex-companion",
+  "version": "1.0.5",
+  "defaultEnabled": false,
+  "surface": "plugin-codex-companion",
+  "contract": "contracts/codex-companion-hooks.contract.json",
+  "managedManifest": "managed-hooks.claude.json",
+  "disabledManifest": "managed-hooks.claude.disabled.json",
+  "sourceReceiptRef": "../../hooks/audit/plugin-source-receipts.json#/plugins/codex-companion@1.0.5"
+}

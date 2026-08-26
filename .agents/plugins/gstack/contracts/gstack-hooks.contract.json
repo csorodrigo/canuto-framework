@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "owner": "plugin:gstack",
+  "sourceReceipt": {
+    "kind": "external-skill",
+    "status": "owner-ready",
+    "remote": "https://github.com/garrytan/gstack.git",
+    "commitSha": "ad8400543cd9ce8d07641362db48d44a95417e33",
+    "ownerPaths": {
+      "settingsHook": "~/.claude/skills/gstack/bin/gstack-settings-hook",
+      "setup": "~/.claude/skills/gstack/setup",
+      "uninstall": "~/.claude/skills/gstack/bin/gstack-uninstall",
+      "schemaAwareTest": "~/.claude/skills/gstack/test/gstack-settings-hook-schema-aware.test.ts"
+    },
+    "ownerPathSha256": {
+      "~/.claude/skills/gstack/bin/gstack-settings-hook": "87407502b1411213e009d7bb40c9800cb88c91a1e0f0dc1fbd42dcddd985bb1c",
+      "~/.claude/skills/gstack/setup": "7d100b626181e86912f7a2a525f22ab9fc868a54aee3419994524d57c5501dc8",
+      "~/.claude/skills/gstack/bin/gstack-uninstall": "e9117b45545912f2c1c21d7629f648514526c942a80802f7de1549389c9168b5",
+      "~/.claude/skills/gstack/test/gstack-settings-hook-schema-aware.test.ts": "c35ebc49e1096be756b502778604c56ec00017b46c138819e3680d0956eb0899"
+    },
+    "checkedPaths": [
+      "~/.claude/skills/gstack/hosts/claude/hooks/question-log-hook",
+      "~/.claude/skills/gstack/hosts/claude/hooks/auq-error-fallback-hook",
+      "~/.claude/skills/gstack/hosts/claude/hooks/question-preference-hook",
+      "~/.claude/skills/gstack/hosts/claude/hooks/timeline-stop-hook"
+    ],
+    "sha256": {
+      "~/.claude/skills/gstack/hosts/claude/hooks/question-log-hook": "a8dae5b30d44cf599e893eb052784a9d78681359f9b0635ca4f5bf823d6b23e2",
+      "~/.claude/skills/gstack/hosts/claude/hooks/auq-error-fallback-hook": "fce153204a040294b4f9877a04a187b626ff625ae12737f8c07888f68473e727",
+      "~/.claude/skills/gstack/hosts/claude/hooks/question-preference-hook": "608d228537f83074eb9ef7a9d64052cd43fd01623d08c04450b9815f2b4bbd75",
+      "~/.claude/skills/gstack/hosts/claude/hooks/timeline-stop-hook": "e306e885103339920b364e365d2382b0882c065860245a6b82cd784c92fda359"
+    },
+    "retirementState": "owner-ready-via-gstack-settings-hook"
+  },
+  "hooks": [
+    { "id": "CU-11", "event": "PostToolUse", "matcher": "AskUserQuestion|mcp__.*ask.*", "role": "observer", "handler": "question-log-hook", "stateScope": "gstack/project/session" },
+    { "id": "CU-12", "event": "PostToolUse", "matcher": "AskUserQuestion|mcp__.*ask.*", "role": "advisory", "handler": "auq-error-fallback-hook", "stateScope": "gstack/project/session" },
+    { "id": "CU-35", "event": "PreToolUse", "matcher": "AskUserQuestion|mcp__.*ask.*", "role": "automation", "handler": "question-preference-hook", "stateScope": "gstack/project/session" },
+    { "id": "CU-42", "event": "Stop", "matcher": "", "role": "automation", "handler": "timeline-stop-hook", "stateScope": "gstack/project/session" }
+  ]
+}

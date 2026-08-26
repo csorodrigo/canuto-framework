@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "obsidian",
+  "defaultEnabled": false,
+  "surfaces": {
+    "claude-user": {
+      "managedManifest": "managed-hooks.claude.json",
+      "disabledManifest": "managed-hooks.claude.disabled.json"
+    },
+    "codex-user": {
+      "managedManifest": "managed-hooks.codex.json",
+      "disabledManifest": "managed-hooks.codex.disabled.json"
+    }
+  },
+  "runtimeContract": {
+    "cleanupOnly": true,
+    "activeOnly": true,
+    "toolOverrideEnv": "CANUTO_OBSIDIAN_MCP_GUARD"
+  }
+}

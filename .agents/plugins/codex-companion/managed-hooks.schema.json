@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "surface", "entries"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "surface": { "type": "string", "minLength": 1 },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "version", "status", "event", "matcher", "timeout", "role", "command"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9-]+$" },
+          "version": { "type": "integer", "minimum": 1 },
+          "status": { "enum": ["active", "retired", "external"] },
+          "origin": { "type": "string", "minLength": 1 },
+          "event": { "type": "string", "minLength": 1 },
+          "matcher": { "type": "string" },
+          "timeout": { "type": ["integer", "null"], "minimum": 1 },
+          "role": { "enum": ["gate", "advisory", "observer", "automation", "probe"] },
+          "command": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(~/[^\\r\\n\\u0000]+|node \"\\$\\{CLAUDE_PLUGIN_ROOT\\}/[A-Za-z0-9._/-]+\\.mjs\"( [A-Za-z0-9._:-]+)?)$"
+          },
+          "expectedHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "mode": { "const": "0755" }
+        }
+      }
+    }
+  }
+}

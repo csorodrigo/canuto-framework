@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "gstack",
+  "defaultEnabled": false,
+  "surface": "claude-user",
+  "contract": "contracts/gstack-hooks.contract.json",
+  "source": {
+    "type": "external-skill",
+    "path": "~/.claude/skills/gstack",
+    "dispositionIds": ["CU-11", "CU-12", "CU-35", "CU-42"]
+  }
+}

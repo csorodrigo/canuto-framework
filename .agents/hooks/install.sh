@@ -21,6 +21,7 @@ canuto_managed_hooks() {
 }
 
 CANUTO_CODEX_PLUGIN_DIR="$SCRIPT_DIR/../plugins/canuto"
+CANUTO_PLUGIN_ROOT="$SCRIPT_DIR/../plugins"
 
 canuto_codex_plugin_hooks() {
   local state="$1"
@@ -30,6 +31,27 @@ canuto_codex_plugin_hooks() {
     manifest="$CANUTO_CODEX_PLUGIN_DIR/managed-hooks.codex.disabled.json"
   fi
   node "$CANUTO_CODEX_PLUGIN_DIR/codex-plugin-reconcile.mjs" "$@" --manifest "$manifest"
+}
+
+canuto_plugin_hooks() {
+  local plugin="$1"
+  local surface="$2"
+  local state="$3"
+  shift 3
+  case "$plugin" in
+    canuto|browser-qa|obsidian|herdr|vercel|codex-companion) ;;
+    *) echo "plugin sem manifest gerenciado: $plugin" >&2; exit 64 ;;
+  esac
+  case "$surface" in
+    claude|codex) ;;
+    *) echo "surface invalida: $surface" >&2; exit 64 ;;
+  esac
+  local manifest="$CANUTO_PLUGIN_ROOT/$plugin/managed-hooks.$surface.json"
+  if [ "$state" = "disabled" ]; then
+    manifest="$CANUTO_PLUGIN_ROOT/$plugin/managed-hooks.$surface.disabled.json"
+  fi
+  [ -f "$manifest" ] || { echo "manifest ausente: $manifest" >&2; exit 66; }
+  node "$SCRIPT_DIR/reconcile-hooks.mjs" "$@" --manifest "$manifest"
 }
 
 # Modos restritos: nunca copiam hooks nem usam a configuração real por padrão.
@@ -68,6 +90,41 @@ case "${1:-}" in
   --rollback-codex-canuto-plugin)
     [ -n "${2:-}" ] && [ -n "${3:-}" ] || { echo "uso: install.sh --rollback-codex-canuto-plugin <batch-id> <state-dir>" >&2; exit 64; }
     node "$CANUTO_CODEX_PLUGIN_DIR/codex-plugin-reconcile.mjs" rollback --batch-id "$2" --state-dir "$3"
+    exit $?
+    ;;
+  --plan-plugin)
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] && [ -n "${4:-}" ] && [ -n "${5:-}" ] || { echo "uso: install.sh --plan-plugin <plugin> <claude|codex> <config.json> <hooks-dir>" >&2; exit 64; }
+    canuto_plugin_hooks "$2" "$3" enabled plan --config "$4" --hooks-dir "$5"
+    exit $?
+    ;;
+  --apply-plugin)
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] && [ -n "${4:-}" ] && [ -n "${5:-}" ] && [ -n "${6:-}" ] && [ -n "${7:-}" ] || { echo "uso: install.sh --apply-plugin <plugin> <claude|codex> <fingerprint> <config.json> <hooks-dir> <state-dir>" >&2; exit 64; }
+    canuto_plugin_hooks "$2" "$3" enabled apply --fingerprint "$4" --config "$5" --hooks-dir "$6" --state-dir "$7"
+    exit $?
+    ;;
+  --verify-plugin)
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] && [ -n "${4:-}" ] && [ -n "${5:-}" ] || { echo "uso: install.sh --verify-plugin <plugin> <claude|codex> <config.json> <hooks-dir>" >&2; exit 64; }
+    canuto_plugin_hooks "$2" "$3" enabled verify --config "$4" --hooks-dir "$5"
+    exit $?
+    ;;
+  --plan-disable-plugin)
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] && [ -n "${4:-}" ] && [ -n "${5:-}" ] || { echo "uso: install.sh --plan-disable-plugin <plugin> <claude|codex> <config.json> <hooks-dir>" >&2; exit 64; }
+    canuto_plugin_hooks "$2" "$3" disabled plan --config "$4" --hooks-dir "$5"
+    exit $?
+    ;;
+  --apply-disable-plugin)
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] && [ -n "${4:-}" ] && [ -n "${5:-}" ] && [ -n "${6:-}" ] && [ -n "${7:-}" ] || { echo "uso: install.sh --apply-disable-plugin <plugin> <claude|codex> <fingerprint> <config.json> <hooks-dir> <state-dir>" >&2; exit 64; }
+    canuto_plugin_hooks "$2" "$3" disabled apply --fingerprint "$4" --config "$5" --hooks-dir "$6" --state-dir "$7"
+    exit $?
+    ;;
+  --verify-disable-plugin)
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] && [ -n "${4:-}" ] && [ -n "${5:-}" ] || { echo "uso: install.sh --verify-disable-plugin <plugin> <claude|codex> <config.json> <hooks-dir>" >&2; exit 64; }
+    canuto_plugin_hooks "$2" "$3" disabled verify --config "$4" --hooks-dir "$5"
+    exit $?
+    ;;
+  --rollback-plugin)
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] || { echo "uso: install.sh --rollback-plugin <batch-id> <state-dir>" >&2; exit 64; }
+    node "$SCRIPT_DIR/reconcile-hooks.mjs" rollback --batch-id "$2" --state-dir "$3"
     exit $?
     ;;
   --plan-managed-hooks)

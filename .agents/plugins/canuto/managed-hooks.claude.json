@@ -1,0 +1,99 @@
+{
+  "$schema": "./managed-hooks.schema.json",
+  "schemaVersion": 1,
+  "surface": "claude-user-canuto-plugin",
+  "entries": [
+    {
+      "id": "CU-CANUTO-SESSION-SAVE",
+      "version": 1,
+      "status": "active",
+      "origin": "hooks/session-save.sh",
+      "event": "Stop",
+      "matcher": "",
+      "timeout": 30,
+      "role": "automation",
+      "command": "~/.claude/hooks/canuto-session-save.sh",
+      "expectedHash": "923cbe310e0c7065c5eb594172baf1553b3494dff39034ad150cbb88586702e8",
+      "mode": "0755"
+    },
+    {
+      "id": "CU-CANUTO-PRECOMPACT-SAVE",
+      "version": 1,
+      "status": "active",
+      "origin": "hooks/pre-compact-save.sh",
+      "event": "PreCompact",
+      "matcher": "",
+      "timeout": 15,
+      "role": "automation",
+      "command": "~/.claude/hooks/canuto-pre-compact-save.sh",
+      "expectedHash": "f5105ce3e393035a1e71228590413c0008edd93305b462160dbc346bce1cc28a",
+      "mode": "0755"
+    },
+    {
+      "id": "CU-CANUTO-SESSION-START",
+      "version": 1,
+      "status": "active",
+      "origin": "hooks/session-start.sh",
+      "event": "SessionStart",
+      "matcher": "",
+      "timeout": 5,
+      "role": "automation",
+      "command": "~/.claude/hooks/canuto-session-start.sh",
+      "expectedHash": "4f497e23f14dcec755f9cb416ab12db29ac2a8072a31d761301b29a4bb798e97",
+      "mode": "0755"
+    },
+    {
+      "id": "CU-CANUTO-POSTCOMPACT-REREAD",
+      "version": 1,
+      "status": "active",
+      "origin": "hooks/post-compact-reread.sh",
+      "event": "SessionStart",
+      "matcher": "compact",
+      "timeout": 8,
+      "role": "advisory",
+      "command": "~/.claude/hooks/canuto-post-compact-reread.sh",
+      "expectedHash": "4f5d49b58fe42dcbac2ff648e687d01f17b26dfa7e57e7213c5a66ea044b62c3",
+      "mode": "0755"
+    },
+    {
+      "id": "CU-38",
+      "version": 1,
+      "status": "retired",
+      "event": "Stop",
+      "matcher": "",
+      "timeout": 30,
+      "role": "automation",
+      "command": "~/.claude/hooks/session-save.sh"
+    },
+    {
+      "id": "CU-43",
+      "version": 1,
+      "status": "retired",
+      "event": "Notification",
+      "matcher": "",
+      "timeout": 15,
+      "role": "automation",
+      "command": "~/.claude/hooks/pre-compact-save.sh"
+    },
+    {
+      "id": "CU-45",
+      "version": 1,
+      "status": "retired",
+      "event": "SessionStart",
+      "matcher": "",
+      "timeout": 5,
+      "role": "automation",
+      "command": "~/.claude/hooks/session-start.sh"
+    },
+    {
+      "id": "CU-49",
+      "version": 1,
+      "status": "retired",
+      "event": "SessionStart",
+      "matcher": "compact",
+      "timeout": 8,
+      "role": "advisory",
+      "command": "~/.claude/hooks/post-compact-reread.sh"
+    }
+  ]
+}

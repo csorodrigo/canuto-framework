@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "browser-qa",
+  "defaultEnabled": false,
+  "surface": "claude-user",
+  "managedManifest": "managed-hooks.claude.json",
+  "disabledManifest": "managed-hooks.claude.disabled.json",
+  "source": {
+    "type": "canuto-framework",
+    "dispositionIds": ["CU-32"]
+  }
+}

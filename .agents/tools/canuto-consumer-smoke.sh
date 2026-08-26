@@ -128,7 +128,7 @@ fi
 for file_path in \
   "$ROOT_DIR/.agents/hooks/install.sh" \
   "$ROOT_DIR/.agents/hooks/codex-pretool-guard.sh" \
-  "$ROOT_DIR/.agents/hooks/screenshot-guard.sh" \
+  "$ROOT_DIR/.agents/plugins/browser-qa/hooks/screenshot-guard.sh" \
   "$ROOT_DIR/.agents/tools/canuto-memory.sh" \
   "$ROOT_DIR/.agents/tools/codex-maestro.sh" \
   "$ROOT_DIR/.agents/tools/codex-health-check.sh" \

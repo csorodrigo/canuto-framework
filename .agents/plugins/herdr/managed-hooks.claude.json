@@ -1,0 +1,17 @@
+{
+  "$schema": "./managed-hooks.schema.json",
+  "schemaVersion": 1,
+  "surface": "claude-user-herdr-plugin-retirement",
+  "entries": [
+    {
+      "id": "CU-50",
+      "version": 1,
+      "status": "retired",
+      "event": "SessionStart",
+      "matcher": "*",
+      "timeout": 10,
+      "role": "observer",
+      "command": "~/.claude/hooks/herdr-agent-state.sh session"
+    }
+  ]
+}
