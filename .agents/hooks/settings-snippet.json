@@ -1,5 +1,5 @@
 {
-  "_comment": "Merge this into ~/.claude/settings.json. Events: SessionStart, PreToolUse, PostToolUse, Stop, Notification.",
+  "_comment": "Compatibility rendering of managed-hooks.json. Reconcile with reconcile-hooks.mjs; do not use as hook identity.",
   "hooks": {
     "SessionStart": [
       {
