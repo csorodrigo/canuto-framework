@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "batch": "T7",
+  "id": "CU-23",
+  "owner": "repository:Papiro/Dobra",
+  "status": "ready",
+  "repository": "csorodrigo/papiro",
+  "pullRequest": {
+    "number": 849,
+    "url": "https://github.com/csorodrigo/papiro/pull/849",
+    "state": "MERGED",
+    "candidateHeadSha": "23e5bc067d700d19473e9a6aebe5deff1fd05102",
+    "candidateTreeSha": "9124f2c617b251fa54fcaa2675d146a2bca58b05",
+    "mergeCommitSha": "5e7ddf90ca31313947ba2697c695dfa306f83d88",
+    "mergeTreeSha": "9124f2c617b251fa54fcaa2675d146a2bca58b05"
+  },
+  "ownerArtifact": {
+    "path": ".agents/hooks/dobra-compose-writer-guard.manifest.json",
+    "manifestSha256": "c5c3d973e0d41e88800e2d27ae79dd806cdbf158019a75fcb84255f1ddaa965d",
+    "sourcePath": ".agents/hooks/dobra-compose-writer-guard.sh",
+    "sourceSha256": "d4ecea86c03c1c8e495dc1bb9d08bf200509ad22367555cabce5a9604c0f84b6",
+    "canonicalRepository": "csorodrigo/papiro",
+    "packageName": "dobra",
+    "hashProof": {
+      "repository": "csorodrigo/papiro",
+      "verifiedAtCommitSha": "5e7ddf90ca31313947ba2697c695dfa306f83d88",
+      "verifiedTreeSha": "9124f2c617b251fa54fcaa2675d146a2bca58b05",
+      "manifest": {
+        "path": ".agents/hooks/dobra-compose-writer-guard.manifest.json",
+        "sha256": "c5c3d973e0d41e88800e2d27ae79dd806cdbf158019a75fcb84255f1ddaa965d"
+      },
+      "source": {
+        "path": ".agents/hooks/dobra-compose-writer-guard.sh",
+        "sha256": "d4ecea86c03c1c8e495dc1bb9d08bf200509ad22367555cabce5a9604c0f84b6"
+      }
+    }
+  },
+  "mainContainment": {
+    "observedMainSha": "5e7ddf90ca31313947ba2697c695dfa306f83d88",
+    "candidateContained": true,
+    "contentContained": true,
+    "compareStatus": "identical",
+    "observedAt": "2026-08-26"
+  },
+  "blockers": []
+}

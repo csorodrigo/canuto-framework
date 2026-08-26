@@ -19,7 +19,44 @@
           "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
           "receipt": { "type": "string", "minLength": 1 },
           "expectedHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-          "requiredStatus": { "const": "ready" }
+          "requiredStatus": { "const": "ready" },
+          "receiptContract": { "enum": ["merged-owner-artifact-v1", "repo-policy-consumers-v1"] },
+          "expectedArtifactId": { "type": "string", "pattern": "^[A-Z][A-Z0-9-]+$" },
+          "expectedRepository": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+          "expectedOwner": { "type": "string", "minLength": 1 },
+          "expectedPackage": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+          "expectedBatch": { "const": "T7" },
+          "expectedInventoryPath": { "const": "audit/t7-repo-policy-consumer-inventory.json" },
+          "expectedRepositories": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "uniqueItems": true,
+            "items": { "enum": ["csorodrigo/canuto-framework", "csorodrigo/papiro"] }
+          },
+          "expectedCanutoManifestSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "expectedCanutoMergeCommitSha": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+          "expectedCanutoContainedInMainSha": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+          "expectedPapiroPullRequest": { "type": "integer", "minimum": 1 },
+          "expectedPapiroCandidateHeadSha": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+          "expectedPapiroCandidateTreeSha": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+          "expectedPapiroMergeCommitSha": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+          "expectedPapiroMergeTreeSha": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+          "expectedPapiroManifestSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "expectedPapiroGateRunid": { "type": "string", "minLength": 1 },
+          "expectedPapiroGateReceipt": { "type": "string", "minLength": 1 },
+          "expectedCanutoValidationAllowedArgv": {
+            "type": "array",
+            "items": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          },
+          "expectedCanutoValidationRequiredFiles": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "expectedPapiroBuildTypecheck": { "type": "string", "minLength": 1 },
+          "expectedPapiroDeployProduction": { "type": "string", "minLength": 1 },
+          "expectedPapiroValidationAllowedArgv": {
+            "type": "array",
+            "items": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          },
+          "expectedPapiroValidationRequiredFiles": { "type": "array", "items": { "type": "string", "minLength": 1 } }
         }
       }
     },
@@ -37,6 +74,7 @@
           "event": { "type": "string", "minLength": 1 },
           "matcher": { "type": "string" },
           "timeout": { "type": ["integer", "null"], "minimum": 1 },
+          "async": { "type": "boolean" },
           "role": { "enum": ["gate", "advisory", "observer", "automation", "probe"] },
           "command": { "type": "string", "minLength": 1, "pattern": "^[^\\r\\n\\u0000]+$" },
           "expectedHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },

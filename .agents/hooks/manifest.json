@@ -1,0 +1,37 @@
+{
+  "$schema": "./repo-policy.schema.json",
+  "schemaVersion": 1,
+  "policies": [
+    {
+      "id": "validation-receipt",
+      "options": {
+        "enabled": true,
+        "requiredFiles": [
+          "test-framework.sh"
+        ],
+        "allowedArgv": [
+          [
+            "bash",
+            "test-framework.sh"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "commit",
+      "options": {
+        "requiredFiles": [
+          "test-framework.sh"
+        ]
+      }
+    },
+    {
+      "id": "pull-request",
+      "options": {
+        "requiredFiles": [
+          "test-framework.sh"
+        ]
+      }
+    }
+  ]
+}

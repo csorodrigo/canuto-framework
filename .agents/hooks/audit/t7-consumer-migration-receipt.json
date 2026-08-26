@@ -1,17 +1,93 @@
 {
   "schemaVersion": 1,
   "batch": "T7",
-  "status": "blocked",
-  "consumers": [],
+  "status": "ready",
+  "inventory": {
+    "path": "audit/t7-repo-policy-consumer-inventory.json",
+    "expectedHash": "64238bd5a82684239a002efd13d5ae902426f0faacd3ea4c3a483a3ffce329e3"
+  },
+  "consumers": [
+    {
+      "id": "canuto-framework",
+      "repository": "csorodrigo/canuto-framework",
+      "status": "versioned-contract-tested",
+      "manifest": ".agents/hooks/manifest.json",
+      "manifestSha256": "3d31b97781f55ed73d528022da8050ee15f9df31c33246540db2e733f3f57971",
+      "validation": {
+        "allowedArgv": [
+          [
+            "bash",
+            "test-framework.sh"
+          ]
+        ],
+        "requiredFiles": [
+          "test-framework.sh"
+        ],
+        "recordAndStopContractTest": ".agents/hooks/retirement-t7.test.mjs",
+        "remoteIdentityContractTest": ".agents/hooks/policies/repo/repo-policy.test.mjs",
+        "proofScope": "versioned repository contract plus hermetic remote-identity and Stop verification"
+      },
+      "publication": {
+        "mergeCommitSha": "4028de248c22985a6466d5126c5268842edb39fa",
+        "containedInCanutoMainSha": "fc2b41e0bf504e43cd0a310befb68f568e2771c7"
+      },
+      "pending": []
+    },
+    {
+      "id": "papiro-dobra",
+      "repository": "csorodrigo/papiro",
+      "status": "merged-versioned-contract-tested",
+      "manifest": ".agents/hooks/manifest.json",
+      "manifestSha256": "80b66071997182fd710755f321d39afee6845417a12194782669ea24331bfd47",
+      "publication": {
+        "pullRequest": 850,
+        "candidateHeadSha": "09a444de0668ac913300c1d484521e925cbe924e",
+        "candidateTreeSha": "a8a6e1bbe95ffd33a5492283fd6e9afe71b110a2",
+        "mergeCommitSha": "676a3124429546cd9e7780dded9ff32e496547f5",
+        "mergeTreeSha": "a8a6e1bbe95ffd33a5492283fd6e9afe71b110a2",
+        "gateReceipt": "~/.canuto/gate-receipts/cartorio.jsonl:252",
+        "gateProof": {
+          "sha": "09a444de0668ac913300c1d484521e925cbe924e",
+          "tree": "a8a6e1bbe95ffd33a5492283fd6e9afe71b110a2",
+          "verdict": "verde",
+          "runid": "tc-MacBook-Air-2-t7-papiro-policy-94394"
+        },
+        "gateResult": {
+          "files": 355,
+          "passed": 6232,
+          "skipped": 5
+        }
+      },
+      "validation": {
+        "buildTypecheck": "npm run typecheck:codex",
+        "deployProduction": "npm run deploy:prod",
+        "allowedArgv": [
+          [
+            "npm",
+            "run",
+            "test",
+            "--",
+            "tests/dobra-compose-writer-guard.test.ts"
+          ]
+        ],
+        "requiredFiles": [
+          ".agents/hooks/dobra-compose-writer-guard.sh",
+          ".agents/hooks/dobra-compose-writer-guard.manifest.json",
+          ".agents/hooks/dobra-compose-writer-guard-manager.mjs",
+          ".claude/settings.json",
+          "docs/operations/dobra-compose-writer-guard.md"
+        ]
+      },
+      "pending": []
+    }
+  ],
   "requirements": [
     "Each governed consumer has a versioned .agents/hooks/manifest.json",
     "Build/typecheck and deploy commands are exact project-owned argv",
     "Validation allowedArgv is exact and rejects undeclared executables",
     "Validation receipt record and Stop verification pass on the candidate SHA",
-    "External owner receipts are attached before owner-specific retirement"
+    "External owner receipts are attached before owner-specific retirement",
+    "Final Canuto publication still requires an unchanged pushed SHA, remote validation receipt and protected merge gate"
   ],
-  "blockers": [
-    "No consumer migration receipts are versioned yet",
-    "CU-23 awaits the Papiro/Dobra owner receipt"
-  ]
+  "blockers": []
 }

@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "batch": "T7",
+  "repositories": [
+    {
+      "id": "canuto-framework",
+      "repository": "csorodrigo/canuto-framework",
+      "manifest": ".agents/hooks/manifest.json",
+      "manifestSha256": "3d31b97781f55ed73d528022da8050ee15f9df31c33246540db2e733f3f57971",
+      "manifestStatus": "versioned-contract-tested"
+    },
+    {
+      "id": "papiro-dobra",
+      "repository": "csorodrigo/papiro",
+      "candidateHeadSha": "09a444de0668ac913300c1d484521e925cbe924e",
+      "candidateTreeSha": "a8a6e1bbe95ffd33a5492283fd6e9afe71b110a2",
+      "mergeCommitSha": "676a3124429546cd9e7780dded9ff32e496547f5",
+      "mergeTreeSha": "a8a6e1bbe95ffd33a5492283fd6e9afe71b110a2",
+      "manifest": ".agents/hooks/manifest.json",
+      "manifestSha256": "80b66071997182fd710755f321d39afee6845417a12194782669ea24331bfd47",
+      "manifestStatus": "merged-versioned-contract-tested",
+      "gateReceipt": "~/.canuto/gate-receipts/cartorio.jsonl:252"
+    }
+  ],
+  "policies": [
+    {
+      "id": "worktree-dependencies",
+      "consumers": [
+        { "repository": "csorodrigo/canuto-framework", "disposition": "no-policy", "applicability": "not-applicable" },
+        { "repository": "csorodrigo/papiro", "disposition": "no-policy", "applicability": "not-applicable" }
+      ]
+    },
+    {
+      "id": "build-typecheck",
+      "consumers": [
+        {
+          "repository": "csorodrigo/canuto-framework",
+          "disposition": "no-policy",
+          "applicability": "not-applicable",
+          "evidence": "Canuto has no package.json typecheck/build script; framework validation is owned by the validation-receipt policy"
+        },
+        {
+          "repository": "csorodrigo/papiro",
+          "disposition": "versioned-contract-tested",
+          "applicability": "required",
+          "expectedOptions": { "commands": ["npm run typecheck:codex"] },
+          "evidence": "package.json scripts.typecheck:codex at candidate head"
+        }
+      ]
+    },
+    {
+      "id": "claims",
+      "consumers": [
+        { "repository": "csorodrigo/canuto-framework", "disposition": "no-policy", "applicability": "not-applicable" },
+        { "repository": "csorodrigo/papiro", "disposition": "no-policy", "applicability": "not-applicable" }
+      ]
+    },
+    {
+      "id": "branch-creation",
+      "consumers": [
+        { "repository": "csorodrigo/canuto-framework", "disposition": "no-policy", "applicability": "not-applicable" },
+        { "repository": "csorodrigo/papiro", "disposition": "no-policy", "applicability": "not-applicable" }
+      ]
+    },
+    {
+      "id": "deploy-target",
+      "consumers": [
+        {
+          "repository": "csorodrigo/canuto-framework",
+          "disposition": "no-policy",
+          "applicability": "not-applicable",
+          "evidence": "Canuto has no repository deploy command"
+        },
+        {
+          "repository": "csorodrigo/papiro",
+          "disposition": "versioned-contract-tested",
+          "applicability": "required",
+          "expectedOptions": {
+            "targets": [
+              { "name": "production", "commands": ["npm run deploy:prod"] }
+            ]
+          },
+          "evidence": "package.json scripts.deploy:prod at candidate head"
+        }
+      ]
+    },
+    {
+      "id": "validation-receipt",
+      "consumers": [
+        {
+          "repository": "csorodrigo/canuto-framework",
+          "disposition": "versioned-contract-tested",
+          "applicability": "required",
+          "expectedOptions": {
+            "enabled": true,
+            "requiredFiles": ["test-framework.sh"],
+            "allowedArgv": [["bash", "test-framework.sh"]]
+          }
+        },
+        {
+          "repository": "csorodrigo/papiro",
+          "disposition": "versioned-contract-tested",
+          "applicability": "required",
+          "expectedOptions": {
+            "enabled": true,
+            "requiredFiles": [
+              ".agents/hooks/dobra-compose-writer-guard.sh",
+              ".agents/hooks/dobra-compose-writer-guard.manifest.json",
+              ".agents/hooks/dobra-compose-writer-guard-manager.mjs",
+              ".claude/settings.json",
+              "docs/operations/dobra-compose-writer-guard.md"
+            ],
+            "allowedArgv": [["npm", "run", "test", "--", "tests/dobra-compose-writer-guard.test.ts"]]
+          },
+          "evidence": "package.json scripts.test delegates to scripts/run-tests.mjs; canonical invocation uses npm run test -- <paths>"
+        }
+      ]
+    },
+    {
+      "id": "commit",
+      "consumers": [
+        { "repository": "csorodrigo/canuto-framework", "disposition": "versioned-contract-tested", "applicability": "required" },
+        { "repository": "csorodrigo/papiro", "disposition": "versioned-contract-tested", "applicability": "required" }
+      ]
+    },
+    {
+      "id": "pull-request",
+      "consumers": [
+        {
+          "repository": "csorodrigo/canuto-framework",
+          "disposition": "versioned-contract-tested",
+          "applicability": "required",
+          "remoteProof": "required"
+        },
+        {
+          "repository": "csorodrigo/papiro",
+          "disposition": "versioned-contract-tested",
+          "applicability": "required",
+          "remoteProof": "required",
+          "expectedRequiredFiles": [
+            ".agents/hooks/dobra-compose-writer-guard.sh",
+            ".agents/hooks/dobra-compose-writer-guard.manifest.json",
+            ".agents/hooks/dobra-compose-writer-guard-manager.mjs",
+            ".claude/settings.json",
+            "docs/operations/dobra-compose-writer-guard.md"
+          ]
+        }
+      ]
+    }
+  ]
+}

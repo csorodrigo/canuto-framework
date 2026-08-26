@@ -70,7 +70,7 @@ export async function executeAndWriteValidationReceipt({
     encoding: "utf8",
     env: { ...process.env, GIT_OPTIONAL_LOCKS: "0", LC_ALL: "C" },
     maxBuffer: 32 * 1024 * 1024,
-    timeout: 10 * 60 * 1000,
+    timeout: 30 * 60 * 1000,
   });
   const currentIdentity = await captureExecutionIdentity({
     cwd: identity.worktreeRoot,

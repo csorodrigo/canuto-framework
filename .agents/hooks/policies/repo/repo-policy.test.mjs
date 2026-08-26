@@ -312,3 +312,18 @@ test("Stop finalizer requires a current validation receipt for opted-in reposito
   const recursive = await runFinalizeHook({ ...payload, stop_hook_active: true });
   assert.deepEqual(JSON.parse(recursive.stdout), {});
 });
+
+test("validation receipt runner allows the full framework gate to exceed ten minutes", async (t) => {
+  const root = await repositoryFixture();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await writeFile(join(root, "first.txt"), "covered\n");
+  const identity = await captureExecutionIdentity({ cwd: root, sessionId: "session-timeout" });
+  let executionOptions;
+  await executeAndWriteValidationReceipt({
+    identity,
+    coveredFiles: ["first.txt"],
+    argv: [process.execPath, "-e", "process.exit(0)"],
+    execute: async (_command, _args, options) => { executionOptions = options; },
+  });
+  assert.equal(executionOptions.timeout, 30 * 60 * 1000);
+});
