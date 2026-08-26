@@ -342,7 +342,7 @@ export function validateManifest(manifest) {
       errors.push(`${at} must be an object`);
       continue;
     }
-    const allowed = new Set(["id", "version", "status", "origin", "event", "matcher", "timeout", "async", "role", "command", "expectedHash", "mode"]);
+    const allowed = new Set(["id", "version", "status", "origin", "event", "matcher", "timeout", "async", "statusMessage", "role", "command", "expectedHash", "mode"]);
     for (const key of Object.keys(entry)) if (!allowed.has(key)) errors.push(`${at} has unknown property ${key}`);
     if (typeof entry.id !== "string" || !/^[A-Z][A-Z0-9-]+$/.test(entry.id)) errors.push(`${at}.id is invalid`);
     else if (ids.has(entry.id)) errors.push(`duplicate managed id ${entry.id}`);
@@ -364,6 +364,7 @@ export function validateManifest(manifest) {
     if (typeof entry.matcher !== "string") errors.push(`${at}.matcher must be a string`);
     if (entry.timeout !== null && (!Number.isInteger(entry.timeout) || entry.timeout < 1)) errors.push(`${at}.timeout must be null or a positive integer`);
     if (entry.async !== undefined && typeof entry.async !== "boolean") errors.push(`${at}.async must be boolean`);
+    if (entry.statusMessage !== undefined && (typeof entry.statusMessage !== "string" || !entry.statusMessage)) errors.push(`${at}.statusMessage must be a non-empty string`);
     if (!ROLES.has(entry.role) && !(registrationOnly && entry.role === "probe")) errors.push(`${at}.role is invalid`);
     if (!registrationOnly && (typeof entry.command !== "string" || !/^~\/[A-Za-z0-9._/-]+$/.test(entry.command) || entry.command.split("/").includes(".."))) {
       errors.push(`${at}.command must be one tilde-relative executable path without arguments`);
@@ -402,6 +403,7 @@ function desiredHook(entry) {
   const hook = { type: "command", command: entry.command };
   if (entry.timeout !== null) hook.timeout = entry.timeout;
   if (entry.async !== undefined) hook.async = entry.async;
+  if (entry.statusMessage !== undefined) hook.statusMessage = entry.statusMessage;
   return hook;
 }
 
@@ -417,7 +419,10 @@ function hookMatches(entry, occurrence, homeDir) {
     && (entry.async === undefined
       ? !Object.hasOwn(actual, "async")
       : Object.hasOwn(actual, "async") && actual.async === entry.async)
-    && Object.keys(actual).every((key) => ["type", "command", "timeout", "async"].includes(key));
+    && (entry.statusMessage === undefined
+      ? !Object.hasOwn(actual, "statusMessage")
+      : Object.hasOwn(actual, "statusMessage") && actual.statusMessage === entry.statusMessage)
+    && Object.keys(actual).every((key) => ["type", "command", "timeout", "async", "statusMessage"].includes(key));
 }
 
 function flattenHooks(config) {
