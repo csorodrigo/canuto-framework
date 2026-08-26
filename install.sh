@@ -1159,6 +1159,7 @@ FRAMEWORK_FILES=(
   ".agents/plugins/codex-companion/managed-hooks.claude.json"
   ".agents/plugins/codex-companion/managed-hooks.claude.disabled.json"
   ".agents/plugins/codex-companion/contracts/codex-companion-hooks.contract.json"
+  ".agents/plugins/codex-companion/behavior-canary.mjs"
   ".agents/plugins/codex-companion/fixtures/plugin-hooks-settings.json"
   ".agents/hooks/settings-snippet.json"
   ".agents/hooks/managed-hooks.schema.json"
@@ -1170,10 +1171,12 @@ FRAMEWORK_FILES=(
   ".agents/hooks/audit/t7-repo-policy-consumer-inventory.json"
   ".agents/hooks/audit/t7-papiro-dobra-owner-receipt.json"
   ".agents/hooks/audit/t7-owner-dispositions.json"
+  ".agents/hooks/audit/t8-behavioral-canary-receipt.json"
   ".agents/hooks/reconcile-hooks.mjs"
   ".agents/hooks/repo-policy.schema.json"
   ".agents/hooks/repo-policy-loader.mjs"
   ".agents/hooks/repo-policy-hook.mjs"
+  ".agents/hooks/repo-policy-prompt-hook.mjs"
   ".agents/hooks/validation-finalize-hook.mjs"
   ".agents/hooks/core/execution-identity.mjs"
   ".agents/hooks/core/invocation.mjs"
@@ -1195,7 +1198,6 @@ FRAMEWORK_FILES=(
   ".agents/hooks/policies/repo/validation-receipt.mjs"
   ".agents/hooks/policies/repo/validation-receipt-cli.mjs"
   ".agents/templates/hooks-manifest.json"
-  ".agents/hooks/log-commands.sh"
   ".agents/hooks/protect-files.sh"
   ".agents/hooks/require-tests-for-pr.sh"
   ".agents/hooks/validation-mark.sh"
@@ -1780,7 +1782,7 @@ dedup_canuto_hook_dupes() {
   done
   # Fallback (instalação remota antes do download dos hooks): lista distribuída.
   if [ -z "$canuto_list" ]; then
-    canuto_list="codex-pretool-guard.sh,log-commands.sh,protect-files.sh,require-tests-for-pr.sh,validation-mark.sh,validation-clear.sh,retry-detect.sh,fingerprint-gate.sh,posttooluse-universal.sh,pre-finalize.sh,pre-commit-branch-check.sh,worktree-collision-check.sh,pre-claim-grep.sh,pre-pr-bash-gate.sh,postdelegate-verify.sh,"
+    canuto_list="codex-pretool-guard.sh,protect-files.sh,require-tests-for-pr.sh,validation-mark.sh,validation-clear.sh,retry-detect.sh,fingerprint-gate.sh,posttooluse-universal.sh,pre-finalize.sh,pre-commit-branch-check.sh,worktree-collision-check.sh,pre-claim-grep.sh,pre-pr-bash-gate.sh,postdelegate-verify.sh,"
   fi
   python3 - "$settings" "$canuto_list" <<'PYDEDUP' || warn "self-heal de hooks duplicados falhou — settings.json intacto."
 import json, os, sys

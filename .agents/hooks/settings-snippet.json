@@ -29,10 +29,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/log-commands.sh"
-          },
-          {
-            "type": "command",
             "command": "~/.claude/hooks/pre-commit-branch-check.sh",
             "timeout": 3
           },
@@ -103,6 +99,18 @@
             "type": "command",
             "command": "~/.claude/hooks/validation-finalize-hook.mjs",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/repo-policy-prompt-hook.mjs",
+            "timeout": 5
           }
         ]
       }

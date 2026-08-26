@@ -274,7 +274,7 @@ echo ""
 # ═══════════════════════════════════════════════════════════════════════════
 echo "── Test 3: Hook Scripts ──"
 
-HOOKS=(session-save pre-compact-save check-references check-orphans screenshot-guard codex-pretool-guard protect-files require-tests-for-pr log-commands session-start validation-mark validation-clear retry-detect fingerprint-gate posttooluse-universal pre-finalize)
+HOOKS=(session-save pre-compact-save check-references check-orphans screenshot-guard codex-pretool-guard protect-files require-tests-for-pr session-start validation-mark validation-clear retry-detect fingerprint-gate posttooluse-universal pre-finalize)
 for hook in "${HOOKS[@]}"; do
   HFILE="$AGENTS_DIR/hooks/$hook.sh"
   if [ ! -f "$HFILE" ]; then
@@ -367,6 +367,7 @@ rm -f /tmp/canuto-machine-policy-test.$$
 if node --check "$AGENTS_DIR/hooks/repo-policy-loader.mjs" >/dev/null 2>&1 \
   && node --check "$AGENTS_DIR/hooks/core/execution-identity.mjs" >/dev/null 2>&1 \
   && node --check "$AGENTS_DIR/hooks/repo-policy-hook.mjs" >/dev/null 2>&1 \
+  && node --check "$AGENTS_DIR/hooks/repo-policy-prompt-hook.mjs" >/dev/null 2>&1 \
   && node --check "$AGENTS_DIR/hooks/validation-finalize-hook.mjs" >/dev/null 2>&1 \
   && node --check "$AGENTS_DIR/hooks/policies/repo/validation-receipt-cli.mjs" >/dev/null 2>&1 \
   && node --check "$AGENTS_DIR/hooks/runners/repo-policy-runner.mjs" >/dev/null 2>&1 \
