@@ -24,8 +24,8 @@ const CLAUDE_TARGETS = [
   ["Stop", "", 5, "~/.claude/hooks/pre-finalize.sh"],
 ];
 const CODEX_TARGETS = [
-  ["PreToolUse", "^Bash$", 30, "~/.claude/hooks/lib/codex-adapt.sh ~/.claude/hooks/assert-deploy-target.sh"],
-  ["PreToolUse", "^Bash$", 180, "~/.claude/hooks/lib/codex-adapt.sh ~/.claude/hooks/pre-pr-bash-gate.sh"],
+  ["PreToolUse", "^Bash$", 30, "~/.claude/hooks/lib/codex-adapt.sh ~/.claude/hooks/assert-deploy-target.sh", "Asserting deploy target"],
+  ["PreToolUse", "^Bash$", 180, "~/.claude/hooks/lib/codex-adapt.sh ~/.claude/hooks/pre-pr-bash-gate.sh", "Checking PR gate receipt"],
 ];
 const CU23_TARGETS = [
   ["PreToolUse", "Bash", null, "~/.claude/hooks/dobra-compose-writer-guard.sh"],
@@ -34,7 +34,7 @@ const EXTERNAL = "/opt/external/preserve-me";
 
 function configFor(targets) {
   const hooks = { PreToolUse: [{ matcher: "External", hooks: [{ type: "command", command: EXTERNAL, timeout: 9 }] }] };
-  for (const [event, matcher, timeout, command] of targets) {
+  for (const [event, matcher, timeout, command, statusMessage] of targets) {
     const groups = hooks[event] ??= [];
     let group = groups.find((candidate) => candidate.matcher === matcher);
     if (!group) {
@@ -43,6 +43,7 @@ function configFor(targets) {
     }
     const hook = { type: "command", command };
     if (timeout !== null) hook.timeout = timeout;
+    if (statusMessage !== undefined) hook.statusMessage = statusMessage;
     group.hooks.push(hook);
   }
   return { theme: "preserved", hooks };

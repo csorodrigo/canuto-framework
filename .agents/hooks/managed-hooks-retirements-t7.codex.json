@@ -58,6 +58,7 @@
       "event": "PreToolUse",
       "matcher": "^Bash$",
       "timeout": 30,
+      "statusMessage": "Asserting deploy target",
       "role": "gate",
       "command": "~/.claude/hooks/lib/codex-adapt.sh ~/.claude/hooks/assert-deploy-target.sh"
     },
@@ -68,6 +69,7 @@
       "event": "PreToolUse",
       "matcher": "^Bash$",
       "timeout": 180,
+      "statusMessage": "Checking PR gate receipt",
       "role": "gate",
       "command": "~/.claude/hooks/lib/codex-adapt.sh ~/.claude/hooks/pre-pr-bash-gate.sh"
     }

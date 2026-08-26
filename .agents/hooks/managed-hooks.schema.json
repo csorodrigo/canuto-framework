@@ -75,6 +75,7 @@
           "matcher": { "type": "string" },
           "timeout": { "type": ["integer", "null"], "minimum": 1 },
           "async": { "type": "boolean" },
+          "statusMessage": { "type": "string", "minLength": 1 },
           "role": { "enum": ["gate", "advisory", "observer", "automation", "probe"] },
           "command": { "type": "string", "minLength": 1, "pattern": "^[^\\r\\n\\u0000]+$" },
           "expectedHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },

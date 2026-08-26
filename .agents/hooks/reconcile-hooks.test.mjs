@@ -228,6 +228,28 @@ test("retirement preserves group metadata when its last managed hook is removed"
   assert.deepEqual(config.hooks.PreToolUse, [{ matcher: "Bash", hooks: [], metadata: { owner: "human" } }]);
 });
 
+test("registration-only retirement matches statusMessage exactly", async () => {
+  const statusMessage = "Checking governed receipt";
+  const hook = { ...managedHook(), statusMessage };
+  const value = fixture({ config: { hooks: { PreToolUse: [{ matcher: "Bash", hooks: [hook] }] } } });
+  const manifest = JSON.parse(readFileSync(value.manifestPath, "utf8"));
+  Object.assign(manifest.entries[0], { status: "retired", statusMessage });
+  delete manifest.entries[0].origin;
+  delete manifest.entries[0].expectedHash;
+  delete manifest.entries[0].mode;
+  writeJson(value.manifestPath, manifest);
+
+  const plan = await buildPlan(options(value));
+  assert.equal(plan.entries[0].action, "remove");
+  await applyPlan({ ...options(value), fingerprint: plan.fingerprint });
+  assert.deepEqual(JSON.parse(readFileSync(value.configPath, "utf8")).hooks.PreToolUse, []);
+
+  writeJson(value.configPath, { hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ ...hook, statusMessage: "Drifted" }] }] } });
+  const drifted = await buildPlan(options(value));
+  assert.equal(drifted.entries[0].action, "preserve");
+  assert.equal(drifted.changed, false);
+});
+
 test("invalid JSON, missing origin, and divergent origin hash fail closed", async (t) => {
   await t.test("truncated manifest", async () => {
     const value = fixture();
