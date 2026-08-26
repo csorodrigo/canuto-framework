@@ -56,6 +56,31 @@ export function validateRepoPolicyManifest(value) {
     if (Object.hasOwn(policy, "options") && (!policy.options || typeof policy.options !== "object" || Array.isArray(policy.options))) {
       errors.push(`${at}.options must be an object`);
     }
+    if (policy.id === "validation-receipt" && policy.options && typeof policy.options === "object" && !Array.isArray(policy.options)) {
+      const allowedOptionKeys = new Set(["enabled", "requiredFiles", "allowedArgv"]);
+      validateObjectKeys(policy.options, allowedOptionKeys, `${at}.options`, errors);
+      if (policy.options.enabled !== true) errors.push(`${at}.options.enabled must equal true`);
+      if (!Array.isArray(policy.options.requiredFiles)
+        || policy.options.requiredFiles.some((file) => typeof file !== "string" || !file)) {
+        errors.push(`${at}.options.requiredFiles must be an array of non-empty strings`);
+      }
+      if (!Array.isArray(policy.options.allowedArgv) || policy.options.allowedArgv.length === 0) {
+        errors.push(`${at}.options.allowedArgv must be a non-empty array`);
+      } else {
+        const argvKeys = new Set();
+        policy.options.allowedArgv.forEach((argv, argvIndex) => {
+          if (!Array.isArray(argv) || argv.length === 0 || argv.some((item) => typeof item !== "string" || !item)) {
+            errors.push(`${at}.options.allowedArgv[${argvIndex}] must be a non-empty string argv`);
+            return;
+          }
+          const key = JSON.stringify(argv);
+          if (argvKeys.has(key)) errors.push(`${at}.options.allowedArgv[${argvIndex}] is duplicated`);
+          argvKeys.add(key);
+        });
+      }
+    } else if (policy.id === "validation-receipt") {
+      errors.push(`${at}.options is required for validation-receipt`);
+    }
   });
   return errors;
 }

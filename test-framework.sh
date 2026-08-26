@@ -320,10 +320,11 @@ if node --check "$AGENTS_DIR/hooks/reconcile-hooks.mjs" >/dev/null 2>&1 \
   && node --test \
     "$AGENTS_DIR/hooks/reconcile-hooks.test.mjs" \
     "$AGENTS_DIR/hooks/retirement-canary.test.mjs" \
+    "$AGENTS_DIR/hooks/retirement-t7.test.mjs" \
     >/tmp/canuto-hook-reconcile-test.$$ 2>&1; then
-  pass "managed hook reconciliation and T5a retirement canary"
+  pass "managed hook reconciliation and retirement canaries"
 else
-  fail "managed hook reconciliation or T5a retirement canary failed"
+  fail "managed hook reconciliation or retirement canary failed"
 fi
 rm -f /tmp/canuto-hook-reconcile-test.$$
 
@@ -358,10 +359,14 @@ rm -f /tmp/canuto-machine-policy-test.$$
 
 if node --check "$AGENTS_DIR/hooks/repo-policy-loader.mjs" >/dev/null 2>&1 \
   && node --check "$AGENTS_DIR/hooks/core/execution-identity.mjs" >/dev/null 2>&1 \
+  && node --check "$AGENTS_DIR/hooks/repo-policy-hook.mjs" >/dev/null 2>&1 \
+  && node --check "$AGENTS_DIR/hooks/validation-finalize-hook.mjs" >/dev/null 2>&1 \
+  && node --check "$AGENTS_DIR/hooks/policies/repo/validation-receipt-cli.mjs" >/dev/null 2>&1 \
   && node --check "$AGENTS_DIR/hooks/runners/repo-policy-runner.mjs" >/dev/null 2>&1 \
   && node --test \
     "$AGENTS_DIR/hooks/repo-policy-loader.test.mjs" \
     "$AGENTS_DIR/hooks/runners/repo-policy-runner.test.mjs" \
+    "$AGENTS_DIR/hooks/policies/repo/repo-policy.test.mjs" \
     >/tmp/canuto-repo-policy-test.$$ 2>&1; then
   pass "repository policy and execution identity layer"
 else
@@ -369,6 +374,15 @@ else
   cat /tmp/canuto-repo-policy-test.$$ >&2
 fi
 rm -f /tmp/canuto-repo-policy-test.$$
+
+if bash -n "$AGENTS_DIR/tools/pr-merge.sh" \
+  && bash -n "$AGENTS_DIR/tools/lib/merge-clobber-check.sh" \
+  && grep -q 'canuto:pinned-sha-merge:v1' "$AGENTS_DIR/tools/pr-merge.sh" \
+  && grep -q 'merge_clobber_check' "$AGENTS_DIR/tools/pr-merge.sh"; then
+  pass "versioned PR merge wrapper keeps SHA and content gates"
+else
+  fail "versioned PR merge wrapper is incomplete"
+fi
 
 echo "── Test 3b: Tooling ──"
 

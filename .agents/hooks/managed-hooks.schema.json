@@ -9,6 +9,20 @@
     "$schema": { "const": "./managed-hooks.schema.json" },
     "schemaVersion": { "const": 1 },
     "surface": { "type": "string", "minLength": 1 },
+    "preconditions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "receipt", "expectedHash", "requiredStatus"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+          "receipt": { "type": "string", "minLength": 1 },
+          "expectedHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "requiredStatus": { "const": "ready" }
+        }
+      }
+    },
     "entries": {
       "type": "array",
       "items": {
@@ -24,7 +38,7 @@
           "matcher": { "type": "string" },
           "timeout": { "type": ["integer", "null"], "minimum": 1 },
           "role": { "enum": ["gate", "advisory", "observer", "automation", "probe"] },
-          "command": { "type": "string", "minLength": 1, "pattern": "^~/[^\\r\\n\\u0000]+$" },
+          "command": { "type": "string", "minLength": 1, "pattern": "^[^\\r\\n\\u0000]+$" },
           "expectedHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
           "mode": { "const": "0755" }
         },
@@ -36,6 +50,18 @@
               "properties": {
                 "role": { "enum": ["gate", "advisory", "observer", "automation"] },
                 "command": { "pattern": "^~/(?!.*\\.\\.(?:/|$))[A-Za-z0-9._/-]+$" }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": { "status": { "const": "retired" } },
+              "required": ["status"],
+              "not": { "required": ["origin"] }
+            },
+            "then": {
+              "properties": {
+                "command": { "pattern": "^[^\\r\\n\\u0000]+$" }
               }
             }
           },

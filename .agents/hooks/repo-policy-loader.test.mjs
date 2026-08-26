@@ -106,12 +106,36 @@ test("manifest path rejects symlinks instead of reading outside policy state", a
   assert.equal(loaded.decision, "block");
 });
 
-test("schema and template describe an inert valid manifest", async () => {
+test("schema and template describe valid repository-owned policy examples", async () => {
   const template = JSON.parse(await readFile(new URL("../templates/hooks-manifest.json", import.meta.url), "utf8"));
   const schema = JSON.parse(await readFile(new URL("./repo-policy.schema.json", import.meta.url), "utf8"));
   assert.equal(schema.properties.schemaVersion.const, 1);
   assert.deepEqual(validateRepoPolicyManifest(template), []);
-  assert.deepEqual(template.policies, []);
+  assert.deepEqual(template.policies.map((policy) => policy.id), [
+    "build-typecheck",
+    "deploy-target",
+    "validation-receipt",
+    "commit",
+    "pull-request",
+  ]);
+  const validation = template.policies.find((policy) => policy.id === "validation-receipt");
+  assert.deepEqual(validation.options.allowedArgv, [["npm", "run", "test"]]);
+});
+
+test("validation receipt policy requires a non-empty exact argv allowlist", () => {
+  const base = {
+    $schema: "./repo-policy.schema.json",
+    schemaVersion: 1,
+    policies: [{
+      id: "validation-receipt",
+      options: { enabled: true, requiredFiles: [], allowedArgv: [] },
+    }],
+  };
+  assert.match(validateRepoPolicyManifest(base).join(" "), /allowedArgv/);
+  base.policies[0].options.allowedArgv = [["/usr/bin/true"], ["/usr/bin/true"]];
+  assert.match(validateRepoPolicyManifest(base).join(" "), /duplicated/);
+  base.policies[0].options.allowedArgv = [["npm", "run", "test"]];
+  assert.deepEqual(validateRepoPolicyManifest(base), []);
 });
 
 test("execution identity separates worktrees and supports detached HEAD", async (t) => {

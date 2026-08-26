@@ -97,8 +97,29 @@ function isRegistrationOnlyRetirement(entry) {
 export function validateManifest(manifest) {
   const errors = [];
   if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) return ["manifest must be an object"];
+  const topLevel = new Set(["$schema", "schemaVersion", "surface", "preconditions", "entries"]);
+  for (const key of Object.keys(manifest)) if (!topLevel.has(key)) errors.push(`manifest has unknown property ${key}`);
   if (manifest.schemaVersion !== 1) errors.push("manifest schemaVersion must be 1");
   if (typeof manifest.surface !== "string" || !manifest.surface) errors.push("manifest surface is required");
+  if (manifest.preconditions !== undefined && !Array.isArray(manifest.preconditions)) {
+    errors.push("manifest preconditions must be an array");
+  }
+  const preconditionIds = new Set();
+  for (const [index, precondition] of (manifest.preconditions ?? []).entries()) {
+    const at = `preconditions[${index}]`;
+    if (!precondition || typeof precondition !== "object" || Array.isArray(precondition)) {
+      errors.push(`${at} must be an object`);
+      continue;
+    }
+    const allowed = new Set(["id", "receipt", "expectedHash", "requiredStatus"]);
+    for (const key of Object.keys(precondition)) if (!allowed.has(key)) errors.push(`${at} has unknown property ${key}`);
+    if (typeof precondition.id !== "string" || !/^[a-z0-9-]+$/.test(precondition.id)) errors.push(`${at}.id is invalid`);
+    if (preconditionIds.has(precondition.id)) errors.push(`duplicate precondition id ${precondition.id}`);
+    preconditionIds.add(precondition.id);
+    if (typeof precondition.receipt !== "string" || !precondition.receipt) errors.push(`${at}.receipt is required`);
+    if (typeof precondition.expectedHash !== "string" || !HASH_RE.test(precondition.expectedHash)) errors.push(`${at}.expectedHash must be sha256`);
+    if (precondition.requiredStatus !== "ready") errors.push(`${at}.requiredStatus must be ready`);
+  }
   if (!Array.isArray(manifest.entries)) return [...errors, "manifest entries must be an array"];
 
   const ids = new Set();
@@ -132,8 +153,8 @@ export function validateManifest(manifest) {
     if (!ROLES.has(entry.role) && !(registrationOnly && entry.role === "probe")) errors.push(`${at}.role is invalid`);
     if (!registrationOnly && (typeof entry.command !== "string" || !/^~\/[A-Za-z0-9._/-]+$/.test(entry.command) || entry.command.split("/").includes(".."))) {
       errors.push(`${at}.command must be one tilde-relative executable path without arguments`);
-    } else if (registrationOnly && (typeof entry.command !== "string" || !/^~\/[^\r\n\0]+$/.test(entry.command))) {
-      errors.push(`${at}.command must be a tilde-relative command without control characters`);
+    } else if (registrationOnly && (typeof entry.command !== "string" || !entry.command || /[\r\n\0]/.test(entry.command))) {
+      errors.push(`${at}.command must be an exact command without control characters`);
     }
     if (hasFileMetadata && (typeof entry.expectedHash !== "string" || !HASH_RE.test(entry.expectedHash))) errors.push(`${at}.expectedHash must be sha256`);
     if (hasFileMetadata && entry.mode !== "0755") errors.push(`${at}.mode must be 0755`);
@@ -258,6 +279,21 @@ async function loadInputs({ manifestPath, configPath, hooksDir, homeDir = proces
   if (schemaErrors.length) fail(`manifest does not satisfy schema: ${schemaErrors.join("; ")}`);
   const manifestErrors = validateManifest(manifest);
   if (manifestErrors.length) fail(`invalid manifest: ${manifestErrors.join("; ")}`);
+
+  for (const precondition of manifest.preconditions ?? []) {
+    const receiptPath = resolve(manifestDir, precondition.receipt);
+    const receiptRelative = relative(manifestDir, receiptPath);
+    if (!receiptRelative || receiptRelative === ".." || receiptRelative.startsWith(`..${sep}`) || isAbsolute(receiptRelative)) {
+      fail(`precondition receipt must stay inside manifest directory for ${precondition.id}`);
+    }
+    const receiptState = await pathState(receiptPath);
+    if (!receiptState.exists) fail(`precondition ${precondition.id} receipt is missing`);
+    if (receiptState.hash !== precondition.expectedHash) fail(`precondition ${precondition.id} receipt hash mismatch`);
+    const receipt = parseJson(receiptState.bytes, `precondition ${precondition.id} receipt`);
+    if (receipt.status !== precondition.requiredStatus) {
+      fail(`precondition ${precondition.id} is ${receipt.status ?? "unknown"}, expected ${precondition.requiredStatus}`);
+    }
+  }
 
   const configState = await pathState(configPath);
   const config = configState.exists ? parseJson(configState.bytes, "configuration") : {};

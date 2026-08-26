@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "batch": "T7",
+  "status": "blocked",
+  "consumers": [],
+  "requirements": [
+    "Each governed consumer has a versioned .agents/hooks/manifest.json",
+    "Build/typecheck and deploy commands are exact project-owned argv",
+    "Validation allowedArgv is exact and rejects undeclared executables",
+    "Validation receipt record and Stop verification pass on the candidate SHA",
+    "External owner receipts are attached before owner-specific retirement"
+  ],
+  "blockers": [
+    "No consumer migration receipts are versioned yet",
+    "CU-23 awaits the Papiro/Dobra owner receipt"
+  ]
+}

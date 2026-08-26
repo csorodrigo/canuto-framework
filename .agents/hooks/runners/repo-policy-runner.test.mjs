@@ -142,6 +142,7 @@ test("runner detects every initial policy, including claim and worktree tool pat
     ["build-typecheck", "npm run typecheck:codex", "Bash"],
     ["deploy-target", "vercel --prod", "Bash"],
     ["validation-receipt", ".agents/hooks/validation-clear.sh", "Bash"],
+    ["validation-receipt", "node .agents/hooks/policies/repo/validation-receipt-cli.mjs verify --session fixture", "Bash"],
     ["commit", "git commit -m fixture", "Bash"],
     ["pull-request", "gh pr create --fill", "Bash"],
     ["claims", "", "mcp__canuto__claim_task"],
