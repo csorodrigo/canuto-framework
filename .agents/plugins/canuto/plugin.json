@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "id": "canuto",
+  "defaultEnabled": false,
+  "surface": "codex-user",
+  "managedManifest": "managed-hooks.codex.json",
+  "disabledManifest": "managed-hooks.codex.disabled.json"
+}
