@@ -91,7 +91,26 @@ case "$duration_ms" in ''|*[!0-9]*) duration_ms=0 ;; esac
 
 file_path=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null) || file_path=""
 command=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null) || command=""
-command="${command:0:200}"
+
+# Observability may correlate repeated values, but must never export command
+# text or filesystem paths. Keep a one-way digest only; if no digest utility is
+# available, use a fixed redaction marker rather than leaking the value.
+redact_observed_value() {
+  local value="$1" digest=""
+  [ -n "$value" ] || return 0
+  if command -v shasum >/dev/null 2>&1; then
+    digest=$(printf '%s' "$value" | shasum -a 256 2>/dev/null | cut -d' ' -f1) || digest=""
+  elif command -v sha256sum >/dev/null 2>&1; then
+    digest=$(printf '%s' "$value" | sha256sum 2>/dev/null | cut -d' ' -f1) || digest=""
+  fi
+  if [ -n "$digest" ]; then
+    printf 'sha256:%s' "$digest"
+  else
+    printf 'redacted'
+  fi
+}
+file_digest=$(redact_observed_value "$file_path")
+command_digest=$(redact_observed_value "$command")
 
 outcome=$(printf '%s' "$INPUT" | jq -r '
   (.tool_response // .tool_output // {}) as $r
@@ -104,7 +123,7 @@ outcome=$(printf '%s' "$INPUT" | jq -r '
 ' 2>/dev/null) || outcome="error"
 
 {
-  otel_emit_span "$tool_name" "$outcome" "$duration_ms" "$file_path" "$command"
+  otel_emit_span "$tool_name" "$outcome" "$duration_ms" "$file_digest" "$command_digest"
   otel_emit_counter "$tool_name" "$outcome"
 } || true
 
@@ -124,7 +143,7 @@ case "$EVENT_TOOLS_MODE" in
 esac
 if [ "$should_log_event" = true ]; then
   canuto_event_append TOOL_CALL actor=hook tool="$tool_name" outcome="$outcome" \
-    duration_ms="$duration_ms" file="$file_path" cmd="${command:0:120}" || true
+    duration_ms="$duration_ms" file_sha256="$file_digest" cmd_sha256="$command_digest" || true
 fi
 
 exit 0

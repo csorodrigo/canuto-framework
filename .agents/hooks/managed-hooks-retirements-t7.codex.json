@@ -48,7 +48,7 @@
       "timeout": 30,
       "role": "gate",
       "command": "~/.claude/hooks/repo-policy-hook.mjs",
-      "expectedHash": "ccc095c49959f7724af4b573f9ecff1a1108b84b44eb627e1a4119597212f3dc",
+      "expectedHash": "e90052e8a4aae8919c3746c5afde410b4edaaa2e5b84d8dc40ee77de1c911f5b",
       "mode": "0755"
     },
     {
@@ -72,6 +72,50 @@
       "statusMessage": "Checking PR gate receipt",
       "role": "gate",
       "command": "~/.claude/hooks/lib/codex-adapt.sh ~/.claude/hooks/pre-pr-bash-gate.sh"
+    },
+    {
+      "id": "CX-05",
+      "version": 1,
+      "status": "retired",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "timeout": 10,
+      "statusMessage": "Checking process-probe self-match",
+      "role": "gate",
+      "command": "~/.claude/hooks/ps-self-match-guard.sh"
+    },
+    {
+      "id": "CX-06",
+      "version": 1,
+      "status": "retired",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "timeout": 20,
+      "statusMessage": "Protecting .env from reads",
+      "role": "gate",
+      "command": "~/.claude/hooks/lib/codex-adapt.sh ~/.claude/hooks/protect-env-read.sh"
+    },
+    {
+      "id": "CX-07",
+      "version": 1,
+      "status": "retired",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "timeout": 20,
+      "statusMessage": "Checking secret hygiene",
+      "role": "gate",
+      "command": "~/.claude/hooks/lib/codex-adapt.sh ~/.claude/hooks/secret-hygiene.sh"
+    },
+    {
+      "id": "CX-08",
+      "version": 1,
+      "status": "retired",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "timeout": 15,
+      "statusMessage": "Checking host memory pressure",
+      "role": "gate",
+      "command": "~/.claude/hooks/lib/codex-adapt.sh ~/.claude/hooks/host-pressure-gate.sh"
     }
   ]
 }

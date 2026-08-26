@@ -22,10 +22,22 @@ const CLAUDE_TARGETS = [
   ["PreToolUse", "Edit|Write", 3, "~/.claude/hooks/fingerprint-gate.sh"],
   ["PreToolUse", "Bash", 300, "~/.claude/hooks/pre-pr-bash-gate.sh"],
   ["Stop", "", 5, "~/.claude/hooks/pre-finalize.sh"],
+  ["PreToolUse", "Bash", 5, "~/.claude/hooks/host-pressure-gate.sh"],
+  ["PreToolUse", "Bash", 5, "~/.claude/hooks/secret-hygiene.sh"],
+  ["PreToolUse", "Bash", null, "~/.claude/hooks/ps-self-match-guard.sh"],
+  ["PreToolUse", "Bash", 30, "bash -c 'INPUT=$(cat); CMD=$(echo \"$INPUT\" | jq -r \".tool_input.command // empty\"); if echo \"$CMD\" | grep -qE \"rm\\s+-rf\\s+(/|~|\\$HOME|\\.\\.)\"; then echo \"BLOCK: Comando rm -rf perigoso detectado\"; exit 2; fi; exit 0'"],
+  ["PreToolUse", "Bash", 3, "~/.claude/hooks/protect-env-read.sh"],
+  ["UserPromptSubmit", "", 5, "~/.claude/hooks/secret-hygiene.sh"],
+  ["PreToolUse", "Bash", null, "~/.claude/hooks/log-commands.sh"],
+  ["Stop", "", null, "~/.claude/hooks/delivery-proof-gate.sh"],
 ];
 const CODEX_TARGETS = [
   ["PreToolUse", "^Bash$", 30, "~/.claude/hooks/lib/codex-adapt.sh ~/.claude/hooks/assert-deploy-target.sh", "Asserting deploy target"],
   ["PreToolUse", "^Bash$", 180, "~/.claude/hooks/lib/codex-adapt.sh ~/.claude/hooks/pre-pr-bash-gate.sh", "Checking PR gate receipt"],
+  ["PreToolUse", "^Bash$", 10, "~/.claude/hooks/ps-self-match-guard.sh", "Checking process-probe self-match"],
+  ["PreToolUse", "^Bash$", 20, "~/.claude/hooks/lib/codex-adapt.sh ~/.claude/hooks/protect-env-read.sh", "Protecting .env from reads"],
+  ["PreToolUse", "^Bash$", 20, "~/.claude/hooks/lib/codex-adapt.sh ~/.claude/hooks/secret-hygiene.sh", "Checking secret hygiene"],
+  ["PreToolUse", "^Bash$", 15, "~/.claude/hooks/lib/codex-adapt.sh ~/.claude/hooks/host-pressure-gate.sh", "Checking host memory pressure"],
 ];
 const CU23_TARGETS = [
   ["PreToolUse", "Bash", null, "~/.claude/hooks/dobra-compose-writer-guard.sh"],
@@ -65,6 +77,19 @@ async function git(cwd, ...args) {
 
 async function runStop(payload) {
   const child = spawn(process.execPath, [new URL("validation-finalize-hook.mjs", import.meta.url).pathname], {
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (chunk) => { stdout += chunk; });
+  child.stderr.on("data", (chunk) => { stderr += chunk; });
+  child.stdin.end(JSON.stringify(payload));
+  const code = await new Promise((resolve) => child.on("close", resolve));
+  return { code, stdout, stderr };
+}
+
+async function runPolicyHook(payload) {
+  const child = spawn(process.execPath, [new URL("repo-policy-hook.mjs", import.meta.url).pathname], {
     stdio: ["pipe", "pipe", "pipe"],
   });
   let stdout = "";
@@ -208,7 +233,11 @@ test("T7 retirement manifests are valid and keep unsupported owner migrations ou
   }
   const ids = new Set([...claude.entries, ...codex.entries].map((entry) => entry.id));
   assert.equal(ids.has("CU-23"), false, "Dobra is not coupled to the general consumer receipt");
-  assert.deepEqual([...ids].sort(), ["CU-01", "CU-02", "CU-03", "CU-05", "CU-06", "CU-25", "CU-28", "CU-33", "CU-37", "CX-11", "CX-13", "CX-18"].sort());
+  assert.deepEqual([...ids].sort(), [
+    "CU-01", "CU-02", "CU-03", "CU-05", "CU-06", "CU-13", "CU-16", "CU-17", "CU-19", "CU-20",
+    "CU-24", "CU-25", "CU-28", "CU-33", "CU-37", "CU-41", "CU-57",
+    "CX-05", "CX-06", "CX-07", "CX-08", "CX-11", "CX-13", "CX-18",
+  ].sort());
   assert.deepEqual(cu23.preconditions, [{
     id: "papiro-dobra-owner",
     receipt: "audit/t7-papiro-dobra-owner-receipt.json",
@@ -244,6 +273,83 @@ test("T7 retirement manifests are valid and keep unsupported owner migrations ou
     receipt: "audit/t7-papiro-dobra-owner-receipt.json",
     retirementManifest: "managed-hooks-retirement-t7-cu23.claude.json",
   });
+});
+
+test("final consolidation replaces raw command logging and legacy machine evaluators", async () => {
+  const active = JSON.parse(await readFile(new URL("managed-hooks.json", import.meta.url), "utf8"));
+  assert.equal(active.entries.some((entry) => entry.id === "CU-20" || entry.command.includes("log-commands.sh")), false);
+  const prompt = active.entries.find((entry) => entry.id === "CU-60");
+  const bash = active.entries.find((entry) => entry.id === "CU-58");
+  assert.equal(prompt.event, "UserPromptSubmit");
+  assert.notEqual(prompt.command, bash.command);
+  assert.equal(prompt.origin, "repo-policy-prompt-hook.mjs");
+  assert.notEqual(prompt.expectedHash, bash.expectedHash);
+
+  const result = await runPolicyHook({
+    hook_event_name: "UserPromptSubmit",
+    session_id: "test-session",
+    cwd: process.cwd(),
+    prompt: "api_key=unit-test-sensitive-value",
+  });
+  assert.equal(result.code, 0, result.stderr);
+  const response = JSON.parse(result.stdout);
+  assert.equal(response.hookSpecificOutput.hookEventName, "UserPromptSubmit");
+  assert.match(response.hookSpecificOutput.additionalContext, /redact/i);
+
+  const installer = await readFile(new URL("../../install.sh", import.meta.url), "utf8");
+  assert.doesNotMatch(installer, /^  "\.agents\/hooks\/log-commands\.sh"$/m);
+});
+
+test("PostToolUse telemetry and event log retain only one-way digests", async () => {
+  const root = await mkdtemp(join(tmpdir(), "canuto-telemetry-redaction-"));
+  const project = join(root, "project");
+  await mkdir(join(root, "tmp"), { recursive: true });
+  await mkdir(join(project, ".agents", "vault", "audit"), { recursive: true });
+  const hookDir = join(root, "hooks");
+  const toolDir = join(root, "tools");
+  await mkdir(hookDir, { recursive: true });
+  await mkdir(toolDir, { recursive: true });
+  const hookPath = join(hookDir, "posttooluse-universal.sh");
+  await writeFile(hookPath, await readFile(new URL("posttooluse-universal.sh", import.meta.url)));
+  const recordPath = join(root, "otel-record.jsonl");
+  await writeFile(join(toolDir, "otel-emit.sh"), `#!/usr/bin/env bash
+otel_enabled() { return 0; }
+otel_emit_span() { printf '%s\\n' "\${1}|\${2}|\${3}|\${4}|\${5}" >> "$CANUTO_OTEL_RECORD"; }
+otel_emit_counter() { :; }
+`);
+  const sentinelCommand = "unit-secret-command --token=do-not-export";
+  const sentinelPath = "/private/unit-secret/path.txt";
+  const child = spawn("bash", [hookPath], {
+    cwd: project,
+    env: {
+      ...process.env,
+      HOME: root,
+      TMPDIR: join(root, "tmp"),
+      CLAUDE_PROJECT_DIR: project,
+      CANUTO_TOOLS_OTLP_ENABLED: "1",
+      CANUTO_OTEL_SKIP_PROBE: "1",
+      CANUTO_OTEL_PRINT_PAYLOAD: "1",
+      CANUTO_EVENT_LOG_TOOLS: "core",
+      CANUTO_OTEL_RECORD: recordPath,
+    },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  let stderr = "";
+  child.stderr.on("data", (chunk) => { stderr += chunk; });
+  child.stdin.end(JSON.stringify({
+    tool_name: "Bash",
+    tool_input: { command: sentinelCommand, file_path: sentinelPath },
+    tool_response: { duration_ms: 4, success: true },
+  }));
+  const code = await new Promise((resolve) => child.on("close", resolve));
+  assert.equal(code, 0);
+  assert.doesNotMatch(stderr, new RegExp(sentinelCommand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.doesNotMatch(stderr, new RegExp(sentinelPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  const record = await readFile(recordPath, "utf8");
+  assert.doesNotMatch(record, new RegExp(sentinelCommand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.doesNotMatch(record, new RegExp(sentinelPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(record, /sha256:[a-f0-9]{64}/);
+  await rm(root, { recursive: true, force: true });
 });
 
 test("T7 consumer inventory and separate CU-23 owner receipt are independently ready", async () => {
@@ -410,8 +516,9 @@ test("canonical ready consumer receipt enables T7 retirement, verification and r
   const plan = await buildPlan(canonical);
   assert.equal(plan.changed, true);
   assert.deepEqual(plan.entries.filter((entry) => entry.action === "remove").map((entry) => entry.id).sort(), [
-    "CU-01", "CU-02", "CU-03", "CU-05", "CU-06", "CU-25", "CU-28", "CU-33", "CU-37",
-  ]);
+    "CU-01", "CU-02", "CU-03", "CU-05", "CU-06", "CU-13", "CU-16", "CU-17", "CU-19", "CU-20",
+    "CU-24", "CU-25", "CU-28", "CU-33", "CU-37", "CU-41", "CU-57",
+  ].sort());
   const applied = await applyPlan({ ...canonical, fingerprint: plan.fingerprint });
   assert.equal((await verifyState(canonical)).ok, true);
   await rollbackBatch({ stateDir: item.stateDir, batchId: applied.batchId });
@@ -602,12 +709,12 @@ test("T7 plan/apply/verify/rollback removes only selected Claude registrations",
   assert.deepEqual(JSON.parse(await readFile(item.configPath, "utf8")), original);
 });
 
-test("T7 Codex plan replaces legacy deploy/PR gates with the shared repo runner", async (t) => {
+test("T7 Codex plan replaces legacy repository and machine gates with the shared repo runner", async (t) => {
   const original = configFor(CODEX_TARGETS);
   const item = await scenario("managed-hooks-retirements-t7.codex.json", original);
   t.after(() => rm(item.root, { recursive: true, force: true }));
   const plan = await buildPlan(item);
-  assert.equal(plan.entries.filter((entry) => entry.action === "remove").length, 2);
+  assert.equal(plan.entries.filter((entry) => entry.action === "remove").length, 6);
   assert.equal(plan.entries.filter((entry) => entry.action === "add").length, 1);
   assert.equal(countCommand(plan.nextConfig, "~/.claude/hooks/repo-policy-hook.mjs"), 1);
   assert.equal(countCommand(plan.nextConfig, EXTERNAL), 1);

@@ -283,6 +283,28 @@ test("external plugin contracts keep ownership outside Canuto and declare T8 ris
   assert.equal(receipts.plugins["codex-companion@1.0.5"].artifacts["scripts/stop-review-gate-hook.mjs"], "caf98d78d995f98df5da3903690c20ab701b56240b6ca8b9fd10ef38bc9119fc");
 });
 
+test("Codex Companion owner Stop gate and SessionEnd cleanup are behaviorally fail-closed", { concurrency: false }, (t) => {
+  if (process.env.CANUTO_RUN_EXTERNAL_CANARIES !== "1") {
+    t.skip("set CANUTO_RUN_EXTERNAL_CANARIES=1 for the isolated external-owner canary");
+    return;
+  }
+  const ownerRoot = path.join(os.homedir(), ".claude", "plugins", "cache", "openai-codex", "codex", "1.0.5");
+  if (!fs.existsSync(path.join(ownerRoot, "scripts", "stop-review-gate-hook.mjs"))) {
+    t.skip("external Codex Companion owner is not installed in this environment");
+    return;
+  }
+  const canary = path.join(pluginsDir, "codex-companion", "behavior-canary.mjs");
+  const result = JSON.parse(execFileSync(process.execPath, [canary], {
+    cwd: repoRoot,
+    env: { ...process.env, CODEX_COMPANION_OWNER_ROOT: ownerRoot },
+    encoding: "utf8",
+    timeout: 120000,
+  }));
+  assert.equal(result.stopHookSha256, "caf98d78d995f98df5da3903690c20ab701b56240b6ca8b9fd10ef38bc9119fc");
+  assert.deepEqual(result.decisions, { allow: "allow", block: "block", error: "block", invalid: "block", timeout: "block" });
+  assert.deepEqual(result.cleanup, { remainingJobs: 1, sameWorkspaceBrokerRemoved: true, foreignBrokerPreserved: true });
+});
+
 test("Herdr retirement-only manifest removes only the global legacy hook", () => {
   const box = sandbox();
   try {

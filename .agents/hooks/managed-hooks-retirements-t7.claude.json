@@ -127,6 +127,86 @@
       "timeout": 5,
       "role": "gate",
       "command": "~/.claude/hooks/pre-finalize.sh"
+    },
+    {
+      "id": "CU-13",
+      "version": 1,
+      "status": "retired",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeout": 5,
+      "role": "gate",
+      "command": "~/.claude/hooks/host-pressure-gate.sh"
+    },
+    {
+      "id": "CU-16",
+      "version": 1,
+      "status": "retired",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeout": 5,
+      "role": "gate",
+      "command": "~/.claude/hooks/secret-hygiene.sh"
+    },
+    {
+      "id": "CU-17",
+      "version": 1,
+      "status": "retired",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeout": null,
+      "role": "gate",
+      "command": "~/.claude/hooks/ps-self-match-guard.sh"
+    },
+    {
+      "id": "CU-19",
+      "version": 1,
+      "status": "retired",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeout": 30,
+      "role": "gate",
+      "command": "-c 'INPUT=$(cat); CMD=$(echo \"$INPUT\" | jq -r \".tool_input.command // empty\"); if echo \"$CMD\" | grep -qE \"rm\\s+-rf\\s+(/|~|\\$HOME|\\.\\.)\"; then echo \"BLOCK: Comando rm -rf perigoso detectado\"; exit 2; fi; exit 0'"
+    },
+    {
+      "id": "CU-24",
+      "version": 1,
+      "status": "retired",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeout": 3,
+      "role": "gate",
+      "command": "~/.claude/hooks/protect-env-read.sh"
+    },
+    {
+      "id": "CU-57",
+      "version": 1,
+      "status": "retired",
+      "event": "UserPromptSubmit",
+      "matcher": "",
+      "timeout": 5,
+      "role": "advisory",
+      "command": "~/.claude/hooks/secret-hygiene.sh"
+    },
+    {
+      "id": "CU-20",
+      "version": 1,
+      "status": "retired",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeout": null,
+      "role": "observer",
+      "command": "~/.claude/hooks/log-commands.sh"
+    },
+    {
+      "id": "CU-41",
+      "version": 1,
+      "status": "retired",
+      "event": "Stop",
+      "matcher": "",
+      "timeout": null,
+      "role": "advisory",
+      "command": "~/.claude/hooks/delivery-proof-gate.sh"
     }
   ]
 }

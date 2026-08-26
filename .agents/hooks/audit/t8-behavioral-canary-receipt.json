@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-08-26T13:46:50Z",
+  "scope": "T8 external-owner behavioral acceptance",
+  "coreTelemetry": {
+    "posttooluseUniversalSha256": "3a5e6d0685f9fea30871a9238dc7e8559afa1af5adef9fb36447426ee8369101",
+    "rawCommandAndPathExport": false,
+    "correlation": "sha256-only"
+  },
+  "gstack": {
+    "ownerCommitSha": "ad8400543cd9ce8d07641362db48d44a95417e33",
+    "settingsHookSha256": "87407502b1411213e009d7bb40c9800cb88c91a1e0f0dc1fbd42dcddd985bb1c",
+    "fixtureConfigSha256": "951978879c879ff7078ba8c12019ed4e13cbfbbea96fdc163785da9b21a2978a2",
+    "sequence": [
+      { "operation": "remove-source", "source": "plan-tune-cathedral", "removed": 2 },
+      { "operation": "remove-source", "source": "auq-error-fallback", "removed": 1 },
+      { "operation": "remove-source", "source": "gstack-timeline-stop", "removed": 1 },
+      { "operation": "prune-stale", "removed": 0 }
+    ],
+    "result": { "ownerHandlers": 0, "ownerSources": 0, "foreignHandlers": 1, "foreignPreserved": true }
+  },
+  "vercel": {
+    "ownerHookConfigSha256": "09d335208258ab6b8593976732869272755b6c7fae30afd906d010234a30aed5",
+    "artifactSha256": {
+      "session-start-seen-skills.mjs": "02f75d69ac4b7c1055688862c65b1223123e44c6fb5bde5db372ca602a3e668e",
+      "session-start-profiler.mjs": "215e6502c4e8fc6edf683e13939ecdee096b1d4e27be29b12599e059693d9416",
+      "inject-claude-md.mjs": "bbda85ac5cb781560d8f9318e27ddaccdc6172e8bb9010ab86b6e297bd0b432c",
+      "session-end-cleanup.mjs": "1db52d969130cbcb954cad129eb06dbe4a89ed636b51bad6ba6b33a22ec80a0a",
+      "telemetry.mjs": "7fb6af72b36ba4a786df4e1e78c905e73a9bf4eaee3762a69255eecdbfe91825"
+    },
+    "result": { "payloadExclusionsVerified": true, "timeoutAndAbortBounded": true, "sessionCleanupScoped": true, "disablePreservedForeign": true }
+  },
+  "codexCompanion": {
+    "ownerRoot": "~/.claude/plugins/cache/openai-codex/codex/1.0.5",
+    "stopHookSha256": "caf98d78d995f98df5da3903690c20ab701b56240b6ca8b9fd10ef38bc9119fc",
+    "result": { "allow": "allow", "block": "block", "error": "block", "invalid": "block", "timeout": "block", "sameWorkspaceJobsRemaining": 1, "sameWorkspaceBrokerRemoved": true, "foreignBrokerPreserved": true }
+  }
+}
