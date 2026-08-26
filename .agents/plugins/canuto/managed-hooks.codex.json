@@ -1,0 +1,59 @@
+{
+  "$schema": "./managed-hooks.schema.json",
+  "schemaVersion": 1,
+  "surface": "codex-user-canuto-plugin",
+  "entries": [
+    {
+      "id": "CX-CANUTO-START",
+      "version": 1,
+      "status": "active",
+      "origin": "hooks/canuto-hook.mjs",
+      "event": "SessionStart",
+      "matcher": "startup|resume|clear|compact",
+      "timeout": 45,
+      "role": "automation",
+      "command": "~/.codex/hooks/canuto-session-start.mjs",
+      "expectedHash": "501345153924bd929bc47b04f37ea2a3cae50e9fd8c2ec8ea53547e365a98a84",
+      "mode": "0755"
+    },
+    {
+      "id": "CX-CANUTO-PRETOOL",
+      "version": 1,
+      "status": "active",
+      "origin": "hooks/canuto-hook.mjs",
+      "event": "PreToolUse",
+      "matcher": "^(Bash|apply_patch)$",
+      "timeout": 30,
+      "role": "advisory",
+      "command": "~/.codex/hooks/canuto-pretool.mjs",
+      "expectedHash": "501345153924bd929bc47b04f37ea2a3cae50e9fd8c2ec8ea53547e365a98a84",
+      "mode": "0755"
+    },
+    {
+      "id": "CX-CANUTO-POSTTOOL",
+      "version": 1,
+      "status": "active",
+      "origin": "hooks/canuto-hook.mjs",
+      "event": "PostToolUse",
+      "matcher": "^(Bash|apply_patch)$",
+      "timeout": 3,
+      "role": "observer",
+      "command": "~/.codex/hooks/canuto-posttool.mjs",
+      "expectedHash": "501345153924bd929bc47b04f37ea2a3cae50e9fd8c2ec8ea53547e365a98a84",
+      "mode": "0755"
+    },
+    {
+      "id": "CX-CANUTO-END",
+      "version": 1,
+      "status": "active",
+      "origin": "hooks/canuto-hook.mjs",
+      "event": "SessionEnd",
+      "matcher": "",
+      "timeout": 3,
+      "role": "automation",
+      "command": "~/.codex/hooks/canuto-session-end.mjs",
+      "expectedHash": "501345153924bd929bc47b04f37ea2a3cae50e9fd8c2ec8ea53547e365a98a84",
+      "mode": "0755"
+    }
+  ]
+}

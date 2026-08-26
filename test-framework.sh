@@ -327,6 +327,16 @@ else
 fi
 rm -f /tmp/canuto-hook-reconcile-test.$$
 
+CANUTO_PLUGIN_DIR="$AGENTS_DIR/plugins/canuto"
+if node --check "$CANUTO_PLUGIN_DIR/hooks/canuto-hook.mjs" >/dev/null 2>&1 \
+  && node --check "$CANUTO_PLUGIN_DIR/codex-plugin-reconcile.mjs" >/dev/null 2>&1 \
+  && node --test "$CANUTO_PLUGIN_DIR/canuto-hook.test.mjs" >/tmp/canuto-plugin-test.$$ 2>&1; then
+  pass "Canuto opt-in plugin lifecycle and Codex hook runtime"
+else
+  fail "Canuto opt-in plugin lifecycle or Codex hook runtime failed"
+fi
+rm -f /tmp/canuto-plugin-test.$$
+
 HOOK_CONTRACT_DIR="$AGENTS_DIR/hooks/contracts"
 if node --check "$HOOK_CONTRACT_DIR/contract-harness.mjs" >/dev/null 2>&1 \
   && node --test "$HOOK_CONTRACT_DIR/contract-harness.test.mjs" >/tmp/canuto-hook-contract-test.$$ 2>&1; then

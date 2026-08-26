@@ -20,9 +20,56 @@ canuto_managed_hooks() {
     --manifest "$SCRIPT_DIR/managed-hooks.json"
 }
 
+CANUTO_CODEX_PLUGIN_DIR="$SCRIPT_DIR/../plugins/canuto"
+
+canuto_codex_plugin_hooks() {
+  local state="$1"
+  shift
+  local manifest="$CANUTO_CODEX_PLUGIN_DIR/managed-hooks.codex.json"
+  if [ "$state" = "disabled" ]; then
+    manifest="$CANUTO_CODEX_PLUGIN_DIR/managed-hooks.codex.disabled.json"
+  fi
+  node "$CANUTO_CODEX_PLUGIN_DIR/codex-plugin-reconcile.mjs" "$@" --manifest "$manifest"
+}
+
 # Modos restritos: nunca copiam hooks nem usam a configuração real por padrão.
 # `apply` exige o fingerprint emitido por uma execução anterior de `plan`.
 case "${1:-}" in
+  --plan-codex-canuto-plugin)
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] || { echo "uso: install.sh --plan-codex-canuto-plugin <hooks.json> <hooks-dir>" >&2; exit 64; }
+    canuto_codex_plugin_hooks enabled plan --config "$2" --hooks-dir "$3"
+    exit $?
+    ;;
+  --apply-codex-canuto-plugin)
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] && [ -n "${4:-}" ] && [ -n "${5:-}" ] || { echo "uso: install.sh --apply-codex-canuto-plugin <fingerprint> <hooks.json> <hooks-dir> <state-dir>" >&2; exit 64; }
+    canuto_codex_plugin_hooks enabled apply --fingerprint "$2" --config "$3" --hooks-dir "$4" --state-dir "$5"
+    exit $?
+    ;;
+  --verify-codex-canuto-plugin)
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] || { echo "uso: install.sh --verify-codex-canuto-plugin <hooks.json> <hooks-dir>" >&2; exit 64; }
+    canuto_codex_plugin_hooks enabled verify --config "$2" --hooks-dir "$3"
+    exit $?
+    ;;
+  --plan-disable-codex-canuto-plugin)
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] || { echo "uso: install.sh --plan-disable-codex-canuto-plugin <hooks.json> <hooks-dir>" >&2; exit 64; }
+    canuto_codex_plugin_hooks disabled plan --config "$2" --hooks-dir "$3"
+    exit $?
+    ;;
+  --apply-disable-codex-canuto-plugin)
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] && [ -n "${4:-}" ] && [ -n "${5:-}" ] || { echo "uso: install.sh --apply-disable-codex-canuto-plugin <fingerprint> <hooks.json> <hooks-dir> <state-dir>" >&2; exit 64; }
+    canuto_codex_plugin_hooks disabled apply --fingerprint "$2" --config "$3" --hooks-dir "$4" --state-dir "$5"
+    exit $?
+    ;;
+  --verify-disable-codex-canuto-plugin)
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] || { echo "uso: install.sh --verify-disable-codex-canuto-plugin <hooks.json> <hooks-dir>" >&2; exit 64; }
+    canuto_codex_plugin_hooks disabled verify --config "$2" --hooks-dir "$3"
+    exit $?
+    ;;
+  --rollback-codex-canuto-plugin)
+    [ -n "${2:-}" ] && [ -n "${3:-}" ] || { echo "uso: install.sh --rollback-codex-canuto-plugin <batch-id> <state-dir>" >&2; exit 64; }
+    node "$CANUTO_CODEX_PLUGIN_DIR/codex-plugin-reconcile.mjs" rollback --batch-id "$2" --state-dir "$3"
+    exit $?
+    ;;
   --plan-managed-hooks)
     [ -n "${2:-}" ] && [ -n "${3:-}" ] || { echo "uso: install.sh --plan-managed-hooks <settings.json> <hooks-dir>" >&2; exit 64; }
     canuto_managed_hooks plan --config "$2" --hooks-dir "$3"
