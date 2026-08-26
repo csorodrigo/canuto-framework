@@ -9,7 +9,7 @@ const COMMAND_MATCHERS = Object.freeze([
   ["branch-creation", /(?:^|[;&|\s])git(?:\s+-\S+(?:=\S+|\s+\S+))*\s+(?:(?:checkout\s+(?:-[A-Za-z]*b|--branch)(?:=|\s+)\S+)|(?:switch\s+(?:-[A-Za-z]*c|--create)(?:=|\s+)\S+)|(?:branch\s+(?!--(?:list|show-current|contains|merged|no-merged|delete|move|copy)\b)(?!-[dDmMcC]\b)[^-\s][^\s]*))(?:\s|$)/],
   ["build-typecheck", /(?:^|[;&|\s])(?:(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:build|typecheck(?::codex)?)|(?:npx\s+)?tsc(?:\s|$))/],
   ["deploy-target", /(?:^|[;&|\s])(?:(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?deploy|vercel\s+(?:deploy|--prod)|railway\s+up|dokploy\s+deploy)(?:\s|$)/],
-  ["validation-receipt", /(?:validation-(?:mark|clear)\.sh|canuto-validation\s+(?:mark|verify)|verify-execution-receipt)/],
+  ["validation-receipt", /(?:validation-(?:mark|clear)\.sh|validation-receipt-cli\.mjs\s+(?:record|verify|clear)|canuto-validation\s+(?:mark|verify)|verify-execution-receipt)/],
   ["commit", /(?:^|[;&|\s])git(?:\s+-\S+(?:=\S+|\s+\S+))*\s+commit(?:\s|$)/],
   ["pull-request", /(?:^|[;&|\s])(?:gh(?:\s+-(?:R|C)\s+\S+|\s+--(?:repo|hostname)(?:=\S+|\s+\S+))*\s+pr\s+(?:create|merge)|(?:\S*\/)?pr-merge\.sh)(?:\s|$)/],
   ["claims", /(?:pre-claim-grep|claim-guard|canuto-claim)(?:\.sh)?(?:\s|$)/],

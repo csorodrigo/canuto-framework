@@ -1,0 +1,48 @@
+{
+  "$schema": "./managed-hooks.schema.json",
+  "schemaVersion": 1,
+  "surface": "codex-user",
+  "preconditions": [
+    {
+      "id": "repo-policy-consumers",
+      "receipt": "audit/t7-consumer-migration-receipt.json",
+      "expectedHash": "c84236017f8122165964733ea25cb0a28ed7bb742bd54c2767de4522cf3d09e8",
+      "requiredStatus": "ready"
+    }
+  ],
+  "entries": [
+    {
+      "id": "CX-18",
+      "version": 1,
+      "status": "active",
+      "origin": "repo-policy-hook.mjs",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "timeout": 30,
+      "role": "gate",
+      "command": "~/.claude/hooks/repo-policy-hook.mjs",
+      "expectedHash": "ccc095c49959f7724af4b573f9ecff1a1108b84b44eb627e1a4119597212f3dc",
+      "mode": "0755"
+    },
+    {
+      "id": "CX-11",
+      "version": 1,
+      "status": "retired",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "timeout": 30,
+      "role": "gate",
+      "command": "~/.claude/hooks/lib/codex-adapt.sh ~/.claude/hooks/assert-deploy-target.sh"
+    },
+    {
+      "id": "CX-13",
+      "version": 1,
+      "status": "retired",
+      "event": "PreToolUse",
+      "matcher": "^Bash$",
+      "timeout": 180,
+      "role": "gate",
+      "command": "~/.claude/hooks/lib/codex-adapt.sh ~/.claude/hooks/pre-pr-bash-gate.sh"
+    }
+  ]
+}

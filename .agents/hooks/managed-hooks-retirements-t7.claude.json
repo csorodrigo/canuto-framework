@@ -1,0 +1,105 @@
+{
+  "$schema": "./managed-hooks.schema.json",
+  "schemaVersion": 1,
+  "surface": "claude-user",
+  "preconditions": [
+    {
+      "id": "repo-policy-consumers",
+      "receipt": "audit/t7-consumer-migration-receipt.json",
+      "expectedHash": "c84236017f8122165964733ea25cb0a28ed7bb742bd54c2767de4522cf3d09e8",
+      "requiredStatus": "ready"
+    }
+  ],
+  "entries": [
+    {
+      "id": "CU-01",
+      "version": 1,
+      "status": "retired",
+      "event": "PostToolUse",
+      "matcher": "Edit|Write",
+      "timeout": 30,
+      "role": "automation",
+      "command": "if [[ \"$CLAUDE_FILE_PATH\" =~ \\.(ts|tsx|js|jsx)$ ]] && command -v prettier &> /dev/null; then prettier --write \"$CLAUDE_FILE_PATH\" 2>/dev/null; fi"
+    },
+    {
+      "id": "CU-02",
+      "version": 1,
+      "status": "retired",
+      "event": "PostToolUse",
+      "matcher": "Edit|Write",
+      "timeout": 30,
+      "role": "advisory",
+      "command": "~/.claude/hooks/posttool-typecheck.sh"
+    },
+    {
+      "id": "CU-03",
+      "version": 1,
+      "status": "retired",
+      "event": "PostToolUse",
+      "matcher": "Edit|Write",
+      "timeout": 3,
+      "role": "observer",
+      "command": "~/.claude/hooks/validation-mark.sh"
+    },
+    {
+      "id": "CU-05",
+      "version": 1,
+      "status": "retired",
+      "event": "PostToolUse",
+      "matcher": "Bash",
+      "timeout": 3,
+      "role": "automation",
+      "command": "~/.claude/hooks/validation-clear.sh"
+    },
+    {
+      "id": "CU-06",
+      "version": 1,
+      "status": "retired",
+      "event": "PostToolUse",
+      "matcher": "Bash",
+      "timeout": 3,
+      "role": "observer",
+      "command": "~/.claude/hooks/retry-detect.sh"
+    },
+    {
+      "id": "CU-25",
+      "version": 1,
+      "status": "retired",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeout": 5,
+      "role": "gate",
+      "command": "~/.claude/hooks/assert-deploy-target.sh"
+    },
+    {
+      "id": "CU-28",
+      "version": 1,
+      "status": "retired",
+      "event": "PreToolUse",
+      "matcher": "Edit|Write",
+      "timeout": 3,
+      "role": "gate",
+      "command": "~/.claude/hooks/fingerprint-gate.sh"
+    },
+    {
+      "id": "CU-33",
+      "version": 1,
+      "status": "retired",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeout": 300,
+      "role": "gate",
+      "command": "~/.claude/hooks/pre-pr-bash-gate.sh"
+    },
+    {
+      "id": "CU-37",
+      "version": 1,
+      "status": "retired",
+      "event": "Stop",
+      "matcher": "",
+      "timeout": 5,
+      "role": "gate",
+      "command": "~/.claude/hooks/pre-finalize.sh"
+    }
+  ]
+}

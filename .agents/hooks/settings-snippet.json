@@ -43,8 +43,8 @@
           },
           {
             "type": "command",
-            "command": "~/.claude/hooks/pre-pr-bash-gate.sh",
-            "timeout": 120
+            "command": "~/.claude/hooks/repo-policy-hook.mjs",
+            "timeout": 30
           }
         ]
       },
@@ -54,11 +54,6 @@
           {
             "type": "command",
             "command": "~/.claude/hooks/protect-files.sh"
-          },
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/fingerprint-gate.sh",
-            "timeout": 3
           }
         ]
       },
@@ -95,28 +90,8 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/validation-mark.sh",
-            "timeout": 3
-          }
-        ]
-      },
-      {
         "matcher": "Bash",
         "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/validation-clear.sh",
-            "timeout": 3
-          },
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/retry-detect.sh",
-            "timeout": 3
-          },
           {
             "type": "command",
             "command": "~/.claude/hooks/postdelegate-verify.sh",
@@ -141,8 +116,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/pre-finalize.sh",
-            "timeout": 5
+            "command": "~/.claude/hooks/validation-finalize-hook.mjs",
+            "timeout": 10
           },
           {
             "type": "command",

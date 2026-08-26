@@ -116,6 +116,17 @@ for script in codex-common.sh codex-diff-context.sh; do
   fi
 done
 
+mkdir -p "$SCRIPTS_DIR/lib"
+if [ -f "$TOOLS_DIR/pr-merge.sh" ] && [ -f "$TOOLS_DIR/lib/merge-clobber-check.sh" ]; then
+  cp "$TOOLS_DIR/pr-merge.sh" "$SCRIPTS_DIR/pr-merge.sh"
+  cp "$TOOLS_DIR/lib/merge-clobber-check.sh" "$SCRIPTS_DIR/lib/merge-clobber-check.sh"
+  chmod +x "$SCRIPTS_DIR/pr-merge.sh" "$SCRIPTS_DIR/lib/merge-clobber-check.sh"
+  echo "   ✅ pr-merge.sh + merge-clobber-check.sh"
+else
+  echo "   ❌ wrapper de merge versionado incompleto — instalação abortada."
+  exit 1
+fi
+
 # ── Git pre-push gate (runtime-agnóstico: Claude, Codex ou humano) ─────────
 echo ""
 echo "🔒 Instalando git pre-push gate..."
@@ -200,6 +211,28 @@ if [ -n "$CANUTO_LIB_OK" ]; then
   } > "$CANUTO_LIB_DIR/VERSION" 2>/dev/null || true
   echo "   ✅ VERSION marker atualizado"
 fi
+
+echo ""
+echo "🧱 Instalando runtime isolado de políticas de repositório..."
+REPO_POLICY_RUNTIME="$HOOKS_DIR/canuto-runtime"
+for runtime_dir in core adapters/claude adapters/codex runners policies/machine policies/repo; do
+  mkdir -p "$REPO_POLICY_RUNTIME/$runtime_dir"
+done
+for runtime_file in \
+  core/execution-identity.mjs core/invocation.mjs core/policy-result.mjs \
+  adapters/claude/index.mjs adapters/codex/index.mjs \
+  runners/host-pressure-evidence.mjs runners/machine-policy-runner.mjs runners/repo-policy-runner.mjs \
+  policies/machine/broad-destruction.mjs policies/machine/host-pressure.mjs \
+  policies/machine/index.mjs policies/machine/process-self-match.mjs \
+  policies/machine/protected-read.mjs policies/machine/secret-material.mjs \
+  policies/repo/build-typecheck.mjs policies/repo/deploy-target.mjs \
+  policies/repo/index.mjs policies/repo/validation-receipt.mjs \
+  policies/repo/validation-receipt-cli.mjs \
+  repo-policy-loader.mjs; do
+  [ -f "$SCRIPT_DIR/$runtime_file" ] || { echo "   ❌ runtime ausente: $runtime_file"; exit 1; }
+  cp "$SCRIPT_DIR/$runtime_file" "$REPO_POLICY_RUNTIME/$runtime_file"
+done
+echo "   ✅ runtime de políticas instalado sem executar código do repositório consumidor"
 
 # ── Prévia do estado desejado dos hooks ─────────────────────────────────────
 # O instalador comum não aplica mudanças de wiring implicitamente. O mesmo

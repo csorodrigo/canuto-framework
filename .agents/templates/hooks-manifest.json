@@ -1,5 +1,45 @@
 {
   "$schema": "./repo-policy.schema.json",
   "schemaVersion": 1,
-  "policies": []
+  "policies": [
+    {
+      "id": "build-typecheck",
+      "options": {
+        "commands": ["npm run typecheck:codex"]
+      }
+    },
+    {
+      "id": "deploy-target",
+      "options": {
+        "targets": [
+          {
+            "name": "production",
+            "commands": ["npm run deploy"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "validation-receipt",
+      "options": {
+        "enabled": true,
+        "requiredFiles": [],
+        "allowedArgv": [
+          ["npm", "run", "test"]
+        ]
+      }
+    },
+    {
+      "id": "commit",
+      "options": {
+        "requiredFiles": []
+      }
+    },
+    {
+      "id": "pull-request",
+      "options": {
+        "requiredFiles": []
+      }
+    }
+  ]
 }
