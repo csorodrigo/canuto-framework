@@ -1180,7 +1180,9 @@ while IFS= read -r skill_file; do
   base=$(basename "$rel")
   # CLAUDE.md dentro de skills são cache do claude-mem, não distribuíveis
   [ "$base" = "CLAUDE.md" ] && continue
-  if ! printf '%s' "$SHIPPED_LIST" | grep -qF "\"$rel\""; then
+  # Feed grep directly: with pipefail, an early grep -q match can SIGPIPE
+  # printf on macOS and turn an actual match into a false negative.
+  if ! grep -qF "\"$rel\"" <<< "$SHIPPED_LIST"; then
     UNSHIPPED+=("$rel")
   fi
 done < <(find "$AGENTS_DIR/skills" -name '*.md' -not -path '*/_archive/*' 2>/dev/null)
