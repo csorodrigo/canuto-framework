@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "batch": "T7",
+  "repositories": [
+    {
+      "id": "canuto-framework",
+      "repository": "csorodrigo/canuto-framework",
+      "manifest": ".agents/hooks/manifest.json",
+      "manifestStatus": "versioned-contract-tested"
+    },
+    {
+      "id": "papiro-dobra",
+      "repository": "csorodrigo/papiro",
+      "candidateHeadSha": "74f1462b021535aea9a7bfee8f27b6a924e47e43",
+      "manifest": ".agents/hooks/manifest.json",
+      "manifestStatus": "missing-pending-owner-change"
+    }
+  ],
+  "policies": [
+    {
+      "id": "worktree-dependencies",
+      "consumers": [
+        { "repository": "csorodrigo/canuto-framework", "disposition": "no-policy", "applicability": "not-applicable" },
+        { "repository": "csorodrigo/papiro", "disposition": "no-policy", "applicability": "not-applicable" }
+      ]
+    },
+    {
+      "id": "build-typecheck",
+      "consumers": [
+        {
+          "repository": "csorodrigo/canuto-framework",
+          "disposition": "no-policy",
+          "applicability": "not-applicable",
+          "evidence": "Canuto has no package.json typecheck/build script; framework validation is owned by the validation-receipt policy"
+        },
+        {
+          "repository": "csorodrigo/papiro",
+          "disposition": "pending-versioned-manifest",
+          "applicability": "required",
+          "expectedOptions": { "commands": ["npm run typecheck:codex"] },
+          "evidence": "package.json scripts.typecheck:codex at candidate head"
+        }
+      ]
+    },
+    {
+      "id": "claims",
+      "consumers": [
+        { "repository": "csorodrigo/canuto-framework", "disposition": "no-policy", "applicability": "not-applicable" },
+        { "repository": "csorodrigo/papiro", "disposition": "no-policy", "applicability": "not-applicable" }
+      ]
+    },
+    {
+      "id": "branch-creation",
+      "consumers": [
+        { "repository": "csorodrigo/canuto-framework", "disposition": "no-policy", "applicability": "not-applicable" },
+        { "repository": "csorodrigo/papiro", "disposition": "no-policy", "applicability": "not-applicable" }
+      ]
+    },
+    {
+      "id": "deploy-target",
+      "consumers": [
+        {
+          "repository": "csorodrigo/canuto-framework",
+          "disposition": "no-policy",
+          "applicability": "not-applicable",
+          "evidence": "Canuto has no repository deploy command"
+        },
+        {
+          "repository": "csorodrigo/papiro",
+          "disposition": "pending-versioned-manifest",
+          "applicability": "required",
+          "expectedOptions": {
+            "targets": [
+              { "name": "production", "commands": ["npm run deploy:prod"] }
+            ]
+          },
+          "evidence": "package.json scripts.deploy:prod at candidate head"
+        }
+      ]
+    },
+    {
+      "id": "validation-receipt",
+      "consumers": [
+        {
+          "repository": "csorodrigo/canuto-framework",
+          "disposition": "versioned-contract-tested",
+          "applicability": "required",
+          "expectedOptions": {
+            "enabled": true,
+            "requiredFiles": ["test-framework.sh"],
+            "allowedArgv": [["bash", "test-framework.sh"]]
+          }
+        },
+        {
+          "repository": "csorodrigo/papiro",
+          "disposition": "pending-versioned-manifest",
+          "applicability": "required",
+          "expectedOptions": {
+            "enabled": true,
+            "requiredFiles": [
+              ".agents/hooks/dobra-compose-writer-guard.sh",
+              ".agents/hooks/dobra-compose-writer-guard.manifest.json",
+              ".agents/hooks/dobra-compose-writer-guard-manager.mjs",
+              ".claude/settings.json",
+              "tests/dobra-compose-writer-guard.test.ts"
+            ],
+            "allowedArgv": [["npm", "run", "test", "--", "tests/dobra-compose-writer-guard.test.ts"]]
+          },
+          "evidence": "package.json scripts.test delegates to scripts/run-tests.mjs; canonical invocation uses npm run test -- <paths>"
+        }
+      ]
+    },
+    {
+      "id": "commit",
+      "consumers": [
+        { "repository": "csorodrigo/canuto-framework", "disposition": "versioned-contract-tested", "applicability": "required" },
+        { "repository": "csorodrigo/papiro", "disposition": "pending-versioned-manifest", "applicability": "required" }
+      ]
+    },
+    {
+      "id": "pull-request",
+      "consumers": [
+        {
+          "repository": "csorodrigo/canuto-framework",
+          "disposition": "versioned-contract-tested",
+          "applicability": "required",
+          "remoteProof": "required"
+        },
+        {
+          "repository": "csorodrigo/papiro",
+          "disposition": "pending-versioned-manifest",
+          "applicability": "required",
+          "remoteProof": "required",
+          "expectedRequiredFiles": [
+            ".agents/hooks/dobra-compose-writer-guard.sh",
+            ".agents/hooks/dobra-compose-writer-guard.manifest.json",
+            ".agents/hooks/dobra-compose-writer-guard-manager.mjs",
+            ".claude/settings.json",
+            "tests/dobra-compose-writer-guard.test.ts"
+          ]
+        }
+      ]
+    }
+  ]
+}

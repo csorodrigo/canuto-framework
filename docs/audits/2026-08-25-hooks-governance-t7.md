@@ -20,11 +20,38 @@ são plan-only e possuem uma precondition verificável: enquanto
 fixado, até o preview é recusado. Nenhuma configuração instalada é alterada por
 este commit.
 
+O próprio Canuto agora é um consumidor versionado em
+`.agents/hooks/manifest.json`. Ele declara somente o fluxo de receipt, commit e
+pull request, com o argv canônico exato `bash test-framework.sh`; não declara
+um comando de deploy inexistente. A suíte direcionada carrega esse manifesto,
+recusa argv diferente e prova record, verificação Stop e vínculo à identidade
+remota em repositório hermético.
+
+O inventário `audit/t7-repo-policy-consumer-inventory.json` delimita os dois
+consumidores conhecidos por cada política. Canuto registra explicitamente
+`deploy-target` como `no-policy/not-applicable`, pois não possui comando de
+deploy do repositório. Papiro permanece pendente até versionar seu próprio
+`.agents/hooks/manifest.json` com `npm run typecheck:codex`,
+`npm run deploy:prod`, o argv de validação
+`npm run test -- tests/dobra-compose-writer-guard.test.ts` e as políticas de
+commit/PR ligadas aos cinco arquivos do owner. Portanto o receipt geral de
+consumidores continua `blocked` independentemente do estado de CU-23.
+
 Um item permanece explicitamente bloqueado:
 
-- CU-23 pertence a Papiro/Dobra. Ele só entra em uma futura revisão do manifest
-  depois do receipt do owner; não houve importação ou aposentadoria por
-  inferência nesta worktree.
+- CU-23 pertence a Papiro/Dobra. O owner candidato está no PR Papiro #849, head
+  `74f1462b021535aea9a7bfee8f27b6a924e47e43`, mas o PR ainda está aberto e o
+  `origin/main` observado (`bd8c248b6bd4177bb2fd26f86a436026fe984fb5`)
+  divergiu e não contém esse head. O receipt versionado permanece `blocked`; CU-23 não entra
+  nos manifests de aposentadoria até merge, containment e hashes do owner serem
+  revalidados.
+
+O gate do owner CU-23 é deliberadamente separado do receipt geral de
+consumidores. Quando estiver comprovado, CU-23 deve entrar em um manifest de
+aposentadoria próprio, com precondition apontando apenas para
+`audit/t7-papiro-dobra-owner-receipt.json`. O reconciliador já aceita múltiplas
+preconditions, mas CU-23 não foi incluído enquanto o receipt permanece
+`blocked`.
 
 CU-01 é inline e não possui artefato a remover. O reconciliador passou a aceitar
 comandos inline somente em aposentadorias registration-only, que fazem match

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "batch": "T7",
+  "id": "CU-23",
+  "owner": "repository:Papiro/Dobra",
+  "status": "blocked",
+  "repository": "csorodrigo/papiro",
+  "pullRequest": {
+    "number": 849,
+    "url": "https://github.com/csorodrigo/papiro/pull/849",
+    "state": "OPEN",
+    "candidateHeadSha": "74f1462b021535aea9a7bfee8f27b6a924e47e43"
+  },
+  "ownerArtifact": {
+    "path": ".agents/hooks/dobra-compose-writer-guard.manifest.json",
+    "manifestSha256": "c5c3d973e0d41e88800e2d27ae79dd806cdbf158019a75fcb84255f1ddaa965d",
+    "sourcePath": ".agents/hooks/dobra-compose-writer-guard.sh",
+    "sourceSha256": "d4ecea86c03c1c8e495dc1bb9d08bf200509ad22367555cabce5a9604c0f84b6",
+    "canonicalRepository": "csorodrigo/papiro",
+    "packageName": "dobra"
+  },
+  "mainContainment": {
+    "observedMainSha": "bd8c248b6bd4177bb2fd26f86a436026fe984fb5",
+    "candidateContained": false,
+    "compareStatus": "diverged",
+    "observedAt": "2026-08-26"
+  },
+  "blockers": [
+    "PR #849 is still open",
+    "Papiro origin/main bd8c248b6bd4177bb2fd26f86a436026fe984fb5 diverged from and does not contain candidate head 74f1462b021535aea9a7bfee8f27b6a924e47e43"
+  ],
+  "unblockRequirements": [
+    "PR #849 is merged",
+    "csorodrigo/papiro origin/main contains candidate head 74f1462b021535aea9a7bfee8f27b6a924e47e43",
+    "the merged owner manifest and source hashes match this receipt"
+  ]
+}

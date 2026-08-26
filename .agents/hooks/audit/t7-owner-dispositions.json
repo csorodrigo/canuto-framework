@@ -7,7 +7,7 @@
     { "id": "CU-03", "owner": "repository", "replacement": "validation-receipt", "status": "retirement-blocked-consumer-receipt" },
     { "id": "CU-05", "owner": "repository", "replacement": "validation-receipt", "status": "retirement-blocked-consumer-receipt" },
     { "id": "CU-06", "owner": "repository", "replacement": "validation-receipt", "status": "retirement-blocked-consumer-receipt" },
-    { "id": "CU-23", "owner": "repository:Papiro/Dobra", "replacement": null, "status": "blocked-owner-receipt" },
+    { "id": "CU-23", "owner": "repository:Papiro/Dobra", "replacement": ".agents/hooks/dobra-compose-writer-guard.manifest.json", "status": "blocked-owner-main-containment", "receipt": "audit/t7-papiro-dobra-owner-receipt.json" },
     { "id": "CU-25", "owner": "repository", "replacement": "deploy-target", "status": "retirement-blocked-consumer-receipt" },
     { "id": "CU-28", "owner": "repository", "replacement": "validation-receipt", "status": "retirement-blocked-consumer-receipt" },
     { "id": "CU-33", "owner": "repository", "replacement": "pull-request", "status": "retirement-blocked-consumer-receipt" },

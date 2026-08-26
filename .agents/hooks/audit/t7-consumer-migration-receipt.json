@@ -2,7 +2,38 @@
   "schemaVersion": 1,
   "batch": "T7",
   "status": "blocked",
-  "consumers": [],
+  "inventory": {
+    "path": "audit/t7-repo-policy-consumer-inventory.json",
+    "expectedHash": "808445b2b5459504a13c74334676693966d198a1b11a1a5ba2be24c2158c0b7f"
+  },
+  "consumers": [
+    {
+      "id": "canuto-framework",
+      "repository": "csorodrigo/canuto-framework",
+      "status": "contract-tested",
+      "manifest": ".agents/hooks/manifest.json",
+      "manifestSha256": "3d31b97781f55ed73d528022da8050ee15f9df31c33246540db2e733f3f57971",
+      "validation": {
+        "allowedArgv": [
+          [
+            "bash",
+            "test-framework.sh"
+          ]
+        ],
+        "requiredFiles": [
+          "test-framework.sh"
+        ],
+        "recordAndStopContractTest": ".agents/hooks/retirement-t7.test.mjs",
+        "remoteIdentityContractTest": ".agents/hooks/policies/repo/repo-policy.test.mjs",
+        "proofScope": "hermetic Git candidate; final Canuto candidate-SHA receipt requires commit and remote publication"
+      },
+      "pending": [
+        "commit the versioned manifest",
+        "publish the final Canuto candidate SHA",
+        "record bash test-framework.sh with --remote and verify Stop on that unchanged SHA"
+      ]
+    }
+  ],
   "requirements": [
     "Each governed consumer has a versioned .agents/hooks/manifest.json",
     "Build/typecheck and deploy commands are exact project-owned argv",
@@ -11,7 +42,7 @@
     "External owner receipts are attached before owner-specific retirement"
   ],
   "blockers": [
-    "No consumer migration receipts are versioned yet",
-    "CU-23 awaits the Papiro/Dobra owner receipt"
+    "Canuto final candidate-SHA record and Stop verification require the committed and published branch",
+    "Papiro candidate head has no versioned .agents/hooks/manifest.json for typecheck:codex, deploy:prod, validation receipt, commit and pull-request policies"
   ]
 }

@@ -6,7 +6,7 @@
     {
       "id": "repo-policy-consumers",
       "receipt": "audit/t7-consumer-migration-receipt.json",
-      "expectedHash": "c84236017f8122165964733ea25cb0a28ed7bb742bd54c2767de4522cf3d09e8",
+      "expectedHash": "237dcd44d3a591efb9a53bbbb8cb32455e3f05e4056b9a1b3d888ae5f7b4125f",
       "requiredStatus": "ready"
     }
   ],
