@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canuto.dev/schemas/repo-policy.schema.json",
+  "title": "Canuto repository policy manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "policies"],
+  "properties": {
+    "$schema": { "const": "./repo-policy.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "policies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id"],
+        "properties": {
+          "id": {
+            "enum": [
+              "worktree-dependencies",
+              "build-typecheck",
+              "claims",
+              "branch-creation",
+              "deploy-target",
+              "validation-receipt",
+              "commit",
+              "pull-request"
+            ]
+          },
+          "options": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  }
+}

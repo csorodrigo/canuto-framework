@@ -346,6 +346,20 @@ else
 fi
 rm -f /tmp/canuto-machine-policy-test.$$
 
+if node --check "$AGENTS_DIR/hooks/repo-policy-loader.mjs" >/dev/null 2>&1 \
+  && node --check "$AGENTS_DIR/hooks/core/execution-identity.mjs" >/dev/null 2>&1 \
+  && node --check "$AGENTS_DIR/hooks/runners/repo-policy-runner.mjs" >/dev/null 2>&1 \
+  && node --test \
+    "$AGENTS_DIR/hooks/repo-policy-loader.test.mjs" \
+    "$AGENTS_DIR/hooks/runners/repo-policy-runner.test.mjs" \
+    >/tmp/canuto-repo-policy-test.$$ 2>&1; then
+  pass "repository policy and execution identity layer"
+else
+  fail "repository policy and execution identity layer failed"
+  cat /tmp/canuto-repo-policy-test.$$ >&2
+fi
+rm -f /tmp/canuto-repo-policy-test.$$
+
 echo "── Test 3b: Tooling ──"
 
 CODEX_TOOLS=(canuto-memory codex-common codex-diff-context codex-context-package codex-health-check canuto-consumer-smoke codex-maestro vault-sync otel-emit)
