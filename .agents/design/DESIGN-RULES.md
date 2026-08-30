@@ -1,11 +1,11 @@
 ---
 name: design-rules
-version: 1.0.1
-lastUpdated: 2026-08-21
+version: 1.1.0
+lastUpdated: 2026-08-30
 shortDescription: >
   Design system normativo do front — densidade, tipografia, espaçamento,
-  overflow e copy. NÃO é skill: é contrato, consultado por QUALQUER runtime
-  (Claude, Codex ou humano) antes de qualquer trabalho de UI.
+  overflow, copy, tema e motion. NÃO é skill: é contrato, consultado por
+  QUALQUER runtime (Claude, Codex ou humano) antes de qualquer trabalho de UI.
 ---
 
 # DESIGN-RULES — regras de front para todos os projetos
@@ -127,7 +127,54 @@ Conteúdo estourando o frame é **bug, não estética**. Regras mecânicas:
   vale mais que adjetivo — na dúvida, corte o adjetivo.
 - Sem seção "fake social proof" (logos genéricos, depoimentos inventados).
 
-## 6. Anti-padrões de LLM (o que este arquivo existe para matar)
+## 6. Tema e identidade (o que este arquivo NÃO fixa)
+
+Este contrato fixa o **regime**: densidade, escala, espaçamento, overflow, copy. Ele não fixa
+a **identidade** — paleta, tema, raio, textura tipográfica e caráter do movimento variam por
+projeto. Mas variam com método, não por gosto do dia:
+
+- **Tema (claro ou escuro) é decisão de projeto, registrada em ADR — nunca escolha de tela.**
+  Antes de decidir, escreva uma frase de cena física: quem usa, onde, sob que luz, em que
+  humor. Se a frase não obrigar a resposta, ela ainda não está concreta o bastante. "Escuro
+  porque ferramenta séria é escura" e "claro por segurança" são as duas não-decisões clássicas.
+- **Cor é posição numa escala ordinal fechada**, não hex escolhido a dedo: 10–12 degraus por
+  matiz (Radix, Geist ou uma própria), e cada papel — fundo, superfície, borda, texto, acento —
+  aponta para um degrau. Neutro tingido leva no máximo 0.015 de croma na direção da marca.
+- **Elevação tem uma linguagem só por projeto.** Em tema escuro: camadas de superfície mais
+  borda de 1px tingida — sombra larga não funciona sobre fundo escuro. Em tema claro: sombra
+  curta (blur ≤ 8px) **ou** borda, nunca as duas no mesmo elemento.
+- **Acento serve a ação primária, seleção e estado.** Nunca decoração, nunca em estado inativo.
+- **Contraste é regra, não preferência:** corpo ≥ 4.5:1, texto grande ≥ 3:1, e placeholder
+  obedece ao mesmo 4.5:1 do corpo. Cinza claro "para ficar elegante" é a falha de legibilidade
+  mais comum de UI gerada por modelo.
+
+## 7. Motion
+
+Movimento comunica **estado**. Se você não souber dizer que estado ele comunica, ele sai.
+
+| Papel | Duração |
+|---|---|
+| Feedback de clique | 90 ms |
+| Hover, seleção, troca de cor | 160 ms |
+| Algo muda de lugar ou de tamanho | 220 ms |
+| Entrada da tela (uma vez só) | 260 ms |
+| Dado desenhando (série, barra) | 700–900 ms |
+
+- **Uma curva para tudo que entra ou se move:** `cubic-bezier(.22, 1, .36, 1)` — sai rápido,
+  chega devagar. Sem bounce e sem elástico: em ferramenta de trabalho, bounce lê como brinquedo.
+- **Anima:** `opacity`, `transform`, `background`, `border-color`, `stroke-dashoffset`.
+  **Não anima:** `width`, `height`, `top`, `left`, nem `box-shadow` em lista longa — layout
+  animado engasga com 180 linhas na tela.
+- **Stagger de lista** é legítimo: 45–60 ms por item, teto de ~500 ms no total. Acima disso,
+  reduza o passo ou limite quantos itens entram escalonados.
+- **`prefers-reduced-motion: reduce` é obrigatório**, com alternativa real (crossfade ou
+  instantâneo) — não basta encurtar a duração.
+- **Proibido:** coreografia de carregamento (a tela abre para trabalhar, não para ser
+  assistida); loop infinito que não represente estado vivo; spinner no meio do conteúdo onde
+  cabe skeleton; e revelação que *esconde* conteúdo por padrão — transição pausada em aba
+  oculta entrega a seção em branco.
+
+## 8. Anti-padrões de LLM (o que este arquivo existe para matar)
 
 Vieses conhecidos de UI gerada por modelo — tratar como erro de review:
 
@@ -140,7 +187,7 @@ Vieses conhecidos de UI gerada por modelo — tratar como erro de review:
 - Ícone decorativo de 48px ao lado de cada item de lista.
 - Página de configurações que parece landing page.
 
-## 7. Checklist de auditoria (design-audit)
+## 9. Checklist de auditoria (design-audit)
 
 Uso: sob demanda, por projeto — reviewer ou browser-qa percorre as telas
 principais e reporta violações (arquivo:linha ou rota + screenshot). O
@@ -156,8 +203,12 @@ priorizado pelo usuário, nunca correção automática em massa.
 - [ ] Headlines dentro dos limites de palavras (APP ≤ 6; LANDING hero ≤ 8)
 - [ ] Cards justificam existir (2+ infos); sem card-de-uma-linha
 - [ ] Formulários contidos (`max-w-lg`–`2xl`), campos `h-9`, `space-y-4` máx
+- [ ] Toda animação tem alternativa em `prefers-reduced-motion: reduce`
+- [ ] Nenhum movimento que não comunique estado; nenhum loop que não seja estado vivo
+- [ ] Elevação com UMA linguagem só (borda **ou** sombra curta, não as duas)
+- [ ] Corpo ≥ 4.5:1 e placeholder no mesmo piso do corpo
 
-## 8. Exceções
+## 10. Exceções
 
 Exceção só existe **declarada no plano** (Architect) com justificativa de uma
 linha, antes da implementação — nunca decidida silenciosamente pelo coder.
