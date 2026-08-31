@@ -177,6 +177,31 @@ test("critical host pressure blocks a resource-intensive command on both platfor
   }
 });
 
+test("pure remote SSH validation does not consume local host-pressure evidence", async () => {
+  let reads = 0;
+  const results = await runBoth("ssh -o BatchMode=yes wedo-backup 'npm run test --'", {
+    hostEvidenceReader: () => {
+      reads += 1;
+      return { ok: true, availableMemoryPercent: 5, loadAverage1m: 17, cpuCount: 8 };
+    },
+  });
+  assert.equal(reads, 0);
+  assert.deepEqual(results.map((item) => item.composition.verdict), ["allow", "allow"]);
+});
+
+test("SSH commands with local execution paths remain subject to local host pressure", async () => {
+  for (const command of [
+    "ssh wedo-backup 'npm run test --'; npm run build",
+    "ssh wedo-backup \"$(npm run test --)\"",
+    "ssh -o ProxyCommand='npm run test --' wedo-backup 'git status'",
+  ]) {
+    const results = await runBoth(command, {
+      hostEvidenceReader: () => ({ ok: true, availableMemoryPercent: 5, loadAverage1m: 17, cpuCount: 8 }),
+    });
+    for (const result of results) assert.ok(result.composition.blockerIds.includes(HOST_PRESSURE_GATE_ID));
+  }
+});
+
 test("elevated host pressure remains observable without becoming a block", async () => {
   const results = await runBoth("npm test", {
     hostEvidenceReader: () => ({ ok: true, availableMemoryPercent: 10, loadAverage1m: 2, cpuCount: 8 }),
