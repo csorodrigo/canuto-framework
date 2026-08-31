@@ -4,9 +4,12 @@ export const HOST_PRESSURE_GATE_ID = "machine.host-pressure";
 export const HOST_PRESSURE_ADVISORY_ID = "machine.host-pressure-advisory";
 
 const RESOURCE_INTENSIVE = /(?:\b(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:build|test|typecheck|dev)\b|\bnext\s+(?:build|dev)\b|\btsc\b|\bpytest\b|\bcargo\s+(?:build|test)\b|\bxcodebuild\b|\bdocker\s+(?:build|compose)\b)/i;
+const PURE_REMOTE_SSH = /^ssh(?:\s+-o\s+(?:ConnectTimeout=\d+|BatchMode=yes))*\s+[A-Za-z0-9._@-]+\s+'[^']*'$/s;
 
 export function requiresHostPressureEvidence(invocation) {
-  return invocation.subjectKind === "command" && RESOURCE_INTENSIVE.test(invocation.subject);
+  return invocation.subjectKind === "command"
+    && !PURE_REMOTE_SSH.test(invocation.subject.trim())
+    && RESOURCE_INTENSIVE.test(invocation.subject);
 }
 
 function validEvidence(evidence) {
