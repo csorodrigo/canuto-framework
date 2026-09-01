@@ -105,6 +105,18 @@ jobs:
           node --test skill-gardener/canuto-skill-gardener.test.js
           node --test .agents/tools/framework-session-audit.test.js
 
+      - name: Test vault integrator foundation
+        run: python3 .agents/tests/vault-integrator-test.py
+
+      - name: Test vault integrator transport
+        run: python3 .agents/tests/vault-integrator-transport-test.py
+
+      - name: Test vault integrator inbox boundary
+        run: python3 .agents/tests/vault-integrator-inbox-test.py
+
+      - name: Smoke vault integrator installer
+        run: /bin/bash .agents/tests/vault-integrator-setup-test.sh
+
       - name: Run complete framework gate
         run: /bin/bash test-framework.sh --verbose
 
