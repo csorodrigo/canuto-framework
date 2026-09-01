@@ -71,7 +71,7 @@
     {
       "name": "implement-spec",
       "upstreamPath": "skills/in-progress/implement-spec",
-      "sha256": "f9c52ea8872865118933ae8bd7dd75f73daa803d7ce4058976b353b9bdd853c5"
+      "sha256": "4c1b84a076e61ab8e4848d654b041c464b790971b855687e3afbf4aff6a9cf30"
     },
     {
       "name": "improve-codebase-architecture",
