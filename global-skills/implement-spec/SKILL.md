@@ -2,6 +2,8 @@
 name: implement-spec
 description: "Implement a specification in code."
 disable-model-invocation: true
+version: 1.1.0
+lastUpdated: 2026-09-01
 ---
 
 You have been provided a spec. This spec should have tickets associated with it, describing how to implement the spec.
@@ -28,8 +30,15 @@ Communication to and from subagents should be sparse. Communicate primarily thro
 
 6. If this changes the **frontier** of available tickets, kick off more **implementer subagents** to work on the new tickets. This allows for maximum concurrency.
 
-7. Once all tickets are complete, run /code-review on the PR branch. Fix all issues raised by the code review in a single **implementer subagent**.
+7. Before code review, run a spec-to-artifact completeness gate. Map every requirement and ticket to its implementation, tests, and owned operational artifact. When code reads or writes a new database object:
 
-8. Mark the PR as ready for review.
+   - verify that the canonical data owner contains the migration and that the delivery includes or pins its exact revision;
+   - apply the migration twice to a disposable database and check constraints, indexes, normalization, and least-privilege grants;
+   - record `migration authored`, `migration merged`, `migration applied`, and `runtime verified` as separate states with the code SHA and migration digest;
+   - if production application was not explicitly authorized, keep the release `HOLD` or `UNVERIFIED` and provide the exact application command. A passing application build does not prove schema availability.
 
-9. Clean up all **implementer subagent** worktrees.
+8. Once all tickets and completeness checks are complete, run /code-review on the PR branch. Fix all issues raised by the code review in a single **implementer subagent**.
+
+9. Mark the PR as ready for review.
+
+10. Clean up all **implementer subagent** worktrees.
