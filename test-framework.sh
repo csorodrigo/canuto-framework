@@ -1299,6 +1299,34 @@ if [ "$lock_rc" -ne 75 ] || [ ! -d "$run_ledger_tmp/.agents/tmp/run-ledger/.roll
 fi
 rmdir "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock"
 
+# A slow host may spend several seconds between mkdir and publishing owner.
+# Keep that lock intact inside the grace window, then recover it after expiry.
+mkdir "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock"
+python3 - "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock" <<'PYEOF'
+import os, sys, time
+stamp = time.time() - 10
+os.utime(sys.argv[1], (stamp, stamp))
+PYEOF
+ownerless_grace_rc=0
+CANUTO_RUN_LEDGER_ROOT="$run_ledger_tmp" \
+  bash "$run_ledger" advance rollout 4 "não deve entrar" >/dev/null 2>&1 \
+  || ownerless_grace_rc=$?
+if [ "$ownerless_grace_rc" -ne 75 ] \
+  || [ ! -d "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock" ]; then
+  run_ledger_ok=false
+fi
+rmdir "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock"
+
+mkdir "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock"
+python3 - "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock" <<'PYEOF'
+import os, sys, time
+stamp = time.time() - 31
+os.utime(sys.argv[1], (stamp, stamp))
+PYEOF
+ownerless_stale_out=$(CANUTO_RUN_LEDGER_ROOT="$run_ledger_tmp" \
+  bash "$run_ledger" block rollout "lock sem owner expirado recuperado" 2>/dev/null) \
+  || run_ledger_ok=false
+
 mkdir "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock"
 : > "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock/owner"
 malformed_lock_rc=0
@@ -1360,6 +1388,7 @@ if [ "$run_ledger_ok" = true ] \
   && [ "$start_out" = "PROGRESSO [-----] 0/5 | fonte canônica localizada | continuo automaticamente" ] \
   && [ "$advance_out" = "PROGRESSO [###--] 3/5 | review adversarial em andamento | continuo automaticamente" ] \
   && printf '%s' "$block_out" | grep -q '^PROGRESSO \[###--\] 3/5 | BLOQUEADO:' \
+  && printf '%s' "$ownerless_stale_out" | grep -q '^PROGRESSO \[###--\] 3/5 | BLOQUEADO: lock sem owner expirado recuperado' \
   && printf '%s' "$pid_reuse_out" | grep -q '^PROGRESSO \[###--\] 3/5 | BLOQUEADO: pid reutilizado recuperado' \
   && [ "$stale_lock_out" = "PROGRESSO [####-] 4/5 | lock abandonado recuperado | continuo automaticamente" ] \
   && [ ! -e "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock" ] \

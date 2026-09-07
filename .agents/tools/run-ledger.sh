@@ -63,6 +63,7 @@ fi
 lock_dir=""
 lock_owned=0
 lock_owner=""
+incomplete_owner_grace_seconds=30
 cleanup() {
   if [ "$lock_owned" -eq 1 ] && [ -n "$lock_dir" ]; then
     current_owner=""
@@ -109,7 +110,7 @@ recover_stale_lock() {
     case "$owner_pid" in
       *[!0-9]*|"")
         age_seconds=$(lock_age_seconds "$owner_file" 2>/dev/null || printf '0')
-        [ "$age_seconds" -ge 5 ] || return 1
+        [ "$age_seconds" -ge "$incomplete_owner_grace_seconds" ] || return 1
         ;;
       *)
         if kill -0 "$owner_pid" 2>/dev/null; then
@@ -125,7 +126,7 @@ recover_stale_lock() {
     esac
   else
     age_seconds=$(lock_age_seconds "$lock_dir" 2>/dev/null || printf '0')
-    [ "$age_seconds" -ge 5 ] || return 1
+    [ "$age_seconds" -ge "$incomplete_owner_grace_seconds" ] || return 1
   fi
 
   stale_dir="${lock_dir}.stale.$$.$RANDOM"
