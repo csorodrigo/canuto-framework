@@ -68,7 +68,7 @@ Usage:
 
 Modes (choose at most one):
   --update             update an existing Canuto consumer
-  --contract-only      synchronize only the shared operating contract
+  --contract-only      synchronize the shared execution contract and run ledger
   --check              compare installed framework files with the source
   --test               run consumer validation
   --migrate            migrate a legacy installation
@@ -83,7 +83,7 @@ Options:
   --no-commit          leave changes unstaged and uncommitted (default)
   --dry-run            report the selected mutating operation without changes
   --channel VALUE       stable (default) or edge; edge resolves to main
-  --version VERSION     pin releases/VERSION (for example 1.8.0)
+  --version VERSION     pin releases/VERSION (for example 1.9.0)
   --ref REF             pin an exact branch, tag, or commit SHA
   --rollback VERSION    update from releases/VERSION and record rollback intent
   --api-key VALUE      Obsidian API key used by migration/setup
@@ -96,8 +96,8 @@ Examples:
   bash install.sh --contract-only --commit
   bash install.sh --skill health-check --no-commit
   bash install.sh --update --channel edge
-  bash install.sh --update --version 1.8.0
-  bash install.sh --rollback 1.7.0 --commit
+  bash install.sh --update --version 1.9.0
+  bash install.sh --rollback 1.8.0 --commit
   bash install.sh --dry-run --update
 HELPEOF
 }
@@ -1089,6 +1089,7 @@ FRAMEWORK_FILES=(
   # SPEC/DESIGN próprios; este arquivo distribui apenas disciplina operacional.
   ".agents/OPERATING-CONTRACT.md"
   ".agents/tools/canuto-update-all.sh"
+  ".agents/tools/run-ledger.sh"
   ".agents/personas/maestro.md"
   ".agents/personas/architect.md"
   ".agents/personas/coder.md"
@@ -1302,8 +1303,13 @@ FRAMEWORK_FILES=(
   ".agents/tools/heartbeat-run.sh"
   ".agents/tools/instinct-aging.sh"
   ".agents/tools/codex-delegate.sh"
+  ".agents/tools/claude-agent-mcp.py"
+  ".agents/tools/claude-architect.sh"
+  ".agents/tools/claude-reviewer.sh"
   # Revisor cego com muro mecânico (ADR-0006)
   ".claude/agents/blind-reviewer.md"
+  # Folha Claude econômica com allowlist somente leitura
+  ".claude/agents/canuto-leaf.md"
   # Novos gates fail-closed (ADR-0002)
   ".agents/hooks/pre-pr-bash-gate.sh"
   ".agents/hooks/git-pre-push-gate.sh"
@@ -2535,6 +2541,51 @@ setup_obsidian_mcp() {
 # As of 2026-04-29: Codex is invoked exclusively via CLI (`codex exec --profile <name>`).
 # The codex-coder/codex-reviewer/codex-maestro MCP servers were retired — see
 # .agents/skills/cost-routing.md for rationale (10-35% lower token overhead per call).
+install_codex_delegate_wrapper() {
+  local source=".agents/tools/codex-delegate.sh"
+  local dest="$HOME/.codex/bin/codex-delegate.sh"
+  local receipt="$HOME/.codex/bin/.codex-delegate.canuto.sha256"
+  local marker="codex-delegate.sh — wrapper canônico de delegação Codex (template versionado)"
+  local source_hash current_hash recorded_hash backup tmp
+
+  [ -f "$source" ] || return 0
+  mkdir -p "$HOME/.codex/bin"
+  source_hash=$(sha256_file "$source" 2>/dev/null || true)
+  [ -n "$source_hash" ] || { warn "Could not hash the canonical Codex delegate wrapper."; return 1; }
+
+  if [ ! -f "$dest" ]; then
+    cp "$source" "$dest"
+    chmod +x "$dest"
+    printf '%s\n' "$source_hash" > "$receipt"
+    ok "Installed: ~/.codex/bin/codex-delegate.sh (wrapper canônico do framework)"
+    return 0
+  fi
+
+  current_hash=$(sha256_file "$dest" 2>/dev/null || true)
+  recorded_hash=$(cat "$receipt" 2>/dev/null | tr -d '[:space:]' || true)
+  if [ "$current_hash" = "$source_hash" ]; then
+    chmod +x "$dest"
+    printf '%s\n' "$source_hash" > "$receipt"
+    return 0
+  fi
+
+  if { [ -n "$recorded_hash" ] && [ "$current_hash" = "$recorded_hash" ]; } \
+    || { [ -z "$recorded_hash" ] && grep -qF "$marker" "$dest" 2>/dev/null; }; then
+    backup="$dest.canuto-backup.$(date -u +%Y%m%dT%H%M%SZ)"
+    cp "$dest" "$backup"
+    tmp=$(mktemp "$dest.canuto.XXXXXX")
+    cp "$source" "$tmp"
+    chmod +x "$tmp"
+    mv "$tmp" "$dest"
+    printf '%s\n' "$source_hash" > "$receipt"
+    ok "Updated: ~/.codex/bin/codex-delegate.sh (backup: $backup)"
+    return 0
+  fi
+
+  warn "Preserved local ~/.codex/bin/codex-delegate.sh; it diverges from the managed Canuto copy."
+  return 0
+}
+
 setup_codex() {
   local config_toml="$HOME/.codex/config.toml"
   local CANONICAL_MODEL="gpt-5.6-sol"
@@ -2722,17 +2773,9 @@ TOMLEOF
   done
   ok "Merged per-role profiles v2: ~/.codex/{coder,reviewer,architect,maestro,fast}.config.toml"
 
-  # ── Wrapper canônico de delegação: ~/.codex/bin/codex-delegate.sh ────────
-  # Template versionado em .agents/tools/codex-delegate.sh. Instala SOMENTE
-  # quando ausente — nunca sobrescreve o wrapper existente da máquina (que
-  # pode carregar ajustes locais). Sem isto, máquina nova ficava sem o
-  # caminho canônico de delegação que o models.yaml documenta.
-  if [ -f ".agents/tools/codex-delegate.sh" ] && [ ! -f "$HOME/.codex/bin/codex-delegate.sh" ]; then
-    mkdir -p "$HOME/.codex/bin"
-    cp ".agents/tools/codex-delegate.sh" "$HOME/.codex/bin/codex-delegate.sh"
-    chmod +x "$HOME/.codex/bin/codex-delegate.sh"
-    ok "Installed: ~/.codex/bin/codex-delegate.sh (wrapper canônico — template do framework)"
-  fi
+  # Atualiza somente a cópia gerenciada. Wrappers locais divergentes ficam
+  # preservados; upgrades do template canônico recebem backup e receipt de hash.
+  install_codex_delegate_wrapper
 
   # ── Add project trust (Conductor-aware) ──────────────────────────────────
   local project_dir
@@ -2939,6 +2982,7 @@ Duplicar a versão numa tabela de doc é como a defasagem começa.
 | `reviewer` | Review de código e plano (roda read-only) |
 | `architect` | Arquitetura, decomposição complexa |
 | `maestro` | Orquestração em runtime Codex direto |
+| `leaf` | Coleta e leitura econômica (roda read-only) |
 | `fast` | Edits rápidos, formatação, docs (tier mais barato) |
 
 - Caminho canônico de delegação: `~/.codex/bin/codex-delegate.sh <role> <task> <out>`.
@@ -3016,6 +3060,7 @@ Duplicar a versão numa tabela de doc é como a defasagem começa.
 | `reviewer` | Review de código e plano (roda read-only) |
 | `architect` | Arquitetura, decomposição complexa |
 | `maestro` | Orquestração em runtime Codex direto |
+| `leaf` | Coleta e leitura econômica (roda read-only) |
 | `fast` | Edits rápidos, formatação, docs (tier mais barato) |
 
 - Caminho canônico de delegação: `~/.codex/bin/codex-delegate.sh <role> <task> <out>`.
@@ -5085,6 +5130,22 @@ else:
 PYREF
 }
 
+ensure_run_ledger_gitignore() {
+  local target=".gitignore"
+  local pattern=".agents/tmp/"
+
+  if [ ! -f "$target" ]; then
+    printf '# Canuto runtime state\n%s\n' "$pattern" > "$target" || return 1
+    ok "$target created with Canuto runtime state ignored"
+    return 0
+  fi
+  if grep -Fqx "$pattern" "$target" 2>/dev/null; then
+    return 0
+  fi
+  printf '\n# Canuto runtime state\n%s\n' "$pattern" >> "$target" || return 1
+  ok "$target updated with Canuto runtime state ignored"
+}
+
 # Test-only library seam: source installer helpers without entering an install
 # mode. It performs no setup and is used by framework smoke tests.
 if [ "${CANUTO_INSTALL_LIBRARY_ONLY:-0}" = "1" ]; then
@@ -5098,12 +5159,13 @@ fi
 
 # ── CONTRACT ONLY ───────────────────────────────────────────────────────────
 # Deliberately narrower than --update: product-owned hooks, personas, skills,
-# models, gates and installers remain untouched. This is the safe rollout path
-# for repositories whose local framework contains domain-specific wiring.
+# models, gates and installers remain untouched. It carries the shared execution
+# contract, run ledger and native Claude leaf into repositories with
+# domain-specific wiring.
 if [ "$MODE" = "contract" ]; then
   echo ""
   echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
-  echo -e "${CYAN}  Canuto Framework — Shared Contract Only${RESET}"
+  echo -e "${CYAN}  Canuto Framework — Execution Contract + Ledger${RESET}"
   echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
   echo ""
 
@@ -5113,21 +5175,27 @@ if [ "$MODE" = "contract" ]; then
 
   download ".agents/OPERATING-CONTRACT.md" ".agents/OPERATING-CONTRACT.md" \
     || error "Could not download the shared operating contract."
+  download ".agents/tools/run-ledger.sh" ".agents/tools/run-ledger.sh" \
+    || error "Could not download the shared run ledger."
+  download ".claude/agents/canuto-leaf.md" ".claude/agents/canuto-leaf.md" \
+    || error "Could not download the native Claude leaf."
+  ensure_run_ledger_gitignore \
+    || error "Could not keep the run ledger state outside Git."
   ensure_shared_operating_contract_reference "$CLAUDE_MD"
   ensure_shared_operating_contract_reference "AGENTS.md"
   write_source_receipt ".agents/CONTRACT-RECEIPT.json" "contract" "contract" \
-    ".agents/OPERATING-CONTRACT.md" "$CLAUDE_MD" "AGENTS.md" \
+    ".agents/OPERATING-CONTRACT.md" ".agents/tools/run-ledger.sh" ".claude/agents/canuto-leaf.md" "$CLAUDE_MD" "AGENTS.md" ".gitignore" \
     || error "Could not publish the contract source receipt."
 
   if [ "$GIT_AVAILABLE" = true ]; then
     commit_declared_paths "docs: sync shared Canuto operating contract" \
-      ".agents/OPERATING-CONTRACT.md" "$CLAUDE_MD" "AGENTS.md" ".agents/CONTRACT-RECEIPT.json" \
+      ".agents/OPERATING-CONTRACT.md" ".agents/tools/run-ledger.sh" ".claude/agents/canuto-leaf.md" "$CLAUDE_MD" "AGENTS.md" ".gitignore" ".agents/CONTRACT-RECEIPT.json" \
       || error "Shared contract commit failed; inspect the staged paths."
   fi
 
   local_contract_hash=$(sha256_file ".agents/OPERATING-CONTRACT.md" 2>/dev/null || true)
   [ -n "$local_contract_hash" ] || error "Could not calculate the shared contract hash."
-  ok "Shared contract active in Claude and Codex (sha256: ${local_contract_hash:0:12})."
+  ok "Execution contract, run ledger and Claude leaf active (sha256: ${local_contract_hash:0:12})."
   echo ""
   exit 0
 fi

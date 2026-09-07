@@ -14,8 +14,8 @@
 #   bash .agents/tools/canuto-update-all.sh --force      # atualiza mesmo em dia
 #   bash .agents/tools/canuto-update-all.sh --commit     # autoriza commit por projeto
 #   bash .agents/tools/canuto-update-all.sh --channel edge # usa main explicitamente
-#   bash .agents/tools/canuto-update-all.sh --version 1.8.0 # fixa releases/1.8.0
-#   bash .agents/tools/canuto-update-all.sh --rollback 1.7.0 # rollback fixado
+#   bash .agents/tools/canuto-update-all.sh --version 1.9.0 # fixa releases/1.9.0
+#   bash .agents/tools/canuto-update-all.sh --rollback 1.8.0 # rollback fixado
 #   bash .agents/tools/canuto-update-all.sh /path/a /path/b   # paths extras
 #   bash .agents/tools/canuto-update-all.sh --scan ~/projetos # bootstrap: acha
 #       projetos com .agents/ sob o diretório (1ª rodada, registro ainda vazio)

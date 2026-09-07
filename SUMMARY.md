@@ -1,4 +1,4 @@
-# Canuto Framework v1.8 Summary
+# Canuto Framework v1.9 Summary
 
 Canuto is a multi-agent operating framework for AI-assisted software work. It
 shares one operational contract across Claude and Codex, preserves project WIP,
@@ -16,7 +16,17 @@ The active personas are Maestro, Architect, Coder, Reviewer, Contextualizer, and
 Investigator. Tester and Debugger remain archived; their workflows are covered
 by explicit test/fix paths rather than always-loaded personas.
 
-## v1.8 operational guarantees
+## v1.9 operational guarantees
+
+- Substantial work advances through three to seven verifiable milestones. The
+  root reports a textual progress bar only when evidence advances and continues
+  automatically after intermediate updates.
+- `run-ledger.sh` records only the milestone labels supplied to it; it does not
+  capture prompts or the surrounding process environment automatically. Labels
+  must remain non-sensitive because they are persisted literally.
+- Bounded read-only leaves use the smallest compatible configured profile;
+  substantial changes, releases, and rollouts receive one independent
+  adversarial review per fixed point and question.
 
 - Distributed defaults contain no machine-specific projects, users, hosts, or
   workspace paths. Effective Skill Gardener configuration belongs only to the
@@ -47,7 +57,7 @@ by explicit test/fix paths rather than always-loaded personas.
 ```bash
 bash install.sh --update                    # stable
 bash install.sh --update --channel edge     # main
-bash install.sh --update --version 1.8.0    # pinned release
+bash install.sh --update --version 1.9.0    # pinned release
 bash install.sh --update --ref <commit-sha> # exact pin
 bash install.sh --rollback <version>        # rollback
 ```

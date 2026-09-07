@@ -10,8 +10,8 @@ description: >
   modelo canônico, gates ou verificação de estado real.
 metadata:
   canuto-type: "global-skill"
-  canuto-version: "0.1.0"
-  canuto-updated: "2026-08-24"
+  canuto-version: "0.2.0"
+  canuto-updated: "2026-09-07"
   canuto-invocation: "model"
   canuto-runtimes: "claude,codex"
   source-revision: "rafaelquintanilha/skills@8c4991b"
@@ -42,6 +42,12 @@ as folhas precisarem escrever na mesma superfície.
 
 - Resolva runtime, ferramentas, modelo e effort da configuração executável
   atual. Nunca fixe versões de modelo nesta skill.
+- Para coleta, inventário, leitura e checagem mecânica, escolha o menor perfil
+  configurado compatível com as ferramentas necessárias (`leaf` pelo
+  `codex-delegate.sh`; subagente `canuto-leaf` numa sessão Claude ou
+  `mcp__claude-architect__spawn_cheap_agent` quando Codex for o root). Essas
+  rotas aplicam read-only mecanicamente. Escale para reviewer/architect quando
+  independência ou risco material exigir mais capacidade.
 - Use no máximo duas folhas na primeira onda e prefira uma quando suficiente.
 - As folhas desta skill são somente leitura, não delegam e não tomam a decisão
   final. A implementação mutável volta ao Coder e ao wrapper canônico do Canuto.
@@ -51,6 +57,9 @@ as folhas precisarem escrever na mesma superfície.
   `co-review` e não transforme concordância entre agentes em prova.
 - Se o runtime não oferecer delegação compatível com essas restrições, trabalhe
   no root e registre a limitação; não improvise outro caminho.
+- A folha devolve um único artefato ao root. Atualizações ao usuário e a barra de
+  progresso pertencem ao root/Maestro; a folha não interrompe a execução para
+  narrar etapas parciais.
 
 Leia [os contratos](references/contracts.md) antes de criar uma folha.
 
@@ -63,3 +72,8 @@ estados separados e exigem receipts próprios.
 
 Depois da síntese, use o fluxo canônico para qualquer mudança. Aprovação humana,
 um escritor por checkout e gates do projeto permanecem obrigatórios.
+
+Para mudança substancial, rollout, release ou propagação, faça um review
+adversarial independente antes de publicar. Registre artefato, `fixed_point`,
+pergunta, reviewer real e veredito; um hook ou review manual satisfaz a mesma
+fronteira, sem repetir a pergunta sobre o mesmo objeto.

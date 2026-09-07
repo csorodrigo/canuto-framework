@@ -97,6 +97,8 @@ done
 if [ -s "$ROOT_DIR/.agents/OPERATING-CONTRACT.md" ] \
   && grep -q '^contract: canuto-operating-contract$' "$ROOT_DIR/.agents/OPERATING-CONTRACT.md" \
   && grep -q '^## Autonomia e autorização$' "$ROOT_DIR/.agents/OPERATING-CONTRACT.md" \
+  && grep -q '^## Execução contínua e progresso$' "$ROOT_DIR/.agents/OPERATING-CONTRACT.md" \
+  && grep -q '^## Orquestração e review$' "$ROOT_DIR/.agents/OPERATING-CONTRACT.md" \
   && grep -q '^## WIP e concorrência$' "$ROOT_DIR/.agents/OPERATING-CONTRACT.md"; then
   pass "shared operating contract has canonical identity and required sections"
 else
@@ -133,6 +135,7 @@ for file_path in \
   "$ROOT_DIR/.agents/tools/codex-maestro.sh" \
   "$ROOT_DIR/.agents/tools/codex-health-check.sh" \
   "$ROOT_DIR/.agents/tools/canuto-consumer-smoke.sh" \
+  "$ROOT_DIR/.agents/tools/run-ledger.sh" \
   "$ROOT_DIR/.agents/tools/vault-sync.sh"; do
   if [ -x "$file_path" ]; then
     pass "runtime executable: ${file_path#$ROOT_DIR/}"
