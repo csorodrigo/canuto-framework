@@ -1,6 +1,6 @@
 ---
 contract: canuto-operating-contract
-version: 1
+version: 2
 ---
 
 # Contrato operacional compartilhado
@@ -29,10 +29,29 @@ versionada em `.agents/OPERATING-CONTRACT.md` pelo instalador do framework.
 - Uma autorização vale somente para os alvos e estados nomeados. Não converta
   autorização de código em autorização de migration, deploy ou operação de dados.
 
+## Execução contínua e progresso
+
+- Trabalho substancial começa com três a sete marcos verificáveis. Cada marco
+  representa um resultado observável, não uma atividade ou estimativa de tempo.
+- Publique progresso apenas no início, quando um marco avançar ou quando o estado
+  de um bloqueio mudar, usando `PROGRESSO [###--] 3/5 | estado verificável |
+  continuo automaticamente`. A barra conta marcos concluídos; não invente
+  porcentagem, prazo, "quase pronto" ou avanço sem evidência.
+- Uma atualização de progresso é intermediária. Continue a tarefa no mesmo turno;
+  não encerre, peça confirmação nem devolva o controle só para narrar o que falta.
+- Pause somente quando faltar informação exclusiva do usuário, uma escolha
+  material não puder ser inferida com segurança ou uma ação irreversível/externa
+  ainda não estiver autorizada. Autorização já concedida continua válida.
+- Quando disponível, persista os marcos com
+  `.agents/tools/run-ledger.sh`; mantenha segredos, credenciais, PII e o prompt
+  bruto fora do ledger.
+
 ## Evidência e estados
 
-- Código presente, teste, typecheck, gate, commit, push, PR, merge, migration,
-  deploy, runtime ativo e aceite externo são estados distintos.
+- `planned`, `implemented`, `reviewed`, `gated`, `merged`, `deployed`,
+  `runtime_verified` e `blocked` são estados distintos. Código presente, teste,
+  typecheck, gate, commit, push, PR, migration e aceite externo também não se
+  substituem.
 - Toda prova deve identificar a árvore ou SHA, o ambiente e o receipt aplicáveis.
   Prova de outro SHA ou ambiente permanece `UNVERIFIED` para o estado atual.
 - Falta de acesso, receipt stale ou ausência de evidência não é sucesso parcial.
@@ -57,6 +76,21 @@ versionada em `.agents/OPERATING-CONTRACT.md` pelo instalador do framework.
 - Publicação entre Mac, GitHub e SSH só está concluída quando cada estado tiver
   receipt próprio e todos os consumidores pretendidos apontarem para a versão
   ou hash canônicos.
+- Antes de review remoto, gate, merge ou deploy, valide acesso, árvore/SHA,
+  dependências e autoridade do ambiente. Não repita uma tentativa enquanto a
+  precondição que falhou permanecer igual.
+
+## Orquestração e review
+
+- Delegue folhas delimitadas de coleta, leitura e trabalho mecânico ao menor
+  perfil configurado que satisfaça o risco. Preserve o root/Maestro para síntese,
+  decisões, mutações e comunicação com o usuário.
+- Mudança substancial, plano de rollout, release ou propagação recebe review
+  adversarial independente antes da publicação. Registre artefato, `fixed_point`,
+  pergunta, reviewer real e veredito.
+- Um hook ou um review manual pode satisfazer a mesma fronteira. Não repita ambos
+  sobre o mesmo objeto, nem repita review com o mesmo `fixed_point` e a mesma
+  pergunta sem mudança de evidência.
 
 ## Modelos e runtimes
 

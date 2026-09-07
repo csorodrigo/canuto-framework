@@ -5,17 +5,17 @@
 # máquina — o caminho canônico de delegação não era distribuído (máquina nova
 # = delegação quebrada). Este template implementa o contrato documentado em
 # .agents/config/models.yaml e é instalado pelo install.sh em
-# ~/.codex/bin/codex-delegate.sh SOMENTE QUANDO AUSENTE — nunca sobrescreve
-# um wrapper já existente na máquina.
+# ~/.codex/bin/codex-delegate.sh. O instalador atualiza cópias que ele gerencia,
+# com backup e receipt de hash, e preserva wrappers locais divergentes.
 #
 # Uso:    codex-delegate.sh <role> <task-file> <out-file>
-# Roles:  coder | reviewer | architect | maestro | fast
+# Roles:  coder | reviewer | architect | maestro | leaf | fast
 #
 # Contrato (fonte: models.yaml — manter os dois coerentes):
-#   model:   CODEX_DELEGATE_MODEL   > models.yaml > gpt-5.5 (hardcoded)
+#   model:   CODEX_DELEGATE_MODEL   > models.yaml > luna (leaf) | gpt-5.5
 #   effort:  (sem env var)          > models.yaml > xhigh (architect/maestro) | high
 #   timeout: CODEX_DELEGATE_TIMEOUT > models.yaml > 1800 (coder/architect/maestro) | 900
-#   sandbox: CODEX_DELEGATE_SANDBOX > models.yaml > read-only (reviewer) | workspace-write
+#   sandbox: leaf=read-only obrigatório; demais roles: env > models.yaml > default
 #
 # Garantias sobre a forma crua (`codex exec` direto):
 #   - passa `-s` explícito (a forma crua herda danger-full-access + never)
@@ -51,7 +51,7 @@ WRAPPER_CWD="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 # erro de uso — nunca chega ao codex.
 [ -n "$ROLE" ] || usage
 case "$ROLE" in
-  coder|reviewer|architect|maestro|fast) : ;;
+  coder|reviewer|architect|maestro|leaf|fast) : ;;
   *)
     mkdir -p "$(dirname "$METRICS")" 2>/dev/null || true
     _ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -63,7 +63,7 @@ case "$ROLE" in
       printf '{"ts":"%s","role":"%s","rc":64,"result":"INVALID_ROLE","bytes":0,"duration":0,"reason":"invalid_role","cwd":"%s"}\n' \
         "$_ts" "$ROLE" "$WRAPPER_CWD" >> "$METRICS" 2>/dev/null || true
     fi
-    echo "[codex-delegate] role inválido: '$ROLE' — válidos: coder|architect|reviewer|fast|maestro" >&2
+    echo "[codex-delegate] role inválido: '$ROLE' — válidos: coder|architect|reviewer|leaf|fast|maestro" >&2
     usage
     ;;
 esac
@@ -90,6 +90,7 @@ yaml_sandbox=$(models_yaml_get "$ROLE" sandbox)
 
 case "$ROLE" in
   architect|maestro) def_effort="xhigh" ;;
+  leaf)               def_effort="low" ;;
   *)                 def_effort="high" ;;
 esac
 case "$ROLE" in
@@ -97,14 +98,27 @@ case "$ROLE" in
   *)                       def_timeout=900 ;;
 esac
 case "$ROLE" in
-  reviewer) def_sandbox="read-only" ;;
-  *)        def_sandbox="workspace-write" ;;
+  reviewer|leaf) def_sandbox="read-only" ;;
+  *)             def_sandbox="workspace-write" ;;
+esac
+case "$ROLE" in
+  leaf) def_model="gpt-5.6-luna" ;;
+  *)    def_model="gpt-5.5" ;;
 esac
 
-MODEL="${CODEX_DELEGATE_MODEL:-${yaml_model:-gpt-5.5}}"
+MODEL="${CODEX_DELEGATE_MODEL:-${yaml_model:-$def_model}}"
 EFFORT="${yaml_effort:-$def_effort}"
 TIMEOUT_S="${CODEX_DELEGATE_TIMEOUT:-${yaml_timeout:-$def_timeout}}"
 SANDBOX="${CODEX_DELEGATE_SANDBOX:-${yaml_sandbox:-$def_sandbox}}"
+
+if [ "$ROLE" = "leaf" ]; then
+  if [ -n "${CODEX_DELEGATE_SANDBOX:-}" ] \
+     && [ "$CODEX_DELEGATE_SANDBOX" != "read-only" ]; then
+    echo "sandbox inválido para leaf: somente read-only é permitido" >&2
+    exit 65
+  fi
+  SANDBOX="read-only"
+fi
 
 case "$EFFORT" in
   low|medium|high|xhigh|max) : ;;

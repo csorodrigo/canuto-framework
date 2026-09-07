@@ -1271,6 +1271,152 @@ else
   fail "contrato operacional sem distribuição, entrypoint ou check de conteúdo"
 fi
 
+# 12f0a. O ledger materializa a barra de progresso entre processos/sessões,
+# avança somente por marcos e não captura o ambiente automaticamente. Os
+# rótulos fornecidos são persistidos literalmente e precisam ser não sensíveis.
+run_ledger_tmp=$(mktemp -d)
+run_ledger="$AGENTS_DIR/tools/run-ledger.sh"
+run_ledger_ok=true
+start_out=$(CANUTO_RUN_LEDGER_ROOT="$run_ledger_tmp" CLAUDE_SESSION_ID="nao-gravar-isto" \
+  bash "$run_ledger" start rollout 5 "fonte canônica localizada" 2>/dev/null) || run_ledger_ok=false
+advance_out=$(CANUTO_RUN_LEDGER_ROOT="$run_ledger_tmp" \
+  bash "$run_ledger" advance rollout 3 "review adversarial em andamento" 2>/dev/null) || run_ledger_ok=false
+status_json=$(CANUTO_RUN_LEDGER_ROOT="$run_ledger_tmp" \
+  bash "$run_ledger" status rollout --json 2>/dev/null) || run_ledger_ok=false
+if CANUTO_RUN_LEDGER_ROOT="$run_ledger_tmp" \
+  bash "$run_ledger" advance rollout 2 "regressão" >/dev/null 2>&1; then
+  run_ledger_ok=false
+fi
+block_out=$(CANUTO_RUN_LEDGER_ROOT="$run_ledger_tmp" \
+  bash "$run_ledger" block rollout "precondição não mudou" 2>/dev/null) || run_ledger_ok=false
+
+mkdir "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock"
+lock_rc=0
+CANUTO_RUN_LEDGER_ROOT="$run_ledger_tmp" \
+  bash "$run_ledger" advance rollout 4 "não deve entrar" >/dev/null 2>&1 || lock_rc=$?
+if [ "$lock_rc" -ne 75 ] || [ ! -d "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock" ]; then
+  run_ledger_ok=false
+fi
+rmdir "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock"
+
+# A slow host may spend several seconds between mkdir and publishing owner.
+# Keep that lock intact inside the grace window, then recover it after expiry.
+mkdir "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock"
+python3 - "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock" <<'PYEOF'
+import os, sys, time
+stamp = time.time() - 10
+os.utime(sys.argv[1], (stamp, stamp))
+PYEOF
+ownerless_grace_rc=0
+CANUTO_RUN_LEDGER_ROOT="$run_ledger_tmp" \
+  bash "$run_ledger" advance rollout 4 "não deve entrar" >/dev/null 2>&1 \
+  || ownerless_grace_rc=$?
+if [ "$ownerless_grace_rc" -ne 75 ] \
+  || [ ! -d "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock" ]; then
+  run_ledger_ok=false
+fi
+rmdir "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock"
+
+mkdir "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock"
+python3 - "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock" <<'PYEOF'
+import os, sys, time
+stamp = time.time() - 31
+os.utime(sys.argv[1], (stamp, stamp))
+PYEOF
+ownerless_stale_out=$(CANUTO_RUN_LEDGER_ROOT="$run_ledger_tmp" \
+  bash "$run_ledger" block rollout "lock sem owner expirado recuperado" 2>/dev/null) \
+  || run_ledger_ok=false
+
+mkdir "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock"
+: > "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock/owner"
+malformed_lock_rc=0
+CANUTO_RUN_LEDGER_ROOT="$run_ledger_tmp" \
+  bash "$run_ledger" advance rollout 4 "não deve entrar" >/dev/null 2>&1 \
+  || malformed_lock_rc=$?
+if [ "$malformed_lock_rc" -ne 75 ] \
+  || [ ! -f "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock/owner" ]; then
+  run_ledger_ok=false
+fi
+rm -f "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock/owner"
+rmdir "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock"
+
+mkdir "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock"
+printf '%s\n' "$$" > "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock/owner"
+touch -t 200001010000 "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock/owner"
+live_incomplete_lock_rc=0
+CANUTO_RUN_LEDGER_ROOT="$run_ledger_tmp" \
+  bash "$run_ledger" block rollout "não deve entrar" >/dev/null 2>&1 \
+  || live_incomplete_lock_rc=$?
+if [ "$live_incomplete_lock_rc" -ne 75 ] \
+  || ! grep -q "^$$$" "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock/owner"; then
+  run_ledger_ok=false
+fi
+rm -f "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock/owner"
+rmdir "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock"
+
+live_lock_token=$(ps -o lstart= -p "$$" 2>/dev/null | tr -d '\n' | cksum | awk '{print $1 ":" $2}')
+mkdir "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock"
+printf '%s %s %s\n' "$$" "$live_lock_token" external \
+  > "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock/owner"
+live_lock_rc=0
+CANUTO_RUN_LEDGER_ROOT="$run_ledger_tmp" \
+  bash "$run_ledger" block rollout "não deve entrar" >/dev/null 2>&1 \
+  || live_lock_rc=$?
+if [ "$live_lock_rc" -ne 75 ] \
+  || ! grep -q "^$$ $live_lock_token external$" "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock/owner"; then
+  run_ledger_ok=false
+fi
+rm -f "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock/owner"
+rmdir "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock"
+
+mkdir "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock"
+printf '%s %s %s\n' "$$" token-de-outro-processo external \
+  > "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock/owner"
+pid_reuse_out=$(CANUTO_RUN_LEDGER_ROOT="$run_ledger_tmp" \
+  bash "$run_ledger" block rollout "pid reutilizado recuperado" 2>/dev/null) \
+  || run_ledger_ok=false
+
+mkdir "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock"
+printf '%s\n' 99999999 > "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock/owner"
+stale_lock_out=$(CANUTO_RUN_LEDGER_ROOT="$run_ledger_tmp" \
+  bash "$run_ledger" advance rollout 4 "lock abandonado recuperado" 2>/dev/null) \
+  || run_ledger_ok=false
+finish_out=$(CANUTO_RUN_LEDGER_ROOT="$run_ledger_tmp" \
+  bash "$run_ledger" finish rollout "ambientes verificados" 2>/dev/null) || run_ledger_ok=false
+
+if [ "$run_ledger_ok" = true ] \
+  && [ "$start_out" = "PROGRESSO [-----] 0/5 | fonte canônica localizada | continuo automaticamente" ] \
+  && [ "$advance_out" = "PROGRESSO [###--] 3/5 | review adversarial em andamento | continuo automaticamente" ] \
+  && printf '%s' "$block_out" | grep -q '^PROGRESSO \[###--\] 3/5 | BLOQUEADO:' \
+  && printf '%s' "$ownerless_stale_out" | grep -q '^PROGRESSO \[###--\] 3/5 | BLOQUEADO: lock sem owner expirado recuperado' \
+  && printf '%s' "$pid_reuse_out" | grep -q '^PROGRESSO \[###--\] 3/5 | BLOQUEADO: pid reutilizado recuperado' \
+  && [ "$stale_lock_out" = "PROGRESSO [####-] 4/5 | lock abandonado recuperado | continuo automaticamente" ] \
+  && [ ! -e "$run_ledger_tmp/.agents/tmp/run-ledger/.rollout.lock" ] \
+  && [ "$finish_out" = "PROGRESSO [#####] 5/5 | CONCLUÍDO: ambientes verificados" ] \
+  && python3 - "$status_json" <<'PYEOF'
+import json, sys
+record = json.loads(sys.argv[1])
+assert record["done"] == 3
+assert record["total"] == 5
+assert record["status"] == "active"
+assert set(record) == {"createdAt", "done", "id", "schemaVersion", "state", "status", "total", "updatedAt"}
+assert "nao-gravar-isto" not in sys.argv[1]
+PYEOF
+then
+  pass "run-ledger persiste rótulos, mantém monotonicidade e preserva lock alheio"
+else
+  fail "run-ledger perdeu formato, persistência, monotonicidade ou propriedade do lock"
+fi
+rm -rf "$run_ledger_tmp"
+
+if grep -qF '".agents/tools/run-ledger.sh"' "$FRAMEWORK_DIR/install.sh" \
+  && grep -q '^## Execução contínua e progresso$' "$AGENTS_DIR/OPERATING-CONTRACT.md" \
+  && grep -q '^## Orquestração e review$' "$AGENTS_DIR/OPERATING-CONTRACT.md"; then
+  pass "execução contínua, ledger e review adversarial integram a distribuição"
+else
+  fail "contrato de execução contínua está fora da distribuição"
+fi
+
 # 12f0b. gates.env é configuração do consumidor: seed if missing, nunca
 # artefato sobrescrito/hash-checked pelo framework.
 framework_block=$(sed -n '/^FRAMEWORK_FILES=(/,/^)/p' "$FRAMEWORK_DIR/install.sh")
@@ -1334,13 +1480,18 @@ contract_first_head=$(git -C "$contract_only_tmp" rev-parse HEAD 2>/dev/null || 
   || contract_only_ok=false
 contract_second_head=$(git -C "$contract_only_tmp" rev-parse HEAD 2>/dev/null || true)
 contract_names=$(git -C "$contract_only_tmp" diff-tree --no-commit-id --name-only -r "$contract_first_head" | sort)
-contract_expected=$(printf '%s\n' .agents/CONTRACT-RECEIPT.json .agents/OPERATING-CONTRACT.md AGENTS.md CLAUDE.md | sort)
+contract_expected=$(printf '%s\n' .agents/CONTRACT-RECEIPT.json .agents/OPERATING-CONTRACT.md .agents/tools/run-ledger.sh .claude/agents/canuto-leaf.md .gitignore AGENTS.md CLAUDE.md | sort)
 
 if [ "$contract_only_ok" = true ] \
   && [ "$contract_first_head" = "$contract_second_head" ] \
   && [ "$contract_names" = "$contract_expected" ] \
   && git -C "$contract_only_tmp" ls-files --error-unmatch .agents/OPERATING-CONTRACT.md >/dev/null 2>&1 \
+  && git -C "$contract_only_tmp" ls-files --error-unmatch .agents/tools/run-ledger.sh >/dev/null 2>&1 \
   && git -C "$contract_only_tmp" ls-files --error-unmatch .agents/CONTRACT-RECEIPT.json >/dev/null 2>&1 \
+  && git -C "$contract_only_tmp" ls-files --error-unmatch .claude/agents/canuto-leaf.md >/dev/null 2>&1 \
+  && [ -x "$contract_only_tmp/.agents/tools/run-ledger.sh" ] \
+  && grep -q '^tools: Read, Glob, Grep$' "$contract_only_tmp/.claude/agents/canuto-leaf.md" \
+  && grep -Fqx '.agents/tmp/' "$contract_only_tmp/.gitignore" \
   && [ "$contract_hook_before" = "$(cksum < "$contract_only_tmp/.agents/hooks/product-gate.sh")" ] \
   && [ "$(grep -c 'Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is the shared' "$contract_only_tmp/AGENTS.md")" = "1" ] \
   && [ "$(grep -c 'Read `.agents/OPERATING-CONTRACT.md` before non-trivial work; it is the shared' "$contract_only_tmp/CLAUDE.md")" = "1" ] \
@@ -1662,26 +1813,131 @@ else
   fail "install.sh voltou a criar blocos [profiles.*] mortos"
 fi
 
-# 12h. Wrapper canônico de delegação: template versionado + install-if-missing
+# 12h. Wrapper canônico de delegação: instala, atualiza cópia gerenciada e
+# preserva uma cópia local divergente.
 DELEGATE="$AGENTS_DIR/tools/codex-delegate.sh"
 if [ -x "$DELEGATE" ] && grep -q "template versionado" "$DELEGATE" \
-  && grep -q 'codex-delegate.sh.*bin/codex-delegate.sh' "$FRAMEWORK_DIR/install.sh"; then
-  pass "codex-delegate.sh: template versionado + instalado quando ausente"
+  && grep -q '^install_codex_delegate_wrapper() {' "$FRAMEWORK_DIR/install.sh"; then
+  pass "codex-delegate.sh: template versionado + instalador gerenciado"
 else
   fail "codex-delegate.sh sem template versionado ou sem wiring no install.sh"
 fi
 
+delegate_install_tmp=$(mktemp -d)
+mkdir -p "$delegate_install_tmp/home/.codex/bin"
+cat > "$delegate_install_tmp/home/.codex/bin/codex-delegate.sh" <<'EOF'
+#!/usr/bin/env bash
+# codex-delegate.sh — wrapper canônico de delegação Codex (template versionado).
+echo antigo
+EOF
+chmod +x "$delegate_install_tmp/home/.codex/bin/codex-delegate.sh"
+if command -v sha256sum >/dev/null 2>&1; then
+  old_delegate_hash=$(sha256sum "$delegate_install_tmp/home/.codex/bin/codex-delegate.sh" | awk '{print $1}')
+else
+  old_delegate_hash=$(shasum -a 256 "$delegate_install_tmp/home/.codex/bin/codex-delegate.sh" | awk '{print $1}')
+fi
+printf '%s\n' "$old_delegate_hash" > "$delegate_install_tmp/home/.codex/bin/.codex-delegate.canuto.sha256"
+
+delegate_install_ok=true
+( cd "$FRAMEWORK_DIR" \
+  && HOME="$delegate_install_tmp/home" CANUTO_INSTALL_LIBRARY_ONLY=1 bash -c \
+    'source ./install.sh; install_codex_delegate_wrapper' >/dev/null 2>&1 ) \
+  || delegate_install_ok=false
+if [ "$delegate_install_ok" = true ] \
+  && cmp -s "$DELEGATE" "$delegate_install_tmp/home/.codex/bin/codex-delegate.sh" \
+  && compgen -G "$delegate_install_tmp/home/.codex/bin/codex-delegate.sh.canuto-backup.*" >/dev/null \
+  && [ -s "$delegate_install_tmp/home/.codex/bin/.codex-delegate.canuto.sha256" ]; then
+  pass "instalador atualiza wrapper Codex gerenciado com backup e receipt"
+else
+  fail "instalador não atualizou com segurança o wrapper Codex gerenciado"
+fi
+
+printf '%s\n' '#!/usr/bin/env bash' 'echo wrapper-local' \
+  > "$delegate_install_tmp/home/.codex/bin/codex-delegate.sh"
+chmod +x "$delegate_install_tmp/home/.codex/bin/codex-delegate.sh"
+rm -f "$delegate_install_tmp/home/.codex/bin/.codex-delegate.canuto.sha256"
+delegate_local_before=$(cksum < "$delegate_install_tmp/home/.codex/bin/codex-delegate.sh")
+( cd "$FRAMEWORK_DIR" \
+  && HOME="$delegate_install_tmp/home" CANUTO_INSTALL_LIBRARY_ONLY=1 bash -c \
+    'source ./install.sh; install_codex_delegate_wrapper' >/dev/null 2>&1 ) \
+  || delegate_install_ok=false
+if [ "$delegate_install_ok" = true ] \
+  && [ "$delegate_local_before" = "$(cksum < "$delegate_install_tmp/home/.codex/bin/codex-delegate.sh")" ]; then
+  pass "instalador preserva wrapper Codex local divergente"
+else
+  fail "instalador sobrescreveu wrapper Codex local divergente"
+fi
+rm -rf "$delegate_install_tmp"
+
 # 12i. O parser do wrapper casa TODOS os roles do models.yaml (regressão do
 # formato flow-style — a mesma que deixou 211 delegações no default errado)
 BROKEN_ROLES=()
-for r in coder reviewer architect maestro fast; do
+for r in coder reviewer architect maestro leaf fast; do
   grep -Eq "^[[:space:]]{2}${r}:[[:space:]]*\{" "$AGENTS_DIR/config/models.yaml" || BROKEN_ROLES+=("$r")
 done
 if [ ${#BROKEN_ROLES[@]} -eq 0 ]; then
-  pass "models.yaml flow-style parseável para os 5 roles"
+  pass "models.yaml flow-style parseável para os 6 roles"
 else
   fail "models.yaml não parseável para: ${BROKEN_ROLES[*]} (block-style volta a ser decorativo)"
 fi
+
+# 12i1. A rota leaf precisa ser econômica e mecanicamente read-only; fast
+# continua disponível para pequenos edits mutáveis.
+delegate_exec_tmp=$(mktemp -d)
+mkdir -p "$delegate_exec_tmp/home" "$delegate_exec_tmp/bin"
+cat > "$delegate_exec_tmp/bin/codex" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = "login" ] && [ "${2:-}" = "status" ]; then
+  exit 0
+fi
+printf '%s\n' "$@" > "$FAKE_CODEX_ARGS"
+out=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then
+    shift
+    out="$1"
+  fi
+  shift
+done
+cat >/dev/null
+printf 'evidência do agente\n' > "$out"
+EOF
+chmod +x "$delegate_exec_tmp/bin/codex"
+printf 'inspecione o escopo\n' > "$delegate_exec_tmp/task.md"
+
+delegate_exec_ok=true
+HOME="$delegate_exec_tmp/home" PATH="$delegate_exec_tmp/bin:$PATH" \
+  FAKE_CODEX_ARGS="$delegate_exec_tmp/leaf.args" \
+  CANUTO_METRICS_FILE="$delegate_exec_tmp/metrics.jsonl" \
+  CODEX_DELEGATE_MODELS_YAML="$AGENTS_DIR/config/models.yaml" \
+  bash "$DELEGATE" leaf "$delegate_exec_tmp/task.md" "$delegate_exec_tmp/leaf.md" \
+  >/dev/null 2>&1 || delegate_exec_ok=false
+HOME="$delegate_exec_tmp/home" PATH="$delegate_exec_tmp/bin:$PATH" \
+  FAKE_CODEX_ARGS="$delegate_exec_tmp/fast.args" \
+  CANUTO_METRICS_FILE="$delegate_exec_tmp/metrics.jsonl" \
+  CODEX_DELEGATE_MODELS_YAML="$AGENTS_DIR/config/models.yaml" \
+  bash "$DELEGATE" fast "$delegate_exec_tmp/task.md" "$delegate_exec_tmp/fast.md" \
+  >/dev/null 2>&1 || delegate_exec_ok=false
+if HOME="$delegate_exec_tmp/home" PATH="$delegate_exec_tmp/bin:$PATH" \
+  FAKE_CODEX_ARGS="$delegate_exec_tmp/leaf-override.args" \
+  CANUTO_METRICS_FILE="$delegate_exec_tmp/metrics.jsonl" \
+  CODEX_DELEGATE_MODELS_YAML="$AGENTS_DIR/config/models.yaml" \
+  CODEX_DELEGATE_SANDBOX=workspace-write \
+  bash "$DELEGATE" leaf "$delegate_exec_tmp/task.md" "$delegate_exec_tmp/leaf-override.md" \
+  >/dev/null 2>&1; then
+  delegate_exec_ok=false
+fi
+
+if [ "$delegate_exec_ok" = true ] \
+  && grep -qx 'read-only' "$delegate_exec_tmp/leaf.args" \
+  && grep -qx 'gpt-5.6-luna' "$delegate_exec_tmp/leaf.args" \
+  && grep -qx 'model_reasoning_effort="low"' "$delegate_exec_tmp/leaf.args" \
+  && grep -qx 'workspace-write' "$delegate_exec_tmp/fast.args"; then
+  pass "codex-delegate força leaf read-only/luna/low e mantém fast mutável"
+else
+  fail "codex-delegate não aplicou a separação leaf read-only versus fast mutável"
+fi
+rm -rf "$delegate_exec_tmp"
 
 # 12j. postdelegate-verify não dispara em bash -n/cp/chmod do arquivo do wrapper
 if grep -q '""|-\*)' "$AGENTS_DIR/hooks/postdelegate-verify.sh" 2>/dev/null \
@@ -1854,6 +2110,107 @@ PYEOF
     SEM_HEADER)  fail "claude-agent-mcp.py sem cabeçalho PEP 723 — a dependência não está declarada em lugar nenhum" ;;
     *)           fail "claude-agent-mcp.py: não achei a dependência 'mcp' declarada ($DEP_VERDICT)" ;;
   esac
+
+  # 14a1. Exercita a construção dos comandos sem depender do pacote MCP real.
+  # O fake registra os nomes das tools para provar que cheap reutiliza somente
+  # o servidor architect e não cria um terceiro processo no startup.
+  if python3 - "$MCP_PY" <<'PYEOF' >/dev/null 2>&1
+import importlib.util
+import sys
+import types
+
+
+class DummyContext:
+    pass
+
+
+class DummyFastMCP:
+    def __init__(self, name):
+        self.name = name
+        self.tool_names = []
+
+    def tool(self):
+        def register(func):
+            self.tool_names.append(func.__name__)
+            return func
+        return register
+
+    def run(self):
+        pass
+
+
+mcp_module = types.ModuleType("mcp")
+server_module = types.ModuleType("mcp.server")
+fastmcp_module = types.ModuleType("mcp.server.fastmcp")
+fastmcp_module.Context = DummyContext
+fastmcp_module.FastMCP = DummyFastMCP
+mcp_module.server = server_module
+server_module.fastmcp = fastmcp_module
+sys.modules["mcp"] = mcp_module
+sys.modules["mcp.server"] = server_module
+sys.modules["mcp.server.fastmcp"] = fastmcp_module
+
+spec = importlib.util.spec_from_file_location("canuto_claude_agent_mcp", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+
+old_argv = sys.argv
+try:
+    sys.argv = ["claude-agent-mcp", "--server-name", "leaf-test", "--mode", "cheap"]
+    parsed = module._parse_args()
+finally:
+    sys.argv = old_argv
+assert parsed.mode == "cheap"
+
+cheap = module.ServerConfig("leaf-test", None, "cheap", {})
+architect = module.ServerConfig("architect-test", None, "architect", {})
+reviewer = module.ServerConfig("reviewer-test", None, "reviewer", {})
+cheap_cmd = module._build_claude_cmd(claude_exec="claude", config=cheap)
+architect_cmd = module._build_claude_cmd(claude_exec="claude", config=architect)
+reviewer_cmd = module._build_claude_cmd(claude_exec="claude", config=reviewer)
+
+assert "--restricted" in cheap_cmd
+assert "--strict-mcp-config" in cheap_cmd
+tools_at = cheap_cmd.index("--tools")
+assert cheap_cmd[tools_at + 1:tools_at + 4] == ["Read", "Glob", "Grep"]
+permission_at = cheap_cmd.index("--permission-mode")
+assert cheap_cmd[permission_at + 1] == "dontAsk"
+assert "auto" not in cheap_cmd
+for command in (architect_cmd, reviewer_cmd):
+    permission_at = command.index("--permission-mode")
+    assert command[permission_at + 1] == "auto"
+
+architect_server = module._build_server(architect)
+reviewer_server = module._build_server(reviewer)
+assert "spawn_cheap_agent" in architect_server.tool_names
+assert "spawn_cheap_agent" not in reviewer_server.tool_names
+PYEOF
+  then
+    pass "Claude cheap é read-only e reutiliza somente o MCP architect"
+  else
+    fail "Claude cheap perdeu flags read-only ou superfície MCP esperada"
+  fi
+
+  if ! grep -q 'claude-cheap' "$FRAMEWORK_DIR/install.sh" "$AGENTS_DIR/hooks/install.sh"; then
+    pass "instaladores mantêm somente dois MCPs Claude no startup"
+  else
+    fail "instalador registrou claude-cheap como terceiro MCP de startup"
+  fi
+
+  CLAUDE_LEAF="$FRAMEWORK_DIR/.claude/agents/canuto-leaf.md"
+  cheap_model=$(sed -nE 's/^[[:space:]]{2}cheap:[[:space:]]*\{[[:space:]]*model:[[:space:]]*([^, }]+).*/\1/p' "$AGENTS_DIR/config/models.yaml" | head -1)
+  leaf_model=$(sed -nE 's/^model:[[:space:]]*([^[:space:]]+).*/\1/p' "$CLAUDE_LEAF" | head -1)
+  leaf_tools=$(sed -nE 's/^tools:[[:space:]]*(.*)/\1/p' "$CLAUDE_LEAF" | head -1)
+  if [ -f "$CLAUDE_LEAF" ] \
+    && [ "$cheap_model" = "$leaf_model" ] \
+    && [ "$leaf_tools" = "Read, Glob, Grep" ] \
+    && grep -qF '".claude/agents/canuto-leaf.md"' "$FRAMEWORK_DIR/install.sh" \
+    && grep -q 'subagente `canuto-leaf` numa sessão Claude' "$FRAMEWORK_DIR/global-skills/canuto-orchestrate/SKILL.md"; then
+    pass "Claude root recebe canuto-leaf econômico, distribuído e somente leitura"
+  else
+    fail "Claude root ficou sem rota canuto-leaf econômica ou houve drift de modelo/tools"
+  fi
 
   # 14b. Nenhum wrapper pode emprestar o virtualenv de um pacote de terceiro.
   BORROWED=""
@@ -3044,7 +3401,7 @@ if (cd "$COMMIT_REPO" && HOME="$CONSENT_HOME" CANUTO_SOURCE_DIR="$FRAMEWORK_DIR"
   COMMIT_PATHS=$(git -C "$COMMIT_REPO" diff-tree --no-commit-id --name-only -r HEAD | LC_ALL=C sort | tr '\n' ' ')
   if [ "$COMMIT_COUNT_AFTER" -eq $((COMMIT_COUNT_BEFORE + 1)) ] \
      && [ -z "$(git -C "$COMMIT_REPO" status --porcelain)" ] \
-     && [ "$COMMIT_PATHS" = ".agents/CONTRACT-RECEIPT.json .agents/OPERATING-CONTRACT.md AGENTS.md CLAUDE.md " ]; then
+     && [ "$COMMIT_PATHS" = ".agents/CONTRACT-RECEIPT.json .agents/OPERATING-CONTRACT.md .agents/tools/run-ledger.sh .claude/agents/canuto-leaf.md .gitignore AGENTS.md CLAUDE.md " ]; then
     pass "21b --commit cria um commit limitado aos paths declarados"
   else
     fail "21b commit explícito não convergiu ou incluiu paths indevidos: $COMMIT_PATHS"
@@ -3382,9 +3739,9 @@ fi
 rm -rf "$SOURCE_ROOT"
 echo ""
 # ═══════════════════════════════════════════════════════════════════════════
-# TEST 23: Release v1.8.0 e prova cross-platform
+# TEST 23: Release v1.9.0 e prova cross-platform
 # ═══════════════════════════════════════════════════════════════════════════
-echo "── Test 23: Release v1.8.0 e prova cross-platform ──"
+echo "── Test 23: Release v1.9.0 e prova cross-platform ──"
 
 RELEASE_VERSION=$(tr -d '[:space:]' < "$FRAMEWORK_DIR/.agents/VERSION")
 MANIFEST_VERSION=$(python3 - "$FRAMEWORK_DIR/distribution/release.json" <<'PYEOF'
@@ -3393,11 +3750,11 @@ with open(sys.argv[1], encoding="utf-8") as fh:
     print(json.load(fh)["version"])
 PYEOF
 )
-if [ "$RELEASE_VERSION" = "1.8.0" ] \
+if [ "$RELEASE_VERSION" = "1.9.0" ] \
   && [ "$MANIFEST_VERSION" = "$RELEASE_VERSION" ] \
-  && grep -q '^# Canuto Framework v1\.8$' "$FRAMEWORK_DIR/README.md" \
-  && grep -q '^# Canuto Framework v1\.8 Summary$' "$FRAMEWORK_DIR/SUMMARY.md"; then
-  pass "23a VERSION, release manifest, README e SUMMARY convergem em 1.8.0"
+  && grep -q '^# Canuto Framework v1\.9$' "$FRAMEWORK_DIR/README.md" \
+  && grep -q '^# Canuto Framework v1\.9 Summary$' "$FRAMEWORK_DIR/SUMMARY.md"; then
+  pass "23a VERSION, release manifest, README e SUMMARY convergem em 1.9.0"
 else
   fail "23a superfícies de versão divergiram: VERSION=$RELEASE_VERSION manifest=$MANIFEST_VERSION"
 fi

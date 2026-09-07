@@ -61,6 +61,7 @@ já era gpt-5.6).
 | `reviewer` | Review de código e plano (roda read-only) |
 | `architect` | Arquitetura, decomposição complexa |
 | `maestro` | Orquestração em runtime Codex direto |
+| `leaf` | Coleta e leitura econômica (roda read-only) |
 | `fast` | Edits rápidos, formatação, docs (tier mais barato) |
 
 Caminho canônico:

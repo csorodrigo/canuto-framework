@@ -18,17 +18,17 @@
 # ele volta a ser decorativo — e silenciosamente.
 #
 # Teste de regressão (deve imprimir uma linha por role):
-#   for r in coder reviewer architect maestro fast; do
+#   for r in coder reviewer architect maestro leaf fast; do
 #     grep -E "^[[:space:]]{2}${r}:[[:space:]]*\{" .agents/config/models.yaml || echo "QUEBRADO: $r"
 #   done
 
-last-updated: 2026-07-26
+last-updated: 2026-09-07
 
 # ── Precedência efetiva (codex-delegate.sh) ──────────────────────────────────
 #   model:   CODEX_DELEGATE_MODEL    > este arquivo > gpt-5.5 (hardcoded)
 #   effort:  (sem env var)           > este arquivo > high/xhigh por role
 #   timeout: CODEX_DELEGATE_TIMEOUT  > este arquivo > 1800 (coder/architect/maestro) | 900
-#   sandbox: CODEX_DELEGATE_SANDBOX  > este arquivo > read-only (reviewer) | workspace-write
+#   sandbox: CODEX_DELEGATE_SANDBOX  > este arquivo > read-only (reviewer/leaf) | workspace-write
 # Não existe CODEX_DELEGATE_EFFORT. Effort só entra por este arquivo.
 
 # ── Codex (tier-2: implementação e review) ───────────────────────────────────
@@ -46,7 +46,7 @@ last-updated: 2026-07-26
 # Ou seja: ~2pp de qualidade entre sol e luna contra 5× de preço.
 #
 # luna é o tier NANO — sucessor do gpt-5.4-mini no mapa de upgrade do registry,
-# não do modelo frontier. Por isso ele fica só em `fast`.
+# não do modelo frontier. Por isso ele atende `leaf` e `fast`.
 #
 # ⚠️ CORREÇÃO DE INVERSÃO NA SUA CONFIG: ~/.codex/coder.config.toml aponta o
 # coder para luna (tier mais fraco) em xhigh — pagando latência de raciocínio
@@ -73,11 +73,13 @@ roles:
   reviewer:  { model: gpt-5.6-sol,  effort: medium, timeout: 1200, sandbox: read-only }
   architect: { model: gpt-5.6-sol,  effort: xhigh, timeout: 2400, sandbox: workspace-write }
   maestro:   { model: gpt-5.6-sol,  effort: xhigh, timeout: 1800, sandbox: workspace-write }
+  leaf:      { model: gpt-5.6-luna, effort: low,   timeout: 900,  sandbox: read-only }
   fast:      { model: gpt-5.6-luna, effort: low,   timeout: 900,  sandbox: workspace-write }
 
 # Por que sol em quase tudo: só sol tem `tool_mode: code_mode` (terra/luna são
 # `code_mode_only`) e lidera todos os benchmarks de coding. `fast` é o único
-# slot desenhado para luna — trabalho mecânico, docs, formatação.
+# tier desenhado para luna: `leaf` cobre coleta read-only; `fast`, trabalho
+# mecânico mutável, docs e formatação.
 # Se custo apertar, o degrau é `terra` (não luna) para coder/reviewer:
 # 77.4 vs 80 no índice, metade do preço, e mantém `ultra` + multi_agent v2.
 #
@@ -100,12 +102,9 @@ roles:
 # modelo. luna suporta max (1102 turns reais medidos); sol também (27944).
 
 # Wrapper VERSIONADO desde 2026-07-27: template em .agents/tools/codex-delegate.sh,
-# instalado pelo install.sh em ~/.codex/bin/ SOMENTE quando ausente (nunca
-# sobrescreve o wrapper existente da máquina). O template aceita
-# low|medium|high|xhigh|max. ATENÇÃO: máquinas com wrapper antigo (pré-template)
-# podem validar apenas high|xhigh — antes de pinar `max` num role canônico,
-# confirme que o wrapper da máquina é o template (grep 'template versionado'
-# ~/.codex/bin/codex-delegate.sh) ou atualize-o manualmente.
+# instalado pelo install.sh em ~/.codex/bin/. Cópias gerenciadas são atualizadas
+# com backup e receipt de hash; wrappers locais divergentes são preservados. O
+# template aceita low|medium|high|xhigh|max.
 
 # ── Claude (tier-1: orquestração e decisão) ──────────────────────────────────
 # Use ALIAS, não versão fixa. `claude --model` aceita `fable`/`opus`/`sonnet`
@@ -128,6 +127,10 @@ claude:
   investigator:   { model: fable,  id: claude-fable-5,             fallback: opus,   notes: "causa raiz é o caso de ambiguidade máxima; vale o topo" }
   contextualizer: { model: sonnet, id: claude-sonnet-5,            fallback: haiku,  notes: "varredura ampla de repositório — volume, não profundidade" }
   cheap:          { model: sonnet, id: claude-sonnet-5,            fallback: haiku,  notes: "subagentes, varredura, trabalho mecânico" }
+
+# `.claude/agents/canuto-leaf.md` espelha o alias de `cheap` para que o Agent
+# tool de uma sessão Claude tenha uma rota nativa. test-framework.sh falha se
+# os dois divergirem; o YAML continua sendo a fonte canônica da escolha.
 
 # `--fallback-model` é nativo do claude CLI: "Enable automatic fallback to
 # specified model(s) when the default model is overloaded or not available.

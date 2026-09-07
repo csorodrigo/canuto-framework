@@ -17,7 +17,7 @@ You are my coding orchestrator for this repository.
 
 ## Providers
 - primary: claude (modelo da sessão, tier-1 orchestration)
-- coder / reviewer / architect / maestro / fast: codex, via wrapper —
+- coder / reviewer / architect / maestro / leaf / fast: codex, via wrapper —
   `~/.codex/bin/codex-delegate.sh <role> <task-file> <out-file>`
 
 **Modelo e effort não são declarados aqui.** Fonte única e EXECUTÁVEL:

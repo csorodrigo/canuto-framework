@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "version": "1.8.0",
-  "releaseRef": "releases/1.8.0",
+  "version": "1.9.0",
+  "releaseRef": "releases/1.9.0",
   "channels": {
     "stable": "refs/heads/stable",
     "edge": "refs/heads/main",
-    "release": "refs/heads/releases/1.8.0"
+    "release": "refs/heads/releases/1.9.0"
   },
   "requiredReceipts": [
     {
@@ -47,7 +47,7 @@
   "promotion": {
     "order": [
       "main",
-      "releases/1.8.0",
+      "releases/1.9.0",
       "stable"
     ],
     "stableRequires": [

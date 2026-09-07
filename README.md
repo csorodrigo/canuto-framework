@@ -1,8 +1,8 @@
-# Canuto Framework v1.8
+# Canuto Framework v1.9
 
 Personal multi-agent framework for AI-assisted development. Claude-first by default, Codex-maestro when you are talking directly to Codex. Obsidian-native memory.
 
-Version 1.8 hardens the operational platform: machine-blind defaults, explicit Git consent, stable/edge source pinning, deterministic receipts, and cross-platform consumer validation now sit alongside the Obsidian-native learning loop.
+Version 1.9 adds continuous execution with milestone-based progress, a persistent run ledger, economical leaf routing, and one adversarial review boundary for substantial publication and rollout work.
 
 ## O que mudou em 2026-07 (absorção edge-of-chaos)
 
@@ -116,6 +116,7 @@ Decisões completas (com alternativas rejeitadas e porquê): [`docs/adr/`](docs/
 
 docs/adr/               — Architecture Decision Records (contexto, opções rejeitadas e porquê, consequências).
 .claude/agents/blind-reviewer.md — Subagent revisor cego (só Read/Grep/Glob).
+.claude/agents/canuto-leaf.md — Folha econômica do Claude (Sonnet, só Read/Glob/Grep).
 
 ~/.canuto/vault/          — Global Obsidian vault (one for all projects)
   projects/
@@ -190,9 +191,9 @@ The default source is **`stable`**. `main` is the explicit **edge** channel:
 ```bash
 bash install.sh --update                    # stable
 bash install.sh --update --channel edge     # main
-bash install.sh --update --version 1.8.0    # releases/1.8.0
+bash install.sh --update --version 1.9.0    # releases/1.9.0
 bash install.sh --update --ref <commit-sha> # exact pin
-bash install.sh --rollback 1.7.0            # explicit rollback
+bash install.sh --rollback 1.8.0            # explicit rollback
 ```
 
 A full install/update writes `.agents/SOURCE-RECEIPT.json`, binding the selected
@@ -313,7 +314,7 @@ Apos a instalacao, abra o projeto em Claude ou inicie o runtime direto do Codex 
 1. **Bootstrap**: carrega `CLAUDE.md`, personas, skills, vault, context package e projeto ativo.
 2. **Session start**: consulta o vault direto no filesystem (paths resolvidos por `.agents/tools/canuto-memory.sh`), carrega latest session, pending tasks, instincts e stale-context signals. Se setup/memoria/contexto parecerem suspeitos, roda `canuto-project-doctor`.
 3. **Planejamento**: limita objetivos da sessao, detecta estilo do projeto e escolhe personas/skills relevantes.
-4. **Execucao**: Architect, Coder e Reviewer trabalham no fluxo minimo valido; Coder escreve os testes no mesmo spawn e `/test` ou `/fix` entram quando a task exige QA/debugging dedicado. `canuto-rework-detector` entra quando houver retry loop, review loop, teste repetido ou pendencia recorrente.
+4. **Execucao**: Architect, Coder e Reviewer trabalham no fluxo minimo valido; coleta delimitada usa `canuto-leaf` no Claude ou `leaf` no Codex. Coder escreve os testes no mesmo spawn e `/test` ou `/fix` entram quando a task exige QA/debugging dedicado. `canuto-rework-detector` entra quando houver retry loop, review loop, teste repetido ou pendencia recorrente.
 5. **QA e review**: Reviewer valida risco, testes, handoffs, PR readiness e, quando aplicavel, skills opcionais de dominio.
 6. **Session end**: `canuto-session-end-learning` reconcilia goals, pending, decisions, metrics, rework e candidate instincts.
 7. **Write-back seguro**: `obsidian-writeback-queue` prepara preview/queue antes de qualquer escrita fora da memoria normal do projeto.

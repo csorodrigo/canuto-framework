@@ -35,7 +35,7 @@ import asyncio
 import os
 import shutil
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from mcp.server.fastmcp import Context, FastMCP
@@ -52,6 +52,7 @@ RETRY_BASE_DELAY = 2.0
 MODE_DEFAULTS = {
     "architect": "fable",
     "reviewer": "opus",
+    "cheap": "sonnet",
 }
 
 # `--fallback-model` e nativo: "automatic fallback ... when the default model is
@@ -60,11 +61,17 @@ MODE_DEFAULTS = {
 MODE_FALLBACKS = {
     "architect": "opus,sonnet",
     "reviewer": "sonnet",
+    "cheap": "haiku",
 }
 
 ARCHITECT_SYSTEM_PROMPT = (
     "You are acting as Architect in a multi-agent AI framework. "
     "Respond with structured plans and analysis only. Be concise and direct."
+)
+
+CHEAP_SYSTEM_PROMPT = (
+    "You are a bounded read-only leaf. Inspect only the requested scope, do not "
+    "delegate, and return one evidence artifact to the parent agent."
 )
 
 
@@ -89,7 +96,7 @@ def _parse_args() -> ServerConfig:
     parser = argparse.ArgumentParser(prog="claude-agent-mcp", add_help=True)
     parser.add_argument("--server-name", required=True)
     parser.add_argument("--model")
-    parser.add_argument("--mode", choices=["architect", "reviewer"], required=True)
+    parser.add_argument("--mode", choices=["architect", "reviewer", "cheap"], required=True)
     parser.add_argument(
         "--env",
         action="append",
@@ -144,9 +151,25 @@ def _build_claude_cmd(*, claude_exec: str, config: ServerConfig) -> list[str]:
         _model(config),
         "--output-format",
         "text",
-        "--permission-mode",
-        "auto",
     ]
+
+    if config.mode == "cheap":
+        cmd.extend(
+            [
+                "--restricted",
+                "--strict-mcp-config",
+                "--permission-mode",
+                "dontAsk",
+                "--tools",
+                "Read",
+                "Glob",
+                "Grep",
+                "--append-system-prompt",
+                CHEAP_SYSTEM_PROMPT,
+            ]
+        )
+    else:
+        cmd.extend(["--permission-mode", "auto"])
 
     fallback = MODE_FALLBACKS.get(config.mode)
     if fallback:
@@ -392,6 +415,16 @@ def _build_server(config: ServerConfig) -> FastMCP:
         tid = thread_id or f"{config.server_name}-{_session_counter['n']}"
 
         return await _run_agent(ctx, prompt, config, tid)
+
+    if config.mode == "architect":
+
+        @mcp.tool()
+        async def spawn_cheap_agent(ctx: Context, prompt: str, thread_id: str = "") -> str:
+            """Spawn a low-cost read-only Claude leaf without another MCP server."""
+            _session_counter["n"] += 1
+            tid = thread_id or f"{config.server_name}-cheap-{_session_counter['n']}"
+            cheap_config = replace(config, mode="cheap", model=None)
+            return await _run_agent(ctx, prompt, cheap_config, tid)
 
     @mcp.tool()
     async def spawn_agents_parallel(
