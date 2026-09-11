@@ -4,6 +4,12 @@
 > Por isso eles **não** entram em `FRAMEWORK_FILES`: nenhum projeto precisa
 > carregar uma cópia disto. Use um clone do `canuto-framework` na VPS.
 
+> [!warning] Novo contrato de escrita do vault
+> O fluxo `vault-remote-setup.sh`, no qual Mac e VPS empurram diretamente para o
+> mesmo hub, agora é **legado**. Para novos rollouts, use o integrador serializado
+> descrito em [`VAULT-INTEGRATOR.md`](VAULT-INTEGRATOR.md). A fundação é opt-in:
+> ela não agenda cron, não commita e não faz push sem flags explícitas.
+
 ## Por que existe
 
 Duas pressões chegaram juntas em 2026-07:
@@ -26,6 +32,10 @@ sudo bash ~/canuto-framework/.agents/vps/bootstrap.sh \
 O `bootstrap.sh` roda as etapas abaixo na ordem certa, cada uma idempotente, e
 termina com a lista numerada do que ainda exige você. Confira no `--dry-run` e
 repita sem a flag para aplicar. Uma etapa que falha **não** aborta as outras.
+
+Para um **novo rollout do vault**, passe `--skip vault` no bootstrap: essa etapa
+ainda chama o fluxo multiwriter legado. Depois instale o integrador manualmente,
+conforme a seção 2.
 
 ### Rodando de fora (do Mac, via ssh)
 
@@ -53,12 +63,12 @@ Flags: `--repo` (repetível), `--skip runner,vault,kuma,signoz`, `--bind <ip>`,
 
 ## Ordem recomendada
 
-| # | Script | Ganho | Custo |
-|---|--------|-------|-------|
-| 1 | `runner-setup.sh` | CI volta a rodar, sem consumir cota | ~15 min |
-| 2 | `vault-remote-setup.sh` | Vault oficial na VPS, Mac vira espelho | ~10 min |
-| 3 | `uptime-kuma-setup.sh` | Alerta quando um app em produção cai | ~5 min |
-| 4 | `signoz-setup.sh` | Preflight + auditoria de exposição do SigNoz | ~20 min, pede ~4GB de RAM |
+| # | Script | Ganho | Ativação |
+|---|--------|-------|----------|
+| 1 | `runner-setup.sh` | CI volta a rodar sem consumir cota | explícita |
+| 2 | `vault-integrator-setup.sh` | leitura local + escrita serializada | opt-in, sem publicação por padrão |
+| 3 | `uptime-kuma-setup.sh` | alerta quando um app em produção cai | explícita |
+| 4 | `signoz-setup.sh` | preflight + auditoria de exposição do SigNoz | explícita |
 
 O SigNoz é o último de propósito: é o mais pesado e o único que pode não caber,
 dependendo do tamanho da VPS. O script avisa se a RAM for insuficiente.
@@ -84,29 +94,62 @@ runs-on: [self-hosted, linux, canuto-vps]   # era: ubuntu-latest
 O usuário do runner **não** entra no grupo `docker` (seria equivalente a root).
 Se um job precisar de docker, decida isso conscientemente.
 
-## 2. Vault Canuto: oficial na VPS, espelho no Mac
+## 2. Vault Canuto: leitura local, publicação serializada
+
+A topologia recomendada é:
+
+```text
+Papiro  ~/.canuto/vault             clone canônico + integrador exclusivo
+Dobra   ~/.canuto/vault             clone local para leitura + outbox
+Mac     ~/.canuto/vault             clone local/Obsidian + outbox
+Wedo    snapshots criptografados    backup e teste de restauração
+```
+
+No Papiro, instale primeiro sem commit/push:
+
+```bash
+bash .agents/vps/vault-integrator-setup.sh --server
+canuto-vault-integrator status
+canuto-vault-integrator process
+```
+
+Na Dobra ou no Mac:
+
+```bash
+bash .agents/vps/vault-integrator-setup.sh \
+  --client \
+  --remote-host papiro \
+  --remote-inbox /home/USUARIO/.canuto/vault-spool/inbox
+```
+
+Somente depois de identificar e interromper writers legados, confirmar branch
+`main`, working tree limpo e restore funcional, habilite commit/push:
+
+```bash
+bash .agents/vps/vault-integrator-setup.sh \
+  --server --commit --push --interval 2
+```
+
+O contrato completo, exemplos de `create`/`replace`, CAS, receipts, journal e
+recuperação estão em [`VAULT-INTEGRATOR.md`](VAULT-INTEGRATOR.md).
+
+### Fluxo legado: hub bare com dois writers
+
+O comando abaixo continua disponível para instalações existentes, mas **não deve
+ser usado em um novo rollout**:
 
 ```bash
 # na VPS
 bash .agents/vps/vault-remote-setup.sh --server
 
-# no Mac (URL impressa pelo passo acima)
+# no Mac
 bash .agents/vps/vault-remote-setup.sh --client ssh://papiro/srv/canuto/vault.git
 ```
 
-Topologia:
-
-```
-VPS  /srv/canuto/vault.git   bare — hub canônico
-VPS  ~/.canuto/vault         working vault OFICIAL (sessões da VPS)  ──┐
-Mac  ~/.canuto/vault         clone/espelho (Obsidian abre este)     ──┘ ambos empurram para o hub
-```
-
-O autosync na VPS commita e empurra a cada 10 min (`--interval`). No Mac, o
-plugin Obsidian Git faz o mesmo — ligue `autoPullInterval: 10`.
-
-**O script nunca destrói nada.** Se os dois lados divergirem, ele relata os dois
-SHAs e para; unir históricos exige `--merge-unrelated` explícito.
+Nesse modelo, Mac e VPS empurram para o mesmo hub. Ele preserva conteúdo e para
+em divergências conhecidas, mas não serializa writers nem transforma falha de
+push em receipt. A migração para o integrador deve ser tratada como mudança de
+arquitetura, não como simples troca de cron.
 
 ## 3. Uptime Kuma
 

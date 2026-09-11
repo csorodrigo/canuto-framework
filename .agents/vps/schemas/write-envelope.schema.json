@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://canuto.local/schemas/write-envelope.schema.json",
+  "title": "Canuto Vault Write Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "operation",
+    "target",
+    "tier",
+    "expected_sha256",
+    "content_b64",
+    "content_sha256",
+    "source",
+    "approval",
+    "created_at"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+    },
+    "operation": { "enum": ["create", "replace"] },
+    "target": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "tier": { "enum": ["hypothesis", "curated"] },
+    "expected_sha256": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "content_b64": { "type": "string", "minLength": 1 },
+    "content_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "agent", "session_id"],
+      "properties": {
+        "host": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "agent": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "session_id": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "approval": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["by", "at"],
+      "properties": {
+        "by": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "created_at": { "type": "string", "format": "date-time" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "operation": { "const": "create" } } },
+      "then": { "properties": { "expected_sha256": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "operation": { "const": "replace" } } },
+      "then": {
+        "properties": {
+          "expected_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "tier": { "const": "curated" } } },
+      "then": { "properties": { "approval": { "type": "object" } } }
+    }
+  ]
+}
