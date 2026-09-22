@@ -1,0 +1,20 @@
+{"id": "c01-001", "text": "onde fica a função que valida o token de sessão?", "humanLabel": "LOCALIZAR"}
+{"id": "c01-002", "text": "explique o que esse hook de pre-commit faz", "humanLabel": "EXPLICAR"}
+{"id": "c01-003", "text": "por que esse teste está falhando desde ontem?", "humanLabel": "INVESTIGAR"}
+{"id": "c01-004", "text": "monte um plano para migrar o banco de dados sem downtime", "humanLabel": "PLANEJAR"}
+{"id": "c01-005", "text": "implementa a validação de CPF no formulário de cadastro", "humanLabel": "IMPLEMENTAR"}
+{"id": "c01-006", "text": "revise esse PR antes de eu pedir merge", "humanLabel": "REVISAR"}
+{"id": "c01-007", "text": "isso aqui não tá funcionando direito, dá uma olhada", "humanLabel": "INSUFFICIENT"}
+{"id": "c01-008", "text": "oi", "humanLabel": "INSUFFICIENT"}
+{"id": "c01-009", "text": "onde está o arquivo de configuração de deploy e explique por que ele falhou", "humanLabel": "INVESTIGAR"}
+{"id": "c01-010", "text": "", "humanLabel": null}
+{"id": "c01-011", "text": "corrija o bug do timeout na chamada de API", "humanLabel": "IMPLEMENTAR"}
+{"id": "c01-012", "text": "qual a arquitetura recomendada para o novo módulo de billing?", "humanLabel": "PLANEJAR"}
+{"id": "c01-013", "text": "debug: a fila está travando depois de 3 mensagens", "humanLabel": "INVESTIGAR"}
+{"id": "c01-014", "text": "localize onde o rate limit é configurado", "humanLabel": "LOCALIZAR"}
+{"id": "c01-015", "text": "faz um review rápido nesse diff", "humanLabel": "REVISAR"}
+{"id": "c01-016", "text": "o que significa esse erro de schema mismatch?", "humanLabel": "EXPLICAR"}
+{"id": "c01-017", "text": "preciso de ajuda com uma coisa relacionada ao sistema", "humanLabel": "INSUFFICIENT"}
+{"id": "c01-018", "text": "adicione um índice na tabela de pedidos para acelerar a query", "humanLabel": "IMPLEMENTAR"}
+{"id": "c01-019", "text": "como abordar a migração de autenticação para OAuth?", "humanLabel": "PLANEJAR"}
+{"id": "c01-020", "text": "por que o deploy de staging está retornando 502?", "humanLabel": "INVESTIGAR"}

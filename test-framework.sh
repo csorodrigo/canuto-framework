@@ -531,6 +531,13 @@ else
 fi
 rm -f /tmp/framework-session-audit-test.$$
 
+if node --test "$AGENTS_DIR/tests/closed-judgment/replay.test.js" >/tmp/closed-judgment-test.$$ 2>&1; then
+  pass "closed-judgment (JEV spike-offline C-01) tests"
+else
+  fail "closed-judgment (JEV spike-offline C-01) tests failed"
+fi
+rm -f /tmp/closed-judgment-test.$$
+
 if node "$AGENTS_DIR/tools/framework-session-audit.js" --help >/dev/null 2>&1; then
   pass "framework-session-audit CLI help"
 else
