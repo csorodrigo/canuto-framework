@@ -28,7 +28,7 @@
 # delegation_ledger_pending).
 #
 # ── Regra de fechamento ───────────────────────────────────────────────────────
-# Uma métrica com result != "OK" está PENDENTE até que o event log do projeto
+# Uma falha (não OK nem PREFLIGHT com rc=0) está PENDENTE até que o event log do projeto
 # tenha, para o MESMO id (campo `id` do evento), um evento posterior:
 #   - DELEGATION_DEAD_LETTER (via delegation_dead_letter)  — park, razão obrigatória
 #   - FALLBACK_DECLARED      (via delegation_declare_fallback) — fallback declarado
@@ -136,6 +136,10 @@ _delegation_ledger_json_field() {
     printf '%s' "$line" | jq -r --arg k "$key" '.[$k] // empty' 2>/dev/null
     return 0
   fi
+  if [ "$key" = "rc" ]; then
+    printf '%s' "$line" | sed -nE 's/.*"rc"[[:space:]]*:[[:space:]]*([0-9]+)[[:space:]]*[,}].*/\1/p' | head -1
+    return 0
+  fi
   printf '%s' "$line" | sed -n "s/.*\"${key}\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p" | head -1
 }
 
@@ -190,7 +194,7 @@ _delegation_ledger_closed_ids() {
 }
 
 # delegation_ledger_pending [--since <iso8601>]
-# Fold puro: uma linha por delegação PENDENTE (result != "OK" na métrica E sem
+# Fold puro: uma linha por delegação PENDENTE (falha na métrica E sem
 # fechamento posterior no event log). Formato de saída (tab-separated):
 #   <id=ts>\trole=<role>\tresult=<result>\treason=<reason>\tout=<out-file>
 # Nunca mantém estado/cursor próprio — recalculado a cada chamada.
@@ -237,6 +241,9 @@ delegation_ledger_pending() {
     result=$(_delegation_ledger_json_field "$line" result)
     [ -n "$ts" ] && [ -n "$result" ] || continue
     [ "$result" = "OK" ] && continue
+    if [ "$result" = "PREFLIGHT" ]; then
+      [ "$(_delegation_ledger_json_field "$line" rc)" = "0" ] && continue
+    fi
     if [ -n "$since" ] && [[ "$ts" < "$since" ]]; then
       continue
     fi
