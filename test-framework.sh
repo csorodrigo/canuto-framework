@@ -1888,63 +1888,12 @@ else
   fail "models.yaml não parseável para: ${BROKEN_ROLES[*]} (block-style volta a ser decorativo)"
 fi
 
-# 12i1. A rota leaf precisa ser econômica e mecanicamente read-only; fast
-# continua disponível para pequenos edits mutáveis.
-delegate_exec_tmp=$(mktemp -d)
-mkdir -p "$delegate_exec_tmp/home" "$delegate_exec_tmp/bin"
-cat > "$delegate_exec_tmp/bin/codex" <<'EOF'
-#!/usr/bin/env bash
-if [ "${1:-}" = "login" ] && [ "${2:-}" = "status" ]; then
-  exit 0
-fi
-printf '%s\n' "$@" > "$FAKE_CODEX_ARGS"
-out=""
-while [ "$#" -gt 0 ]; do
-  if [ "$1" = "--output-last-message" ]; then
-    shift
-    out="$1"
-  fi
-  shift
-done
-cat >/dev/null
-printf 'evidência do agente\n' > "$out"
-EOF
-chmod +x "$delegate_exec_tmp/bin/codex"
-printf 'inspecione o escopo\n' > "$delegate_exec_tmp/task.md"
-
-delegate_exec_ok=true
-HOME="$delegate_exec_tmp/home" PATH="$delegate_exec_tmp/bin:$PATH" \
-  FAKE_CODEX_ARGS="$delegate_exec_tmp/leaf.args" \
-  CANUTO_METRICS_FILE="$delegate_exec_tmp/metrics.jsonl" \
-  CODEX_DELEGATE_MODELS_YAML="$AGENTS_DIR/config/models.yaml" \
-  bash "$DELEGATE" leaf "$delegate_exec_tmp/task.md" "$delegate_exec_tmp/leaf.md" \
-  >/dev/null 2>&1 || delegate_exec_ok=false
-HOME="$delegate_exec_tmp/home" PATH="$delegate_exec_tmp/bin:$PATH" \
-  FAKE_CODEX_ARGS="$delegate_exec_tmp/fast.args" \
-  CANUTO_METRICS_FILE="$delegate_exec_tmp/metrics.jsonl" \
-  CODEX_DELEGATE_MODELS_YAML="$AGENTS_DIR/config/models.yaml" \
-  bash "$DELEGATE" fast "$delegate_exec_tmp/task.md" "$delegate_exec_tmp/fast.md" \
-  >/dev/null 2>&1 || delegate_exec_ok=false
-if HOME="$delegate_exec_tmp/home" PATH="$delegate_exec_tmp/bin:$PATH" \
-  FAKE_CODEX_ARGS="$delegate_exec_tmp/leaf-override.args" \
-  CANUTO_METRICS_FILE="$delegate_exec_tmp/metrics.jsonl" \
-  CODEX_DELEGATE_MODELS_YAML="$AGENTS_DIR/config/models.yaml" \
-  CODEX_DELEGATE_SANDBOX=workspace-write \
-  bash "$DELEGATE" leaf "$delegate_exec_tmp/task.md" "$delegate_exec_tmp/leaf-override.md" \
-  >/dev/null 2>&1; then
-  delegate_exec_ok=false
-fi
-
-if [ "$delegate_exec_ok" = true ] \
-  && grep -qx 'read-only' "$delegate_exec_tmp/leaf.args" \
-  && grep -qx 'gpt-5.6-luna' "$delegate_exec_tmp/leaf.args" \
-  && grep -qx 'model_reasoning_effort="low"' "$delegate_exec_tmp/leaf.args" \
-  && grep -qx 'workspace-write' "$delegate_exec_tmp/fast.args"; then
-  pass "codex-delegate força leaf read-only/luna/low e mantém fast mutável"
+# 12i1. Exercita roteamento e ciclo de vida sem chamar serviços de IA.
+if python3 "$FRAMEWORK_DIR/tests/orchestration-routing.test.py"; then
+  pass "roteamento Codex/Claude, leitura obrigatória, capacidade, fallback e receipts"
 else
-  fail "codex-delegate não aplicou a separação leaf read-only versus fast mutável"
+  fail "contratos de orquestração divergiram do comportamento dos executores"
 fi
-rm -rf "$delegate_exec_tmp"
 
 # 12j. postdelegate-verify não dispara em bash -n/cp/chmod do arquivo do wrapper
 if grep -q '""|-\*)' "$AGENTS_DIR/hooks/postdelegate-verify.sh" 2>/dev/null \
@@ -2186,7 +2135,8 @@ assert cheap_cmd[permission_at + 1] == "dontAsk"
 assert "auto" not in cheap_cmd
 for command in (architect_cmd, reviewer_cmd):
     permission_at = command.index("--permission-mode")
-    assert command[permission_at + 1] == "auto"
+    assert command[permission_at + 1] == "dontAsk"
+    assert "--restricted" in command
 
 architect_server = module._build_server(architect)
 reviewer_server = module._build_server(reviewer)

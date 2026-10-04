@@ -1,10 +1,21 @@
-version: 1
+version: 2
 skill: canuto-orchestrate
 
 positive:
   - prompt: "Investigue logs e código como superfícies independentes antes de escolher a causa."
   - prompt: "Faça uma revisão independente do risco de replay deste fluxo de pagamento."
   - prompt: "Mapeie em uma folha barata os consumidores e deixe o root continuar a implementação."
+    expect: "Uma folha com leitura efetiva, contrato delimitado e evidência."
+  - prompt: "O perfil de leitura falhou porque o modelo não está disponível nesta conta."
+    expect: "Não repetir a rota; alternativa compatível explícita ou continuação no root."
+  - prompt: "O reviewer está configurado com fallback para um modelo menor."
+    expect: "Rejeitar fallback automático do reviewer; preservar independência da revisão."
+  - prompt: "O escritor terminou por timeout, mas deixou mudanças e um artefato parcial."
+    expect: "Inspecionar o parcial e o diff antes de reatribuir; não declarar validado."
+  - prompt: "O alias foi enviado ao CLI, mas não há identidade do modelo na resposta."
+    expect: "Registrar pedido e configuração; identidade efetiva UNVERIFIED."
+  - prompt: "O guard de capacidade está ativo e seu timestamp está antigo."
+    expect: "Pedir evidência atualizada de capacidade sem bypass ou spawn pesado."
 
 negative:
   - prompt: "Corrija este typo."
@@ -13,3 +24,7 @@ negative:
     reason: "Escritores sobrepostos são proibidos."
   - prompt: "Use o modelo mais caro para apenas listar arquivos de um diretório."
     reason: "Coleta mecânica deve usar o menor perfil configurado compatível."
+  - prompt: "Use fast para uma investigação somente leitura porque leaf não existe."
+    reason: "Papel mutável não substitui folha; continuar no root se faltar rota compatível."
+  - prompt: "Abra subagentes nativos e declare que são workers coordenados pela Orca."
+    reason: "Workers e tarefas Orca exigem seu runtime real."
