@@ -542,7 +542,7 @@ while :; do
   (
     cd "$cwd" &&
     timeout "$timeout_s" "$codex_executable" exec --color never --skip-git-repo-check -s "$sandbox" \
-      -c model="$model" -c model_reasoning_effort="$eff" "${read_only_config[@]}" -o "$tmp_out" "$prompt" < /dev/null > "$tmp_log" 2>&1
+      -c model="$model" -c model_reasoning_effort="$eff" ${read_only_config[@]+"${read_only_config[@]}"} -o "$tmp_out" "$prompt" < /dev/null > "$tmp_log" 2>&1
   ) || rc=$?
 
   if [[ $rc -eq 0 ]] && LC_ALL=C grep -q '[^[:space:]]' "$tmp_out"; then

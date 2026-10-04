@@ -120,6 +120,8 @@ class CodexRouting(unittest.TestCase):
             arguments.append("--preflight-only")
         arguments.extend([role, "read the bounded scope", str(self.output), str(cwd or self.base)])
         environment = dict(self.environment, FAKE_MODE=mode, **(overrides or {}))
+        shell = environment.pop("TEST_WRAPPER_BASH", "bash")
+        arguments[0] = shell
         return subprocess.run(arguments, cwd=self.base, env=environment,
                               capture_output=True, text=True, timeout=12)
 
@@ -148,6 +150,20 @@ class CodexRouting(unittest.TestCase):
                 self.assertIn(f"model_reasoning_effort={effort}", call)
                 self.assertEqual(call[call.index("-s") + 1], access)
                 self.assertIsNone(self.events()[-1]["effective_model"])
+
+    @unittest.skipUnless(sys.platform == "darwin", "Bash 3.2 is the macOS system shell")
+    def test_system_bash_accepts_empty_read_only_arguments_for_writers(self):
+        self.executable("bash", 'import os,sys\nos.execv("/bin/bash", ["/bin/bash"] + sys.argv[1:])\n')
+        for role in ("fast", "coder", "maestro"):
+            with self.subTest(role=role):
+                extra = {"TEST_WRAPPER_BASH": "/bin/bash"}
+                if role == "maestro":
+                    extra["CODEX_DELEGATE_MODEL"] = "gpt-6.1-sol"
+                result = self.run_wrapper(role, overrides=extra)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                call = self.calls()[-1]
+                self.assertEqual(call[call.index("-s") + 1], "workspace-write")
+                self.assertNotIn("features.multi_agent=false", call)
 
     def test_model_override_wins_without_confusing_claude_section(self):
         self.config.write_text(self.config.read_text().replace("model: sonnet", "model: bad-model"))

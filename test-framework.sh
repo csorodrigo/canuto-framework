@@ -976,8 +976,8 @@ if [ -f "$FRAMEWORK_DIR/install.sh" ]; then
   fi
 
   for role in architect maestro; do
-    if grep -Eq "^[[:space:]]{2}${role}:.*effort:[[:space:]]*xhigh" "$AGENTS_DIR/config/models.yaml"; then
-      pass "$role uses wrapper-compatible xhigh effort"
+    if grep -Eq "^[[:space:]]{2}${role}:.*effort:[[:space:]]*(low|medium|high|xhigh|max)[[:space:]]*[,}]" "$AGENTS_DIR/config/models.yaml"; then
+      pass "$role uses wrapper-compatible effort"
     else
       fail "$role uses an effort unsupported by released wrappers"
     fi
