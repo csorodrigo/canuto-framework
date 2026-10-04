@@ -25,7 +25,7 @@ These skills ship with every install and update automatically.
 | `colorize` | BM25 over curated palettes → WCAG-compliant semantic token sets | design, color |
 | `cost-routing` | Provider routing matrix: what runs on Claude inline vs Codex spawn | cost-management, orchestration |
 | `design-consultation` | Generate a full design system → `design-system/MASTER.md` | design |
-| `domain-modeling` | Linguagem ubíqua em `CONTEXT.md` + filtro de 3 condições para ADR | documentation, architecture |
+| `domain-modeling` | Linguagem ubíqua em `CONTEXT.md` + filtro de 3 condições para ADR + gate executável (`glossary-gate.mjs`) | documentation, architecture |
 | `context-maintenance` | How to maintain `.context.md`, `FEATURE-MAP.md`, and Repo Index (evaluate-repo pipeline) | documentation, indexation |
 | `continuous-learning` | Extract, store, and evolve reusable patterns (instincts) from session experience | learning, memory |
 | `convergence-detection` | Detect when multiple personas independently reach the same conclusion | observability |
