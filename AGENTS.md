@@ -31,8 +31,9 @@
 - **playwright**: Browser automation — navigate, click, fill, screenshot, assert
 - **claude-architect**: Delega planejamento/arquitetura a Claude — `mcp__claude-architect__spawn_agent`
 - **claude-reviewer**: Review cross-model via Claude — `mcp__claude-reviewer__spawn_agent`
-  - Modelo por alias (`fable`/`opus`), definido em `.agents/tools/claude-agent-mcp.py`
-    (`MODE_DEFAULTS`), com `--fallback-model` automático. Não pinar versão.
+  - Papel, modelo e alternativas vêm de `.agents/config/models.yaml`, consumido
+    por `.agents/tools/claude-agent-mcp.py`. Reviewer usa somente leitura e não
+    faz fallback automático. Alias solicitado não comprova identidade efetiva.
   - Use for bias-free review: Codex implements → Claude reviews (or vice-versa)
   - Same interface as `codex-reviewer`: pass diff between `--- CHANGES START/END ---` delimiters
 
