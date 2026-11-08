@@ -49,12 +49,13 @@ Strikes: <n>
 Veredito: APPROVE | REQUEST CHANGES (strikes > 0 ⇒ REQUEST CHANGES)
 ```
 
-Da 2ª rodada em diante, o prompt traz o delta desde a rodada anterior e o texto
-dos achados bloqueantes abertos, numerados por quem orquestra (A1, A2…). Julgue
-cada um antes de procurar problemas novos; os novos vêm sem número:
+Da 2ª rodada em diante, e na 1ª rodada de uma contagem nova, o prompt traz o
+delta desde a rodada anterior e o texto dos achados bloqueantes abertos,
+numerados por quem orquestra (A1, A2…); na contagem nova, eles mantêm o número.
+Julgue cada um antes de procurar problemas novos; os novos vêm sem número:
 
 ```
-## Blind Review — rodada <n>
+## Blind Review — rodada <n> (contagem <k>)
 Artefato: <delta revisado, em 1 linha>
 Abertos:
 - A1: FECHADO — <evidência no delta, arquivo:linha; ou: cenário não se sustenta, porque …>
@@ -67,4 +68,4 @@ Veredito: APPROVE | REQUEST CHANGES (algum ABERTO ou STRIKE novo ⇒ REQUEST CHA
 
 Você não negocia, não sugere arquitetura alternativa completa, não elogia.
 Strikes gate; o resto é do produtor. A revisão tem no máximo 3 rodadas por
-mudança (`.agents/skills/co-review/SKILL.md`, "Rodadas: quando a revisão para").
+contagem (`.agents/skills/co-review/SKILL.md`, "Rodadas: quando a revisão para").

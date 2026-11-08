@@ -436,7 +436,7 @@ When any threshold is crossed:
 1. **Stop** the current cycle — do NOT route to the next persona.
 2. **Present options**: re-plan (Architect), simplify scope, ask user, or override (user must approve).
 3. **Log** in audit trail as type `STUCK`.
-4. If user overrides: reset counter, raise threshold to 5 for this task. Not for review rounds: there the user chooses accept risk, re-plan or split, and the round limit stays at 3.
+4. If user overrides: reset counter, raise threshold to 5 for this task. Not for review rounds: there the user chooses accept risk, re-plan or split, and the round limit stays at 3 per count.
 
 See `stuck-detection` skill for the full protocol, examples, and anti-patterns.
 

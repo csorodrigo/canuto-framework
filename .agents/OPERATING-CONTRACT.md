@@ -88,8 +88,11 @@ versionada em `.agents/OPERATING-CONTRACT.md` pelo instalador do framework.
 - Mudança substancial, plano de rollout, release ou propagação recebe review
   adversarial independente antes da publicação. Registre artefato, `fixed_point`,
   pergunta, reviewer real e veredito.
-  O review tem no máximo 3 rodadas por mudança, e o que sobra aberto vai ao usuário
-  (`.agents/skills/co-review/SKILL.md`, "Rodadas: quando a revisão para").
+  O review cego, adversarial ou de co-review tem no máximo 3 rodadas por contagem, e o
+  que sobra aberto vai ao usuário (`.agents/skills/co-review/SKILL.md`, "Rodadas: quando
+  a revisão para"). O hook de pre-commit (Mode 4) tem política própria: um commit que ele
+  libera ao degradar para advisory não satisfaz esta fronteira, e antes da publicação o
+  HOLD aberto vai ao usuário.
 - Um hook ou um review manual pode satisfazer a mesma fronteira. Não repita ambos
   sobre o mesmo objeto, nem repita review com o mesmo `fixed_point` e a mesma
   pergunta sem mudança de evidência.
