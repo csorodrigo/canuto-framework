@@ -430,6 +430,7 @@ Maintain a **cycle counter** per task alongside the file modification map:
 | Same error repeating | 2 consecutive cycles | Pause and present stuck warning |
 | Same escalation pattern repeating | 2x | Pause and present stuck warning |
 | File rework + cycle count | File 3x AND cycle >= 2 | Pause (compound signal) |
+| Review round count (blind/adversarial/co-review) | >= 3, or the same strike ABERTO in 2 consecutive rounds | Pause; leftover confirmed strikes go to the user, never downgraded (co-review, "Rodadas") |
 
 When any threshold is crossed:
 1. **Stop** the current cycle — do NOT route to the next persona.

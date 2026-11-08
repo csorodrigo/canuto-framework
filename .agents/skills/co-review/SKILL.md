@@ -120,6 +120,28 @@ Para a segunda opinião **estruturalmente** isolada, use o subagent
 - Complementar (não substituto) do Reviewer normal: o cego não executa
   testes — verificação de execução continua com `verification-gates`.
 
+#### Rodadas: quando a revisão para
+
+"Strikes gate" sem teto vira laço. Num consumidor do framework (papiro), um PR passou
+por 47 rodadas de revisão cega, com seis revisores por rodada a partir da 37ª, e a
+própria sessão teve de inventar na 40ª um critério de parada. Em outro PR, o merge
+aconteceu antes de a revisão terminar. As regras abaixo valem para revisão cega,
+adversarial e co-review:
+
+1. **No máximo 3 rodadas por candidato.**
+2. **Quem orquestra numera os strikes** (S1, S2…). A partir da 2ª rodada, o revisor
+   recebe o diff desde o SHA da rodada anterior **e o texto completo** de cada strike
+   aberto. Para cada um ele devolve `FECHADO` ou `ABERTO`, com evidência; strike novo
+   ganha número novo. Quem decide se é o mesmo strike é o revisor, não o produtor.
+3. **Strike só bloqueia com cenário reproduzível** (arquivo:linha, entrada → saída).
+   Ponto sem cenário vira pendência não verificada e não bloqueia.
+4. **O mesmo strike `ABERTO` em 2 rodadas seguidas encerra o ciclo**, com o mesmo limiar
+   que o Maestro usa para ciclos fix→test (`personas/maestro.md`, Loop Self-Regulation).
+5. **Strike confirmado que sobra depois da 3ª rodada não vira "não verificado".** O
+   candidato não segue para merge; a sessão para e pergunta ao usuário: aceitar o
+   risco (registrando quem aceitou), replanejar ou dividir.
+6. **Marcação de pronto para merge só depois que a revisão fecha.**
+
 ---
 
 ## Three Modes (Summary)
