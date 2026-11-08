@@ -120,6 +120,56 @@ Para a segunda opinião **estruturalmente** isolada, use o subagent
 - Complementar (não substituto) do Reviewer normal: o cego não executa
   testes — verificação de execução continua com `verification-gates`.
 
+#### Rodadas: quando a revisão para
+
+"Strikes gate" sem teto vira laço. Num consumidor do framework (papiro), um PR passou
+por 47 rodadas de revisão cega, com seis revisores por rodada a partir da 37ª, e a
+própria sessão teve de inventar na 40ª um critério de parada. Em outro PR, o merge
+aconteceu antes de a revisão terminar. As regras abaixo valem para revisão cega,
+adversarial e co-review de um PR ou de um plano (Mode 3). O Mode 4 (pre-commit) fica de
+fora: o hook `codex-pretool-guard.sh` tem política própria, que degrada para advisory no
+3º HOLD seguido, e não guarda delta nem estado por achado.
+
+1. **No máximo 3 rodadas por contagem.** Mudança é o PR, inclusive o diff da branch
+   revisado antes de o PR existir, ou o plano no Mode 3; as rodadas do plano não contam para
+   o PR que vem depois. Uma mudança começa com uma contagem, e só o usuário abre outra
+   (regra 5). A contagem soma todos os pushes, e fechar e reabrir a mesma mudança continua a
+   contagem. Depois que a revisão fechou, qualquer push reabre a revisão, exceto rebase ou
+   merge da base sem conflito. Antes do push que reabre, tire a marcação de pronto. Quem
+   decide se a revisão reaberta cabe na contagem atual ou numa nova é o usuário. Se a
+   contagem atual já fez 3 rodadas, cabe nela só como aceite de risco registrado (regra 5);
+   para revisar o push, é contagem nova.
+2. **Quem orquestra numera os achados bloqueantes** (A1, A2…), sem nunca reaproveitar um
+   número; o revisor não numera, e ressalva não ganha número. A partir da 2ª rodada, e já na
+   1ª rodada de uma contagem nova, o revisor recebe o delta desde a rodada anterior **e o
+   texto completo** de cada achado aberto. Na contagem nova, os abertos passam com o mesmo
+   número; ao dividir, cada um vai para a peça que leva o código dele. Para cada um ele devolve `FECHADO` (com a evidência no delta, ou com o motivo de o
+   cenário não se sustentar) ou `ABERTO` (com a linha onde o problema continua, que pode estar
+   fora do delta). Quem decide se é o mesmo achado é o revisor, não o produtor.
+   - No Mode 3, nas mesmas rodadas, acrescente ao prompt do Codex o bloco "Achados
+     abertos" com o texto de cada um e peça `FECHADO`/`ABERTO` por achado antes do veredito.
+   - Se o revisor da rodada não está disponível (fallback Claude-only em "Graceful
+     Degradation"), a rodada inteira, abertos e novos, vai para um `blind-reviewer`, nunca
+     para o agente principal.
+3. **Bloqueia o que o revisor classifica como STRIKE**, desde que traga cenário concreto de
+   falha (arquivo:linha e o que quebra, inclusive teste ausente para caminho crítico).
+   RESSALVA nunca bloqueia, mesmo com cenário. No Mode 3, o prompt do Codex pede essa
+   classificação (`references/modes.md`); achado do Codex sem rótulo que traga o ponto do
+   plano ou arquivo:linha e o que quebra conta como STRIKE. Quem orquestra não reclassifica:
+   quem julga se o cenário se sustenta é o revisor da rodada seguinte, não o produtor.
+4. **O ciclo para** depois da 3ª rodada concluída, ou antes, quando um achado bloqueante
+   aberto numa rodada continua `ABERTO` na rodada seguinte da mesma contagem.
+5. **Ciclo parado com achado bloqueante aberto não segue para merge.** A sessão para e
+   pergunta ao usuário: aceitar o risco (registrando quem aceitou), replanejar ou dividir.
+   Não há 4ª rodada na mesma contagem, e o achado não vira "não verificado". Replanejar ou
+   dividir abre contagem nova por decisão do usuário, registrada. Sem achado bloqueante
+   aberto, a revisão fecha.
+6. **Marcação de pronto para merge só depois que a revisão fecha**, e ela sai antes de um
+   push que reabra a revisão (regra 1).
+
+O "final say" do agente principal (Staff Engineer Framing) vale para sugestões. Um achado
+bloqueante só sai como `FECHADO` pelo revisor ou por decisão do usuário (regra 5).
+
 ---
 
 ## Three Modes (Summary)
@@ -195,7 +245,7 @@ certa.
 - **Never assume Codex's suggestions are correct** — validate each one yourself.
 - **You are the lead engineer** with final say on all decisions.
 - **Treat Codex's output as a junior developer's review** — useful but not authoritative.
-- **Override with justification** — if you disagree, explain why.
+- **Override with justification** — if you disagree, explain why. Isso não fecha achado bloqueante de rodada: veja "Rodadas: quando a revisão para".
 
 ---
 

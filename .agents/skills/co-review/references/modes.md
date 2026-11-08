@@ -91,6 +91,10 @@ Be critical and thorough. Look for:
 4. Unverified assumptions?
 5. Missing error handling or rollback strategy?
 
+Label each issue STRIKE or RESSALVA. STRIKE: a concrete failure scenario, naming the
+plan step or file:line and what breaks (a missing test for a critical path counts).
+RESSALVA: a risk without a concrete failure.
+
 Plan:
 ---
 {plan content}
@@ -105,16 +109,20 @@ Return the review directly in this response.
 ## Co-Validate: {plan name}
 
 ### Convergent Issues
-- {issue}: {description}
+- [STRIKE|RESSALVA] {issue}: {description}
 
 ### Codex-Only Issues
-- {issue}: {description} — [Accept | Override: {reason}]
+- [STRIKE|RESSALVA] {issue}: {description} — [Accept | Override: {reason}]
 
 ### Claude-Only Issues
-- {issue}: {description} — [Accept | Override: {reason}]
+- [STRIKE|RESSALVA] {issue}: {description} — [Accept | Override: {reason}]
 
 ### Verdict: ✓ LGTM | ⚠️ Concerns ({N} issues to address)
 ```
+
+`Override` vale para RESSALVA. Achado bloqueante (STRIKE com cenário concreto, ou achado do
+Codex sem rótulo que traga o que quebra) só sai como `FECHADO` pelo revisor ou por decisão do
+usuário: veja "Rodadas: quando a revisão para" no `SKILL.md`.
 
 ---
 
