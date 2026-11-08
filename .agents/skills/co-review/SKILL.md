@@ -126,21 +126,34 @@ Para a segunda opinião **estruturalmente** isolada, use o subagent
 por 47 rodadas de revisão cega, com seis revisores por rodada a partir da 37ª, e a
 própria sessão teve de inventar na 40ª um critério de parada. Em outro PR, o merge
 aconteceu antes de a revisão terminar. As regras abaixo valem para revisão cega,
-adversarial e co-review:
+adversarial e co-review (Modes 3 e 4) de uma mesma mudança:
 
-1. **No máximo 3 rodadas por candidato.**
-2. **Quem orquestra numera os strikes** (S1, S2…). A partir da 2ª rodada, o revisor
-   recebe o diff desde o SHA da rodada anterior **e o texto completo** de cada strike
-   aberto. Para cada um ele devolve `FECHADO` ou `ABERTO`, com evidência; strike novo
-   ganha número novo. Quem decide se é o mesmo strike é o revisor, não o produtor.
-3. **Strike só bloqueia com cenário reproduzível** (arquivo:linha, entrada → saída).
-   Ponto sem cenário vira pendência não verificada e não bloqueia.
-4. **O mesmo strike `ABERTO` em 2 rodadas seguidas encerra o ciclo**, com o mesmo limiar
-   que o Maestro usa para ciclos fix→test (`personas/maestro.md`, Loop Self-Regulation).
-5. **Strike confirmado que sobra depois da 3ª rodada não vira "não verificado".** O
-   candidato não segue para merge; a sessão para e pergunta ao usuário: aceitar o
-   risco (registrando quem aceitou), replanejar ou dividir.
+1. **No máximo 3 rodadas por mudança** (o PR, ou o commit no Mode 4), somando todos os
+   pushes ou novos stages. Fechar e reabrir a mesma mudança continua a contagem.
+2. **Quem orquestra numera os achados** (A1, A2…), sem nunca reaproveitar um número; o
+   revisor não numera. A partir da 2ª rodada, o revisor recebe o delta desde a rodada
+   anterior **e o texto completo** de cada achado aberto, e devolve para cada um `FECHADO`
+   (com a evidência no delta) ou `ABERTO` (com a linha onde o problema continua, que pode
+   estar fora do delta). Quem decide se é o mesmo achado é o revisor, não o produtor.
+   - No Mode 4 (pre-commit) o delta é a diferença entre o patch staged revisado na rodada
+     anterior e o atual: guarde o patch de cada rodada.
+   - Nos prompts do Codex (Modes 3 e 4), da 2ª rodada em diante acrescente ao template o
+     bloco "Achados abertos" com o texto de cada um e peça `FECHADO`/`ABERTO` por achado
+     antes do veredito.
+3. **Bloqueia o achado com cenário concreto de falha** — arquivo:linha e o que quebra,
+   inclusive teste ausente para caminho crítico: é o STRIKE do `blind-reviewer`. Ponto sem
+   cenário concreto é ressalva e não bloqueia. Quem julga se o cenário se sustenta é o
+   revisor da rodada seguinte, não o produtor.
+4. **O ciclo para** depois da 3ª rodada concluída, ou antes, quando o revisor marca o mesmo
+   achado `ABERTO` em 2 rodadas seguidas.
+5. **Ciclo parado com achado bloqueante aberto não segue para merge.** A sessão para e
+   pergunta ao usuário: aceitar o risco (registrando quem aceitou), replanejar ou dividir.
+   Não há 4ª rodada, e o achado não vira "não verificado". Sem achado bloqueante aberto, a
+   revisão fecha.
 6. **Marcação de pronto para merge só depois que a revisão fecha.**
+
+O "final say" do agente principal (Staff Engineer Framing) vale para sugestões. Um achado
+bloqueante só sai como `FECHADO` pelo revisor ou por decisão do usuário (regra 5).
 
 ---
 
@@ -217,7 +230,7 @@ certa.
 - **Never assume Codex's suggestions are correct** — validate each one yourself.
 - **You are the lead engineer** with final say on all decisions.
 - **Treat Codex's output as a junior developer's review** — useful but not authoritative.
-- **Override with justification** — if you disagree, explain why.
+- **Override with justification** — if you disagree, explain why. Isso não fecha achado bloqueante de rodada: veja "Rodadas: quando a revisão para".
 
 ---
 

@@ -49,21 +49,22 @@ Strikes: <n>
 Veredito: APPROVE | REQUEST CHANGES (strikes > 0 ⇒ REQUEST CHANGES)
 ```
 
-Da 2ª rodada em diante, o prompt traz o diff desde a rodada anterior e o texto
-dos strikes abertos (S1, S2…). Julgue cada um antes de procurar strikes novos, e
-numere os novos a partir do último:
+Da 2ª rodada em diante, o prompt traz o delta desde a rodada anterior e o texto
+dos achados abertos, numerados por quem orquestra (A1, A2…). Julgue cada um antes
+de procurar problemas novos; os novos vêm sem número:
 
 ```
 ## Blind Review — rodada <n>
 Artefato: <delta revisado, em 1 linha>
 Abertos:
-- S1: FECHADO | ABERTO — <evidência no delta, arquivo:linha>
+- A1: FECHADO — <evidência no delta, arquivo:linha>
+- A2: ABERTO — <onde o problema continua, arquivo:linha (pode estar fora do delta)>
 Novos: <n>
-- [STRIKE S<k>] arquivo:linha — <cenário concreto de falha>
+- [STRIKE] arquivo:linha — <cenário concreto de falha>
 - [RESSALVA] arquivo:linha — <risco e cenário>
-Veredito: APPROVE | REQUEST CHANGES (algum ABERTO ou strike novo ⇒ REQUEST CHANGES)
+Veredito: APPROVE | REQUEST CHANGES (algum ABERTO ou STRIKE novo ⇒ REQUEST CHANGES)
 ```
 
 Você não negocia, não sugere arquitetura alternativa completa, não elogia.
-Strikes gate; o resto é do produtor. A revisão tem no máximo 3 rodadas
-(`.agents/skills/co-review/SKILL.md`, "Rodadas: quando a revisão para").
+Strikes gate; o resto é do produtor. A revisão tem no máximo 3 rodadas por
+mudança (`.agents/skills/co-review/SKILL.md`, "Rodadas: quando a revisão para").

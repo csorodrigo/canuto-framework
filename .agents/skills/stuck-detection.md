@@ -22,7 +22,7 @@ evals:
 
 This skill is **passive** — Maestro applies it automatically during any fix→implement→re-test cycle (fluxo /fix + Coder). It is NOT triggered by the user.
 
-**Activates when:** the same task enters its 3rd iteration of the fix-test cycle, or the same escalation pattern repeats twice.
+**Activates when:** the same task enters its 3rd iteration of the fix-test cycle, or the same escalation pattern repeats twice. It also covers review rounds (blind/adversarial/co-review), whose limit and outcome live in `co-review/SKILL.md`, "Rodadas: quando a revisão para".
 
 **Does NOT apply to:** first or second fix attempts (normal iteration), different tasks within the same session, or user-directed retries ("try again with X approach").
 
@@ -44,6 +44,7 @@ Maestro maintains a **cycle counter** per task (alongside the existing file modi
 | Same error message repeating | 2 consecutive cycles with identical root cause | Emit stuck warning |
 | Same escalation pattern | 2x (e.g., teste falha→/fix→Coder→teste falha→/fix→Coder) | Emit stuck warning |
 | File rework + cycle count | File modified 3x AND cycle count >= 2 | Emit stuck warning (compound signal) |
+| Review rounds on one change (blind/adversarial/co-review) | after round 3 completes, or the same finding ABERTO in 2 consecutive rounds | Stop and ask the user (accept risk / re-plan / split); override does not add rounds — see co-review "Rodadas" |
 
 ### Stuck Warning
 

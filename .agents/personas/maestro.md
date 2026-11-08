@@ -430,13 +430,13 @@ Maintain a **cycle counter** per task alongside the file modification map:
 | Same error repeating | 2 consecutive cycles | Pause and present stuck warning |
 | Same escalation pattern repeating | 2x | Pause and present stuck warning |
 | File rework + cycle count | File 3x AND cycle >= 2 | Pause (compound signal) |
-| Review round count (blind/adversarial/co-review) | >= 3, or the same strike ABERTO in 2 consecutive rounds | Pause; leftover confirmed strikes go to the user, never downgraded (co-review, "Rodadas") |
+| Review rounds (blind/adversarial/co-review) on one change | after round 3 completes, or the same finding ABERTO in 2 consecutive rounds | Stop; open blocking findings go to the user (accept risk / re-plan / split) — no 4th round, never downgraded (co-review, "Rodadas") |
 
 When any threshold is crossed:
 1. **Stop** the current cycle — do NOT route to the next persona.
 2. **Present options**: re-plan (Architect), simplify scope, ask user, or override (user must approve).
 3. **Log** in audit trail as type `STUCK`.
-4. If user overrides: reset counter, raise threshold to 5 for this task.
+4. If user overrides: reset counter, raise threshold to 5 for this task. Not for review rounds: there the user chooses accept risk, re-plan or split, and the round limit stays at 3.
 
 See `stuck-detection` skill for the full protocol, examples, and anti-patterns.
 
