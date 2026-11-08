@@ -44,7 +44,7 @@ Maestro maintains a **cycle counter** per task (alongside the existing file modi
 | Same error message repeating | 2 consecutive cycles with identical root cause | Emit stuck warning |
 | Same escalation pattern | 2x (e.g., teste falha→/fix→Coder→teste falha→/fix→Coder) | Emit stuck warning |
 | File rework + cycle count | File modified 3x AND cycle count >= 2 | Emit stuck warning (compound signal) |
-| Review rounds on one change (blind/adversarial/co-review) | round 3 completes with a blocking finding still open, or a blocking finding still ABERTO in the round after it was raised | Stop and ask the user (accept risk / re-plan / split); a clean APPROVE is not stuck — see co-review "Rodadas" |
+| Review rounds on one change (blind/adversarial/co-review) | round 3 of the current count completes with a blocking finding still open, or a blocking finding open in one round is still ABERTO in the next round of the same count (findings carried into a new count included) | Stop and ask the user (accept risk / re-plan / split); a clean APPROVE is not stuck — see co-review "Rodadas" |
 
 ### Stuck Warning
 
@@ -61,8 +61,9 @@ Options:
 ```
 
 For review rounds the options are different: 1. Accept the risk (record who accepted),
-2. Re-plan, 3. Split. "Override — continue" does not exist there: it would mean a 4th round
-or a merge without the recorded acceptance.
+2. Re-plan, 3. Split. Re-plan or split opens a new count, recorded. "Override — continue"
+does not exist there: it would mean a 4th round in the same count or a merge without the
+recorded acceptance.
 
 ### Rules
 

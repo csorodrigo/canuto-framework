@@ -136,18 +136,20 @@ fora: o hook `codex-pretool-guard.sh` tem política própria, que degrada para a
    (regra 5). A contagem soma todos os pushes, e fechar e reabrir a mesma mudança continua a
    contagem. Depois que a revisão fechou, qualquer push reabre a revisão, exceto rebase ou
    merge da base sem conflito. Antes do push que reabre, tire a marcação de pronto. Quem
-   decide se a revisão reaberta cabe na contagem atual ou numa nova é o usuário.
+   decide se a revisão reaberta cabe na contagem atual ou numa nova é o usuário. Se a
+   contagem atual já fez 3 rodadas, cabe nela só como aceite de risco registrado (regra 5);
+   para revisar o push, é contagem nova.
 2. **Quem orquestra numera os achados bloqueantes** (A1, A2…), sem nunca reaproveitar um
    número; o revisor não numera, e ressalva não ganha número. A partir da 2ª rodada, e já na
    1ª rodada de uma contagem nova, o revisor recebe o delta desde a rodada anterior **e o
    texto completo** de cada achado aberto. Na contagem nova, os abertos passam com o mesmo
-   número. Para cada um ele devolve `FECHADO` (com a evidência no delta, ou com o motivo de o
+   número; ao dividir, cada um vai para a peça que leva o código dele. Para cada um ele devolve `FECHADO` (com a evidência no delta, ou com o motivo de o
    cenário não se sustentar) ou `ABERTO` (com a linha onde o problema continua, que pode estar
    fora do delta). Quem decide se é o mesmo achado é o revisor, não o produtor.
    - No Mode 3, nas mesmas rodadas, acrescente ao prompt do Codex o bloco "Achados
      abertos" com o texto de cada um e peça `FECHADO`/`ABERTO` por achado antes do veredito.
    - Se o revisor da rodada não está disponível (fallback Claude-only em "Graceful
-     Degradation"), o `FECHADO`/`ABERTO` dos abertos vai para um `blind-reviewer`, nunca
+     Degradation"), a rodada inteira, abertos e novos, vai para um `blind-reviewer`, nunca
      para o agente principal.
 3. **Bloqueia o que o revisor classifica como STRIKE**, desde que traga cenário concreto de
    falha (arquivo:linha e o que quebra, inclusive teste ausente para caminho crítico).
