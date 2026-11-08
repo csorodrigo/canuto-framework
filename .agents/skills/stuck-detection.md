@@ -44,7 +44,7 @@ Maestro maintains a **cycle counter** per task (alongside the existing file modi
 | Same error message repeating | 2 consecutive cycles with identical root cause | Emit stuck warning |
 | Same escalation pattern | 2x (e.g., teste falha→/fix→Coder→teste falha→/fix→Coder) | Emit stuck warning |
 | File rework + cycle count | File modified 3x AND cycle count >= 2 | Emit stuck warning (compound signal) |
-| Review rounds on one change (blind/adversarial/co-review) | after round 3 completes, or the same finding ABERTO in 2 consecutive rounds | Stop and ask the user (accept risk / re-plan / split); override does not add rounds — see co-review "Rodadas" |
+| Review rounds on one change (blind/adversarial/co-review) | round 3 completes with a blocking finding still open, or a blocking finding still ABERTO in the round after it was raised | Stop and ask the user (accept risk / re-plan / split); a clean APPROVE is not stuck — see co-review "Rodadas" |
 
 ### Stuck Warning
 
@@ -60,12 +60,16 @@ Options:
 4. Override — continue anyway (user must explicitly approve)
 ```
 
+For review rounds the options are different: 1. Accept the risk (record who accepted),
+2. Re-plan, 3. Split. "Override — continue" does not exist there: it would mean a 4th round
+or a merge without the recorded acceptance.
+
 ### Rules
 
 - **Never silently continue** past the threshold. The whole point is to break the loop.
 - **Log the stuck event** in the audit trail as type `STUCK` with cycle count and signal.
 - **If the user chooses "Re-plan"**: Architect receives the failure history as context (what was tried, why it failed).
-- **If the user chooses "Override"**: reset the cycle counter but increase the threshold to 5 for this task (avoid nagging).
+- **If the user chooses "Override"**: reset the cycle counter but increase the threshold to 5 for this task (avoid nagging). (Not for review rounds; see above.)
 - **Compound signals** (rework + cycles) trigger at LOWER thresholds because they indicate both the approach AND the implementation are wrong.
 
 ## Examples

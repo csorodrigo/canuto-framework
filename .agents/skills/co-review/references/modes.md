@@ -116,6 +116,10 @@ Return the review directly in this response.
 ### Verdict: ✓ LGTM | ⚠️ Concerns ({N} issues to address)
 ```
 
+`Override` vale para sugestões. Achado bloqueante (STRIKE com cenário concreto) só sai como
+`FECHADO` pelo revisor ou por decisão do usuário: veja "Rodadas: quando a revisão para" no
+`SKILL.md`.
+
 ---
 
 ## MCP Tool Reference

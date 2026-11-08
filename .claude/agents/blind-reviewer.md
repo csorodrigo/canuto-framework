@@ -50,14 +50,14 @@ Veredito: APPROVE | REQUEST CHANGES (strikes > 0 ⇒ REQUEST CHANGES)
 ```
 
 Da 2ª rodada em diante, o prompt traz o delta desde a rodada anterior e o texto
-dos achados abertos, numerados por quem orquestra (A1, A2…). Julgue cada um antes
-de procurar problemas novos; os novos vêm sem número:
+dos achados bloqueantes abertos, numerados por quem orquestra (A1, A2…). Julgue
+cada um antes de procurar problemas novos; os novos vêm sem número:
 
 ```
 ## Blind Review — rodada <n>
 Artefato: <delta revisado, em 1 linha>
 Abertos:
-- A1: FECHADO — <evidência no delta, arquivo:linha>
+- A1: FECHADO — <evidência no delta, arquivo:linha; ou: cenário não se sustenta, porque …>
 - A2: ABERTO — <onde o problema continua, arquivo:linha (pode estar fora do delta)>
 Novos: <n>
 - [STRIKE] arquivo:linha — <cenário concreto de falha>

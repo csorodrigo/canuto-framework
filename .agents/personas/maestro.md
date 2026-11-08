@@ -430,7 +430,7 @@ Maintain a **cycle counter** per task alongside the file modification map:
 | Same error repeating | 2 consecutive cycles | Pause and present stuck warning |
 | Same escalation pattern repeating | 2x | Pause and present stuck warning |
 | File rework + cycle count | File 3x AND cycle >= 2 | Pause (compound signal) |
-| Review rounds (blind/adversarial/co-review) on one change | after round 3 completes, or the same finding ABERTO in 2 consecutive rounds | Stop; open blocking findings go to the user (accept risk / re-plan / split) — no 4th round, never downgraded (co-review, "Rodadas") |
+| Review rounds (blind/adversarial/co-review) on one change | round 3 completes with a blocking finding still open, or a blocking finding raised in one round is still ABERTO in the next | Stop; open blocking findings go to the user (accept risk / re-plan / split) — no 4th round in the same count, never downgraded (co-review, "Rodadas"). A clean APPROVE closes the review: no STUCK |
 
 When any threshold is crossed:
 1. **Stop** the current cycle — do NOT route to the next persona.

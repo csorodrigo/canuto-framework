@@ -126,30 +126,33 @@ Para a segunda opinião **estruturalmente** isolada, use o subagent
 por 47 rodadas de revisão cega, com seis revisores por rodada a partir da 37ª, e a
 própria sessão teve de inventar na 40ª um critério de parada. Em outro PR, o merge
 aconteceu antes de a revisão terminar. As regras abaixo valem para revisão cega,
-adversarial e co-review (Modes 3 e 4) de uma mesma mudança:
+adversarial e co-review de um PR ou de um plano (Mode 3). O Mode 4 (pre-commit) fica de
+fora: o hook `codex-pretool-guard.sh` tem política própria, que degrada para advisory no
+3º HOLD seguido, e não guarda delta nem estado por achado.
 
-1. **No máximo 3 rodadas por mudança** (o PR, ou o commit no Mode 4), somando todos os
-   pushes ou novos stages. Fechar e reabrir a mesma mudança continua a contagem.
-2. **Quem orquestra numera os achados** (A1, A2…), sem nunca reaproveitar um número; o
-   revisor não numera. A partir da 2ª rodada, o revisor recebe o delta desde a rodada
-   anterior **e o texto completo** de cada achado aberto, e devolve para cada um `FECHADO`
-   (com a evidência no delta) ou `ABERTO` (com a linha onde o problema continua, que pode
-   estar fora do delta). Quem decide se é o mesmo achado é o revisor, não o produtor.
-   - No Mode 4 (pre-commit) o delta é a diferença entre o patch staged revisado na rodada
-     anterior e o atual: guarde o patch de cada rodada.
-   - Nos prompts do Codex (Modes 3 e 4), da 2ª rodada em diante acrescente ao template o
-     bloco "Achados abertos" com o texto de cada um e peça `FECHADO`/`ABERTO` por achado
-     antes do veredito.
-3. **Bloqueia o achado com cenário concreto de falha** — arquivo:linha e o que quebra,
-   inclusive teste ausente para caminho crítico: é o STRIKE do `blind-reviewer`. Ponto sem
-   cenário concreto é ressalva e não bloqueia. Quem julga se o cenário se sustenta é o
+1. **No máximo 3 rodadas por mudança.** Mudança é o PR, ou o plano no Mode 3; as rodadas do
+   plano não contam para o PR que vem depois. A contagem soma todos os pushes, e fechar e
+   reabrir a mesma mudança continua a contagem. Push que muda comportamento depois que a
+   revisão fechou reabre a revisão, e quem decide se ela cabe numa contagem nova é o usuário.
+2. **Quem orquestra numera os achados bloqueantes** (A1, A2…), sem nunca reaproveitar um
+   número; o revisor não numera, e ressalva não ganha número. A partir da 2ª rodada, o
+   revisor recebe o delta desde a rodada anterior **e o texto completo** de cada achado
+   aberto. Para cada um ele devolve `FECHADO` (com a evidência no delta, ou com o motivo de o
+   cenário não se sustentar) ou `ABERTO` (com a linha onde o problema continua, que pode estar
+   fora do delta). Quem decide se é o mesmo achado é o revisor, não o produtor.
+   - No Mode 3, da 2ª rodada em diante, acrescente ao prompt do Codex o bloco "Achados
+     abertos" com o texto de cada um e peça `FECHADO`/`ABERTO` por achado antes do veredito.
+3. **Bloqueia o que o revisor classifica como STRIKE**, desde que traga cenário concreto de
+   falha (arquivo:linha e o que quebra, inclusive teste ausente para caminho crítico).
+   RESSALVA nunca bloqueia, mesmo com cenário. Quem julga se o cenário se sustenta é o
    revisor da rodada seguinte, não o produtor.
-4. **O ciclo para** depois da 3ª rodada concluída, ou antes, quando o revisor marca o mesmo
-   achado `ABERTO` em 2 rodadas seguidas.
+4. **O ciclo para** depois da 3ª rodada concluída, ou antes, quando um achado bloqueante
+   aberto numa rodada continua `ABERTO` na rodada seguinte.
 5. **Ciclo parado com achado bloqueante aberto não segue para merge.** A sessão para e
    pergunta ao usuário: aceitar o risco (registrando quem aceitou), replanejar ou dividir.
-   Não há 4ª rodada, e o achado não vira "não verificado". Sem achado bloqueante aberto, a
-   revisão fecha.
+   Não há 4ª rodada na mesma contagem, e o achado não vira "não verificado". Replanejar ou
+   dividir abre contagem nova por decisão do usuário, registrada. Sem achado bloqueante
+   aberto, a revisão fecha.
 6. **Marcação de pronto para merge só depois que a revisão fecha.**
 
 O "final say" do agente principal (Staff Engineer Framing) vale para sugestões. Um achado
