@@ -1895,6 +1895,13 @@ else
   fail "contratos de orquestração divergiram do comportamento dos executores"
 fi
 
+# Revisão: candidato congelado, artefato de tentativa e instalação isolada.
+if PYTHONDONTWRITEBYTECODE=1 python3 "$FRAMEWORK_DIR/tests/reviewer-integrity.test.py"; then
+  pass "reviewer: resultado, contexto e instalação preservadora"
+else
+  fail "contratos de integridade do reviewer falharam"
+fi
+
 # 12j. postdelegate-verify não dispara em bash -n/cp/chmod do arquivo do wrapper
 if grep -q '""|-\*)' "$AGENTS_DIR/hooks/postdelegate-verify.sh" 2>/dev/null \
   || grep -q '"")\|-\*)' "$AGENTS_DIR/hooks/postdelegate-verify.sh" 2>/dev/null; then
@@ -3718,7 +3725,7 @@ fi
 
 CI_RELEASE_FILE="$FRAMEWORK_DIR/.github/workflows/validate-framework.yml"
 if grep -q 'ubuntu-latest' "$CI_RELEASE_FILE" \
-  && grep -q 'macos-14' "$CI_RELEASE_FILE" \
+  && grep -q 'macos-15-intel' "$CI_RELEASE_FILE" \
   && grep -q "'releases/\*\*'" "$CI_RELEASE_FILE" \
   && grep -q '^[[:space:]]*- stable$' "$CI_RELEASE_FILE" \
   && grep -q '/bin/bash tests/cross-consumer-e2e.sh' "$CI_RELEASE_FILE" \

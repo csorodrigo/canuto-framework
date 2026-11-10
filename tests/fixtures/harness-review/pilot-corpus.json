@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "comprehension": [
+    {
+      "id": "C1",
+      "document": "Este documento define somente a classificação de lotes já autorizados; autenticação e transporte estão fora do escopo. Um lote tem uma lista finita de valores inteiros e um limite inteiro. Farol é o resultado calculado: verde se a soma dos valores for menor ou igual ao limite; vermelho caso contrário. Valores negativos e lista vazia são permitidos; a soma vazia é zero. A classificação não altera o lote. O consumidor devolve ACEITO para verde e RECUSADO para vermelho. Exemplos: [2,3] com limite 5 é ACEITO; [2,4] com limite 5 é RECUSADO; [] com limite 0 é ACEITO. Testes cobrem esses exemplos, soma negativa e repetição sem mutação."
+    },
+    {
+      "id": "C2",
+      "document": "Este documento define somente a classificação de lotes já autorizados; autenticação e transporte estão fora do escopo. Um lote tem uma lista finita de valores inteiros e um limite inteiro. A classificação não altera o lote. O consumidor devolve ACEITO quando o farol estiver verde e RECUSADO caso contrário. Valores negativos e lista vazia são permitidos. Testes cobrem repetição sem mutação e os dois resultados."
+    }
+  ],
+  "drift": [
+    {
+      "id": "D1",
+      "documents": [
+        {"status": "accepted", "text": "eligible(total, limit) devolve true se total for menor ou igual a limit; ambos são inteiros. Esta é a regra vigente."},
+        {"status": "proposed", "text": "Proposta ainda não aceita: limitar a total estritamente menor que limit."},
+        {"status": "historical", "text": "A versão anterior aceitava qualquer total positivo."}
+      ],
+      "code": "def eligible(total, limit):\n    return total <= limit\n"
+    },
+    {
+      "id": "D2",
+      "documents": [
+        {"status": "accepted", "text": "eligible(total, limit) devolve true se total for menor ou igual a limit; ambos são inteiros. Esta é a regra vigente."},
+        {"status": "proposed", "text": "Proposta ainda não aceita: limitar a total estritamente menor que limit."},
+        {"status": "historical", "text": "A versão anterior aceitava qualquer total positivo."}
+      ],
+      "code": "def eligible(total, limit):\n    return total < limit\n"
+    }
+  ],
+  "oracle": {"C1": [], "C2": ["farol verde sem regra de cálculo"], "D1": [], "D2": ["igualdade aceita pela regra vigente e recusada pelo código"]}
+}

@@ -1,424 +1,192 @@
 #!/usr/bin/env bash
-
+# Congela o candidato em objetos Git antes de construir qualquer parte do review.
 set -euo pipefail
+common_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/codex-common.sh"
+[ -f "$common_script" ] || common_script="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/scripts/codex-common.sh"
+exec python3 - "$common_script" "$@" <<'PY'
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tempfile
 
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-MODE="staged"
-BASE_REF=""
-OUTPUT_FILE=""
-DIFF_TARGET="index"
+common_script = sys.argv.pop(1)
+parser = argparse.ArgumentParser()
+modes = parser.add_mutually_exclusive_group()
+modes.add_argument('--staged', action='store_true')
+modes.add_argument('--uncommitted', action='store_true')
+modes.add_argument('--commit-candidate', choices=('index', 'all-tracked'))
+modes.add_argument('--base')
+parser.add_argument('--output')
+parser.add_argument('--receipt')
+parser.add_argument('--max-output-bytes', type=int, default=int(os.environ.get('CODEX_DIFF_MAX_TOTAL_BYTES', '420000')))
+args = parser.parse_args()
+root = os.environ.get('CLAUDE_PROJECT_DIR', os.getcwd())
+# Variáveis de outra worktree não podem trocar o repositório ou o índice revisado.
+env = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
+env.update(GIT_CONFIG_NOSYSTEM='1', GIT_LITERAL_PATHSPECS='1')
+def git(*command, data=None, index=None):
+    call_env = dict(env)
+    if index is not None: call_env['GIT_INDEX_FILE'] = str(index)
+    return subprocess.check_output(['git', '-c', 'core.fsmonitor=false', '-c', 'diff.external=',
+        '-c', 'core.quotePath=true', *command], cwd=root, env=call_env, input=data, stderr=subprocess.PIPE)
+def oid(*command, **kwargs): return git(*command, **kwargs).decode().strip()
+def limit(name, default):
+    value = int(os.environ.get(name, str(default)))
+    if value < 0: raise ValueError('negative context budget')
+    return value
 
-# ── Orçamento de contexto do review ─────────────────────────────────────────
-# Redesenho 2026-08-01 (auditoria mecesa/lucrando): o modelo anterior truncava
-# ARQUIVO NO MEIO (teto de 400 linhas por arquivo, além de 1500 linhas/90KB no
-# total) e o reviewer respondia HOLD exatamente por causa do truncamento
-# ("migration and validator bodies are omitted") — ≥20 HOLDs em 4 sessões,
-# todos pelo corte, nenhum por achado real. Resultado: CANUTO_ALLOW_COMMIT=1
-# virou modus operandi (92 usos no mecesa, 53 no lucrando) e o gate virou ruído.
-#
-# Modelo novo (whole-file budgeting):
-#   1. NENHUM arquivo é cortado no meio. Arquivo incluído = hunks COMPLETOS.
-#   2. Arquivos security-sensitive (heurística canônica de codex-common.sh)
-#      entram PRIMEIRO no orçamento, na ordem original do diff.
-#   3. Estourou o orçamento? Caem ARQUIVOS INTEIROS de menor risco
-#      (não-sensíveis; os menores entram antes para maximizar cobertura) e
-#      cada omitido é listado em "## Omitted Files (not reviewed)".
-#   4. Sensível que não coube também sai INTEIRO, e o cabeçalho marca
-#      `sensitive_files_omitted: true` — o chamador (codex-pretool-guard.sh)
-#      então instrui o reviewer que o veredicto SKIP-TRUNCATED é permitido
-#      (tratado como advisory), nunca HOLD por falta de contexto.
-#
-# Calibração dos tetos (medida 2026-08-01 com migration sintética):
-#   uma migration SQL de 1500 linhas gera ~1505 linhas / ~150KB de patch.
-#   Antigo: 1500 linhas totais / 90KB / 400 por arquivo → a migration NUNCA
-#   cabia inteira (chegavam 394 de 1500 linhas ao reviewer).
-#   Novo: 8000 linhas / 400KB → a migration da auditoria ocupa ~19% do teto de
-#   linhas ("com folga"); 400KB ≈ ~100k tokens, confortável para os modelos do
-#   reviewer (janela ≥400k tokens) sem explodir custo/latência do hook.
-#   O contexto de 3 linhas é o default do git e segue valendo (papiro#341).
-DIFF_CONTEXT_LINES="${CODEX_DIFF_CONTEXT_LINES:-3}"
-MAX_PATCH_BYTES="${CODEX_DIFF_MAX_BYTES:-400000}"
-MAX_PATCH_LINES="${CODEX_DIFF_MAX_LINES:-8000}"
-MAX_PATCH_FILES="${CODEX_DIFF_MAX_FILES:-40}"
-# CODEX_DIFF_MAX_LINES_PER_FILE foi removido de propósito: truncar um arquivo
-# no meio era o gerador dos HOLDs falsos. O corte agora é sempre por arquivo
-# inteiro, com lista explícita do que ficou de fora.
+def sensitive_paths(paths):
+    # A mesma política do hook, incluindo adaptações locais do consumidor.
+    script = 'source "$1"; while IFS= read -r -d "" path; do if codex_is_security_sensitive_path "$path"; then printf "1\\0"; else printf "0\\0"; fi; done'
+    payload = b''.join(os.fsencode(path) + b'\0' for path in paths)
+    result = subprocess.run(['bash', '-c', script, 'review-policy', common_script],
+        input=payload, capture_output=True, check=True)
+    flags = result.stdout.split(b'\0')[:-1]
+    if len(flags) != len(paths) or any(flag not in (b'0', b'1') for flag in flags):
+        raise ValueError('invalid path classification')
+    return {path: flag == b'1' for path, flag in zip(paths, flags)}
 
-# ── Heurística de risco (fonte canônica: codex-common.sh) ───────────────────
-_SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || printf '%s' "$PWD")
-if ! declare -F codex_is_security_sensitive_path >/dev/null 2>&1; then
-  for _common_candidate in "$_SCRIPT_DIR/codex-common.sh" "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/scripts/codex-common.sh"; do
-    if [ -f "$_common_candidate" ]; then
-      # shellcheck source=/dev/null
-      source "$_common_candidate"
-      break
-    fi
-  done
-fi
-if ! declare -F codex_is_security_sensitive_path >/dev/null 2>&1; then
-  # Cópia de segurança, usada só quando codex-common.sh não está instalado ao
-  # lado deste script nem em ~/.claude/scripts. Manter em sincronia manualmente.
-  codex_is_security_sensitive_path() {
-    local path="${1:-}"
-    [[ "$path" =~ (^|/)(auth|middleware|crypto|payments?|billing|routes?|api|controllers?|schema|db|database|rls|supabase|env|config)(/|$) ]] \
-      || [[ "$path" =~ (^|/)(package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|go\.mod|go\.sum|requirements.*|poetry\.lock|Cargo\.toml|Cargo\.lock|Gemfile|Gemfile\.lock|composer\.json|composer\.lock|Dockerfile|docker-compose.*|\.env.*)$ ]]
-  }
-fi
+def mask(text):
+    if os.environ.get('CODEX_DIFF_MASK_SECRETS', 'true').lower() in ('false', '0'): return text
+    text = re.sub(r'(api[_-]?key|secret|token|password|bearer|credentials?)\s*[:=]\s*"?[A-Za-z0-9+/_.~-]{8,}"?', r'\1=<REDACTED>', text, flags=re.I)
+    for pattern in (r'(?:sk_live_|pk_live_|sk_test_|pk_test_|xox[bpsar])-[A-Za-z0-9]{8,}',
+        r'gh[po]_[A-Za-z0-9]{36,}', r'github_pat_[A-Za-z0-9_]{20,}',
+        r'eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}'):
+        text = re.sub(pattern, '<REDACTED_KEY>', text)
+    return text
 
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --staged)
-      MODE="staged"
-      ;;
-    --uncommitted)
-      MODE="uncommitted"
-      ;;
-    --commit-candidate)
-      MODE="commit-candidate"
-      DIFF_TARGET="${2:-index}"
-      shift
-      ;;
-    --base)
-      MODE="base"
-      BASE_REF="${2:-}"
-      shift
-      ;;
-    --output)
-      OUTPUT_FILE="${2:-}"
-      shift
-      ;;
-    *)
-      echo "Usage: $0 [--staged|--uncommitted|--commit-candidate <index|all-tracked>|--base <ref>] [--output <file>]" >&2
-      exit 1
-      ;;
-  esac
-  shift
-done
+def save(path, data):
+    target = Path(path)
+    with tempfile.NamedTemporaryFile(dir=target.parent, delete=False) as handle:
+        temporary = Path(handle.name)
+        handle.write(data)
+    try: os.replace(temporary, target)
+    finally: temporary.unlink(missing_ok=True)
 
-cd "$PROJECT_DIR"
-
-if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  echo "Not a git repository." >&2
-  exit 1
-fi
-
-case "$MODE" in
-  staged)
-    DIFF_CMD=(git diff --cached "-U$DIFF_CONTEXT_LINES" --no-color)
-    STAT_CMD=(git diff --cached --stat=120 --compact-summary --no-color)
-    FILE_CMD=(git diff --cached --name-only --diff-filter=ACMR)
-    ;;
-  uncommitted)
-    DIFF_CMD=(git diff "-U$DIFF_CONTEXT_LINES" --no-color)
-    STAT_CMD=(git diff --stat=120 --compact-summary --no-color)
-    FILE_CMD=(git diff --name-only --diff-filter=ACMR)
-    ;;
-  commit-candidate)
-    if [ "$DIFF_TARGET" = "all-tracked" ]; then
-      if git rev-parse --verify HEAD >/dev/null 2>&1; then
-        DIFF_CMD=(git diff HEAD "-U$DIFF_CONTEXT_LINES" --no-color)
-        STAT_CMD=(git diff HEAD --stat=120 --compact-summary --no-color)
-        FILE_CMD=(git diff HEAD --name-only --diff-filter=ACMR)
-      else
-        DIFF_CMD=(git diff --cached "-U$DIFF_CONTEXT_LINES" --no-color)
-        STAT_CMD=(git diff --cached --stat=120 --compact-summary --no-color)
-        FILE_CMD=(git diff --cached --name-only --diff-filter=ACMR)
-      fi
-    else
-      DIFF_CMD=(git diff --cached "-U$DIFF_CONTEXT_LINES" --no-color)
-      STAT_CMD=(git diff --cached --stat=120 --compact-summary --no-color)
-      FILE_CMD=(git diff --cached --name-only --diff-filter=ACMR)
-    fi
-    ;;
-  base)
-    if [ -z "$BASE_REF" ]; then
-      echo "--base requires a ref." >&2
-      exit 1
-    fi
-    DIFF_CMD=(git diff "$BASE_REF"...HEAD "-U$DIFF_CONTEXT_LINES" --no-color)
-    STAT_CMD=(git diff "$BASE_REF"...HEAD --stat=120 --compact-summary --no-color)
-    FILE_CMD=(git diff "$BASE_REF"...HEAD --name-only --diff-filter=ACMR)
-    ;;
-esac
-
-DIFF_OUTPUT="$("${DIFF_CMD[@]}")"
-if [ -z "$DIFF_OUTPUT" ]; then
-  DIFF_OUTPUT="No changes detected."
-fi
-
-# C7: Mask potential secrets/tokens in diff output
-_mask_secrets="${CODEX_DIFF_MASK_SECRETS:-true}"
-if [ "$_mask_secrets" != "false" ] && [ "$_mask_secrets" != "FALSE" ] && [ "$_mask_secrets" != "0" ]; then
-  # Case-insensitive matching via piping through two passes (sed -E on macOS doesn't support /I)
-  DIFF_OUTPUT=$(printf '%s' "$DIFF_OUTPUT" | \
-    sed -E \
-      -e 's/([Aa][Pp][Ii][_-]?[Kk][Ee][Yy]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Bb][Ee][Aa][Rr][Ee][Rr]|[Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll][Ss]?)[[:space:]]*[:=][[:space:]]*"?[A-Za-z0-9+\/_.~-]{8,}"?/\1=<REDACTED>/g' \
-      -e 's/(sk_live_|pk_live_|sk_test_|pk_test_|xox[bpsar])-[A-Za-z0-9]{8,}/<REDACTED_KEY>/g' \
-      -e 's/ghp_[A-Za-z0-9]{36,}/<REDACTED_GITHUB_PAT>/g' \
-      -e 's/gho_[A-Za-z0-9]{36,}/<REDACTED_GITHUB_OAUTH>/g' \
-      -e 's/github_pat_[A-Za-z0-9_]{20,}/<REDACTED_GITHUB_PAT>/g' \
-      -e 's/eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}/<REDACTED_JWT>/g' \
-  )
-fi
-
-STAT_OUTPUT="$("${STAT_CMD[@]}" 2>/dev/null || true)"
-if [ -z "$STAT_OUTPUT" ]; then
-  STAT_OUTPUT="No file-level diff summary detected."
-fi
-
-declare -a CHANGED_FILES=()
-while IFS= read -r changed_file; do
-  [ -n "$changed_file" ] || continue
-  CHANGED_FILES+=("$changed_file")
-done < <("${FILE_CMD[@]}" 2>/dev/null | sed '/^$/d')
-
-extract_identifiers() {
-  local regex="$1"
-  printf '%s\n' "$DIFF_OUTPUT" \
-    | grep -E '^[+-][^+-]' \
-    | grep -oE "$regex" \
-    | sed 's/[(]$//' \
-    | sort -u \
-    | head -20 \
-    || true
-}
-
-join_pattern() {
-  local joined=""
-  while IFS= read -r item; do
-    [ -n "$item" ] || continue
-    if [ -z "$joined" ]; then
-      joined="$item"
-    else
-      joined="$joined|$item"
-    fi
-  done
-  printf '%s\n' "$joined"
-}
-
-TYPE_PATTERN=$(extract_identifiers '\b[A-Z][A-Za-z0-9_]*\b' | join_pattern)
-FUNC_PATTERN=$(extract_identifiers '\b[a-z][A-Za-z0-9_]*\(' | join_pattern)
-
-render_signatures() {
-  local file="$1"
-  local rendered=false
-
-  if [ -n "$TYPE_PATTERN" ]; then
-    if rg -n "^[[:space:]]*(export[[:space:]]+)?(type|interface|enum|class)[[:space:]]+(${TYPE_PATTERN})\\b" "$file" 2>/dev/null | head -20; then
-      rendered=true
-    fi
-  fi
-
-  if [ -n "$FUNC_PATTERN" ]; then
-    if rg -n "^[[:space:]]*(export[[:space:]]+)?(async[[:space:]]+)?function[[:space:]]+(${FUNC_PATTERN})\\b|^[[:space:]]*(export[[:space:]]+)?(const|let|var)[[:space:]]+(${FUNC_PATTERN})[[:space:]]*=" "$file" 2>/dev/null | head -20; then
-      rendered=true
-    fi
-  fi
-
-  [ "$rendered" = true ] || return 1
-}
-
-RESULT_FILE="${OUTPUT_FILE:-$(mktemp)}"
-SPLIT_DIR=$(mktemp -d)
-trap 'rm -rf "$SPLIT_DIR"' EXIT
-
-# ── Split do diff em um bloco por arquivo ───────────────────────────────────
-# LC_ALL=C: length() conta bytes (é o que o orçamento mede) e o parsing fica
-# estável para conteúdo binário/UTF-8. Cada bloco `diff --git` vira um arquivo
-# NNNNNN.patch e o index.tsv registra: bloco, linhas, bytes, path.
-printf '%s\n' "$DIFF_OUTPUT" | LC_ALL=C awk -v dir="$SPLIT_DIR" '
-  BEGIN { n = 0; out = "" }
-  /^diff --git / {
-    if (out != "") close(out)
-    n++
-    out = sprintf("%s/%06d.patch", dir, n)
-    p = $0
-    sub(/^diff --git [^ ]+ b\//, "", p)
-    gsub(/^"|"$/, "", p)
-    hdrpath[n] = p
-  }
-  n > 0 {
-    if ($0 ~ /^\+\+\+ / && pluspath[n] == "") {
-      p = $0
-      sub(/^\+\+\+ /, "", p)
-      if (p != "/dev/null") {
-        gsub(/^"|"$/, "", p)
-        sub(/^b\//, "", p)
-        sub(/\t.*$/, "", p)
-        pluspath[n] = p
-      }
-    }
-    print > out
-    lc[n]++
-    bc[n] += length($0) + 1
-  }
-  END {
-    if (out != "") close(out)
-    idx = dir "/index.tsv"
-    for (i = 1; i <= n; i++) {
-      p = (pluspath[i] != "" ? pluspath[i] : hdrpath[i])
-      printf "%06d\t%d\t%d\t%s\n", i, lc[i], bc[i], p > idx
-    }
-    close(idx)
-  }
-'
-
-BLOCK_COUNT=0
-declare -a block_lines=()
-declare -a block_bytes=()
-declare -a block_path=()
-declare -a block_sens=()
-if [ -s "$SPLIT_DIR/index.tsv" ]; then
-  while IFS=$'\t' read -r blk blines bbytes bpath; do
-    [ -n "$blk" ] || continue
-    idx=$((10#$blk))
-    block_lines[$idx]=$blines
-    block_bytes[$idx]=$bbytes
-    block_path[$idx]=$bpath
-    if codex_is_security_sensitive_path "$bpath"; then
-      block_sens[$idx]=1
-    else
-      block_sens[$idx]=0
-    fi
-    if [ "$idx" -gt "$BLOCK_COUNT" ]; then
-      BLOCK_COUNT=$idx
-    fi
-  done < "$SPLIT_DIR/index.tsv"
-fi
-
-# ── Ordem de inclusão no orçamento ──────────────────────────────────────────
-#   prioridade 0: arquivos sensíveis, na ordem original do diff
-#   prioridade 1: não-sensíveis, do menor para o maior (maximiza cobertura)
-TAB=$(printf '\t')
-PRIORITY_FILE="$SPLIT_DIR/priority.tsv"
-: > "$PRIORITY_FILE"
-i=1
-while [ "$i" -le "$BLOCK_COUNT" ]; do
-  if [ "${block_sens[$i]}" = "1" ]; then
-    printf '0\t%s\t%s\t%s\n' "$i" "$i" "$i" >> "$PRIORITY_FILE"
-  else
-    printf '1\t%s\t%s\t%s\n' "${block_lines[$i]}" "$i" "$i" >> "$PRIORITY_FILE"
-  fi
-  i=$((i + 1))
-done
-
-declare -a included=()
-INCLUDED_COUNT=0
-OMITTED_COUNT=0
-SENSITIVE_OMITTED=false
-OMITTED_FILE="$SPLIT_DIR/omitted.tsv"
-: > "$OMITTED_FILE"
-tot_lines=0
-tot_bytes=0
-if [ "$BLOCK_COUNT" -gt 0 ]; then
-  while IFS=$'\t' read -r _prio _key _seq idx; do
-    [ -n "$idx" ] || continue
-    blines=${block_lines[$idx]}
-    bbytes=${block_bytes[$idx]}
-    if [ "$INCLUDED_COUNT" -ge "$MAX_PATCH_FILES" ] \
-      || [ $((tot_lines + blines)) -gt "$MAX_PATCH_LINES" ] \
-      || [ $((tot_bytes + bbytes)) -gt "$MAX_PATCH_BYTES" ]; then
-      OMITTED_COUNT=$((OMITTED_COUNT + 1))
-      if [ "${block_sens[$idx]}" = "1" ]; then
-        SENSITIVE_OMITTED=true
-      fi
-      printf '%s\t%s\t%s\n' "${block_sens[$idx]}" "$blines" "${block_path[$idx]}" >> "$OMITTED_FILE"
-      continue
-    fi
-    included[$idx]=1
-    INCLUDED_COUNT=$((INCLUDED_COUNT + 1))
-    tot_lines=$((tot_lines + blines))
-    tot_bytes=$((tot_bytes + bbytes))
-  done < <(sort -t "$TAB" -k1,1n -k2,2n -k3,3n "$PRIORITY_FILE")
-fi
-
-# Render do excerpt na ordem ORIGINAL do diff (mais legível para o reviewer).
-PATCH_EXCERPT_FILE="$SPLIT_DIR/excerpt.patch"
-: > "$PATCH_EXCERPT_FILE"
-if [ "$BLOCK_COUNT" -gt 0 ]; then
-  i=1
-  while [ "$i" -le "$BLOCK_COUNT" ]; do
-    if [ "${included[$i]:-0}" = "1" ]; then
-      cat "$SPLIT_DIR/$(printf '%06d' "$i").patch" >> "$PATCH_EXCERPT_FILE"
-    fi
-    i=$((i + 1))
-  done
-else
-  # Diff sem headers `diff --git` (ex.: "No changes detected.") passa cru.
-  printf '%s\n' "$DIFF_OUTPUT" > "$PATCH_EXCERPT_FILE"
-fi
-
-{
-  echo "# Compressed Diff Context"
-  echo ""
-  echo "## Review Scope"
-  echo "- mode: $MODE"
-  if [ "$MODE" = "commit-candidate" ]; then
-    echo "- commit_target: $DIFF_TARGET"
-  fi
-  if [ -n "$BASE_REF" ]; then
-    echo "- base: $BASE_REF"
-  fi
-  echo "- files: ${#CHANGED_FILES[@]}"
-  echo "- files_in_patch: $BLOCK_COUNT"
-  echo "- files_included_full: $INCLUDED_COUNT"
-  echo "- files_omitted: $OMITTED_COUNT"
-  echo "- sensitive_files_omitted: $SENSITIVE_OMITTED"
-  echo "- budget: $MAX_PATCH_FILES files / $MAX_PATCH_LINES patch lines / $MAX_PATCH_BYTES bytes"
-  echo ""
-  echo "## Diff Summary"
-  echo '```text'
-  printf '%s\n' "$STAT_OUTPUT"
-  echo '```'
-  echo ""
-  echo "## Patch Excerpt"
-  if [ "$OMITTED_COUNT" -gt 0 ]; then
-    echo "_Context budget applied: $INCLUDED_COUNT of $BLOCK_COUNT changed files included with COMPLETE hunks; $OMITTED_COUNT file(s) omitted IN FULL and listed under \"Omitted Files (not reviewed)\". No file is ever cut mid-way._"
-  elif [ "$BLOCK_COUNT" -gt 0 ]; then
-    echo "_All $BLOCK_COUNT changed files included with complete hunks (nothing omitted)._"
-  fi
-  echo '```diff'
-  cat "$PATCH_EXCERPT_FILE"
-  echo '```'
-  echo ""
-
-  if [ "$OMITTED_COUNT" -gt 0 ]; then
-    echo "## Omitted Files (not reviewed)"
-    echo "_These files exceeded the review context budget and were omitted IN FULL (never cut mid-file). They were NOT reviewed:_"
-    while IFS=$'\t' read -r osens olines opath; do
-      [ -n "$opath" ] || continue
-      if [ "$osens" = "1" ]; then
-        echo "- $opath ($olines diff lines) [SECURITY-SENSITIVE]"
-      else
-        echo "- $opath ($olines diff lines)"
-      fi
-    done < <(sort -t "$TAB" -k1,1nr -k2,2n "$OMITTED_FILE")
-    echo ""
-  fi
-
-  if [ ${#CHANGED_FILES[@]} -gt 0 ]; then
-    echo "## Referenced Signatures"
-    sig_tmp=$(mktemp)
-    for file in "${CHANGED_FILES[@]}"; do
-      [ -f "$file" ] || continue
-      : > "$sig_tmp"
-      if ! render_signatures "$file" >"$sig_tmp" 2>/dev/null; then
-        continue
-      fi
-      if [ -s "$sig_tmp" ]; then
-        echo "### $file"
-        echo '```text'
-        cat "$sig_tmp"
-        echo '```'
-        echo ""
-      fi
-    done
-    rm -f "$sig_tmp"
-  fi
-} > "$RESULT_FILE"
-
-cat "$RESULT_FILE"
-
-if [ -z "$OUTPUT_FILE" ]; then
-  rm -f "$RESULT_FILE"
-fi
+try:
+    root = oid('rev-parse', '--show-toplevel')
+    empty = oid('hash-object', '-t', 'tree', '--stdin', data=b'')
+    try: head = oid('rev-parse', '--verify', 'HEAD^{commit}')
+    except subprocess.CalledProcessError: head = None
+    base_commit = merge_base = None
+    if args.base:
+        mode = 'base'
+        base_commit = oid('rev-parse', '--verify', args.base + '^{commit}')
+        merge_base = oid('merge-base', base_commit, head or 'HEAD')
+        before = oid('rev-parse', merge_base + '^{tree}')
+        candidate = oid('rev-parse', (head or 'HEAD') + '^{tree}')
+    else:
+        mode = 'uncommitted' if args.uncommitted else 'commit-candidate' if args.commit_candidate else 'staged'
+        # Copiar o índice evita que write-tree atualize inclusive o cache do índice real.
+        index_path = Path(oid('rev-parse', '--git-path', 'index'))
+        if not index_path.is_absolute(): index_path = Path(root) / index_path
+        with tempfile.TemporaryDirectory(prefix='codex-review-index-') as temp:
+            index = Path(temp) / 'index'
+            if index_path.exists(): index.write_bytes(index_path.read_bytes())
+            else: git('read-tree', empty, index=index)
+            staged = oid('write-tree', index=index)
+            before = staged if args.uncommitted else oid('rev-parse', head + '^{tree}') if head else empty
+            if args.uncommitted or args.commit_candidate == 'all-tracked':
+                git('add', '-u', '--', '.', index=index)
+            candidate = oid('write-tree', index=index)
+    context = limit('CODEX_DIFF_CONTEXT_LINES', 3)
+    max_files = limit('CODEX_DIFF_MAX_FILES', 40)
+    max_lines = limit('CODEX_DIFF_MAX_LINES', 8000)
+    max_bytes = limit('CODEX_DIFF_MAX_BYTES', 400000)
+    if args.max_output_bytes <= 0: raise ValueError('invalid total budget')
+    raw = git('diff', '--name-status', '-z', '-M', before, candidate).split(b'\0')
+    gitlink_paths = set()
+    for tree in (before, candidate):
+        for item in git('ls-tree', '-rz', tree).split(b'\0'):
+            if item:
+                metadata, path = item.split(b'\t', 1)
+                if metadata.split()[0] == b'160000': gitlink_paths.add(os.fsdecode(path))
+    changes = []
+    while raw and raw[0]:
+        status = raw.pop(0).decode()
+        paths = [os.fsdecode(raw.pop(0))]
+        if status[0] in ('R', 'C'): paths.append(os.fsdecode(raw.pop(0)))
+        changes.append((status, paths))
+    classification = sensitive_paths(list(dict.fromkeys(path for _, paths in changes for path in paths)))
+    entries = []
+    for status, paths in changes:
+        patch = mask(git('diff', '--no-ext-diff', '--no-textconv', '--no-color', '-M', f'-U{context}',
+            before, candidate, '--', *paths).decode('utf-8', errors='replace'))
+        label = ' → '.join(json.dumps(path, ensure_ascii=True) for path in paths)
+        entry = dict(paths=paths, label=label, status=status, patch=patch,
+            lines=len(patch.splitlines()), bytes=len(patch.encode()), sensitive=any(classification[path] for path in paths),
+            signatures='', binary='Binary files ' in patch, gitlink=any(path in gitlink_paths for path in paths))
+        if status[0] != 'D' and not entry['binary'] and not entry['gitlink']:
+            blob = git('show', candidate + ':' + paths[-1]).decode('utf-8', errors='replace')
+            identifiers = set(re.findall(r'\b[A-Za-z_][A-Za-z_0-9]*\b', '\n'.join(
+                line for line in patch.splitlines() if line[:1] in ('+', '-') and line[:3] not in ('+++', '---'))))
+            signatures = []
+            for number, line in enumerate(blob.splitlines(), 1):
+                match = re.match(r'^\s*(?:export\s+)?(?:(?:async\s+)?function|type|interface|enum|class|const|let|var)\s+([A-Za-z_][A-Za-z_0-9]*)', line)
+                if match and match[1] in identifiers:
+                    signatures.append(f'{number}:{mask(line)}')
+                    if len(signatures) >= 20: break
+            if signatures:
+                entry['signatures'] = '\n### ' + label + '\n```text\n' + '\n'.join(signatures) + '\n```\n'
+        entries.append(entry)
+    identity = dict(mode=mode, head_sha=head, base_sha=base_commit, merge_base_sha=merge_base,
+        base_tree=before, candidate_tree=candidate, signature_tree=candidate)
+    selected = set()
+    def render():
+        omitted = [entry for i, entry in enumerate(entries) if i not in selected]
+        lines = ['# Compressed Diff Context', '', '## Review Scope']
+        lines += [f'- {key}: {value or "none"}' for key, value in identity.items()]
+        if args.commit_candidate: lines.append('- commit_target: ' + args.commit_candidate)
+        lines += [f'- files: {len(entries)}', f'- files_in_patch: {len(entries)}',
+            f'- files_included_full: {len(selected)}', f'- files_omitted: {len(omitted)}',
+            '- sensitive_files_omitted: ' + str(any(entry['sensitive'] for entry in omitted)).lower(),
+            '- coverage: ' + ('partial' if omitted or any(entry['gitlink'] for entry in entries) else 'complete'),
+            f'- budget: {max_files} files / {max_lines} patch lines / {max_bytes} patch bytes / {args.max_output_bytes} total bytes',
+            '', '## Diff Summary']
+        lines += [f'- {entry["status"]} {entry["label"]}' for entry in entries]
+        lines += ['', '## Patch Excerpt', '_Included files have complete hunks; omitted files were NOT reviewed._', '```diff']
+        lines += [entry['patch'].rstrip('\n') for i, entry in enumerate(entries) if i in selected]
+        if not entries: lines.append('No changes detected.')
+        lines += ['```', '']
+        if omitted:
+            lines += ['## Omitted Files (not reviewed)']
+            lines += [f'- {entry["label"]} ({entry["lines"]} diff lines)' + (' [SECURITY-SENSITIVE]' if entry['sensitive'] else '')
+                + (' [BINARY: content not reviewed]' if entry['binary'] else ' [context budget]') for entry in omitted]
+        gitlinks = [entry for entry in entries if entry['gitlink']]
+        if gitlinks:
+            lines += ['', '## Unreviewed Content', '_Gitlink changes show commit pointers only; submodule contents were NOT reviewed._']
+            lines += ['- ' + entry['label'] + ' [GITLINK]' for entry in gitlinks]
+        lines += ['', '## Referenced Signatures', '- source_tree: ' + candidate]
+        lines += [entry['signatures'] for i, entry in enumerate(entries) if i in selected and entry['signatures']]
+        return ('\n'.join(lines) + '\n').encode()
+    # Até a lista de omissões precisa caber; nunca escondê-la para aparentar cobertura.
+    if len(render()) > args.max_output_bytes:
+        raise ValueError('scope and omission list exceed complete context budget')
+    total_lines = total_bytes = 0
+    order = sorted(range(len(entries)), key=lambda i: (not entries[i]['sensitive'], i if entries[i]['sensitive'] else entries[i]['lines'], i))
+    for i in order:
+        entry = entries[i]
+        if entry['binary'] or len(selected) >= max_files or total_lines + entry['lines'] > max_lines or total_bytes + entry['bytes'] > max_bytes: continue
+        selected.add(i)
+        if len(render()) > args.max_output_bytes:
+            selected.remove(i)
+            continue
+        total_lines += entry['lines']; total_bytes += entry['bytes']
+    payload = render()
+    receipt = dict(identity, payload_sha256=hashlib.sha256(payload).hexdigest(), payload_bytes=len(payload),
+        coverage='partial' if len(selected) < len(entries) or any(entry['gitlink'] for entry in entries) else 'complete',
+        unreviewed_content=[entry['paths'] for entry in entries if entry['gitlink']],
+        included=[entry['paths'] for i, entry in enumerate(entries) if i in selected],
+        omitted=[entry['paths'] for i, entry in enumerate(entries) if i not in selected])
+    if args.output: save(args.output, payload)
+    if args.receipt: save(args.receipt, (json.dumps(receipt) + '\n').encode())
+    sys.stdout.buffer.write(payload)
+except (ValueError, OSError, subprocess.CalledProcessError) as error:
+    print('codex-diff-context: ' + str(error), file=sys.stderr)
+    raise SystemExit(1)
+PY

@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-10",
+  "adapter": "native collaboration.spawn_agent",
+  "context_mode": "fork_turns=none",
+  "requested_model": "inherited session model",
+  "effective_model": null,
+  "model_evidence": "UNVERIFIED",
+  "calls": 4,
+  "tool_calls_observed": 0,
+  "prompt_manifest": {
+    "comprehension-baseline": {
+      "sha256": "2b90e97fb3630dd8867d574c2ba4e423e5fe7ca53b145595b5583b8329720a55",
+      "bytes": 1592
+    },
+    "comprehension-egm": {
+      "sha256": "2fc447c5411412c3fa0ef1c788534cc013fdaf853a68fbc670920c0f92dddea3",
+      "bytes": 1696
+    },
+    "drift-baseline": {
+      "sha256": "93b3619acfc64dc1bd6f8946fbea366e70fe2b1faf1cd2a288646b1f834330a0",
+      "bytes": 1599
+    },
+    "drift-egm": {
+      "sha256": "91c01dc2c755ad40b95e8744ab43c08b933957bdd6ff5fcc3c2aed0a388d3246",
+      "bytes": 1672
+    }
+  },
+  "corpus_sha256": "6d0d248e7a88129f5250a81c11f73f51d4c961fe3a9b89f5b58ff41ca7b23a5b",
+  "evaluation": "manual against fixed oracle",
+  "cases_per_call": 2,
+  "results": [
+    {
+      "name": "comprehension-baseline",
+      "confirmed_findings": [
+        "C2"
+      ],
+      "false_positives": 0,
+      "missed_seeded_findings": 0,
+      "status": "completed",
+      "prompt": "Não use ferramentas, arquivos, memória nem fontes externas. Avalie somente os casos anexados, separadamente e dentro do escopo explícito. Retorne JSON com cases: [{id, findings:[{quote, consequence}], understanding:string}]. Caso sem problema tem findings vazio. Não reescreva os documentos.\nRevise como engenheiro de software: há falhas concretas ou decisões faltantes para implementar o que foi especificado?\n[\n  {\n    \"id\": \"C1\",\n    \"document\": \"Este documento define somente a classificação de lotes já autorizados; autenticação e transporte estão fora do escopo. Um lote tem uma lista finita de valores inteiros e um limite inteiro. Farol é o resultado calculado: verde se a soma dos valores for menor ou igual ao limite; vermelho caso contrário. Valores negativos e lista vazia são permitidos; a soma vazia é zero. A classificação não altera o lote. O consumidor devolve ACEITO para verde e RECUSADO para vermelho. Exemplos: [2,3] com limite 5 é ACEITO; [2,4] com limite 5 é RECUSADO; [] com limite 0 é ACEITO. Testes cobrem esses exemplos, soma negativa e repetição sem mutação.\"\n  },\n  {\n    \"id\": \"C2\",\n    \"document\": \"Este documento define somente a classificação de lotes já autorizados; autenticação e transporte estão fora do escopo. Um lote tem uma lista finita de valores inteiros e um limite inteiro. A classificação não altera o lote. O consumidor devolve ACEITO quando o farol estiver verde e RECUSADO caso contrário. Valores negativos e lista vazia são permitidos. Testes cobrem repetição sem mutação e os dois resultados.\"\n  }\n]\n",
+      "observed_findings": {
+        "C1": [],
+        "C2": [
+          {
+            "quote": "O consumidor devolve ACEITO quando o farol estiver verde e RECUSADO caso contrário.",
+            "consequence": "O documento não define o farol nem como determiná-lo a partir da lista e do limite. Falta a regra de classificação, impedindo implementar o resultado de um lote e estabelecer os resultados esperados dos testes."
+          }
+        ]
+      }
+    },
+    {
+      "name": "comprehension-egm",
+      "confirmed_findings": [
+        "C2"
+      ],
+      "false_positives": 0,
+      "missed_seeded_findings": 0,
+      "status": "completed",
+      "prompt": "Não use ferramentas, arquivos, memória nem fontes externas. Avalie somente os casos anexados, separadamente e dentro do escopo explícito. Retorne JSON com cases: [{id, findings:[{quote, consequence}], understanding:string}]. Caso sem problema tem findings vazio. Não reescreva os documentos.\nExplique o que cada documento propõe e como o sistema funciona segundo o documento. Aponte termos próprios sem definição ou interpretações que mudem a implementação. Não cobre definição de termos técnicos gerais.\n[\n  {\n    \"id\": \"C1\",\n    \"document\": \"Este documento define somente a classificação de lotes já autorizados; autenticação e transporte estão fora do escopo. Um lote tem uma lista finita de valores inteiros e um limite inteiro. Farol é o resultado calculado: verde se a soma dos valores for menor ou igual ao limite; vermelho caso contrário. Valores negativos e lista vazia são permitidos; a soma vazia é zero. A classificação não altera o lote. O consumidor devolve ACEITO para verde e RECUSADO para vermelho. Exemplos: [2,3] com limite 5 é ACEITO; [2,4] com limite 5 é RECUSADO; [] com limite 0 é ACEITO. Testes cobrem esses exemplos, soma negativa e repetição sem mutação.\"\n  },\n  {\n    \"id\": \"C2\",\n    \"document\": \"Este documento define somente a classificação de lotes já autorizados; autenticação e transporte estão fora do escopo. Um lote tem uma lista finita de valores inteiros e um limite inteiro. A classificação não altera o lote. O consumidor devolve ACEITO quando o farol estiver verde e RECUSADO caso contrário. Valores negativos e lista vazia são permitidos. Testes cobrem repetição sem mutação e os dois resultados.\"\n  }\n]\n",
+      "observed_findings": {
+        "C1": [],
+        "C2": [
+          {
+            "quote": "O consumidor devolve ACEITO quando o farol estiver verde e RECUSADO caso contrário.",
+            "consequence": "O termo próprio “farol” não é definido: não há indicação de sua origem nem da regra que determina quando está verde. Também não se estabelece como a lista e o limite influenciam a classificação. Implementações poderiam calcular esse estado por regras diferentes ou recebê-lo de outra fonte, produzindo resultados distintos para o mesmo lote."
+          }
+        ]
+      }
+    },
+    {
+      "name": "drift-baseline",
+      "confirmed_findings": [
+        "D2"
+      ],
+      "false_positives": 0,
+      "missed_seeded_findings": 0,
+      "status": "completed",
+      "prompt": "Não use ferramentas, arquivos, memória nem fontes externas. Avalie somente os casos anexados, separadamente e dentro do escopo explícito. Retorne JSON com cases: [{id, findings:[{quote, consequence}], understanding:string}]. Caso sem problema tem findings vazio. Não reescreva os documentos.\nRevise os pares de contrato e código como engenheiro de software. Aponte divergências concretas do comportamento vigente. Respeite status accepted, proposed e historical.\n[\n  {\n    \"id\": \"D1\",\n    \"documents\": [\n      {\n        \"status\": \"accepted\",\n        \"text\": \"eligible(total, limit) devolve true se total for menor ou igual a limit; ambos são inteiros. Esta é a regra vigente.\"\n      },\n      {\n        \"status\": \"proposed\",\n        \"text\": \"Proposta ainda não aceita: limitar a total estritamente menor que limit.\"\n      },\n      {\n        \"status\": \"historical\",\n        \"text\": \"A versão anterior aceitava qualquer total positivo.\"\n      }\n    ],\n    \"code\": \"def eligible(total, limit):\\n    return total <= limit\\n\"\n  },\n  {\n    \"id\": \"D2\",\n    \"documents\": [\n      {\n        \"status\": \"accepted\",\n        \"text\": \"eligible(total, limit) devolve true se total for menor ou igual a limit; ambos são inteiros. Esta é a regra vigente.\"\n      },\n      {\n        \"status\": \"proposed\",\n        \"text\": \"Proposta ainda não aceita: limitar a total estritamente menor que limit.\"\n      },\n      {\n        \"status\": \"historical\",\n        \"text\": \"A versão anterior aceitava qualquer total positivo.\"\n      }\n    ],\n    \"code\": \"def eligible(total, limit):\\n    return total < limit\\n\"\n  }\n]\n",
+      "observed_findings": {
+        "D1": [],
+        "D2": [
+          {
+            "quote": "return total < limit",
+            "consequence": "Quando total é igual a limit, o código devolve false, mas o contrato accepted exige true."
+          }
+        ]
+      }
+    },
+    {
+      "name": "drift-egm",
+      "confirmed_findings": [
+        "D2"
+      ],
+      "false_positives": 0,
+      "missed_seeded_findings": 0,
+      "status": "completed",
+      "prompt": "Não use ferramentas, arquivos, memória nem fontes externas. Avalie somente os casos anexados, separadamente e dentro do escopo explícito. Retorne JSON com cases: [{id, findings:[{quote, consequence}], understanding:string}]. Caso sem problema tem findings vazio. Não reescreva os documentos.\nConfronte afirmação documental com implementação e produza cenário observável de divergência. Somente accepted define o contrato vigente. Proposta não entregue e histórico anterior não são drift; detalhe interno ausente não é falha.\n[\n  {\n    \"id\": \"D1\",\n    \"documents\": [\n      {\n        \"status\": \"accepted\",\n        \"text\": \"eligible(total, limit) devolve true se total for menor ou igual a limit; ambos são inteiros. Esta é a regra vigente.\"\n      },\n      {\n        \"status\": \"proposed\",\n        \"text\": \"Proposta ainda não aceita: limitar a total estritamente menor que limit.\"\n      },\n      {\n        \"status\": \"historical\",\n        \"text\": \"A versão anterior aceitava qualquer total positivo.\"\n      }\n    ],\n    \"code\": \"def eligible(total, limit):\\n    return total <= limit\\n\"\n  },\n  {\n    \"id\": \"D2\",\n    \"documents\": [\n      {\n        \"status\": \"accepted\",\n        \"text\": \"eligible(total, limit) devolve true se total for menor ou igual a limit; ambos são inteiros. Esta é a regra vigente.\"\n      },\n      {\n        \"status\": \"proposed\",\n        \"text\": \"Proposta ainda não aceita: limitar a total estritamente menor que limit.\"\n      },\n      {\n        \"status\": \"historical\",\n        \"text\": \"A versão anterior aceitava qualquer total positivo.\"\n      }\n    ],\n    \"code\": \"def eligible(total, limit):\\n    return total < limit\\n\"\n  }\n]\n",
+      "observed_findings": {
+        "D1": [],
+        "D2": [
+          {
+            "quote": "eligible(total, limit) devolve true se total for menor ou igual a limit; ambos são inteiros.",
+            "consequence": "Para total=5 e limit=5, o contrato exige true, mas eligible(5, 5) devolve false porque a implementação usa total < limit."
+          }
+        ]
+      }
+    }
+  ],
+  "additional_useful_findings": 0,
+  "decision": "keep opt-in; no evidence for automatic activation",
+  "latency_s": null,
+  "tokens": null,
+  "cost": null,
+  "observation_window_upper_bound_s": 249.52,
+  "limitations": [
+    "One small synthetic corpus, one sample per lens; not a general quality benchmark.",
+    "Window includes preparation/orchestration, not executor latency.",
+    "No observation of effective model, token cost, CLI or Claude isolation.",
+    "No tool use observed; filesystem/tool access was not mechanically removed."
+  ]
+}

@@ -169,153 +169,129 @@ raise SystemExit(completed.returncode)
 ' "$timeout_seconds" "$@"
 }
 
-codex_reviewer_args() {
-  local config_toml="$HOME/.codex/config.toml"
-  if [ -f "$config_toml" ] && grep -q '\[profiles\.reviewer\]' "$config_toml" 2>/dev/null; then
-    printf '%s\n' "--profile" "reviewer"
-  else
-    printf '%s\n' "-m" "gpt-5.5"
-  fi
+# A política vem do mesmo resolvedor do wrapper, mesmo com cwd de execução externo.
+codex_reviewer_policy() {
+  local project_dir="${1:-$(codex_project_dir)}"
+  local delegate="$project_dir/.agents/tools/codex-delegate.sh"
+  [ -f "$delegate" ] || delegate="$HOME/.codex/bin/codex-delegate.sh"
+  [ -f "$delegate" ] || { echo 'reviewer policy resolver unavailable' >&2; return 1; }
+  bash "$delegate" --resolve-role reviewer "" "" "$project_dir"
 }
 
-codex_profile_model() {
-  local profile="${1:-}"
-  local config_toml="$HOME/.codex/config.toml"
-
-  [ -n "$profile" ] || return 1
-  [ -f "$config_toml" ] || return 1
-
-  awk -v profile="$profile" '
-    $0 ~ "^\\[profiles\\." profile "\\]$" { in_profile=1; next }
-    /^\[.*\]$/ && in_profile { exit }
-    in_profile && $1 == "model" {
-      value = $3
-      gsub(/"/, "", value)
-      print value
-      exit
-    }
-  ' "$config_toml"
+codex_reviewer_args() {
+  local policy
+  policy=$(codex_reviewer_policy) || return 1
+  printf '%s\n' '-m' "$(jq -r .model <<<"$policy")"
 }
 
 codex_reviewer_candidates() {
-  local config_toml="$HOME/.codex/config.toml"
-  if [ -f "$config_toml" ] && grep -q '\[profiles\.reviewer\]' "$config_toml" 2>/dev/null; then
-    printf '%s\n' "profile:reviewer"
-  else
-    printf '%s\n' "model:gpt-5.5"
-  fi
-  printf '%s\n' "profile:maestro"
-  printf '%s\n' "profile:architect"
+  local policy
+  policy=$(codex_reviewer_policy) || return 1
+  printf 'model:%s\n' "$(jq -r .model <<<"$policy")"
 }
 
-codex_reviewer_preferred_candidate() {
-  codex_reviewer_candidates | head -1
-}
-
-codex_candidate_path_label() {
-  local candidate="${1:-}"
-  if [ -z "$candidate" ]; then
-    printf '%s\n' "unavailable"
-  else
-    printf '%s\n' "$candidate"
-  fi
-}
-
+codex_reviewer_preferred_candidate() { codex_reviewer_candidates; }
+codex_candidate_path_label() { printf '%s\n' "${1:-unavailable}"; }
 codex_candidate_model_name() {
-  local candidate="${1:-}"
-  case "$candidate" in
-    profile:*)
-      codex_profile_model "${candidate#profile:}" 2>/dev/null || printf '%s\n' "${candidate#profile:}"
-      ;;
-    model:*)
-      printf '%s\n' "${candidate#model:}"
-      ;;
-    *)
-      printf '%s\n' "unknown"
-      ;;
-  esac
+  case "${1:-}" in model:*) printf '%s\n' "${1#model:}" ;; *) printf '%s\n' unknown ;; esac
 }
+codex_candidate_fallback_occurred() { printf '%s\n' false; }
 
-codex_candidate_fallback_occurred() {
-  local candidate="${1:-}"
-  local preferred
-  preferred=$(codex_reviewer_preferred_candidate 2>/dev/null || true)
-
-  if [ -z "$candidate" ] || [ -z "$preferred" ]; then
-    printf '%s\n' "true"
-    return
-  fi
-
-  if [ "$candidate" = "$preferred" ]; then
-    printf '%s\n' "false"
-  else
-    printf '%s\n' "true"
-  fi
+# Subconjunto explícito de JSON Schema usado pelos consumidores de review.
+# Keyword desconhecida falha fechada; não depende de pacote Python instalado.
+codex_validate_review_output() {
+  python3 - "$1" "$2" <<'PY_SCHEMA'
+import json, math, sys
+allowed = {"type", "properties", "required", "additionalProperties", "items", "enum", "const"}
+def reject_constant(value):
+    raise ValueError("non-finite JSON number")
+def unique_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result: raise ValueError("duplicate JSON key")
+        result[key] = value
+    return result
+def load(path):
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle, parse_constant=reject_constant, object_pairs_hook=unique_pairs)
+def check_schema(schema):
+    if not isinstance(schema, dict) or set(schema) - allowed:
+        raise ValueError("unsupported review schema")
+    for child in schema.get("properties", {}).values(): check_schema(child)
+    if "items" in schema: check_schema(schema["items"])
+def validate(value, schema):
+    kinds = schema.get("type", [])
+    kinds = [kinds] if isinstance(kinds, str) else kinds
+    matches = {"object": isinstance(value, dict), "array": isinstance(value, list),
+        "string": isinstance(value, str), "boolean": isinstance(value, bool),
+        "null": value is None, "integer": type(value) is int,
+        "number": type(value) in (float, int) and math.isfinite(value)}
+    if kinds and not any(matches.get(kind, False) for kind in kinds): return False
+    # bool não equivale a 0/1 no contrato JSON.
+    equal = lambda a, b: type(a) is type(b) and a == b
+    if "const" in schema and not equal(value, schema["const"]): return False
+    if "enum" in schema and not any(equal(value, item) for item in schema["enum"]): return False
+    if isinstance(value, dict):
+        props = schema.get("properties", {})
+        if set(schema.get("required", [])) - set(value): return False
+        if schema.get("additionalProperties") is False and set(value) - set(props): return False
+        return all(validate(item, props[key]) for key, item in value.items() if key in props)
+    if isinstance(value, list) and "items" in schema:
+        return all(validate(item, schema["items"]) for item in value)
+    return True
+try:
+    schema, result = load(sys.argv[1]), load(sys.argv[2])
+    check_schema(schema)
+    raise SystemExit(0 if validate(result, schema) else 1)
+except (ValueError, OSError, TypeError, OverflowError):
+    raise SystemExit(1)
+PY_SCHEMA
 }
 
 codex_run_reviewer() {
-  local exec_dir="$1"
-  local schema_file="$2"
-  local output_file="$3"
-  local prompt_file="$4"
-  local used_file="$5"
-  local error_file="${6:-}"
-
-  local candidate=""
-  local local_error_file=""
-  local -a cmd=()
-  local candidate_error_file=""
-
-  if [ -n "$error_file" ]; then
-    : > "$error_file"
-  else
-    local_error_file=$(mktemp)
-    error_file="$local_error_file"
+  local exec_dir="$1" schema_file="$2" output_file="$3" prompt_file="$4" used_file="$5"
+  local error_file="${6:-${3}.err}"
+  local policy candidate effort timeout_s attempt_dir rc=0 status
+  # Nenhum artefato de chamada anterior é elegível como resultado desta chamada.
+  rm -f -- "$output_file" "$used_file" "${output_file}.receipt.json"
+  : > "$error_file"
+  policy=$(codex_reviewer_policy 2>>"$error_file") || return 1
+  candidate="model:$(jq -r .model <<<"$policy")"
+  effort=$(jq -r .effort <<<"$policy")
+  timeout_s="${CODEX_REVIEWER_TIMEOUT:-120}"
+  if ! [[ "$timeout_s" =~ ^[1-9][0-9]*$ ]] || [ "$timeout_s" -gt 180 ]; then
+    echo 'reviewer timeout must be 1..180 seconds (host hook budget: 240)' >> "$error_file"
+    return 1
   fi
-
-  while IFS= read -r candidate; do
-    [ -n "$candidate" ] || continue
-    candidate_error_file=$(mktemp)
-    local reviewer_timeout="${CODEX_REVIEWER_TIMEOUT:-120}"
-    cmd=(codex exec -C "$exec_dir" -s read-only --skip-git-repo-check --ephemeral -c 'model_reasoning_effort="high"')
-    case "$candidate" in
-      profile:*)
-        cmd+=(--profile "${candidate#profile:}")
-        ;;
-      model:*)
-        cmd+=(-m "${candidate#model:}")
-        ;;
-    esac
-    cmd+=(--output-schema "$schema_file" -o "$output_file" -)
-
-    if codex_run_with_timeout "$reviewer_timeout" "${cmd[@]}" < "$prompt_file" >/dev/null 2>"$candidate_error_file"; then
-      printf '%s\n' "$candidate" > "$used_file"
-      if [ -s "$candidate_error_file" ]; then
-        cat "$candidate_error_file" > "$error_file"
-      else
-        : > "$error_file"
-      fi
-      # C9: notify user when fallback occurred
-      local preferred
-      preferred=$(codex_reviewer_preferred_candidate 2>/dev/null || true)
-      if [ -n "$preferred" ] && [ "$candidate" != "$preferred" ]; then
-        printf '[codex-reviewer] FALLBACK: preferred %s unavailable, used %s instead\n' "$preferred" "$candidate" >&2
-      fi
-      rm -f "$candidate_error_file"
-      [ -n "$local_error_file" ] && rm -f "$local_error_file"
-      return 0
-    fi
-
-    {
-      printf '[candidate=%s]\n' "$candidate"
-      cat "$candidate_error_file"
-      printf '\n'
-    } >> "$error_file"
-    rm -f "$candidate_error_file"
-  done < <(codex_reviewer_candidates)
-
-  [ -n "$local_error_file" ] && rm -f "$local_error_file"
-  return 1
+  if [ "$(wc -c < "$prompt_file")" -gt "${CODEX_REVIEW_MAX_PROMPT_BYTES:-450000}" ]; then
+    echo 'review prompt exceeds complete payload budget' >> "$error_file"
+    return 1
+  fi
+  attempt_dir=$(mktemp -d "${output_file}.attempt.XXXXXX") || return 1
+  local -a cmd=(codex exec -C "$exec_dir" -s read-only --skip-git-repo-check --ephemeral
+    -c features.multi_agent=false -c "model_reasoning_effort=\"$effort\""
+    -m "${candidate#model:}" --output-schema "$schema_file" -o "$attempt_dir/result.json" -)
+  codex_run_with_timeout "$timeout_s" "${cmd[@]}" < "$prompt_file" >"$attempt_dir/stdout.log" 2>"$error_file" || rc=$?
+  if [ "$rc" -eq 124 ]; then status=TIMEOUT
+  elif [ "$rc" -ne 0 ]; then status=EXECUTION_FAILED
+  elif [ ! -s "$attempt_dir/result.json" ]; then status=EMPTY_OUTPUT
+  elif ! codex_validate_review_output "$schema_file" "$attempt_dir/result.json"; then status=INVALID_OUTPUT
+  else status=OK; fi
+  python3 - "$attempt_dir/receipt.json" "$policy" "$status" "$rc" "$prompt_file" "$attempt_dir" <<'PY_RECEIPT'
+import hashlib, json, pathlib, sys
+path, policy, status, rc, prompt, attempt = sys.argv[1:]
+receipt = dict(policy=json.loads(policy), status=status, exit_code=int(rc), attempt=attempt,
+    requested_role="reviewer", effective_model=None, model_evidence="UNVERIFIED", fallback_occurred=False,
+    prompt_sha256=hashlib.sha256(pathlib.Path(prompt).read_bytes()).hexdigest())
+pathlib.Path(path).write_text(json.dumps(receipt) + "\n")
+PY_RECEIPT
+  cp "$attempt_dir/receipt.json" "${output_file}.receipt.json" || return 1
+  if [ "$status" != OK ]; then
+    printf '[reviewer status=%s attempt=%s] partial output is diagnostic only\n' "$status" "$attempt_dir" >> "$error_file"
+    return 1
+  fi
+  mv "$attempt_dir/result.json" "$output_file" || return 1
+  printf '%s\n' "$candidate" > "$used_file"
 }
 
 codex_is_security_sensitive_path() {

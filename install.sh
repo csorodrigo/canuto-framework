@@ -1243,6 +1243,7 @@ FRAMEWORK_FILES=(
   ".agents/tools/canuto-memory.sh"
   ".agents/tools/canuto-mcp.sh"
   ".agents/tools/codex-common.sh"
+  ".agents/tools/reviewer-inventory.py"
   ".agents/tools/codex-diff-context.sh"
   ".agents/tools/codex-context-package.sh"
   ".agents/tools/codex-health-check.sh"
@@ -1263,6 +1264,7 @@ FRAMEWORK_FILES=(
   ".agents/skills/audit.md"
   ".agents/skills/auto-analysis.md"
   ".agents/skills/co-review/references/modes.md"
+  ".agents/skills/co-review/references/egm-pilot.md"
   ".agents/skills/colorize.md"
   ".agents/skills/design-consultation.md"
   ".agents/skills/experiment-loop/SKILL.md"
@@ -2542,49 +2544,57 @@ setup_obsidian_mcp() {
 # The codex-coder/codex-reviewer/codex-maestro MCP servers were retired — see
 # .agents/skills/cost-routing.md for rationale (10-35% lower token overhead per call).
 install_codex_delegate_wrapper() {
-  local source=".agents/tools/codex-delegate.sh"
-  local dest="$HOME/.codex/bin/codex-delegate.sh"
-  local receipt="$HOME/.codex/bin/.codex-delegate.canuto.sha256"
-  local marker="codex-delegate.sh — wrapper canônico de delegação Codex (template versionado)"
-  local source_hash current_hash recorded_hash backup tmp
-
-  [ -f "$source" ] || return 0
-  mkdir -p "$HOME/.codex/bin"
-  source_hash=$(sha256_file "$source" 2>/dev/null || true)
-  [ -n "$source_hash" ] || { warn "Could not hash the canonical Codex delegate wrapper."; return 1; }
-
-  if [ ! -f "$dest" ]; then
-    cp "$source" "$dest"
-    chmod +x "$dest"
-    printf '%s\n' "$source_hash" > "$receipt"
-    ok "Installed: ~/.codex/bin/codex-delegate.sh (wrapper canônico do framework)"
-    return 0
-  fi
-
-  current_hash=$(sha256_file "$dest" 2>/dev/null || true)
-  recorded_hash=$(cat "$receipt" 2>/dev/null | tr -d '[:space:]' || true)
-  if [ "$current_hash" = "$source_hash" ]; then
-    chmod +x "$dest"
-    printf '%s\n' "$source_hash" > "$receipt"
-    return 0
-  fi
-
-  if { [ -n "$recorded_hash" ] && [ "$current_hash" = "$recorded_hash" ]; } \
-    || { [ -z "$recorded_hash" ] && grep -qF "$marker" "$dest" 2>/dev/null; }; then
-    backup="$dest.canuto-backup.$(date -u +%Y%m%dT%H%M%SZ)"
-    cp "$dest" "$backup"
-    tmp=$(mktemp "$dest.canuto.XXXXXX")
-    cp "$source" "$tmp"
-    chmod +x "$tmp"
-    mv "$tmp" "$dest"
-    printf '%s\n' "$source_hash" > "$receipt"
-    ok "Updated: ~/.codex/bin/codex-delegate.sh (backup: $backup)"
-    return 0
-  fi
-
-  warn "Preserved local ~/.codex/bin/codex-delegate.sh; it diverges from the managed Canuto copy."
-  return 0
+  # O destino opcional permite validar instalação/rollback sem tocar a máquina.
+  local bin_dir="${1:-$HOME/.codex/bin}"
+  [ -f .agents/tools/codex-delegate.sh ] || return 0
+  python3 - .agents/tools/codex-delegate.sh "$bin_dir" <<'PY_INSTALL'
+import hashlib, os, pathlib, shutil, sys, tempfile
+source, directory = map(pathlib.Path, sys.argv[1:])
+directory.mkdir(parents=True, exist_ok=True)
+dest = directory / 'codex-delegate.sh'
+receipt = directory / '.codex-delegate.canuto.sha256'
+def digest(data): return hashlib.sha256(data).hexdigest()
+def atomic(path, data, mode):
+    with tempfile.NamedTemporaryFile(dir=directory, delete=False) as handle:
+        temporary = pathlib.Path(handle.name)
+        handle.write(data)
+    try:
+        temporary.chmod(mode)
+        os.replace(temporary, path)
+    finally: temporary.unlink(missing_ok=True)
+if dest.is_symlink() or receipt.is_symlink():
+    print('Preserved local delegate symlink; install not applied.', file=sys.stderr)
+    raise SystemExit(0)
+new = source.read_bytes()
+old = dest.read_bytes() if dest.exists() else None
+recorded = receipt.read_text().strip() if receipt.exists() else None
+if old is not None and old != new and digest(old) != recorded:
+    print('Preserved local delegate: no matching managed hash receipt.', file=sys.stderr)
+    raise SystemExit(0)
+backup = None
+old_receipt = receipt.read_bytes() if receipt.exists() else None
+old_mode = dest.stat().st_mode & 0o777 if dest.exists() else 0o755
+if old is not None and old != new:
+    with tempfile.NamedTemporaryFile(prefix='codex-delegate.sh.canuto-backup.', dir=directory, delete=False) as handle:
+        backup = pathlib.Path(handle.name); handle.write(old)
+    backup.chmod(old_mode)
+try:
+    # Recusar uma edição ocorrida depois da inspeção inicial.
+    if (dest.read_bytes() if dest.exists() else None) != old:
+        raise RuntimeError('delegate changed during installation')
+    atomic(dest, new, 0o755)
+    try: atomic(receipt, (digest(new) + '\n').encode(), 0o600)
+    except OSError:
+        if old is None: dest.unlink()
+        else: atomic(dest, old, old_mode)
+        raise
+except (OSError, RuntimeError) as error:
+    print('Delegate installation failed: ' + str(error), file=sys.stderr)
+    raise SystemExit(1)
+print('Delegate installed: ' + str(dest) + ('; backup: ' + str(backup) if backup else ''))
+PY_INSTALL
 }
+
 
 setup_codex() {
   local config_toml="$HOME/.codex/config.toml"
