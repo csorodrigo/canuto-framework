@@ -2,7 +2,7 @@
 
 Loaded on demand when a co-review mode activates. See `SKILL.md` for the summary.
 
-The current reviewer contract is one-shot via `codex exec --profile reviewer`.
+The current reviewer contract is one-shot via `~/.codex/bin/codex-delegate.sh reviewer <task-file> <out-file>`.
 Do not assume reviewer-side continuation IDs or reply tools.
 
 ---
@@ -100,6 +100,9 @@ Plan:
 {plan content}
 ---
 
+Achados abertos (se fornecidos): devolva FECHADO com evidência ou ABERTO com cenário
+para cada ID, antes de listar achados novos sem número.
+
 Return the review directly in this response.
 ```
 
@@ -126,12 +129,8 @@ usuário: veja "Rodadas: quando a revisão para" no `SKILL.md`.
 
 ---
 
-## MCP Tool Reference
+## Adapter de execução
 
-| Tool | Purpose |
-|------|---------|
-| `(parallel codex exec --profile coder)` | Parallel brainstorm or implementation |
-| `codex exec --profile reviewer` | One-shot reviewer pass using the `reviewer` profile |
-
-If reviewer MCP is unavailable, the explicit degraded path is:
-`codex exec --profile reviewer` -> `/ask codex` only when a CCB Codex session is active -> Claude-only review.
+Use o wrapper instalado para CLI e o adapter nativo anunciado pelo runtime para
+agentes nativos. Fonte de política: `.agents/config/models.yaml`. Reviewer não
+faz fallback automático. Falha mantém achados abertos e o eixo não avaliado.

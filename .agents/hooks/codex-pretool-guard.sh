@@ -52,6 +52,18 @@ fi
 # shellcheck source=/dev/null
 source "$COMMON_LIB"
 
+# Bash tem escopo dinâmico: receipts locais existem apenas durante este review.
+_append_review_event() {
+  local event="$2"
+  if [ -f "${context_receipt:-}" ]; then
+    event=$(jq -c --slurpfile context "$context_receipt" '. + {context:$context[0]}' <<<"$event")
+  fi
+  if [ -f "${output_file:-}.receipt.json" ]; then
+    event=$(jq -c --slurpfile execution "${output_file}.receipt.json" '. + {execution:$execution[0],effective_model:null,model_evidence:"UNVERIFIED"}' <<<"$event")
+  fi
+  codex_append_event "$1" "$event"
+}
+
 TOOL_NAME=$(printf '%s' "$HOOK_INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)
 
 # ── Escada CANUTO_GUARD_MODE (spec A1 item 2) ───────────────────────────────
@@ -103,7 +115,7 @@ _guard_mode_disabled_note() {
     --arg command "$command_text" \
     '{timestamp:$timestamp,type:"guard-dark",reason:"disabled",mode:0,enforced:false,status:"dark",provider:"codex",summary:"CANUTO_GUARD_MODE=0 — commit review guard disabled for this session.",command:$command}' 2>/dev/null) || event_json=""
   if [ -n "$event_json" ]; then
-    codex_append_event "$ROOT_DIR" "$event_json" 2>/dev/null || true
+    _append_review_event "$ROOT_DIR" "$event_json" 2>/dev/null || true
   fi
   printf '%s\n' "[codex-pretool-guard] CANUTO_GUARD_MODE=0 — commit review guard disabled for this session (evento type=guard-dark reason=disabled registrado uma vez por sessão em metrics)." >&2
   return 0
@@ -126,7 +138,7 @@ _guard_dark_event() {
     --argjson mode "$GUARD_MODE" \
     '{timestamp:$timestamp,type:"guard-dark",reason:$reason,review_id:$review_id,mode:$mode,enforced:false,status:"dark",provider:"codex",summary:"review indisponível — commit segue SEM review (dark)."}' 2>/dev/null) || event_json=""
   if [ -n "$event_json" ]; then
-    codex_append_event "$ROOT_DIR" "$event_json" 2>/dev/null || true
+    _append_review_event "$ROOT_DIR" "$event_json" 2>/dev/null || true
   fi
   printf '%s\n' "[codex-pretool-guard] review indisponível — commit segue SEM review (dark). reason=$reason (evento type=guard-dark registrado em metrics)." >&2
 }
@@ -204,7 +216,7 @@ handle_commit_gate() {
   local preferred_candidate
   local preferred_path
   local preferred_model
-  local fallback_occurred="true"
+  local fallback_occurred="false"
   local override_files=""
   local sensitive_omitted=false
   local omitted_count=0
@@ -244,7 +256,7 @@ handle_commit_gate() {
       --argjson enforced "$guard_enforced" \
       '{timestamp:$timestamp,type:"override-commit",review_type:"pre-commit",status:"override",provider:"codex",mode:$mode,enforced:$enforced,reason:$reason,summary:"Commit review skipped via CANUTO_ALLOW_COMMIT=1.",command:$command,files:($files | split("\n") | map(select(length > 0)))}' 2>/dev/null) || event_json=""
     if [ -n "$event_json" ]; then
-      codex_append_event "$ROOT_DIR" "$event_json" 2>/dev/null || true
+      _append_review_event "$ROOT_DIR" "$event_json" 2>/dev/null || true
     fi
     printf '%s\n' "[codex-pretool-guard] commit review skipped (CANUTO_ALLOW_COMMIT=1) — override registrado em metrics (type=override-commit). Dica: CANUTO_ALLOW_REASON=\"...\" documenta o porquê." >&2
     return 0
@@ -318,9 +330,20 @@ handle_commit_gate() {
     review_tier="fast"
   fi
 
+  tmp_dir=$(codex_tmp_dir "$ROOT_DIR")
+  review_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+  prompt_file="$tmp_dir/pre-commit-$review_id.prompt.txt"
+  schema_file="$tmp_dir/pre-commit-$review_id.schema.json"
+  output_file="$tmp_dir/pre-commit-$review_id.json"
+  used_file="$tmp_dir/pre-commit-$review_id.used"
+  error_file="$tmp_dir/pre-commit-$review_id.err"
+  review_markdown=$(codex_review_markdown_path "$ROOT_DIR" "latest-pre-commit-review")
+  local context_receipt="$tmp_dir/context-$review_id.json"
+
   # Fail-open: uma falha interna do gerador de contexto nunca pode quebrar o
   # commit — sem payload não há review, e o gate avisa em vez de bloquear.
-  if ! diff_payload=$(bash "$DIFF_SCRIPT" --commit-candidate "$diff_mode" 2>/dev/null) || [ -z "$diff_payload" ]; then
+  if ! diff_payload=$(bash "$DIFF_SCRIPT" --commit-candidate "$diff_mode" --receipt "$context_receipt" 2>/dev/null) || [ -z "$diff_payload" ]; then
+    _guard_dark_event "context-unavailable" "$review_id"
     printf '%s\n' "[codex-pretool-guard] codex-diff-context.sh failed — commit review skipped (fail-open)." >&2
     return 0
   fi
@@ -338,14 +361,6 @@ handle_commit_gate() {
   omitted_count=$(sed -n '/^- files_omitted: [0-9][0-9]*$/{s/^- files_omitted: //p;q;}' <<<"$diff_payload")
   case "$omitted_count" in ''|*[!0-9]*) omitted_count=0 ;; esac
 
-  tmp_dir=$(codex_tmp_dir "$ROOT_DIR")
-  review_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
-  prompt_file="$tmp_dir/pre-commit-$review_id.prompt.txt"
-  schema_file="$tmp_dir/pre-commit-$review_id.schema.json"
-  output_file="$tmp_dir/pre-commit-$review_id.json"
-  used_file="$tmp_dir/pre-commit-$review_id.used"
-  error_file="$tmp_dir/pre-commit-$review_id.err"
-  review_markdown=$(codex_review_markdown_path "$ROOT_DIR" "latest-pre-commit-review")
   preferred_candidate=$(codex_reviewer_preferred_candidate 2>/dev/null || true)
   preferred_path=$(codex_candidate_path_label "$preferred_candidate")
   preferred_model=$(codex_candidate_model_name "$preferred_candidate")
@@ -399,9 +414,6 @@ EOF
       echo "These files are security-sensitive. Treat auth, secrets, injection, access control, RLS, and race conditions as release-blocking."
     fi
     echo ""
-    echo "Changed files:"
-    printf '%s\n' "$staged_files"
-    echo ""
     cat <<'EOF'
 Focus on:
 - correctness and regressions
@@ -415,30 +427,14 @@ EOF
   } > "$prompt_file"
 
   local review_ok=false
-  if [ "$review_tier" = "fast" ]; then
-    # Tier fast: perfil `fast` com reasoning baixo (o modelo sai de models.yaml
-    # via perfil — não citar versão aqui, vira defasagem silenciosa).
-    #
-    # O timeout NÃO é opcional. Este hook roda SÍNCRONO dentro do Codex: o
-    # processo pai fica parado até o hook retornar, e aqui o hook sobe um SEGUNDO
-    # `codex exec` completo (config, auth, startup de MCP). Sem limite, qualquer
-    # travada do filho — MCP que não sobe, uvx buscando pacote na rede, auth
-    # expirada esperando input — congela a UI inteira sem log e sem saída. Foi
-    # exatamente esse o sintoma relatado ("codex todo travado, parece deadlock").
-    # O caminho `full` já era limitado por codex_run_with_timeout desde sempre;
-    # só o tier fast — o que deveria ser o mais barato — ficou sem rédea.
-    # Limite menor que o do full de propósito: um review "rápido" que passa de
-    # ~45s já falhou no que prometia; melhor degradar para advisory que travar.
-    local fast_timeout="${CODEX_FAST_REVIEW_TIMEOUT:-45}"
-    local fast_cmd=(codex exec -C "$ROOT_DIR" -s read-only --skip-git-repo-check --ephemeral --profile fast -c 'model_reasoning_effort="low"' --output-schema "$schema_file" -o "$output_file" -)
-    if codex_run_with_timeout "$fast_timeout" "${fast_cmd[@]}" < "$prompt_file" >/dev/null 2>&1; then
-      review_ok=true
-      printf '%s\n' "profile:fast" > "$used_file"
-    fi
-  else
-    if reviewer_cmd "$ROOT_DIR" "$schema_file" "$output_file" "$prompt_file" "$used_file" "$error_file" >/dev/null 2>&1; then
-      review_ok=true
-    fi
+  local adapter_timeout="${CODEX_REVIEWER_TIMEOUT:-120}"
+  if [ "$review_tier" = fast ]; then adapter_timeout="${CODEX_FAST_REVIEW_TIMEOUT:-45}"; fi
+  if CODEX_REVIEWER_TIMEOUT="$adapter_timeout" reviewer_cmd "$ROOT_DIR" "$schema_file" "$output_file" "$prompt_file" "$used_file" "$error_file" >/dev/null 2>&1; then
+    review_ok=true
+  fi
+  if [ "$review_ok" = true ] && [ "$(jq -r .verdict "$output_file")" = SKIP-TRUNCATED ] && [ "$sensitive_omitted" != true ]; then
+    review_ok=false
+    echo 'invalid-output: SKIP-TRUNCATED without omitted sensitive files' >> "$error_file"
   fi
 
   if [ "$review_ok" = false ]; then
@@ -452,7 +448,7 @@ EOF
       echo "- reviewer_path: unavailable"
       echo "- model: none"
       echo "- verdict: DEGRADED"
-      echo "- fallback_occurred: true"
+      echo "- fallback_occurred: false"
       echo ""
       echo "## Summary"
       echo "Reviewer path unavailable. Commit review ran in degraded advisory mode."
@@ -474,8 +470,8 @@ EOF
       --argjson mode "$GUARD_MODE" \
       --argjson enforced "$guard_enforced" \
       --arg files "$staged_files" \
-      '{timestamp:$timestamp,review_id:$review_id,review_type:$review_kind,status:$status,provider:"codex",preferred_reviewer_path:$preferred_path,preferred_model:$preferred_model,reviewer_path:"unavailable",model:"none",fallback_occurred:true,mode:$mode,enforced:$enforced,summary:"Reviewer path unavailable. Commit review ran in degraded advisory mode.",command:$command,error_file:$error_file,files:($files | split("\n") | map(select(length > 0)))}')
-    codex_append_event "$ROOT_DIR" "$event_json"
+      '{timestamp:$timestamp,review_id:$review_id,review_type:$review_kind,status:$status,provider:"codex",preferred_reviewer_path:$preferred_path,preferred_model:$preferred_model,reviewer_path:"unavailable",model:"none",fallback_occurred:false,mode:$mode,enforced:$enforced,summary:"Reviewer path unavailable. Commit review ran in degraded advisory mode.",command:$command,error_file:$error_file,files:($files | split("\n") | map(select(length > 0)))}')
+    _append_review_event "$ROOT_DIR" "$event_json"
     # Infra ≠ veredito (spec A1 item 5): o reviewer (fast ou full) falhou por
     # transporte/timeout/auth — nunca vira HOLD nem PASS fabricado.
     _guard_dark_event "reviewer-unavailable" "$review_id"
@@ -483,12 +479,7 @@ EOF
     return 0
   fi
 
-  if [ ! -s "$output_file" ] || ! jq -e '
-    (.verdict | type == "string")
-    and (.summary | type == "string")
-    and (.score | type == "number")
-    and (.issues | type == "array")
-  ' "$output_file" >/dev/null 2>&1; then
+  if ! codex_validate_review_output "$schema_file" "$output_file"; then
     used_candidate=$(cat "$used_file" 2>/dev/null || true)
     reviewer_path=$(codex_candidate_path_label "$used_candidate")
     model_name=$(codex_candidate_model_name "$used_candidate")
@@ -507,8 +498,8 @@ EOF
       --argjson mode "$GUARD_MODE" \
       --argjson enforced "$guard_enforced" \
       --arg files "$staged_files" \
-      '{timestamp:$timestamp,review_id:$review_id,review_type:$review_kind,status:$status,provider:"codex",preferred_reviewer_path:$preferred_path,preferred_model:$preferred_model,reviewer_path:$reviewer_path,model:$model,fallback_occurred:true,mode:$mode,enforced:$enforced,summary:"Reviewer returned invalid output. Commit review ran in degraded advisory mode.",command:$command,error_file:$error_file,output_file:$output_file,files:($files | split("\n") | map(select(length > 0)))}')
-    codex_append_event "$ROOT_DIR" "$event_json"
+      '{timestamp:$timestamp,review_id:$review_id,review_type:$review_kind,status:$status,provider:"codex",preferred_reviewer_path:$preferred_path,preferred_model:$preferred_model,reviewer_path:$reviewer_path,model:$model,fallback_occurred:false,mode:$mode,enforced:$enforced,summary:"Reviewer returned invalid output. Commit review ran in degraded advisory mode.",command:$command,error_file:$error_file,output_file:$output_file,files:($files | split("\n") | map(select(length > 0)))}')
+    _append_review_event "$ROOT_DIR" "$event_json"
     # Infra ≠ veredito (spec A1 item 5): a saída do reviewer não validou contra
     # o schema — trate como falha de infra, não como um veredicto qualquer.
     _guard_dark_event "invalid-output" "$review_id"
@@ -520,9 +511,11 @@ EOF
       echo "- preferred_reviewer_path: $preferred_path"
       echo "- preferred_model: $preferred_model"
       echo "- reviewer_path: $reviewer_path"
-      echo "- model: $model_name"
+      echo "- configured_model: $model_name"
+    echo "- effective_model: UNVERIFIED"
+    echo "- context_receipt: $context_receipt"
       echo "- verdict: DEGRADED"
-      echo "- fallback_occurred: true"
+      echo "- fallback_occurred: false"
       echo ""
       echo "## Summary"
       echo "Reviewer returned invalid output. Commit review ran in degraded advisory mode."
@@ -548,6 +541,7 @@ EOF
   score=$(jq -r '.score' "$output_file" 2>/dev/null || echo "0")
   issues_count=$(jq '.issues | length' "$output_file" 2>/dev/null || echo "0")
   event_status="$verdict"
+  if [ "$verdict" = COMMIT ] && [ "$(jq -r .coverage "$context_receipt")" != complete ]; then event_status=COMMIT_PARTIAL; fi
   # X3: o PORQUÊ viaja junto do veredito no evento — summary sanitizado (sem
   # aspas/quebras) e truncado a 160 chars. A próxima auditoria classifica
   # HOLDs por causa direto do JSONL, sem abrir o markdown de cada review.
@@ -561,7 +555,9 @@ EOF
     echo "- preferred_reviewer_path: $preferred_path"
     echo "- preferred_model: $preferred_model"
     echo "- reviewer_path: $reviewer_path"
-    echo "- model: $model_name"
+    echo "- configured_model: $model_name"
+    echo "- effective_model: UNVERIFIED"
+    echo "- context_receipt: $context_receipt"
     echo "- fallback_occurred: $fallback_occurred"
     echo "- verdict: $verdict"
     echo "- score: $score"
@@ -599,7 +595,7 @@ EOF
     --argjson enforced "$guard_enforced" \
     --arg files "$staged_files" \
     '{timestamp:$timestamp,review_id:$review_id,review_type:$review_kind,status:$status,provider:"codex",preferred_reviewer_path:$preferred_path,preferred_model:$preferred_model,reviewer_path:$reviewer_path,model:$model,fallback_occurred:$fallback_occurred,score:$score,issues_count:$issues,hook_duration_s:$hook_duration_s,review_tier:$review_tier,files_omitted:$files_omitted,sensitive_omitted:$sensitive_omitted,mode:$mode,enforced:$enforced,summary:$summary,command:$command,files:($files | split("\n") | map(select(length > 0)))}')
-  codex_append_event "$ROOT_DIR" "$event_json"
+  _append_review_event "$ROOT_DIR" "$event_json"
 
   # Loop-breaker: an agent retrying the same blocked commit burns tokens
   # (observed: 29 HOLD blocks in a single session). After 3 HOLDs in the same
@@ -652,7 +648,7 @@ EOF
       --arg files "$staged_files" \
       '{timestamp:$timestamp,type:"skip-truncated",review_id:$review_id,review_type:$review_kind,status:"advisory",provider:"codex",score:$score,files_omitted:$files_omitted,sensitive_omitted:$sensitive_omitted,mode:$mode,enforced:$enforced,summary:$summary,files:($files | split("\n") | map(select(length > 0)))}' 2>/dev/null) || event_json=""
     if [ -n "$event_json" ]; then
-      codex_append_event "$ROOT_DIR" "$event_json" 2>/dev/null || true
+      _append_review_event "$ROOT_DIR" "$event_json" 2>/dev/null || true
     fi
     rm -f "$hold_count_file" 2>/dev/null || true
     printf '%s\n' "Codex review: SKIP-TRUNCATED — arquivo(s) sensível(is) ficaram fora do contexto por orçamento; commit LIBERADO em modo advisory (nunca bloqueia). Detalhes: .agents/tmp/codex/latest-pre-commit-review.md (evento type=skip-truncated registrado em metrics)." >&2

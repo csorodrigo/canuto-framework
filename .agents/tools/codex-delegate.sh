@@ -36,6 +36,11 @@ fi
 
 set -uo pipefail
 
+resolve_only=0
+if [[ "${1:-}" == "--resolve-role" ]]; then
+  resolve_only=1
+  shift
+fi
 preflight_only=0
 if [[ "${1:-}" == "--preflight-only" ]]; then
   preflight_only=1
@@ -67,6 +72,7 @@ sanitize_field() {
 METRICS_FILE="${CODEX_DELEGATE_METRICS:-${CANUTO_METRICS_FILE:-$HOME/.codex/delegate-metrics.jsonl}}"
 start_epoch="$(date +%s)"
 metrics_emit() {
+  [[ $resolve_only -eq 0 ]] || return 0
   local result="$1" rc="${2:-0}" reason="${3:-}" bytes="${4:-0}" dur
   dur=$(( $(date +%s) - start_epoch ))
   python3 - "$METRICS_FILE" "$role" "${model:-unknown}" "${original_model:-${model:-unknown}}" \
@@ -275,6 +281,50 @@ elif [[ "$configured_fallback" != "none" ]]; then
   exit 64
 fi
 
+# Deadlines calibrados pelo p90 real medido (auditoria de falha de delegacao,
+# 2026-08-11: coder p90=1548s era o maior contribuinte de deadline_exceeded).
+# CODEX_DELEGATE_TIMEOUT (env) e yaml_timeout (models.yaml) continuam com
+# precedencia sobre este default -- nenhuma variavel nova foi criada, a que
+# ja existia so ganhou defaults por role mais folgados que o p90.
+case "$role" in
+  coder)     timeout_default=1800 ;;
+  architect) timeout_default=1500 ;;
+  reviewer)  timeout_default=900  ;;
+  maestro)   timeout_default=900  ;;
+  fast)      timeout_default=300  ;;
+  *)         timeout_default=900  ;;
+esac
+timeout_s="${CODEX_DELEGATE_TIMEOUT:-${yaml_timeout:-$timeout_default}}"
+if ! [[ "$timeout_s" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+  emit_executor SPAWN_FAILED true invalid_timeout >&2
+  legacy_failure SPAWN_FAILED 64
+  exit 64
+fi
+if ! python3 - "$timeout_s" <<'PY' >/dev/null 2>&1
+import sys
+raise SystemExit(0 if float(sys.argv[1]) > 0 else 1)
+PY
+then
+  emit_executor SPAWN_FAILED true invalid_timeout >&2
+  legacy_failure SPAWN_FAILED 64
+  exit 64
+fi
+
+
+# Resolução compartilhada com adapters de review: sem login, spawn ou métricas.
+if [[ $resolve_only -eq 1 ]]; then
+  python3 - "$role" "$model" "$eff" "$sandbox" "$configured_fallback" "$timeout_s" "$models_yaml_file" <<'PY_POLICY'
+import hashlib, json, pathlib, sys
+role, model, effort, sandbox, fallback, timeout, source = sys.argv[1:]
+path = pathlib.Path(source)
+print(json.dumps(dict(role=role, model=model, effort=effort, sandbox=sandbox,
+    fallback=fallback, timeout=float(timeout), source=str(path),
+    source_sha256=hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None,
+    effective_model=None, model_evidence="UNVERIFIED")))
+PY_POLICY
+  exit $?
+fi
+
 if [[ $preflight_only -eq 0 && -z "$src" ]]; then
   emit_executor SPAWN_FAILED true missing_prompt_source >&2
   legacy_failure SPAWN_FAILED 64
@@ -404,34 +454,6 @@ fi
 }
 check_capacity
 
-# Deadlines calibrados pelo p90 real medido (auditoria de falha de delegacao,
-# 2026-08-11: coder p90=1548s era o maior contribuinte de deadline_exceeded).
-# CODEX_DELEGATE_TIMEOUT (env) e yaml_timeout (models.yaml) continuam com
-# precedencia sobre este default -- nenhuma variavel nova foi criada, a que
-# ja existia so ganhou defaults por role mais folgados que o p90.
-case "$role" in
-  coder)     timeout_default=1800 ;;
-  architect) timeout_default=1500 ;;
-  reviewer)  timeout_default=900  ;;
-  maestro)   timeout_default=900  ;;
-  fast)      timeout_default=300  ;;
-  *)         timeout_default=900  ;;
-esac
-timeout_s="${CODEX_DELEGATE_TIMEOUT:-${yaml_timeout:-$timeout_default}}"
-if ! [[ "$timeout_s" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
-  emit_executor SPAWN_FAILED true invalid_timeout >&2
-  legacy_failure SPAWN_FAILED 64
-  exit 64
-fi
-if ! python3 - "$timeout_s" <<'PY' >/dev/null 2>&1
-import sys
-raise SystemExit(0 if float(sys.argv[1]) > 0 else 1)
-PY
-then
-  emit_executor SPAWN_FAILED true invalid_timeout >&2
-  legacy_failure SPAWN_FAILED 64
-  exit 64
-fi
 
 JWT_CHECK="${CODEX_DELEGATE_JWT_CHECK:-$HOME/.claude/scripts/codex-jwt-check.sh}"
 if [[ $central_routing -eq 0 && -x "$JWT_CHECK" ]]; then

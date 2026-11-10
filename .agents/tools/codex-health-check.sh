@@ -415,9 +415,9 @@ if [ "$MODE" = "full" ]; then
 
   if command -v codex >/dev/null 2>&1; then
     if [ "$REVIEWER_PROFILE_AVAILABLE" = true ]; then
-      pass "reviewer helper available (gpt-5.5, high)"
+      pass "reviewer helper available (configured role; effective model UNVERIFIED)"
     else
-      warn "reviewer helper unavailable — reviewer/maestro calls will fall back"
+      warn "reviewer helper unavailable — review not evaluated; no automatic fallback"
     fi
   fi
 fi

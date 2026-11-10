@@ -74,8 +74,8 @@ Caminho canônico:
 - **`--profile` não é lido pelo wrapper.** Vale para `codex exec` cru e para o
   app Desktop, via `~/.codex/<role>.config.toml` (perfis v2) — **não** pelos
   blocos `[profiles.*]` de `config.toml`, que o codex-cli 0.135+ ignora.
-  Exceção viva: `codex-pretool-guard.sh` usa `--profile fast` no tier degradado
-  do review de pre-commit.
+  O hook resolve o papel reviewer pelo mesmo wrapper; seu tier fast reduz só
+  o prazo e preserva read-only, schema e ausência de fallback.
 - **Nunca use `-q`** (removido no codex-cli 0.135 — causava falha instantânea).
 - Nunca `codex exec` cru para trabalho de coder: omite `-s` e herda
   `sandbox_mode="danger-full-access"` + `approval_policy="never"`.
